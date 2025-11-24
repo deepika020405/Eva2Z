@@ -16,66 +16,26 @@ class ApiService {
     private val baseUrl = KtorClient.BASE_URL
 
     suspend fun login(request: LoginRequest): LoginResponse {
-        return client.post("${baseUrl}login") {
-            contentType(ContentType.Application.Json)
-            setBody(request)
-        }.body()
-    }
+        println("🌐 API: Sending login request to ${baseUrl}login")
+        println("🌐 API: Request body: $request")
 
-
-    suspend fun getUserDevices(token: String): DeviceResponse {
-        return client.get("${baseUrl}user/devices/latest-locations") {
-            header("Authorization", token)
-        }.body()
-    }
-
-
-    suspend fun addDevice(token: String, payload: JsonObject): JsonObject {
-        return client.post("${baseUrl}add-device") {
-            header("Authorization", token)
-            contentType(ContentType.Application.Json)
-            setBody(payload)
-        }.body()
-    }
-
-
-    suspend fun updateDevice(token: String, payload: JsonObject): JsonObject {
-        return client.post("${baseUrl}update-device") {
-            header("Authorization", token)
-            contentType(ContentType.Application.Json)
-            setBody(payload)
-        }.body()
-    }
-
-
-    suspend fun getMyDevices(token: String): MyDevicesResponse {
-        return client.get("${baseUrl}devices/my-devices") {
-            header("Authorization", token)
-        }.body()
-    }
-
-
-    suspend fun deleteDevice(deviceId: String, token: String): JsonObject {
-        return client.delete("${baseUrl}api/delete-device/$deviceId") {
-            header("Authorization", token)
-        }.body()
-    }
-
-
-    suspend fun mobilizeDevice(
-        token: String,
-        terminalId: String,
-        command: String
-    ): JsonObject {
-        return client.submitForm(
-            url = "${baseUrl}api/mobilize",
-            formParameters = Parameters.build {
-                append("terminal_id", terminalId)
-                append("command", command)
+        try {
+            val response = client.post("${baseUrl}login") {
+                contentType(ContentType.Application.Json)
+                setBody(request)
             }
-        ) {
-            header("Authorization", token)
-            header("Accept", "application/json")
-        }.body()
+
+            println("🌐 API: Response status: ${response.status}")
+            val result: LoginResponse = response.body()
+            println("🌐 API: Response body: $result")
+            return result
+
+        } catch (e: Exception) {
+            println("❌ API Error: ${e.message}")
+            e.printStackTrace()
+            throw e
+        }
     }
+
+    // ... rest of your methods
 }
