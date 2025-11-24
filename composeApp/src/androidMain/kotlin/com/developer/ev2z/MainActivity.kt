@@ -13,13 +13,7 @@ class MainActivity : ComponentActivity() {
         initStorageManager(this)
 
         setContent {
-            App(
-                onLoginSuccess = {
-                    // Navigate to HomeActivity
-                    // startActivity(Intent(this, HomeActivity::class.java))
-                    // finish()
-                }
-            )
+            App()
         }
     }
 }
