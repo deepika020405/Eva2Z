@@ -1,49 +1,26 @@
+// composeApp/src/commonMain/kotlin/com/developer/ev2z/App.kt
 package com.developer.ev2z
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.safeContentPadding
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import org.jetbrains.compose.resources.painterResource
-import org.jetbrains.compose.ui.tooling.preview.Preview
-
-import eva2z_connect_multiplatform.composeapp.generated.resources.Res
-import eva2z_connect_multiplatform.composeapp.generated.resources.compose_multiplatform
+import androidx.compose.runtime.Composable
+import com.developer.ev2z.data.local.createStorageManager
+import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.repository.AuthRepository
+import com.developer.ev2z.ui.screens.AuthPagerScreen
+import com.developer.ev2z.viewmodel.AuthViewModel
 
 @Composable
-@Preview
-fun App() {
+fun App(onLoginSuccess: () -> Unit = {}) {
+    // Common setup for both platforms
+    val apiService = ApiService()
+    val repository = AuthRepository(apiService)
+    val storage = createStorageManager()
+    val viewModel = AuthViewModel(repository, storage)
+
     MaterialTheme {
-        var showContent by remember { mutableStateOf(false) }
-        Column(
-            modifier = Modifier
-                .background(MaterialTheme.colorScheme.primaryContainer)
-                .safeContentPadding()
-                .fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Button(onClick = { showContent = !showContent }) {
-                Text("Click me!")
-            }
-            AnimatedVisibility(showContent) {
-                val greeting = remember { Greeting().greet() }
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Image(painterResource(Res.drawable.compose_multiplatform), null)
-                    Text("Compose: $greeting")
-                }
-            }
-        }
+        AuthPagerScreen(
+            viewModel = viewModel,
+            onLoginSuccess = onLoginSuccess
+        )
     }
 }
