@@ -1,18 +1,18 @@
 package com.developer.ev2z.ui.screens.loginScreen
 
-import com.developer.ev2z.request.LoginRequest
-
-
-
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import com.developer.ev2z.request.LoginRequest
+import com.developer.ev2z.ui.components.CommonPhoneField
+import com.developer.ev2z.ui.components.CommonTextField
 import com.developer.ev2z.viewmodel.AuthViewModel
+import org.jetbrains.compose.ui.tooling.preview.Preview
 
+@Preview(showBackground = true)
 @Composable
 fun LoginScreen(
     viewModel: AuthViewModel,
@@ -27,7 +27,6 @@ fun LoginScreen(
 
     Column(
         modifier = Modifier
-            .fillMaxSize()
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
@@ -39,40 +38,41 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Phone Field
-        OutlinedTextField(
+        // Phone Field - Using Common Component
+        CommonPhoneField(
             value = phone,
             onValueChange = { phone = it },
-            label = { Text("Phone Number") },
-            modifier = Modifier.fillMaxWidth(),
-            prefix = { Text("+91 ") },
-            enabled = !isLoading
+            label = "Phone Number"
         )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Password Field
-        OutlinedTextField(
+        // Password Field - Using Common Component
+        CommonTextField(
             value = password,
             onValueChange = { password = it },
-            label = { Text("Password") },
-            visualTransformation = PasswordVisualTransformation(),
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !isLoading
+            label = "Password",
+            isPassword = true
         )
 
         Spacer(modifier = Modifier.height(24.dp))
 
         // Login Button
+        // Login Button mein logging add karo
         Button(
             onClick = {
+                println("🔘 Button clicked!")
+                println("🔘 Phone: $phone, Password length: ${password.length}")
+
                 val phoneNumber = "+91$phone"
+                println("🔘 Full phone number: $phoneNumber")
+
                 viewModel.login(LoginRequest(phoneNumber, password))
             },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp),
-            enabled = !isLoading && phone.isNotEmpty() && password.isNotEmpty()
+            enabled = !isLoading && phone.length == 10 && password.isNotEmpty()
         ) {
             if (isLoading) {
                 CircularProgressIndicator(
