@@ -1,47 +1,127 @@
-package com.developer.ev2z.ui.screens.auth
-
+package com.developer.ev2z.ui.screens.signupScreen
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.developer.ev2z.ui.components.CommonButton
+//import com.developer.ev2z.request.SignupRequest
 import com.developer.ev2z.ui.components.CommonPhoneField
-import com.developer.ev2z.ui.components.CommonText
 import com.developer.ev2z.ui.components.CommonTextField
-import org.jetbrains.compose.ui.tooling.preview.Preview
+import com.developer.ev2z.viewmodel.AuthViewModel
 
 @Composable
-@Preview(showBackground = true)
-fun SignupScreen() {
-
+fun SignupScreen(
+    viewModel: AuthViewModel,
+    onSignupSuccess: () -> Unit
+) {
+    var name by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var name by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+
+    val isLoading by viewModel.loading.collectAsState()
+    val signupSuccess by viewModel.signupSuccess.collectAsState()
+    val error by viewModel.error.collectAsState()
 
     Column(
-        modifier = Modifier.wrapContentSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        CommonText("Create Account ✨", style = MaterialTheme.typography.titleLarge, fontSize = 24)
+        Text(
+            text = "Create Account 🚀",
+            style = MaterialTheme.typography.headlineMedium
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        // Name Field
+        CommonTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = "Full Name"
+        )
+
         Spacer(modifier = Modifier.height(16.dp))
-        CommonTextField(value = name, onValueChange = { name = it }, label = "Name")
-        Spacer(modifier = Modifier.height(8.dp))
-        CommonPhoneField(value = phone, onValueChange = { phone = it })
-        Spacer(modifier = Modifier.height(8.dp))
-        CommonTextField(value = password, onValueChange = { password = it }, label = "Password", isPassword = true)
+
+        // Phone Field
+        CommonPhoneField(
+            value = phone,
+            onValueChange = { phone = it },
+            label = "Phone Number"
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Password Field
+        CommonTextField(
+            value = password,
+            onValueChange = { password = it },
+            label = "Password",
+            isPassword = true
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Confirm Password Field
+        CommonTextField(
+            value = confirmPassword,
+            onValueChange = { confirmPassword = it },
+            label = "Confirm Password",
+            isPassword = true
+        )
+
         Spacer(modifier = Modifier.height(24.dp))
 
-        CommonButton("Sign Up", onClick = {
-            // TODO: Handle signup click (navigate to HomeScreen)
-            // Example: navController.navigate("home")
-        }, isLoading = true)
+        // Signup Button
+        Button(
+            onClick = {
+                if (password == confirmPassword) {
+                    val phoneNumber = "+91$phone"
+//                    viewModel.signup(SignupRequest(name, phoneNumber, password))
+                } else {
+                    viewModel.setError("Passwords do not match")
+                }
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp),
+            enabled = !isLoading &&
+                    name.isNotEmpty() &&
+                    phone.length == 10 &&
+                    password.isNotEmpty() &&
+                    confirmPassword.isNotEmpty()
+        ) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            } else {
+                Text("Sign Up")
+            }
+        }
+
+        // Error Message
+        error?.let { errorMessage ->
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = errorMessage,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+    }
+
+    // Navigate on success
+    LaunchedEffect(signupSuccess) {
+        if (signupSuccess) {
+            onSignupSuccess()
+            viewModel.resetSignupSuccess()
+        }
     }
 }
