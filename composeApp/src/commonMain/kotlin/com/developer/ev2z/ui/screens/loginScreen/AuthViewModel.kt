@@ -1,6 +1,5 @@
 package com.developer.ev2z.viewmodel
 
-
 import com.developer.ev2z.request.LoginRequest
 import com.developer.ev2z.repository.AuthRepository
 import com.developer.ev2z.data.local.StorageManager
@@ -22,33 +21,53 @@ class AuthViewModel(
     private val _loginSuccess = MutableStateFlow(false)
     val loginSuccess: StateFlow<Boolean> = _loginSuccess
 
+    private val _signupSuccess = MutableStateFlow(false)
+    val signupSuccess: StateFlow<Boolean> = _signupSuccess
+
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
     fun login(request: LoginRequest) {
+        println("🔥 Login started with phone: ${request.phone}")
+
         viewModelScope.launch {
             _loading.value = true
             _error.value = null
 
             try {
+                println("🔥 Making API call...")
                 val result = repository.login(request)
+
+                println("🔥 Login successful! Token: ${result.token}")
 
                 storage.saveString("token", result.token)
                 storage.saveString("name", result.user.name)
                 storage.saveString("phone", result.user.phone)
 
                 _loginSuccess.value = true
+                println("🔥 Login success set to true")
 
             } catch (e: Exception) {
+                println("❌ Login error: ${e.message}")
+                e.printStackTrace()
                 _error.value = e.message ?: "Login failed"
             } finally {
                 _loading.value = false
+                println("🔥 Loading set to false")
             }
         }
     }
 
     fun resetLoginSuccess() {
         _loginSuccess.value = false
+    }
+
+    fun resetSignupSuccess() {
+        _signupSuccess.value = false
+    }
+
+    fun setError(message: String) {
+        _error.value = message
     }
 
     fun clearError() {
