@@ -19,13 +19,14 @@ class AuthViewModel(
     val loading: StateFlow<Boolean> = _loading
 
     private val _loginSuccess = MutableStateFlow(false)
-    val loginSuccess: StateFlow<Boolean> = _loginSuccess
+    val loginSuccess: StateFlow<Boolean> = _loginSuccess   // 🔥 FIXED: val not var
 
     private val _signupSuccess = MutableStateFlow(false)
     val signupSuccess: StateFlow<Boolean> = _signupSuccess
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
+
 
     fun login(request: LoginRequest) {
         println("🔥 Login started with phone: ${request.phone}")
@@ -44,7 +45,7 @@ class AuthViewModel(
                 storage.saveString("name", result.user.name)
                 storage.saveString("phone", result.user.phone)
 
-                _loginSuccess.value = true
+                _loginSuccess.value = true      // Login success
                 println("🔥 Login success set to true")
 
             } catch (e: Exception) {
@@ -56,6 +57,10 @@ class AuthViewModel(
                 println("🔥 Loading set to false")
             }
         }
+    }
+
+    fun setLoginSuccess(value: Boolean) {
+        _loginSuccess.value = value
     }
 
     fun resetLoginSuccess() {
