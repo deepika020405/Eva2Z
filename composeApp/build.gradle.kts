@@ -55,6 +55,8 @@ kotlin {
             implementation(libs.ktor.serialization.kotlinx.json)
             implementation(libs.ktor.client.logging)
             implementation(libs.kotlinx.serialization.json)
+
+            implementation("androidx.compose.material3:material3-window-size-class:1.4.0")
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -82,6 +84,7 @@ android {
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {
