@@ -3,33 +3,65 @@ package com.developer.ev2z
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.material3.MaterialTheme
-import com.developer.ev2z.network.ApiService
-import com.developer.ev2z.repository.AuthRepository
-import com.developer.ev2z.data.local.StorageManagerImpl
-import com.developer.ev2z.ui.screens.AuthPagerScreen
-import com.developer.ev2z.viewmodel.AuthViewModel
+import com.developer.ev2z.data.local.initStorageManager
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val apiService = ApiService()
-        val repository = AuthRepository(apiService)
-        val storage = StorageManagerImpl(this)
-        val viewModel = AuthViewModel(repository, storage)
+        // Initialize storage for Android
+        initStorageManager(this)
 
         setContent {
-            MaterialTheme {
-                AuthPagerScreen(
-                    viewModel = viewModel,
-                    onLoginSuccess = {
-                        // Navigate to HomeActivity
-                        // startActivity(Intent(this, HomeActivity::class.java))
-                        // finish()
-                    }
-                )
-            }
+            App(
+                onLoginSuccess = {
+                    // Navigate to HomeActivity
+                    // startActivity(Intent(this, HomeActivity::class.java))
+                    // finish()
+                }
+            )
         }
     }
 }
+
+
+//package com.developer.ev2z
+//
+//import android.os.Bundle
+//import androidx.activity.ComponentActivity
+//import androidx.activity.compose.setContent
+//import androidx.compose.material3.MaterialTheme
+//import com.developer.ev2z.network.ApiService
+//import com.developer.ev2z.repository.AuthRepository
+//import com.developer.ev2z.data.local.initStorageManager
+//import com.developer.ev2z.data.local.createStorageManager
+//import com.developer.ev2z.ui.screens.AuthPagerScreen
+//import com.developer.ev2z.viewmodel.AuthViewModel
+//
+//class MainActivity : ComponentActivity() {
+//    override fun onCreate(savedInstanceState: Bundle?) {
+//        super.onCreate(savedInstanceState)
+//
+//        // Initialize storage manager with context (no return value)
+//        initStorageManager(this)
+//
+//        // Create instances
+//        val apiService = ApiService()
+//        val repository = AuthRepository(apiService)
+//        val storage = createStorageManager()  // ✅ Yeh StorageManager return karta hai
+//        val viewModel = AuthViewModel(repository, storage)
+//
+//        setContent {
+//            MaterialTheme {
+//                AuthPagerScreen(
+//                    viewModel = viewModel,
+//                    onLoginSuccess = {
+//                        // Navigate to HomeActivity
+//                        // startActivity(Intent(this, HomeActivity::class.java))
+//                        // finish()
+//                    }
+//                )
+//            }
+//        }
+//    }
+//}
