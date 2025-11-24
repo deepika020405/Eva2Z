@@ -44,16 +44,16 @@ fun CommonPhoneField(
                 modifier = Modifier.padding(start = 8.dp, end = 4.dp)
             ) {
 
-                Image(
-                    painter = painterResource(Res.drawable.flag),
-                    contentDescription = "India Flag",
-                    modifier = Modifier.size(24.dp)
-                )
-
-                Spacer(modifier = Modifier.width(4.dp))
+//                Image(
+//                    painter = painterResource(Res.drawable.flag),
+//                    contentDescription = "India Flag",
+//                    modifier = Modifier.size(24.dp)
+//                )
+//
+//                Spacer(modifier = Modifier.width(4.dp))
 
                 Text(
-                    text = "+91",
+                    text = "🇮🇳 +91 ",
                     style = TextStyle(
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Medium
