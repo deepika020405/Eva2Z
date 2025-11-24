@@ -1,26 +1,28 @@
 package com.developer.ev2z.data.local
 
-class UserPrefs(private val storage: Storage) {
+class UserPrefs(private val storage: StorageManager) {  // ✅ Storage → StorageManager
 
-    suspend fun saveUser(
+    fun saveUser(
         token: String,
         name: String,
         phone: String,
         email: String?,
         photo: String?
     ) {
-        storage.putString("token", token)
-        storage.putString("name", name)
-        storage.putString("phone", phone)
-        storage.putString("email", email)
-        storage.putString("photo", photo)
+        storage.saveString("token", token)
+        storage.saveString("name", name)
+        storage.saveString("phone", phone)
+        email?.let { storage.saveString("email", it) }
+        photo?.let { storage.saveString("photo", it) }
     }
 
-    suspend fun getToken() = storage.getString("token")
-    suspend fun getName() = storage.getString("name")
-    suspend fun getPhone() = storage.getString("phone")
-    suspend fun getEmail() = storage.getString("email")
-    suspend fun getPhoto() = storage.getString("photo")
+    fun getToken() = storage.getString("token", "")
+    fun getName() = storage.getString("name", "")
+    fun getPhone() = storage.getString("phone", "")
+    fun getEmail() = storage.getString("email", "")
+    fun getPhoto() = storage.getString("photo", "")
 
-    suspend fun clear() = storage.clear()
+    fun isLoggedIn() = getToken().isNotEmpty()
+
+    fun clear() = storage.clear()
 }
