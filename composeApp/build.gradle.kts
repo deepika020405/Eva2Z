@@ -68,6 +68,8 @@ kotlin {
 
             implementation(libs.voyager.navigator)
             implementation(libs.voyager.tab.navigator)
+            implementation("androidx.compose.material3:material3-window-size-class:1.4.0")
+
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -95,6 +97,7 @@ android {
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {
