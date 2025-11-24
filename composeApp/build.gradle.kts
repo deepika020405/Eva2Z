@@ -16,7 +16,7 @@ kotlin {
             jvmTarget.set(JvmTarget.JVM_11)
         }
     }
-    
+
     listOf(
         iosArm64(),
         iosSimulatorArm64()
@@ -26,12 +26,24 @@ kotlin {
             isStatic = true
         }
     }
-    
+
     sourceSets {
         androidMain.dependencies {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
 
+            // Android-only lifecycle
+            implementation(libs.androidx.lifecycle.viewmodelCompose)
+            implementation(libs.androidx.lifecycle.runtimeCompose)
+
+            // Android-only navigation
+            implementation(libs.androidx.navigation.compose)
+
+            // Android-only Material3 (remove from commonMain)
+            implementation(libs.androidx.material3)
+            implementation(libs.androidx.material.icons.extended)
+
+            // Ktor
             implementation(libs.ktor.client.okhttp)
         }
         iosMain.dependencies {
@@ -40,21 +52,22 @@ kotlin {
         commonMain.dependencies {
             implementation(compose.runtime)
             implementation(compose.foundation)
-            implementation(compose.material3)
+            implementation(compose.material3)                  // Jetbrains MPP
             implementation(compose.ui)
+            implementation(compose.materialIconsExtended)       // Jetbrains MPP
+
             implementation(compose.components.resources)
             implementation(compose.components.uiToolingPreview)
-            implementation(libs.androidx.lifecycle.viewmodelCompose)
-            implementation(libs.androidx.lifecycle.runtimeCompose)
 
-            implementation(compose.material3)
-            implementation(compose.materialIconsExtended)
-
+            // Ktor common
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.serialization.kotlinx.json)
             implementation(libs.ktor.client.logging)
             implementation(libs.kotlinx.serialization.json)
+
+            implementation(libs.voyager.navigator)
+            implementation(libs.voyager.tab.navigator)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
