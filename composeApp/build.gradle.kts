@@ -51,7 +51,10 @@ kotlin {
 
             // Ktor
             implementation(libs.ktor.client.okhttp)
+
             implementation(libs.play.services.maps)
+
+            implementation(libs.maps.compose)
 
         }
         iosMain.dependencies {
@@ -79,6 +82,7 @@ kotlin {
 
 //            implementation(libs.components.map)
 //            implementation(libs.maplibre)
+//            implementation(libs.accompanist.pager)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
