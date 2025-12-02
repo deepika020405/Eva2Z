@@ -64,6 +64,7 @@ fun AuthPagerScreen(
             ) { page ->
                 when (page) {
                     0 -> LoginScreen(viewModel, onLoginSuccess)
+//                    1 -> SignupScreen(viewModel,onLoginSuccess)
                     1 -> SignupScreen(viewModel)
                 }
             }

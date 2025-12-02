@@ -10,6 +10,12 @@ plugins {
     kotlin("plugin.serialization") version "2.1.0"
 }
 
+repositories {
+    google()
+    mavenCentral()
+    maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
+}
+
 kotlin {
     androidTarget {
         compilerOptions {
@@ -45,6 +51,8 @@ kotlin {
 
             // Ktor
             implementation(libs.ktor.client.okhttp)
+            implementation(libs.play.services.maps)
+
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
@@ -68,8 +76,9 @@ kotlin {
 
             implementation(libs.voyager.navigator)
             implementation(libs.voyager.tab.navigator)
-            implementation("androidx.compose.material3:material3-window-size-class:1.4.0")
 
+//            implementation(libs.components.map)
+//            implementation(libs.maplibre)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
