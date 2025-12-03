@@ -367,7 +367,7 @@ fun OverviewBottomSheet(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Overview",
+                text = "Daily Overview",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -377,6 +377,9 @@ fun OverviewBottomSheet(
                     imageVector = Icons.Default.Refresh,
                     contentDescription = "Refresh",
                     modifier = Modifier.size(24.dp)
+                        .clickable {
+                            viewModel.refreshDevices()
+                        }
                 )
                 Icon(
                     imageVector = Icons.Default.Download,
@@ -402,7 +405,7 @@ fun OverviewBottomSheet(
         ) {
             StatItem("Average Speed", "${avgSpeed.toInt()} km")
             StatItem("Total Distance", "${totalDistance}km")
-            StatItem("Carbon Saved", "40,000")
+//            StatItem("Carbon Saved", "40,000")
         }
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -412,10 +415,10 @@ fun OverviewBottomSheet(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
-            ColorIndicator(response.runningCount.toString(), Color(0xFF4CAF50), "Running")
-            ColorIndicator(response.idleCount.toString(), Color(0xFFFFC107), "Ideal")
-            ColorIndicator(response.parkedCount.toString(), Color(0xFFF44336), "Parked")
-            ColorIndicator(response.offlineCount.toString(), Color(0xFFBDBDBD), "Offline")
+            ColorIndicator(response.runningCount.toString(), Color(0xFF86b071), "Running")
+            ColorIndicator(response.idleCount.toString(), Color(0xFFfcd158), "Ideal")
+            ColorIndicator(response.parkedCount.toString(), Color(0xFFfa7575), "Parked")
+            ColorIndicator(response.offlineCount.toString(), Color(0xFFe8e8e8), "Offline")
         }
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -503,12 +506,12 @@ fun StatItem(label: String, value: String) {
 fun ColorIndicator(value: String, color: Color, label: String) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(70.dp)
+        modifier = Modifier.width(80.dp)
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(50.dp)
+                .height(45.dp)
                 .background(color, RoundedCornerShape(8.dp)),
             contentAlignment = Alignment.Center
         ) {
@@ -516,17 +519,34 @@ fun ColorIndicator(value: String, color: Color, label: String) {
                 text = value,
                 color = Color.White,
                 fontWeight = FontWeight.Bold,
-                fontSize = 18.sp
+                fontSize = 22.sp
             )
         }
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = label,
-            fontSize = 11.sp,
-            color = Color.Gray
-        )
+        Spacer(modifier = Modifier.height(6.dp))
+
+        // Colored dot + label
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .background(color, CircleShape)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = label,
+                fontSize = 12.sp,
+                color = Color.DarkGray,
+                fontWeight = FontWeight.Medium
+            )
+        }
     }
 }
+
+
 
 // Platform specific map
 @Composable
@@ -537,18 +557,3 @@ expect fun PlatformMapView(
     onMarkerClick: (Device) -> Unit
 )
 
-//package com.developer.ev2z.ui.screens.homeScreen
-//
-//import androidx.compose.runtime.Composable
-//import androidx.compose.foundation.layout.fillMaxSize
-//import androidx.compose.ui.Modifier
-//
-//@Composable
-//fun HomeScreen() {
-//    PlatformMapView(
-//        modifier = Modifier.fillMaxSize(),
-//        latitude = 28.6139,
-//        longitude = 77.2090,
-//        zoom = 12.0
-//    )
-//}

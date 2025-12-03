@@ -1,3 +1,4 @@
+
 // androidMain/ui/screens/homeScreen/PlatformMapView.android.kt
 package com.developer.ev2z.ui.screens.homeScreen
 
@@ -43,7 +44,7 @@ actual fun PlatformMapView(
                         icon = com.google.android.gms.maps.model.BitmapDescriptorFactory.defaultMarker(markerColor),
                         onClick = {
                             onMarkerClick(device)
-                            true
+                            false
                         }
                     )
                 }

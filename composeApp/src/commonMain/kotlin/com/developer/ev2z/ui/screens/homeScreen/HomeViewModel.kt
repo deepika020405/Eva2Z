@@ -29,6 +29,7 @@ class HomeViewModel(
 
     private val _showOverview = MutableStateFlow(false)
     val showOverview: StateFlow<Boolean> = _showOverview.asStateFlow()
+    var isRefreshing = MutableStateFlow(false)
 
     private val _showDeviceDropdown = MutableStateFlow(false)
     val showDeviceDropdown: StateFlow<Boolean> = _showDeviceDropdown.asStateFlow()
