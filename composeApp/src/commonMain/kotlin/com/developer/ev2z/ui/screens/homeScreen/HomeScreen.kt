@@ -21,143 +21,16 @@ import androidx.compose.ui.unit.sp
 import com.developer.ev2z.data.local.model.Device
 import com.developer.ev2z.data.local.model.DeviceResponse
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.Composable
+import eva2z_connect_multiplatform.composeapp.generated.resources.Res
+import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
+import org.jetbrains.compose.resources.painterResource
+import org.jetbrains.compose.resources.DrawableResource
+import org.jetbrains.compose.resources.InternalResourceApi
 
-//@OptIn(ExperimentalMaterial3Api::class)
-//@Preview()
 
-//@Composable
-//fun HomeScreen() {
-//    var showOverview by remember { mutableStateOf(false) }
-//    var showDeviceDropdown by remember { mutableStateOf(false) }
-//    var selectedDevice by remember { mutableStateOf<Device?>(null) }
-//
-//    // API response state -ViewModel se replace karna
-//    var deviceResponse by remember { mutableStateOf<DeviceResponse?>(null) }
-//
-//    // Sample data from API response
-//    LaunchedEffect(Unit) {
-//        // Yahan API call hogi
-//        // deviceResponse = viewModel.getDevices()
-//
-//        // Temporary sample data
-//        deviceResponse = DeviceResponse(
-//            success = true,
-//            userId = 419,
-//            name = "hshsa324",
-//            totalDevices = 14,
-//            runningCount = 2,
-//            idleCount = 3,
-//            parkedCount = 0,
-//            offlineCount = 9,
-//            data = listOf(
-//                Device("0863656047642660", null, "28.244157", "80.107397", 0, "idle", "2025-12-02 08:54:39", 3),
-//                Device("0863656047487991", null, "28.603788", "77.352734", 0, "idle", "2025-12-02 08:56:41", 1),
-//                Device("0863656047491639", null, "22.707926", "75.917024", 0, "idle", "2025-12-02 08:53:15", 4),
-//                Device("0863656047548878", null, null, null, 0, "no_data", null, null),
-//                Device("08636560475488756", null, null, null, 0, "no_data", null, null),
-//                Device("0863656047646372", null, "28.396273", "77.093408", 40, "moving", "2025-12-02 08:58:09", 0),
-//                Device("456491790605", null, null, null, 0, "no_data", null, null),
-//                Device("01359097370173471", null, null, null, 0, "no_data", null, null),
-//                Device("0564891203289460", null, null, null, 0, "no_data", null, null),
-//                Device("0863656047558650", null, "28.506051", "77.069514", 0, "offline", "2025-11-21 11:20:26", 15697),
-//                Device("056585586575223", null, null, null, 0, "no_data", null, null),
-//                Device("4564917906052243", null, null, null, 0, "no_data", null, null),
-//                Device("0863656047649434", null, "28.603674", "77.352726", 0, "offline", "2025-12-02 08:08:16", 49),
-//                Device("0863656047646497", null, "28.605106", "77.359708", 14, "moving", "2025-12-02 08:58:13", 0)
-//            )
-//        )
-//    }
-//
-//    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-//
-//    deviceResponse?.let { response ->
-//        Box(modifier = Modifier.fillMaxSize()) {
-//            // Map with markers - only devices with valid locations
-//            val devicesWithLocation = response.data.filter { it.hasValidLocation() }
-//
-//            PlatformMapView(
-//                modifier = Modifier.fillMaxSize(),
-//                devices = devicesWithLocation,
-//                selectedDevice = selectedDevice,
-//                onMarkerClick = { device ->
-//                    selectedDevice = device
-//                    showOverview = true
-//                }
-//            )
-//
-//            // Top Card
-//            Column(
-//                modifier = Modifier
-//                    .fillMaxWidth()
-//                    .align(Alignment.TopCenter)
-//                    .padding(16.dp)
-//            ) {
-//                TopDeviceCard(
-//                    userName = response.name,
-//                    deviceCount = response.totalDevices,
-//                    selectedDevice = selectedDevice,
-//                    onDropdownClick = { showDeviceDropdown = !showDeviceDropdown }
-//                )
-//
-//                // Device Dropdown
-//                if (showDeviceDropdown) {
-//                    DeviceDropdownSheet(
-//                        devices = response.data,
-//                        onDeviceSelect = { device ->
-//                            selectedDevice = device
-//                            showDeviceDropdown = false
-//                            if (device.hasValidLocation()) {
-//                                showOverview = true
-//                            }
-//                        },
-//                        onAddDevice = {
-//                            // Add device action
-//                        },
-//                        onDismiss = { showDeviceDropdown = false }
-//                    )
-//                }
-//            }
-//
-//            // Overview Bottom Sheet
-//            if (showOverview) {
-//                ModalBottomSheet(
-//                    onDismissRequest = {
-//                        showOverview = false
-//                        selectedDevice = null
-//                    },
-//                    sheetState = sheetState,
-//                    containerColor = Color.White,
-//                    dragHandle = {
-//                        Box(
-//                            modifier = Modifier
-//                                .fillMaxWidth()
-//                                .padding(vertical = 12.dp),
-//                            contentAlignment = Alignment.Center
-//                        ) {
-//                            Box(
-//                                modifier = Modifier
-//                                    .width(40.dp)
-//                                    .height(4.dp)
-//                                    .background(Color.LightGray, RoundedCornerShape(2.dp))
-//                            )
-//                        }
-//                    }
-//                ) {
-//                    OverviewBottomSheet(
-//                        response = response,
-//                        onClose = { showOverview = false }
-//                    )
-//                }
-//            }
-//        }
-//    } ?: Box(
-//        modifier = Modifier.fillMaxSize(),
-//        contentAlignment = Alignment.Center
-//    ) {
-//        CircularProgressIndicator()
-//    }
-//}
-// ui/screens/homeScreen/HomeScreen.kt
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 @Preview()
@@ -275,6 +148,7 @@ fun HomeScreen(
     }
 }
 
+@OptIn(InternalResourceApi::class)
 @Composable
 fun TopDeviceCard(
     userName: String,
@@ -321,12 +195,13 @@ fun TopDeviceCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        tint = Color(0xFF4CAF50),
+                    Image(
+                        painter = painterResource(Res.drawable.app_logo),
+                        contentDescription = "App Logo",
                         modifier = Modifier.size(20.dp)
                     )
+
+
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = selectedDevice?.getDisplayName() ?: "Select Device",
