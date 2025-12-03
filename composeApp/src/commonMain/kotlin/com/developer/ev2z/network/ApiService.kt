@@ -1,14 +1,11 @@
 package com.developer.ev2z.network
 
-import com.developer.ev2z.response.DeviceResponse
-import com.developer.ev2z.response.MyDevicesResponse
+import com.developer.ev2z.data.local.model.DeviceResponse
 import com.developer.ev2z.request.LoginRequest
 import com.developer.ev2z.response.LoginResponse
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import io.ktor.client.request.forms.submitForm
 import io.ktor.http.*
-import kotlinx.serialization.json.JsonObject
 
 class ApiService {
 
@@ -28,6 +25,30 @@ class ApiService {
             println("🌐 API: Response status: ${response.status}")
             val result: LoginResponse = response.body()
             println("🌐 API: Response body: $result")
+            return result
+
+        } catch (e: Exception) {
+            println("❌ API Error: ${e.message}")
+            e.printStackTrace()
+            throw e
+        }
+    }
+
+
+    suspend fun getDevicesLatestLocations(token: String): DeviceResponse {
+        println("🌐 API: Fetching latest device locations")
+        println("🌐 API: Token: $token")
+
+        try {
+            val response = client.get("${baseUrl}user/devices/latest-locations") {
+                headers {
+                    append(HttpHeaders.Authorization, "Bearer $token")
+                }
+            }
+
+            println("🌐 API: Response status: ${response.status}")
+            val result: DeviceResponse = response.body()
+            println("🌐 API: Devices fetched: ${result.totalDevices}")
             return result
 
         } catch (e: Exception) {

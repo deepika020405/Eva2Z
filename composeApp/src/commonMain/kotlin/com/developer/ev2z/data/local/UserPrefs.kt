@@ -22,7 +22,7 @@ class UserPrefs(private val storage: StorageManager) {  // ✅ Storage → Stora
     fun getEmail() = storage.getString("email", "")
     fun getPhoto() = storage.getString("photo", "")
 
-    fun isLoggedIn() = getToken().isNotEmpty()
+    fun isLoggedIn() = getToken()?.isNotEmpty()
 
     fun clear() = storage.clear()
 }
