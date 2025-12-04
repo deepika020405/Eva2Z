@@ -230,7 +230,7 @@ actual fun AddDevice(onNavigate: (String) -> Unit, viewModel: AddDeviceViewModel
             )
 
             Text(
-                if (scanStep == 1) "Scan Device Barcode" else "Scan SIM Card QR",
+                if (scanStep == 1) "Step 1: Scan Device Barcode" else "Step 2: Scan SIM Card QR",
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(bottom = screenWidth * 0.25f),
                 style = MaterialTheme.typography.titleLarge,
@@ -633,7 +633,7 @@ actual fun AddDeviceDeteails(
         OutlinedTextField(
             value = deviceName,
             onValueChange = { deviceName = it },
-            label = { Text("Device Name") },
+            label = { Text("Enter Vehicle Name") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             shape = RoundedCornerShape(8.dp)

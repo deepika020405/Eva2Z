@@ -176,7 +176,7 @@ actual fun AddDeviceDeteails(
         OutlinedTextField(
             value = deviceName,
             onValueChange = { deviceName = it },
-            label = { Text("Device Name") },
+            label = { Text("Enter Vehicle Name") },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             shape = RoundedCornerShape(8.dp)
