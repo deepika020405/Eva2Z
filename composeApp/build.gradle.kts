@@ -55,8 +55,15 @@ kotlin {
             implementation(libs.ktor.client.okhttp)
 
             implementation(libs.play.services.maps)
-
             implementation(libs.maps.compose)
+
+            // CameraX for Android
+            implementation(libs.androidx.camera.camera2)
+            implementation(libs.androidx.camera.lifecycle)
+            implementation(libs.androidx.camera.view)
+
+            // ML Kit Barcode Scanning for Android
+            implementation(libs.barcode.scanning)
 
         }
         iosMain.dependencies {
@@ -81,6 +88,11 @@ kotlin {
 
             implementation(libs.voyager.navigator)
             implementation(libs.voyager.tab.navigator)
+
+            // ViewModel for KMP (common)
+            implementation(libs.lifecycle.viewmodel.compose.v296)
+            implementation(libs.lifecycle.runtime.compose.v296)
+
 
 //            implementation(libs.components.map)
 //            implementation(libs.maplibre)

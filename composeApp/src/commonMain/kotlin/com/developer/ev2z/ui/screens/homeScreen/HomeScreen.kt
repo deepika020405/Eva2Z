@@ -33,10 +33,10 @@ import org.jetbrains.compose.resources.InternalResourceApi
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-@Preview()
 fun HomeScreen(
     viewModel: HomeViewModel,
-    token: String // LoginResponse se milega
+    token: String,
+    onNavigateToAddDevice: () -> Unit  // ✅ Add this parameter
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val selectedDevice by viewModel.selectedDevice.collectAsState()
@@ -100,17 +100,17 @@ fun HomeScreen(
                         .padding(16.dp)
                 ) {
                     TopDeviceCard(
-                        userName = response.name,
-                        deviceCount = response.totalDevices,
+                        userName = response.name ?: "User",
+                        deviceCount = response.totalDevices ?: 0,
                         selectedDevice = selectedDevice,
                         onDropdownClick = { viewModel.toggleDeviceDropdown() }
                     )
 
                     if (showDeviceDropdown) {
                         DeviceDropdownSheet(
-                            devices = response.data,
+                            devices = response.data ?: emptyList(),
                             onDeviceSelect = { viewModel.selectDevice(it) },
-                            onAddDevice = { /* Navigate */ },
+                            onAddDevice = onNavigateToAddDevice,  // ✅ Fixed
                             onDismiss = { viewModel.toggleDeviceDropdown() }
                         )
                     }
@@ -148,7 +148,124 @@ fun HomeScreen(
     }
 }
 
+// Rest of the code stays same...
+//fun HomeScreen(
+//    viewModel: HomeViewModel,
+//    token: String // LoginResponse se milega
+//) {
+//    val uiState by viewModel.uiState.collectAsState()
+//    val selectedDevice by viewModel.selectedDevice.collectAsState()
+//    val showOverview by viewModel.showOverview.collectAsState()
+//    val showDeviceDropdown by viewModel.showDeviceDropdown.collectAsState()
+//
+//    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+//
+//    LaunchedEffect(Unit) {
+//        viewModel.loadDevices(token)
+//    }
+//
+//    when (val state = uiState) {
+//        is HomeUiState.Loading -> {
+//            Box(
+//                modifier = Modifier.fillMaxSize(),
+//                contentAlignment = Alignment.Center
+//            ) {
+//                CircularProgressIndicator()
+//            }
+//        }
+//
+//        is HomeUiState.Error -> {
+//            Box(
+//                modifier = Modifier.fillMaxSize(),
+//                contentAlignment = Alignment.Center
+//            ) {
+//                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+//                    Text(
+//                        text = "Error: ${state.message}",
+//                        color = Color.Red,
+//                        fontSize = 16.sp
+//                    )
+//                    Spacer(modifier = Modifier.height(16.dp))
+//                    Button(onClick = { viewModel.refreshDevices(token) }) {
+//                        Text("Retry")
+//                    }
+//                }
+//            }
+//        }
+//
+//        is HomeUiState.Success -> {
+//            val response = state.deviceResponse
+//
+//            Box(modifier = Modifier.fillMaxSize()) {
+//                val devicesWithLocation = response.data.filter { it.hasValidLocation() }
+//
+//                PlatformMapView(
+//                    modifier = Modifier.fillMaxSize(),
+//                    devices = devicesWithLocation,
+//                    selectedDevice = selectedDevice,
+//                    onMarkerClick = { device ->
+//                        viewModel.selectDevice(device)
+//                    }
+//                )
+//
+//                Column(
+//                    modifier = Modifier
+//                        .fillMaxWidth()
+//                        .align(Alignment.TopCenter)
+//                        .padding(16.dp)
+//                ) {
+//                    TopDeviceCard(
+//                        userName = response.name,
+//                        deviceCount = response.totalDevices,
+//                        selectedDevice = selectedDevice,
+//                        onDropdownClick = { viewModel.toggleDeviceDropdown() }
+//                    )
+//
+//                    if (showDeviceDropdown) {
+//                        DeviceDropdownSheet(
+//                            devices = response.data,
+//                            onDeviceSelect = { viewModel.selectDevice(it) },
+////                            onAddDevice = { /* Navigate */ },
+//                            onAddDevice = onNavigateToAddDevice,
+//                            onDismiss = { viewModel.toggleDeviceDropdown() }
+//                        )
+//                    }
+//                }
+//
+//                if (showOverview) {
+//                    ModalBottomSheet(
+//                        onDismissRequest = { viewModel.hideOverviewSheet() },
+//                        sheetState = sheetState,
+//                        containerColor = Color.White,
+//                        dragHandle = {
+//                            Box(
+//                                modifier = Modifier
+//                                    .fillMaxWidth()
+//                                    .padding(vertical = 12.dp),
+//                                contentAlignment = Alignment.Center
+//                            ) {
+//                                Box(
+//                                    modifier = Modifier
+//                                        .width(40.dp)
+//                                        .height(4.dp)
+//                                        .background(Color.LightGray, RoundedCornerShape(2.dp))
+//                                )
+//                            }
+//                        }
+//                    ) {
+//                        OverviewBottomSheet(
+//                            response = response,
+//                            onClose = { viewModel.hideOverviewSheet() }
+//                        )
+//                    }
+//                }
+//            }
+//        }
+//    }
+//}
+
 @OptIn(InternalResourceApi::class)
+@Preview()
 @Composable
 fun TopDeviceCard(
     userName: String,
@@ -378,7 +495,7 @@ fun OverviewBottomSheet(
                     contentDescription = "Refresh",
                     modifier = Modifier.size(24.dp)
                         .clickable {
-                            viewModel.refreshDevices()
+//                            viewModel.refreshDevices()
                         }
                 )
                 Icon(
