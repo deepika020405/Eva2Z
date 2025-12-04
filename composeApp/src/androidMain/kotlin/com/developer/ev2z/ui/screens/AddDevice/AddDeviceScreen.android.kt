@@ -45,7 +45,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
@@ -58,20 +57,21 @@ private val transprentfull = Color.Transparent
 private val primaryContainerLight = Color(0xFF00C853)
 private val iconbcakground = Color.Gray
 
-//@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+// ✅ Fixed: Added viewModel parameter
 @Composable
-actual fun BottomSheet(onNavigate: (String) -> Unit) {
-    val viewModel: AddDeviceViewModel = viewModel { AddDeviceViewModel() }
-    var currentScreen by remember { mutableStateOf("scan") } // "scan" or "details"
+actual fun BottomSheet(
+    onNavigate: (String) -> Unit,
+    viewModel: AddDeviceViewModel
+) {
+    var currentScreen by remember { mutableStateOf("scan") }
 
     when (currentScreen) {
         "details" -> {
-            // Full screen details
             AddDeviceDeteails(
                 onNavigate = { route ->
                     when (route) {
                         "home" -> onNavigate("home")
-                        "addDevice" -> currentScreen = "scan"  // Back to scan
+                        "addDevice" -> currentScreen = "scan"
                         else -> onNavigate(route)
                     }
                 },
@@ -79,7 +79,6 @@ actual fun BottomSheet(onNavigate: (String) -> Unit) {
             )
         }
         else -> {
-            // Scan screen with bottom sheet
             val sheetState = rememberBottomSheetScaffoldState()
 
             LaunchedEffect(sheetState.bottomSheetState.currentValue) {
@@ -521,6 +520,8 @@ actual fun FillDeviceDetails(
     }
 }
 
+// composeApp/src/androidMain/kotlin/com/developer/ev2z/ui/screens/AddDevice/AddDeviceScreen.android.kt
+
 @Composable
 actual fun AddDeviceDeteails(
     onNavigate: (String) -> Unit,
@@ -528,18 +529,25 @@ actual fun AddDeviceDeteails(
 ) {
     val configuration = LocalConfiguration.current
     val screenWidth = configuration.screenWidthDp.dp
+    val context = LocalContext.current
 
     var deviceName by remember { mutableStateOf("") }
     var deviceId by remember { mutableStateOf("") }
     var simNumber by remember { mutableStateOf("") }
-    var deviceType by remember { mutableStateOf("") }
+    var deviceType by remember { mutableStateOf("") } // ✅ Empty initially
     var expanded by remember { mutableStateOf(false) }
-    val deviceTypes = listOf("Wired", "Wireless")
+    val deviceTypes = listOf("Wired", "Wireless") // ✅ Capital case for display
 
     val scannedDeviceId by viewModel.scannedDeviceId.collectAsState()
     val scannedSimNumber by viewModel.scannedSimNumber.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val addDeviceResult by viewModel.addDeviceResult.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
+
+    // ✅ Get token from DataStore
+    val storage = remember { com.developer.ev2z.data.local.createStorageManager() }
+    val userPrefs = remember { com.developer.ev2z.data.local.UserPrefs(storage) }
+    val authToken = remember { userPrefs.getToken() ?: "" }
 
     LaunchedEffect(scannedDeviceId, scannedSimNumber) {
         deviceId = scannedDeviceId
@@ -547,14 +555,14 @@ actual fun AddDeviceDeteails(
     }
 
     LaunchedEffect(addDeviceResult) {
-        addDeviceResult?.let { result ->
-            result.onSuccess { message ->
-                viewModel.clearData()
-                onNavigate("home")
+        when (val result = addDeviceResult) {
+            is AddDeviceResult.Success -> {
+                println("✅ Device added successfully")
             }
-            result.onFailure { error ->
-                Log.e("AddDevice", "Error: ${error.message}")
+            is AddDeviceResult.Error -> {
+                Log.e("AddDevice", "Error: ${result.message}")
             }
+            null -> { /* No result yet */ }
         }
     }
 
@@ -631,6 +639,58 @@ actual fun AddDeviceDeteails(
             shape = RoundedCornerShape(8.dp)
         )
 
+//        Row(
+//            modifier = Modifier.fillMaxWidth(),
+//            horizontalArrangement = Arrangement.spacedBy(8.dp),
+//            verticalAlignment = Alignment.CenterVertically
+//        ) {
+//            OutlinedTextField(
+//                value = deviceId,
+//                onValueChange = { newValue ->
+//                    if (newValue.all { it.isDigit() }) {
+//                        deviceId = newValue
+//                    }
+//                },
+//                label = { Text("Device ID") },
+//                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+//                modifier = Modifier.weight(1f),
+//                singleLine = true,
+//                shape = RoundedCornerShape(8.dp)
+//            )
+//            Icon(
+//                imageVector = Icons.Outlined.Info,
+//                contentDescription = "Info",
+//                tint = Color.Black,
+//                modifier = Modifier.size(24.dp)
+//            )
+//        }
+//
+//        Row(
+//            modifier = Modifier.fillMaxWidth(),
+//            horizontalArrangement = Arrangement.spacedBy(8.dp),
+//            verticalAlignment = Alignment.CenterVertically
+//        ) {
+//            OutlinedTextField(
+//                value = simNumber,
+//                onValueChange = { newValue ->
+//                    if (newValue.matches(Regex("^[0-9]*U?$"))) {
+//                        simNumber = newValue
+//                    }
+//                },
+//                label = { Text("Sim Number") },
+//                modifier = Modifier.weight(1f),
+//                singleLine = true,
+//                shape = RoundedCornerShape(8.dp)
+//            )
+//            Icon(
+//                imageVector = Icons.Outlined.Info,
+//                contentDescription = "Info",
+//                tint = Color.Black,
+//                modifier = Modifier.size(24.dp)
+//            )
+//        }
+
+        // Device ID field with validation
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -639,7 +699,8 @@ actual fun AddDeviceDeteails(
             OutlinedTextField(
                 value = deviceId,
                 onValueChange = { newValue ->
-                    if (newValue.all { it.isDigit() }) {
+                    // ✅ Max 16 digits for Device ID
+                    if (newValue.all { it.isDigit() } && newValue.length <= 16) {
                         deviceId = newValue
                     }
                 },
@@ -647,7 +708,18 @@ actual fun AddDeviceDeteails(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.weight(1f),
                 singleLine = true,
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(8.dp),
+                // ✅ Show error if less than 15 digits
+                isError = deviceId.isNotEmpty() && deviceId.length < 15,
+                supportingText = {
+                    if (deviceId.isNotEmpty() && deviceId.length < 15) {
+                        Text(
+                            text = "Device ID must be 15-16 digits",
+                            color = Color.Red,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
             )
             Icon(
                 imageVector = Icons.Outlined.Info,
@@ -657,6 +729,7 @@ actual fun AddDeviceDeteails(
             )
         }
 
+// SIM Number field with validation
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -665,14 +738,29 @@ actual fun AddDeviceDeteails(
             OutlinedTextField(
                 value = simNumber,
                 onValueChange = { newValue ->
-                    if (newValue.matches(Regex("^[0-9]*U?$"))) {
-                        simNumber = newValue
+                    // ✅ Max 20 digits + 'U' for SIM Number
+                    val withoutU = newValue.removeSuffix("U")
+                    if (withoutU.all { it.isDigit() } && withoutU.length <= 20) {
+                        if (newValue.matches(Regex("^[0-9]*U?$"))) {
+                            simNumber = newValue
+                        }
                     }
                 },
                 label = { Text("Sim Number") },
                 modifier = Modifier.weight(1f),
                 singleLine = true,
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(8.dp),
+                // ✅ Show error if less than 19 digits (excluding U)
+                isError = simNumber.isNotEmpty() && simNumber.removeSuffix("U").length < 19,
+                supportingText = {
+                    if (simNumber.isNotEmpty() && simNumber.removeSuffix("U").length < 19) {
+                        Text(
+                            text = "SIM Number must be 19-20 digits",
+                            color = Color.Red,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
             )
             Icon(
                 imageVector = Icons.Outlined.Info,
@@ -682,34 +770,53 @@ actual fun AddDeviceDeteails(
             )
         }
 
+        // ✅ Better looking dropdown
         ExposedDropdownMenuBox(
             expanded = expanded,
-            onExpandedChange = { expanded = !expanded }
+            onExpandedChange = { expanded = !expanded },
+            modifier = Modifier.fillMaxWidth()
         ) {
             OutlinedTextField(
                 value = deviceType,
                 onValueChange = {},
                 readOnly = true,
                 label = { Text("Device Type") },
+                placeholder = { Text("Select device type", color = Color.Gray) },
                 trailingIcon = {
                     ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
                 },
-                modifier = Modifier.menuAnchor().fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = primaryContainerLight,
+                    unfocusedBorderColor = Color.Gray
+                ),
+                modifier = Modifier
+                    .menuAnchor()
+                    .fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp)
             )
 
             ExposedDropdownMenu(
                 expanded = expanded,
-                onDismissRequest = { expanded = false }
+                onDismissRequest = { expanded = false },
+                modifier = Modifier.background(Color.White)
             ) {
                 deviceTypes.forEach { type ->
                     DropdownMenuItem(
-                        text = { Text(type) },
+                        text = {
+                            Text(
+                                text = type,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        },
                         onClick = {
                             deviceType = type
                             expanded = false
-                        }
+                        },
+                        modifier = Modifier.fillMaxWidth()
                     )
+                    if (type != deviceTypes.last()) {
+                        Divider(color = Color.LightGray, thickness = 0.5.dp)
+                    }
                 }
             }
         }
@@ -720,6 +827,17 @@ actual fun AddDeviceDeteails(
             style = MaterialTheme.typography.bodySmall,
             textAlign = TextAlign.Center
         )
+
+        // ✅ Show error message
+        errorMessage?.let { error ->
+            Text(
+                text = error,
+                color = Color.Red,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+        }
 
         Row(
             Modifier.fillMaxWidth(),
@@ -736,24 +854,97 @@ actual fun AddDeviceDeteails(
 
             Spacer(Modifier.width(16.dp))
 
+//            Button(
+//                onClick = {
+//                    // ✅ Check all fields including deviceType
+//                    if (deviceName.isNotEmpty() &&
+//                        deviceId.isNotEmpty() &&
+//                        simNumber.isNotEmpty() &&
+//                        deviceType.isNotEmpty()) {
+//
+//                        println("🔹 Calling addDevice API")
+//                        println("🔹 Token: Bearer $authToken")
+//                        println("🔹 Device Name: $deviceName")
+//                        println("🔹 Device ID: $deviceId")
+//                        println("🔹 SIM Number: $simNumber")
+//                        println("🔹 Device Type: $deviceType")
+//
+//                        viewModel.addDevice(
+//                            token = authToken,
+//                            deviceName = deviceName,
+//                            deviceId = deviceId,
+//                            simNumber = simNumber,
+//                            deviceType = deviceType.lowercase() // ✅ Send as lowercase
+//                        )
+//                    } else {
+//                        println("❌ Please fill all fields")
+//                    }
+//                },
+//                // ✅ Enable only when ALL fields are filled
+//                enabled = !isLoading &&
+//                        deviceName.isNotEmpty() &&
+//                        deviceId.isNotEmpty() &&
+//                        simNumber.isNotEmpty() &&
+//                        deviceType.isNotEmpty(),
+//                modifier = Modifier.weight(0.7f),
+//                colors = ButtonDefaults.buttonColors(containerColor = primaryContainerLight),
+//                shape = RoundedCornerShape(100.dp)
+//            ) {
+//                Text(
+//                    text = if (isLoading) "Adding..." else "Add Device",
+//                    color = Color.White
+//                )
+//            }
             Button(
                 onClick = {
-                    if (deviceName.isNotEmpty() && deviceId.isNotEmpty() && simNumber.isNotEmpty()) {
+                    // ✅ Validate all fields including length
+                    val isDeviceIdValid = deviceId.length in 15..16
+                    val isSimNumberValid = simNumber.removeSuffix("U").length in 19..20
+
+                    if (deviceName.isNotEmpty() &&
+                        deviceId.isNotEmpty() &&
+                        simNumber.isNotEmpty() &&
+                        deviceType.isNotEmpty() &&
+                        isDeviceIdValid &&
+                        isSimNumberValid) {
+
+                        println("🔹 Calling addDevice API")
+                        println("🔹 Token: Bearer $authToken")
+                        println("🔹 Device Name: $deviceName")
+                        println("🔹 Device ID: $deviceId (${deviceId.length} digits)")
+                        println("🔹 SIM Number: $simNumber (${simNumber.removeSuffix("U").length} digits)")
+                        println("🔹 Device Type: $deviceType")
+
                         viewModel.addDevice(
-                            token = "YOUR_TOKEN_HERE",
+                            token = authToken,
                             deviceName = deviceName,
                             deviceId = deviceId,
-                            simNumber = simNumber
+                            simNumber = simNumber,
+                            deviceType = deviceType.lowercase()
                         )
+                    } else {
+                        when {
+                            deviceName.isEmpty() -> println("❌ Device name is empty")
+                            deviceId.isEmpty() -> println("❌ Device ID is empty")
+                            !isDeviceIdValid -> println("❌ Device ID must be 15-16 digits")
+                            simNumber.isEmpty() -> println("❌ SIM number is empty")
+                            !isSimNumberValid -> println("❌ SIM number must be 19-20 digits")
+                            deviceType.isEmpty() -> println("❌ Device type not selected")
+                        }
                     }
                 },
-                enabled = !isLoading && deviceName.isNotEmpty() && deviceId.isNotEmpty() && simNumber.isNotEmpty(),
+                // ✅ Enable only when ALL validations pass
+                enabled = !isLoading &&
+                        deviceName.isNotEmpty() &&
+                        deviceId.length in 15..16 &&
+                        simNumber.removeSuffix("U").length in 19..20 &&
+                        deviceType.isNotEmpty(),
                 modifier = Modifier.weight(0.7f),
                 colors = ButtonDefaults.buttonColors(containerColor = primaryContainerLight),
                 shape = RoundedCornerShape(100.dp)
             ) {
                 Text(
-                    text = if (isLoading) "Adding.." else "Add Device",
+                    text = if (isLoading) "Adding..." else "Add Device",
                     color = Color.White
                 )
             }

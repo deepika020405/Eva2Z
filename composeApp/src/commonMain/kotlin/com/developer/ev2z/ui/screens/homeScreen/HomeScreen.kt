@@ -1,4 +1,4 @@
-// commonMain/ui/screens/homeScreen/HomeScreen.kt
+// composeApp/src/commonMain/kotlin/com/developer/ev2z/ui/screens/homeScreen/HomeScreen.kt
 package com.developer.ev2z.ui.screens.homeScreen
 
 import androidx.compose.foundation.background
@@ -27,16 +27,14 @@ import androidx.compose.runtime.Composable
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
 import org.jetbrains.compose.resources.painterResource
-import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.InternalResourceApi
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
     token: String,
-    onNavigateToAddDevice: () -> Unit  // ✅ Add this parameter
+    onNavigateToAddDevice: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val selectedDevice by viewModel.selectedDevice.collectAsState()
@@ -46,6 +44,7 @@ fun HomeScreen(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
 
     LaunchedEffect(Unit) {
+        println("🏠 HomeScreen: Loading devices with token")
         viewModel.loadDevices(token)
     }
 
@@ -103,14 +102,24 @@ fun HomeScreen(
                         userName = response.name ?: "User",
                         deviceCount = response.totalDevices ?: 0,
                         selectedDevice = selectedDevice,
-                        onDropdownClick = { viewModel.toggleDeviceDropdown() }
+                        onDropdownClick = {
+                            println("🔽 Dropdown clicked")
+                            viewModel.toggleDeviceDropdown()
+                        }
                     )
 
                     if (showDeviceDropdown) {
                         DeviceDropdownSheet(
                             devices = response.data ?: emptyList(),
-                            onDeviceSelect = { viewModel.selectDevice(it) },
-                            onAddDevice = onNavigateToAddDevice,  // ✅ Fixed
+                            onDeviceSelect = {
+                                viewModel.selectDevice(it)
+                                viewModel.toggleDeviceDropdown()
+                            },
+                            onAddDevice = {
+                                println("➕ Add Device clicked from dropdown")
+                                viewModel.toggleDeviceDropdown()
+                                onNavigateToAddDevice()
+                            },
                             onDismiss = { viewModel.toggleDeviceDropdown() }
                         )
                     }
@@ -148,124 +157,7 @@ fun HomeScreen(
     }
 }
 
-// Rest of the code stays same...
-//fun HomeScreen(
-//    viewModel: HomeViewModel,
-//    token: String // LoginResponse se milega
-//) {
-//    val uiState by viewModel.uiState.collectAsState()
-//    val selectedDevice by viewModel.selectedDevice.collectAsState()
-//    val showOverview by viewModel.showOverview.collectAsState()
-//    val showDeviceDropdown by viewModel.showDeviceDropdown.collectAsState()
-//
-//    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-//
-//    LaunchedEffect(Unit) {
-//        viewModel.loadDevices(token)
-//    }
-//
-//    when (val state = uiState) {
-//        is HomeUiState.Loading -> {
-//            Box(
-//                modifier = Modifier.fillMaxSize(),
-//                contentAlignment = Alignment.Center
-//            ) {
-//                CircularProgressIndicator()
-//            }
-//        }
-//
-//        is HomeUiState.Error -> {
-//            Box(
-//                modifier = Modifier.fillMaxSize(),
-//                contentAlignment = Alignment.Center
-//            ) {
-//                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-//                    Text(
-//                        text = "Error: ${state.message}",
-//                        color = Color.Red,
-//                        fontSize = 16.sp
-//                    )
-//                    Spacer(modifier = Modifier.height(16.dp))
-//                    Button(onClick = { viewModel.refreshDevices(token) }) {
-//                        Text("Retry")
-//                    }
-//                }
-//            }
-//        }
-//
-//        is HomeUiState.Success -> {
-//            val response = state.deviceResponse
-//
-//            Box(modifier = Modifier.fillMaxSize()) {
-//                val devicesWithLocation = response.data.filter { it.hasValidLocation() }
-//
-//                PlatformMapView(
-//                    modifier = Modifier.fillMaxSize(),
-//                    devices = devicesWithLocation,
-//                    selectedDevice = selectedDevice,
-//                    onMarkerClick = { device ->
-//                        viewModel.selectDevice(device)
-//                    }
-//                )
-//
-//                Column(
-//                    modifier = Modifier
-//                        .fillMaxWidth()
-//                        .align(Alignment.TopCenter)
-//                        .padding(16.dp)
-//                ) {
-//                    TopDeviceCard(
-//                        userName = response.name,
-//                        deviceCount = response.totalDevices,
-//                        selectedDevice = selectedDevice,
-//                        onDropdownClick = { viewModel.toggleDeviceDropdown() }
-//                    )
-//
-//                    if (showDeviceDropdown) {
-//                        DeviceDropdownSheet(
-//                            devices = response.data,
-//                            onDeviceSelect = { viewModel.selectDevice(it) },
-////                            onAddDevice = { /* Navigate */ },
-//                            onAddDevice = onNavigateToAddDevice,
-//                            onDismiss = { viewModel.toggleDeviceDropdown() }
-//                        )
-//                    }
-//                }
-//
-//                if (showOverview) {
-//                    ModalBottomSheet(
-//                        onDismissRequest = { viewModel.hideOverviewSheet() },
-//                        sheetState = sheetState,
-//                        containerColor = Color.White,
-//                        dragHandle = {
-//                            Box(
-//                                modifier = Modifier
-//                                    .fillMaxWidth()
-//                                    .padding(vertical = 12.dp),
-//                                contentAlignment = Alignment.Center
-//                            ) {
-//                                Box(
-//                                    modifier = Modifier
-//                                        .width(40.dp)
-//                                        .height(4.dp)
-//                                        .background(Color.LightGray, RoundedCornerShape(2.dp))
-//                                )
-//                            }
-//                        }
-//                    ) {
-//                        OverviewBottomSheet(
-//                            response = response,
-//                            onClose = { viewModel.hideOverviewSheet() }
-//                        )
-//                    }
-//                }
-//            }
-//        }
-//    }
-//}
-
 @OptIn(InternalResourceApi::class)
-@Preview()
 @Composable
 fun TopDeviceCard(
     userName: String,
@@ -280,7 +172,6 @@ fun TopDeviceCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            // Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -301,7 +192,6 @@ fun TopDeviceCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Select Device Dropdown
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -317,8 +207,6 @@ fun TopDeviceCard(
                         contentDescription = "App Logo",
                         modifier = Modifier.size(20.dp)
                     )
-
-
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = selectedDevice?.getDisplayName() ?: "Select Device",
@@ -362,7 +250,6 @@ fun DeviceDropdownSheet(
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
-            // Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -386,7 +273,6 @@ fun DeviceDropdownSheet(
 
             Divider()
 
-            // Device List
             LazyColumn(
                 modifier = Modifier.weight(1f)
             ) {
@@ -398,7 +284,6 @@ fun DeviceDropdownSheet(
                 }
             }
 
-            // Add Device Button
             Button(
                 onClick = onAddDevice,
                 modifier = Modifier
@@ -432,7 +317,6 @@ fun DeviceListItem(device: Device, onClick: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Status Dot
         Box(
             modifier = Modifier
                 .size(8.dp)
@@ -468,7 +352,6 @@ fun OverviewBottomSheet(
     response: DeviceResponse,
     onClose: () -> Unit
 ) {
-    // Calculate total stats
     val totalDistance = response.data.sumOf { (it.speed * (it.lastSeenMinutesAgo ?: 0)).toLong() }
     val avgSpeed = response.data.filter { it.speed > 0 }.map { it.speed }.average().takeIf { !it.isNaN() } ?: 0.0
 
@@ -477,7 +360,6 @@ fun OverviewBottomSheet(
             .fillMaxWidth()
             .padding(16.dp)
     ) {
-        // Header
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -494,9 +376,6 @@ fun OverviewBottomSheet(
                     imageVector = Icons.Default.Refresh,
                     contentDescription = "Refresh",
                     modifier = Modifier.size(24.dp)
-                        .clickable {
-//                            viewModel.refreshDevices()
-                        }
                 )
                 Icon(
                     imageVector = Icons.Default.Download,
@@ -515,19 +394,16 @@ fun OverviewBottomSheet(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Stats Row
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             StatItem("Average Speed", "${avgSpeed.toInt()} km")
             StatItem("Total Distance", "${totalDistance}km")
-//            StatItem("Carbon Saved", "40,000")
         }
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Color Indicators
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly
@@ -540,14 +416,12 @@ fun OverviewBottomSheet(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Device List - show only devices with location
         response.data.filter { it.hasValidLocation() }.forEach { device ->
             DeviceOverviewItem(device)
         }
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // See All
         Text(
             text = "See All",
             color = Color(0xFF4CAF50),
@@ -641,7 +515,6 @@ fun ColorIndicator(value: String, color: Color, label: String) {
         }
         Spacer(modifier = Modifier.height(6.dp))
 
-        // Colored dot + label
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center,
@@ -663,9 +536,6 @@ fun ColorIndicator(value: String, color: Color, label: String) {
     }
 }
 
-
-
-// Platform specific map
 @Composable
 expect fun PlatformMapView(
     modifier: Modifier,
@@ -673,4 +543,3 @@ expect fun PlatformMapView(
     selectedDevice: Device?,
     onMarkerClick: (Device) -> Unit
 )
-

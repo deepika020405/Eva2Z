@@ -1,15 +1,22 @@
+// composeApp/src/commonMain/kotlin/com/developer/ev2z/ui/screens/AddDevice/AddDeviceScreen.kt
 package com.developer.ev2z.ui.screens.AddDevice
 
 import androidx.compose.runtime.Composable
 
-
-// Navigation callback type
 typealias NavigationCallback = (String) -> Unit
+
+// ✅ Added viewModel parameter
 @Composable
-expect fun BottomSheet(onNavigate: NavigationCallback)
+expect fun BottomSheet(
+    onNavigate: NavigationCallback,
+    viewModel: AddDeviceViewModel
+)
 
 @Composable
-expect fun AddDevice(onNavigate: (String) -> Unit, viewModel: AddDeviceViewModel)
+expect fun AddDevice(
+    onNavigate: NavigationCallback,
+    viewModel: AddDeviceViewModel
+)
 
 @Composable
 expect fun OpenCamera(
@@ -38,6 +45,7 @@ expect fun FillDeviceDetails(
     onResult: (String) -> Unit
 )
 
+// ✅ Fixed name to match Android
 @Composable
 expect fun AddDeviceDeteails(
     onNavigate: NavigationCallback,

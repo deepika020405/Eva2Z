@@ -22,7 +22,10 @@ import com.developer.ev2z.ui.screens.homeScreen.HomeViewModel
 import com.developer.ev2z.viewmodel.AuthViewModel
 import com.developer.ev2z.navigation.HomeNavGraph
 import com.developer.ev2z.repository.HomeRepository
+import com.developer.ev2z.ui.screens.AddDevice.AddDeviceViewModel
+import com.developer.ev2z.ui.screens.AddDevice.AddDeviceResult
 import com.developer.ev2z.ui.screens.AddDevice.BottomSheet
+import com.developer.ev2z.ui.screens.AddDeviceSuccess.AddDeviceSuccessScreen
 import kotlinx.coroutines.delay
 
 @Composable
@@ -34,15 +37,26 @@ fun App() {
     val userPrefs = remember { UserPrefs(storage) }
     val authViewModel = remember { AuthViewModel(authRepository, storage) }
     val homeViewModel = remember { HomeViewModel(homeRepository) }
+    val addDeviceViewModel = remember { AddDeviceViewModel() }
 
     var isLoading by remember { mutableStateOf(true) }
     var isLoggedIn by remember { mutableStateOf(false) }
     var authToken by remember { mutableStateOf("") }
     var showAddDevice by remember { mutableStateOf(false) }
+    var showAddDeviceSuccess by remember { mutableStateOf(false) }
+
+    // Success screen data
+    var successDeviceName by remember { mutableStateOf("") }
+    var successDeviceId by remember { mutableStateOf("") }
+    var successSimNumber by remember { mutableStateOf("") }
+    var successDeviceType by remember { mutableStateOf("") } // ✅ Added this line
 
     val loginSuccess by authViewModel.loginSuccess.collectAsState()
+    val addDeviceResult by addDeviceViewModel.addDeviceResult.collectAsState()
 
+    // Initial load
     LaunchedEffect(Unit) {
+        println("🚀 App: Starting initial load")
         delay(2000)
         isLoggedIn = userPrefs.isLoggedIn() == true
         if (isLoggedIn) {
@@ -52,11 +66,31 @@ fun App() {
         isLoading = false
     }
 
+    // Login success handler
     LaunchedEffect(loginSuccess) {
         if (loginSuccess) {
             authToken = userPrefs.getToken() ?: ""
             isLoggedIn = authToken.isNotEmpty()
             println("✅ Login successful! Token: $authToken")
+        }
+    }
+
+    // AddDevice result handler
+    LaunchedEffect(addDeviceResult) {
+        when (val result = addDeviceResult) {
+            is AddDeviceResult.Success -> {
+                println("✅ Device added successfully, showing success screen")
+                successDeviceName = result.deviceName
+                successDeviceId = result.deviceId
+                successSimNumber = result.simNumber
+                successDeviceType = result.deviceType
+                showAddDevice = false
+                showAddDeviceSuccess = true
+            }
+            is AddDeviceResult.Error -> {
+                println("❌ Device add error: ${result.message}")
+            }
+            null -> { /* No result */ }
         }
     }
 
@@ -66,30 +100,52 @@ fun App() {
                 SplashScreen()
             }
 
+            showAddDeviceSuccess -> {
+                println("📱 Rendering: Success Screen")
+                AddDeviceSuccessScreen(
+                    onNavigate = { route ->
+                        when (route) {
+                            "home" -> {
+                                println("🏠 Navigating back to home from success")
+                                showAddDeviceSuccess = false
+                                addDeviceViewModel.clearData()
+                                homeViewModel.loadDevices(authToken)
+                            }
+                        }
+                    },
+                    deviceName = successDeviceName,
+                    deviceId = successDeviceId,
+                    simNumber = successSimNumber,
+                    deviceType = successDeviceType
+                )
+            }
+
             showAddDevice -> {
+                println("📱 Rendering: Add Device Screen")
                 BottomSheet(
                     onNavigate = { route ->
                         when (route) {
-                            "home" -> showAddDevice = false
-                            "addDeviceDeteails" -> {
-                                // Stay on add device screen
+                            "home" -> {
+                                println("🏠 Navigating back to home from add device")
+                                showAddDevice = false
+                                addDeviceViewModel.clearData()
                             }
-                            else -> {
-                                if (route.startsWith("addDeviceSuccess")) {
-                                    showAddDevice = false
-                                    homeViewModel.loadDevices(authToken)
-                                }
+                            "addDeviceDeteails" -> {
+                                println("📝 Staying on add device details")
                             }
                         }
-                    }
+                    },
+                    viewModel = addDeviceViewModel
                 )
             }
 
             isLoggedIn && authToken.isNotEmpty() -> {
+                println("📱 Rendering: Home Screen")
                 HomeNavGraph(
                     viewModel = homeViewModel,
                     token = authToken,
                     onNavigateToAddDevice = {
+                        println("➕ Navigate to Add Device triggered")
                         showAddDevice = true
                     },
                     onLogout = {
@@ -103,6 +159,7 @@ fun App() {
             }
 
             else -> {
+                println("📱 Rendering: Auth Screen")
                 AuthPagerScreen(
                     viewModel = authViewModel,
                     onLoginSuccess = {
