@@ -1,4 +1,81 @@
 // composeApp/src/iosMain/kotlin/com/developer/ev2z/ui/screens/AddDevice/AddDeviceScreen.ios.kt
+@file:OptIn(ExperimentalMaterial3Api::class)
+
+package com.developer.ev2z.ui.screens.AddDevice
+
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardBackspace
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+
+@Composable
+actual fun BottomSheet(
+    onNavigate: (String) -> Unit,
+    viewModel: AddDeviceViewModel
+) {
+    // iOS simple implementation
+    AddDeviceDeteails(onNavigate, viewModel)
+}
+
+@Composable
+actual fun AddDevice(
+    onNavigate: (String) -> Unit,
+    viewModel: AddDeviceViewModel
+) {
+    // iOS camera implementation placeholder
+    Box(modifier = Modifier.fillMaxSize()) {
+        Text("Camera scanning - iOS implementation pending")
+    }
+}
+
+@Composable
+actual fun OpenCamera(
+    scanStep: Int,
+    onBarcodeDetected: (String) -> Unit
+) {
+    // iOS camera placeholder
+}
+
+actual fun ScanBarcode(
+    scanner: Any,
+    imageProxy: Any,
+    scanStep: Int,
+    onBarcodeDetected: (String) -> Unit
+) {
+    // iOS barcode scanning placeholder
+}
+
+actual fun ProcessBarcodeData(
+    data: String,
+    format: Int,
+    scanStep: Int,
+    onBarcodeDetected: (String) -> Unit
+) {
+    // iOS barcode processing placeholder
+}
+
+actual fun FillDeviceDetails(
+    imageUri: Any,
+    context: Any,
+    scanStep: Int,
+    onResult: (String) -> Unit
+) {
+    // iOS gallery picking placeholder
+}
 
 @Composable
 actual fun AddDeviceDeteails(
@@ -30,7 +107,7 @@ actual fun AddDeviceDeteails(
     LaunchedEffect(addDeviceResult) {
         when (val result = addDeviceResult) {
             is AddDeviceResult.Success -> {
-                println("✅ Device added successfully")
+                println("✅ Device added successfully (iOS)")
             }
             is AddDeviceResult.Error -> {
                 println("❌ Error: ${result.message}")
@@ -48,7 +125,6 @@ actual fun AddDeviceDeteails(
         verticalArrangement = Arrangement.spacedBy(24.dp),
         horizontalAlignment = Alignment.Start,
     ) {
-        // Back button
         IconButton(
             onClick = { onNavigate("home") },
             modifier = Modifier
@@ -64,7 +140,6 @@ actual fun AddDeviceDeteails(
             )
         }
 
-        // Header
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -98,7 +173,6 @@ actual fun AddDeviceDeteails(
             }
         }
 
-        // Device Name
         OutlinedTextField(
             value = deviceName,
             onValueChange = { deviceName = it },
@@ -108,7 +182,6 @@ actual fun AddDeviceDeteails(
             shape = RoundedCornerShape(8.dp)
         )
 
-        // Device ID with validation
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -145,7 +218,6 @@ actual fun AddDeviceDeteails(
             )
         }
 
-        // SIM Number with validation
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -184,7 +256,6 @@ actual fun AddDeviceDeteails(
             )
         }
 
-        // Device Type dropdown
         ExposedDropdownMenuBox(
             expanded = expanded,
             onExpandedChange = { expanded = !expanded },
@@ -242,7 +313,6 @@ actual fun AddDeviceDeteails(
             textAlign = TextAlign.Center
         )
 
-        // Error message
         errorMessage?.let { error ->
             Text(
                 text = error,
@@ -253,7 +323,6 @@ actual fun AddDeviceDeteails(
             )
         }
 
-        // Buttons
         Row(
             Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -275,19 +344,11 @@ actual fun AddDeviceDeteails(
                     val isSimNumberValid = simNumber.removeSuffix("U").length in 19..20
 
                     if (deviceName.isNotEmpty() &&
-                        deviceId.isNotEmpty() &&
-                        simNumber.isNotEmpty() &&
-                        deviceType.isNotEmpty() &&
                         isDeviceIdValid &&
-                        isSimNumberValid) {
+                        isSimNumberValid &&
+                        deviceType.isNotEmpty()) {
 
                         println("🔹 Calling addDevice API (iOS)")
-                        println("🔹 Token: Bearer $authToken")
-                        println("🔹 Device Name: $deviceName")
-                        println("🔹 Device ID: $deviceId")
-                        println("🔹 SIM Number: $simNumber")
-                        println("🔹 Device Type: $deviceType")
-
                         viewModel.addDevice(
                             token = authToken,
                             deviceName = deviceName,
@@ -295,8 +356,6 @@ actual fun AddDeviceDeteails(
                             simNumber = simNumber,
                             deviceType = deviceType.lowercase()
                         )
-                    } else {
-                        println("❌ Validation failed (iOS)")
                     }
                 },
                 enabled = !isLoading &&
