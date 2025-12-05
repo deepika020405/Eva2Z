@@ -206,13 +206,12 @@ private fun processCameraFrame(
 ) {
     CMSampleBufferGetImageBuffer(sampleBuffer)?.let { pixelBuffer ->
         val request = VNDetectBarcodesRequest { vnRequest, _ ->
-            vnRequest?.results?.let { results ->
-                for (i in 0 until results.count().toInt()) {
-                    val observation = results.objectAtIndex(i.toULong()) as? VNBarcodeObservation
-                    observation?.payloadStringValue?.let { data ->
-                        val isQR = observation.symbology == VNBarcodeSymbologyQR
-                        extractBarcodeData(data, isQR, scanStep, onBarcodeDetected)
-                    }
+            val results = vnRequest?.results as? List<*>
+            results?.forEach { result ->
+                val observation = result as? VNBarcodeObservation
+                observation?.payloadStringValue?.let { data ->
+                    val isQR = observation.symbology == VNBarcodeSymbologyQR
+                    extractBarcodeData(data, isQR, scanStep, onBarcodeDetected)
                 }
             }
         }
@@ -233,29 +232,28 @@ private fun processImageForBarcode(
 ) {
     image.CGImage?.let { cgImage ->
         val request = VNDetectBarcodesRequest { vnRequest, _ ->
-            vnRequest?.results?.let { results ->
-                for (i in 0 until results.count().toInt()) {
-                    val observation = results.objectAtIndex(i.toULong()) as? VNBarcodeObservation
-                    observation?.payloadStringValue?.let { data ->
-                        val isQR = observation.symbology == VNBarcodeSymbologyQR
-                        when (scanStep) {
-                            1 -> {
-                                if (!isQR) {
-                                    val deviceId = data.replace(Regex("[^0-9]"), "")
-                                    if (deviceId.isNotEmpty()) {
-                                        viewModel.setDeviceId(deviceId)
-                                    }
+            val results = vnRequest?.results as? List<*>
+            results?.forEach { result ->
+                val observation = result as? VNBarcodeObservation
+                observation?.payloadStringValue?.let { data ->
+                    val isQR = observation.symbology == VNBarcodeSymbologyQR
+                    when (scanStep) {
+                        1 -> {
+                            if (!isQR) {
+                                val deviceId = data.replace(Regex("[^0-9]"), "")
+                                if (deviceId.isNotEmpty()) {
+                                    viewModel.setDeviceId(deviceId)
                                 }
                             }
-                            2 -> {
-                                if (isQR) {
-                                    val simNoRegex = Regex("""simNo="([^"]+)"""")
-                                    val match = simNoRegex.find(data)
-                                    val simNumber = match?.groups?.get(1)?.value ?: data
-                                    val cleanSim = simNumber.removeSuffix("U")
-                                    if (cleanSim.isNotEmpty()) {
-                                        viewModel.setSimNumber(cleanSim + "U")
-                                    }
+                        }
+                        2 -> {
+                            if (isQR) {
+                                val simNoRegex = Regex("""simNo="([^"]+)"""")
+                                val match = simNoRegex.find(data)
+                                val simNumber = match?.groups?.get(1)?.value ?: data
+                                val cleanSim = simNumber.removeSuffix("U")
+                                if (cleanSim.isNotEmpty()) {
+                                    viewModel.setSimNumber(cleanSim + "U")
                                 }
                             }
                         }
