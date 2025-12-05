@@ -5,7 +5,6 @@ import androidx.compose.runtime.Composable
 
 typealias NavigationCallback = (String) -> Unit
 
-// ✅ Added viewModel parameter
 @Composable
 expect fun BottomSheet(
     onNavigate: NavigationCallback,
@@ -18,6 +17,13 @@ expect fun AddDevice(
     viewModel: AddDeviceViewModel
 )
 
+@Composable
+expect fun AddDeviceDeteails(
+    onNavigate: NavigationCallback,
+    viewModel: AddDeviceViewModel
+)
+
+// ✅ Platform-specific camera functions
 @Composable
 expect fun OpenCamera(
     scanStep: Int,
@@ -43,11 +49,4 @@ expect fun FillDeviceDetails(
     context: Any,
     scanStep: Int,
     onResult: (String) -> Unit
-)
-
-// ✅ Fixed name to match Android
-@Composable
-expect fun AddDeviceDeteails(
-    onNavigate: NavigationCallback,
-    viewModel: AddDeviceViewModel
 )
