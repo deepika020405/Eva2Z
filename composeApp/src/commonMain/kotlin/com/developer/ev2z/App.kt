@@ -24,7 +24,7 @@ import com.developer.ev2z.navigation.HomeNavGraph
 import com.developer.ev2z.repository.HomeRepository
 import com.developer.ev2z.ui.screens.AddDevice.AddDeviceViewModel
 import com.developer.ev2z.ui.screens.AddDevice.AddDeviceResult
-import com.developer.ev2z.ui.screens.AddDevice.BottomSheet
+//import com.developer.ev2z.ui.screens.AddDevice.BottomSheet
 import com.developer.ev2z.ui.screens.AddDeviceSuccess.AddDeviceSuccessScreen
 import kotlinx.coroutines.delay
 
@@ -122,21 +122,21 @@ fun App() {
 
             showAddDevice -> {
                 println("📱 Rendering: Add Device Screen")
-                BottomSheet(
-                    onNavigate = { route ->
-                        when (route) {
-                            "home" -> {
-                                println("🏠 Navigating back to home from add device")
-                                showAddDevice = false
-                                addDeviceViewModel.clearData()
-                            }
-                            "addDeviceDeteails" -> {
-                                println("📝 Staying on add device details")
-                            }
-                        }
-                    },
-                    viewModel = addDeviceViewModel
-                )
+//                BottomSheet(
+//                    onNavigate = { route ->
+//                        when (route) {
+//                            "home" -> {
+//                                println("🏠 Navigating back to home from add device")
+//                                showAddDevice = false
+//                                addDeviceViewModel.clearData()
+//                            }
+//                            "addDeviceDeteails" -> {
+//                                println("📝 Staying on add device details")
+//                            }
+//                        }
+//                    },
+//                    viewModel = addDeviceViewModel
+//                )
             }
 
             isLoggedIn && authToken.isNotEmpty() -> {
