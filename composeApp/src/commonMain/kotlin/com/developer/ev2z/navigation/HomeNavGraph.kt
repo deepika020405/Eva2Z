@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.tab.*
+import com.developer.ev2z.ui.screens.device_Report.DeviceReportScreen
 import com.developer.ev2z.ui.screens.homeScreen.HomeScreen
 import com.developer.ev2z.ui.screens.homeScreen.HomeViewModel
 import kotlinx.coroutines.launch
@@ -55,7 +56,8 @@ object WalletTab : Tab {
 
 object OrdersTab : Tab {
     @Composable
-    override fun Content() = OrdersScreen()
+//    override fun Content() = OrdersScreen()
+    override fun Content() = DeviceReportScreen()
 
     override val options: TabOptions
         @Composable get() = TabOptions(
@@ -175,12 +177,12 @@ fun WalletScreen() {
     }
 }
 
-@Composable
-fun OrdersScreen() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text("Shop Screen", style = MaterialTheme.typography.headlineMedium)
-    }
-}
+//@Composable
+//fun OrdersScreen() {
+//    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+//        Text("Shop Screen", style = MaterialTheme.typography.headlineMedium)
+//    }
+//}
 
 @Composable
 fun ProfileScreen() {

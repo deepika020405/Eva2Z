@@ -32,6 +32,7 @@ import platform.CoreGraphics.CGRectMake
 import platform.CoreMedia.CMSampleBufferGetImageBuffer
 import platform.UIKit.*
 import platform.Vision.*
+import platform.darwin.NSObject
 
 private val primaryContainerLight = Color(0xFF00C853)
 
@@ -277,7 +278,7 @@ actual fun OpenCamera(
             val device = AVCaptureDevice.defaultDeviceWithMediaType(AVMediaTypeVideo)
 
             device?.let { camera ->
-                val input = AVCaptureDeviceInput.deviceInputWithDevice(camera, null) as? AVCaptureDeviceInput
+                val input: AVCaptureDeviceInput? = AVCaptureDeviceInput.deviceInputWithDevice(camera, null) as? AVCaptureDeviceInput
 
                 if (captureSession.canAddInput(input)) {
                     captureSession.addInput(input!!)
@@ -334,7 +335,7 @@ actual fun ScanBarcode(
     CMSampleBufferGetImageBuffer(sampleBuffer)?.let { imageBuffer ->
         val request = VNDetectBarcodesRequest { request, error ->
             if (error == null) {
-                val observations = request.results as? List<*>
+                val observations = request?.results as? List<*>
                 observations?.forEach { observation ->
                     val barcode = observation as? VNBarcodeObservation
                     barcode?.payloadStringValue?.let { data ->
