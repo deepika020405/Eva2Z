@@ -207,7 +207,7 @@ private fun processCameraFrame(
     CMSampleBufferGetImageBuffer(sampleBuffer)?.let { pixelBuffer ->
         val request = VNDetectBarcodesRequest { vnRequest, _ ->
             vnRequest?.results?.let { results ->
-                for (i in 0 until results.count.toInt()) {
+                for (i in 0 until results.count().toInt()) {
                     val observation = results.objectAtIndex(i.toULong()) as? VNBarcodeObservation
                     observation?.payloadStringValue?.let { data ->
                         val isQR = observation.symbology == VNBarcodeSymbologyQR
@@ -234,7 +234,7 @@ private fun processImageForBarcode(
     image.CGImage?.let { cgImage ->
         val request = VNDetectBarcodesRequest { vnRequest, _ ->
             vnRequest?.results?.let { results ->
-                for (i in 0 until results.count.toInt()) {
+                for (i in 0 until results.count().toInt()) {
                     val observation = results.objectAtIndex(i.toULong()) as? VNBarcodeObservation
                     observation?.payloadStringValue?.let { data ->
                         val isQR = observation.symbology == VNBarcodeSymbologyQR
