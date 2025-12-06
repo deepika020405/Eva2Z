@@ -17,12 +17,14 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.developer.ev2z.BackPressHandler
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
 import com.developer.ev2z.response.Device
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
@@ -43,10 +45,12 @@ fun statusColor(status: String) = when (status) {
     else -> Color.Gray
 }
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun DeviceReportScreen(
     viewModel: DeviceReportViewModel,
     token: String,
+    username: String,
     onBack: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -55,9 +59,14 @@ fun DeviceReportScreen(
     val liveLocation by viewModel.liveLocation.collectAsState()
     val totalDevices by viewModel.totalDevices.collectAsState()
 
+
+
+    BackPressHandler { onBack() }
+
     LaunchedEffect(Unit) {
         viewModel.fetchMyDevices(token)
     }
+
 
     when (uiState) {
         is DeviceReportUiState.Loading -> {
@@ -83,6 +92,7 @@ fun DeviceReportScreen(
                 totalDevices = totalDevices,
                 onDeviceSelected = { device -> viewModel.selectDevice(device, token) },
                 onBack = onBack,
+                username = username,
                 viewModel = viewModel// 👈 NEW
             )
         }
@@ -98,6 +108,7 @@ fun DeviceReportContent(
     totalDevices: Int,
     onDeviceSelected: (Device) -> Unit,
     onBack: () -> Unit,
+    username: String,
     viewModel: DeviceReportViewModel
 ) {
     var isExpanded by remember { mutableStateOf(false) }
@@ -117,16 +128,16 @@ fun DeviceReportContent(
             zoom = 15.0
         )
         // Map Marker Chip showing selected device
-        if (selectedDevice != null && liveLocation != null) {
-            MapMarkerChipWithData(
-                deviceName = selectedDevice.device_name,
-                speed = liveLocation.data?.latestLocation?.speed?.toString() ?: "0"
-            )
-        }
+//        if (selectedDevice != null && liveLocation != null) {
+////            MapMarkerChipWithData(
+////                deviceName = selectedDevice.device_name,
+////                speed = liveLocation.data?.latestLocation?.speed?.toString() ?: "0"
+////            )
+//        }
 
         // TOP BAR
         TopDeviceBoxWithData(
-            userName = "User", // You can pass actual user name from preferences
+            userName = username, // You can pass actual user name from preferences
             deviceCount = totalDevices,
             selectedDevice = selectedDevice?.device_name,
             onBackClick = onBack,
@@ -202,7 +213,7 @@ fun TopDeviceBoxWithData(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 16.dp),
+            .padding(top = 35.dp, start = 16.dp, end = 16.dp, bottom = 16.dp),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
@@ -520,7 +531,7 @@ fun DeviceAnalysisContentWithData(liveLocation: LiveLocationResponse?) {
 
     // Pass status count to the graph
     HeadingGraphCardWithData(liveLocation?.data?.statusCount)
-    Spacer(Modifier.height(40.dp))
+    Spacer(Modifier.height(20.dp))
 }
 
 @Composable

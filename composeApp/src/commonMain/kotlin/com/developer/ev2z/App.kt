@@ -56,6 +56,7 @@ fun App() {
     var isLoading by remember { mutableStateOf(true) }
     var isLoggedIn by remember { mutableStateOf(false) }
     var authToken by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
     var showAddDevice by remember { mutableStateOf(false) }
     var showDeviceReport by remember { mutableStateOf(false) }
     var showAddDeviceSuccess by remember { mutableStateOf(false) }
@@ -76,6 +77,7 @@ fun App() {
         isLoggedIn = userPrefs.isLoggedIn() == true
         if (isLoggedIn) {
             authToken = userPrefs.getToken() ?: ""
+            username = userPrefs.getName() ?: "User"
             println("📱 Token loaded from storage: $authToken")
         }
         isLoading = false
@@ -159,6 +161,7 @@ fun App() {
                 DeviceReportScreen(
                     viewModel = deviceReportViewModel, // ✅ Pass ViewModel
                     token = authToken, // ✅ Pass token
+                    username = username,
                     onBack = {
                         println("🔙 Back from Device Report to Home")
                         showDeviceReport = false
