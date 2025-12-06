@@ -25,13 +25,15 @@ import kotlinx.coroutines.launch
 class HomeTab(
     private val viewModel: HomeViewModel,
     private val token: String,
-    private val onNavigateToAddDevice: () -> Unit
+    private val onNavigateToAddDevice: () -> Unit,
+    private val onNavigateToDeviceReport: () -> Unit
 ) : Tab {
     @Composable
     override fun Content() = HomeScreen(
         viewModel = viewModel,
         token = token,
-        onNavigateToAddDevice = onNavigateToAddDevice
+        onNavigateToAddDevice = onNavigateToAddDevice,
+        onNavigateToDeviceReport = onNavigateToDeviceReport
     )
 
     override val options: TabOptions
@@ -56,8 +58,8 @@ object WalletTab : Tab {
 
 object OrdersTab : Tab {
     @Composable
-//    override fun Content() = OrdersScreen()
-    override fun Content() = DeviceReportScreen()
+    override fun Content() = OrdersScreen()
+//    override fun Content() = DeviceReportScreen()
 
     override val options: TabOptions
         @Composable get() = TabOptions(
@@ -87,11 +89,12 @@ fun HomeNavGraph(
     viewModel: HomeViewModel,
     token: String,
     onNavigateToAddDevice: () -> Unit,
+    onNavigateToDeviceReport: () -> Unit,
     onLogout: () -> Unit = {}
 ) {
     SetupStatusBar()
 
-    val homeTab = remember { HomeTab(viewModel, token, onNavigateToAddDevice) }
+    val homeTab = remember { HomeTab(viewModel, token, onNavigateToAddDevice,onNavigateToDeviceReport) }
     val tabs = listOf(homeTab, WalletTab, OrdersTab, ProfileTab)
     val pagerState = rememberPagerState(pageCount = { tabs.size })
     val coroutineScope = rememberCoroutineScope()
@@ -177,12 +180,12 @@ fun WalletScreen() {
     }
 }
 
-//@Composable
-//fun OrdersScreen() {
-//    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-//        Text("Shop Screen", style = MaterialTheme.typography.headlineMedium)
-//    }
-//}
+@Composable
+fun OrdersScreen() {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text("Shop Screen", style = MaterialTheme.typography.headlineMedium)
+    }
+}
 
 @Composable
 fun ProfileScreen() {

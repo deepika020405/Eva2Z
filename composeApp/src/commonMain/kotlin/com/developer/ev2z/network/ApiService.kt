@@ -1,6 +1,7 @@
 package com.developer.ev2z.network
 
 import com.developer.ev2z.data.local.model.DeviceResponse
+import com.developer.ev2z.data.local.remote.LiveLocationResponse
 import com.developer.ev2z.request.LoginRequest
 import com.developer.ev2z.response.LoginResponse
 import com.developer.ev2z.response.MyDevicesResponse
@@ -125,6 +126,31 @@ class ApiService {
 
         } catch (e: Exception) {
             println("❌ API Error: ${e.message}")
+            e.printStackTrace()
+            throw e
+        }
+    }
+
+
+    suspend fun getDeviceLiveLocation(
+        token: String,
+        deviceId: String
+    ): LiveLocationResponse {
+        println("🌐 API: Fetching live location for deviceId=$deviceId")
+
+        try {
+            val response = client.get("${baseUrl}live-location/$deviceId") {
+                headers {
+                    append(HttpHeaders.Authorization, "Bearer $token")
+                }
+            }
+
+            println("🌐 API: Live location status: ${response.status}")
+            val result: LiveLocationResponse = response.body()
+            return result
+
+        } catch (e: Exception) {
+            println("❌ Live Location API Error: ${e.message}")
             e.printStackTrace()
             throw e
         }

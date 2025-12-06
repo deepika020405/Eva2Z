@@ -34,7 +34,8 @@ import org.jetbrains.compose.resources.InternalResourceApi
 fun HomeScreen(
     viewModel: HomeViewModel,
     token: String,
-    onNavigateToAddDevice: () -> Unit
+    onNavigateToAddDevice: () -> Unit,
+    onNavigateToDeviceReport: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val selectedDevice by viewModel.selectedDevice.collectAsState()
@@ -148,7 +149,8 @@ fun HomeScreen(
                     ) {
                         OverviewBottomSheet(
                             response = response,
-                            onClose = { viewModel.hideOverviewSheet() }
+                            onClose = { viewModel.hideOverviewSheet() },
+                            onNavigateToDeviceReport = onNavigateToDeviceReport
                         )
                     }
                 }
@@ -350,7 +352,8 @@ fun DeviceListItem(device: Device, onClick: () -> Unit) {
 @Composable
 fun OverviewBottomSheet(
     response: DeviceResponse,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    onNavigateToDeviceReport : () -> Unit
 ) {
     val totalDistance = response.data.sumOf { (it.speed * (it.lastSeenMinutesAgo ?: 0)).toLong() }
     val avgSpeed = response.data.filter { it.speed > 0 }.map { it.speed }.average().takeIf { !it.isNaN() } ?: 0.0
@@ -416,33 +419,90 @@ fun OverviewBottomSheet(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        response.data.filter { it.hasValidLocation() }.forEach { device ->
-            DeviceOverviewItem(device)
-        }
+//        response.data.filter { it.hasValidLocation() }.forEach { device ->
+//            DeviceOverviewItem(device)
+//            onNavigateToDeviceReport()
+//        }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        response.data
+            .filter { it.hasValidLocation() }
+            .forEach { device ->
+                DeviceOverviewItem(
+                    device = device,
+                    onClick = {
+                        onNavigateToDeviceReport()
+                    }
+                )
+            }
 
-        Text(
-            text = "See All",
-            color = Color(0xFF4CAF50),
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-            modifier = Modifier
-                .align(Alignment.End)
-                .clickable { }
-        )
+//        Spacer(modifier = Modifier.height(8.dp))
+//
+//        Text(
+//            text = "See All",
+//            color = Color(0xFF4CAF50),
+//            fontSize = 14.sp,
+//            fontWeight = FontWeight.Medium,
+//            modifier = Modifier
+//                .align(Alignment.End)
+//                .clickable { }
+//        )
 
         Spacer(modifier = Modifier.height(20.dp))
     }
 }
 
+//@Composable
+//fun DeviceOverviewItem(device: Device) {
+//    val statusColor = Color(device.getStatusColor())
+//
+//    Row(
+//        modifier = Modifier
+//            .fillMaxWidth()
+//            .padding(vertical = 8.dp),
+//        verticalAlignment = Alignment.CenterVertically
+//    ) {
+//        Box(
+//            modifier = Modifier
+//                .size(8.dp)
+//                .background(statusColor, CircleShape)
+//        )
+//
+//        Spacer(modifier = Modifier.width(12.dp))
+//
+//        Column(modifier = Modifier.weight(1f)) {
+//            Text(
+//                text = device.getDisplayName(),
+//                fontSize = 14.sp,
+//                fontWeight = FontWeight.Medium
+//            )
+//            Text(
+//                text = "Device ID: ${device.deviceId}",
+//                fontSize = 11.sp,
+//                color = Color.Gray
+//            )
+//        }
+//
+//        Text(
+//            text = device.getStatusDisplay(),
+//            fontSize = 12.sp,
+//            color = statusColor,
+//            fontWeight = FontWeight.Medium
+//        )
+//    }
+//}
+
+
 @Composable
-fun DeviceOverviewItem(device: Device) {
+fun DeviceOverviewItem(
+    device: Device,
+    onClick: () -> Unit
+) {
     val statusColor = Color(device.getStatusColor())
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable { onClick() }   // 👈 yaha se callback fire hoga
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -475,7 +535,6 @@ fun DeviceOverviewItem(device: Device) {
         )
     }
 }
-
 @Composable
 fun StatItem(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {

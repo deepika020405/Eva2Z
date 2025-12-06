@@ -18,24 +18,89 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
+import com.developer.ev2z.data.local.remote.LiveLocationResponse
+import com.developer.ev2z.response.Device
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
-import org.jetbrains.compose.resources.InternalResourceApi
 import org.jetbrains.compose.resources.painterResource
 
+
+data class DeviceItem(
+    val name: String,
+    val deviceId: String,
+    val status: String // Running, Idle, Stopped
+)
+
+fun statusColor(status: String) = when (status) {
+    "Running", "moving" -> Color(0xFF6DBD6D)
+    "Idle", "idle" -> Color(0xFFE8A93A)
+    "Stopped", "parked", "offline" -> Color(0xFFE35E5E)
+    else -> Color.Gray
+}
+
 @Composable
-fun DeviceReportScreen() {
+fun DeviceReportScreen(
+    viewModel: DeviceReportViewModel,
+    token: String,
+    onBack: () -> Unit = {}
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    val myDevices by viewModel.myDevices.collectAsState()
+    val selectedDevice by viewModel.selectedDevice.collectAsState()
+    val liveLocation by viewModel.liveLocation.collectAsState()
+    val totalDevices by viewModel.totalDevices.collectAsState()
 
+    LaunchedEffect(Unit) {
+        viewModel.fetchMyDevices(token)
+    }
+
+    when (uiState) {
+        is DeviceReportUiState.Loading -> {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+        }
+        is DeviceReportUiState.Error -> {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text((uiState as DeviceReportUiState.Error).message)
+                    Button(onClick = { viewModel.refreshData(token) }) {
+                        Text("Retry")
+                    }
+                }
+            }
+        }
+        is DeviceReportUiState.Success -> {
+            DeviceReportContent(
+                devices = myDevices,
+                selectedDevice = selectedDevice,
+                liveLocation = liveLocation,
+                totalDevices = totalDevices,
+                onDeviceSelected = { device -> viewModel.selectDevice(device, token) },
+                onBack = onBack,
+                viewModel = viewModel// 👈 NEW
+            )
+        }
+    }
+}
+
+
+@Composable
+fun DeviceReportContent(
+    devices: List<Device>,
+    selectedDevice: Device?,
+    liveLocation: LiveLocationResponse?,
+    totalDevices: Int,
+    onDeviceSelected: (Device) -> Unit,
+    onBack: () -> Unit,
+    viewModel: DeviceReportViewModel
+) {
     var isExpanded by remember { mutableStateOf(false) }
-
-    // Fake devices for dropdown – later you can replace with API data
-    val devices = listOf("Name 1", "Name 2", "Name 3", "Truck 4")
-    var selectedDevice by remember { mutableStateOf(devices[1]) }
     var isDropdownOpen by remember { mutableStateOf(false) }
 
     Box(
@@ -43,171 +108,156 @@ fun DeviceReportScreen() {
             .fillMaxSize()
             .background(Color(0xFFEFF3EF))
     ) {
+        // Map Area (You can integrate Google Maps here later)
+//        MapArea()
+        PlatformMapView(
+            modifier = Modifier.fillMaxSize(),
+            latitude =  liveLocation?.data?.latestLocation?.latitude?.toDoubleOrNull() ?: 0.0,
+            longitude =  liveLocation?.data?.latestLocation?.longitude?.toDoubleOrNull() ?: 0.0,
+            zoom = 15.0
+        )
+        // Map Marker Chip showing selected device
+        if (selectedDevice != null && liveLocation != null) {
+            MapMarkerChipWithData(
+                deviceName = selectedDevice.device_name,
+                speed = liveLocation.data?.latestLocation?.speed?.toString() ?: "0"
+            )
+        }
 
-        // -------------------- MAP AREA --------------------
-        MapArea()
-
-        // Fake marker card on map
-        MapMarkerChip()
-
-        // -------------------- TOP GREETING + DROPDOWN BOX --------------------
-        TopDeviceBox(
-            userName = "Rishab",
-            deviceCount = devices.size,
-            selectedDevice = selectedDevice,
-            onDropdownClick = {
-                isDropdownOpen = true
-            },
-            onAddClick = {
-                // TODO: Open Add Device Screen
-            }
+        // TOP BAR
+        TopDeviceBoxWithData(
+            userName = "User", // You can pass actual user name from preferences
+            deviceCount = totalDevices,
+            selectedDevice = selectedDevice?.device_name,
+            onBackClick = onBack,
+            onDropdownClick = { isDropdownOpen = true },
+            onAddClick = { /* Navigate to Add Device Screen */ }
         )
 
-        // -------------------- EXPANDABLE SHEET --------------------
-        DeviceReportBottomSheet(
-            isExpanded = isExpanded,
-            onExpandToggle = { isExpanded = !isExpanded }
-        )
+        // FULL SCREEN DROPDOWN PANEL
+        if (isDropdownOpen) {
+            DeviceSelectorPanelWithData(
+                devices = devices,
+                onDeviceSelected = {
+                    onDeviceSelected(it)
+                    isDropdownOpen = false
+                },
+                onAddDevice = { /* Navigate to Add Device */ },
+                onDismiss = { isDropdownOpen = false }
+            )
+        }
+
+        // BOTTOM SHEET
+        if (selectedDevice != null) {
+            DeviceReportBottomSheetWithData(
+                device = selectedDevice,
+                liveLocation = liveLocation,
+                isExpanded = isExpanded,
+                onExpandToggle = { isExpanded = !isExpanded },
+                viewModel = viewModel
+            )
+        }
     }
 }
 
-
-// ---------------------------------------------------------------------------
-// MAP LAYER
-// ---------------------------------------------------------------------------
 @Composable
-fun MapArea() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFEFF3EF))
-    )
-}
-
-// Small marker-like chip (Name + speed) on map
-@Composable
-fun BoxScope.MapMarkerChip() {
+fun BoxScope.MapMarkerChipWithData(
+    deviceName: String,
+    speed: String
+) {
     Surface(
         shape = RoundedCornerShape(16.dp),
         color = Color.White,
-        tonalElevation = 2.dp,
+        shadowElevation = 4.dp,
         modifier = Modifier
             .align(Alignment.Center)
             .padding(bottom = 100.dp)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(18.dp)
-                    .background(Color(0xFF3EBB3E), RoundedCornerShape(9.dp))
+                    .size(14.dp)
+                    .background(Color(0xFF3EBB3E), RoundedCornerShape(50))
             )
             Spacer(Modifier.width(8.dp))
-            Text("Name 1", fontSize = 13.sp)
+            Text(deviceName, fontSize = 13.sp)
             Spacer(Modifier.width(6.dp))
-            Text("50 km/h", fontSize = 13.sp, color = Color.Gray)
+            Text("$speed km/h", fontSize = 13.sp, color = Color.Gray)
         }
     }
 }
 
-
-// ---------------------------------------------------------------------------
-// TOP BOX : HELLO + DROPDOWN
-// ---------------------------------------------------------------------------
-@OptIn(InternalResourceApi::class)
 @Composable
-fun TopDeviceBox(
+fun TopDeviceBoxWithData(
     userName: String,
     deviceCount: Int,
     selectedDevice: String?,
+    onBackClick: () -> Unit,
     onDropdownClick: () -> Unit,
     onAddClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 16.dp, vertical = 16.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
-
         Column(modifier = Modifier.padding(16.dp)) {
-
-            // --------------------------------------------------
-            // TOP ROW : Hello + device count
-            // --------------------------------------------------
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = "Hello, $userName",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold
+                Icon(
+                    Icons.Default.ArrowBack,
+                    contentDescription = "Back",
+                    modifier = Modifier.clickable { onBackClick() }
                 )
+                Spacer(Modifier.width(10.dp))
 
-                Text(
-                    text = "$deviceCount Devices Listed",
-                    fontSize = 13.sp,
-                    color = Color.Gray
-                )
+                Text("Hello, $userName", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+
+                Spacer(Modifier.weight(1f))
+
+                Text("$deviceCount Devices Listed", fontSize = 13.sp, color = Color.Gray)
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(Modifier.height(14.dp))
 
-            // --------------------------------------------------
-            // DROPDOWN ROW
-            // --------------------------------------------------
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp))
-                    .padding(horizontal = 14.dp, vertical = 12.dp)
-                    .clickable { onDropdownClick() },
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .clickable { onDropdownClick() }
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-
-                // LEFT SIDE : Logo + title
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Image(
                         painter = painterResource(Res.drawable.app_logo),
-                        contentDescription = "App Logo",
+                        contentDescription = null,
                         modifier = Modifier.size(22.dp)
                     )
-
-                    Spacer(modifier = Modifier.width(10.dp))
-
-                    Text(
-                        text = selectedDevice ?: "Select Device",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium
-                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(selectedDevice ?: "Select Device", fontSize = 15.sp)
                 }
 
-                // RIGHT SIDE : Dropdown + Add icons
                 Row(verticalAlignment = Alignment.CenterVertically) {
-
                     Icon(
-                        imageVector = Icons.Default.ArrowDropDown,
+                        Icons.Default.ArrowDropDown,
                         contentDescription = null,
-                        tint = Color.Gray,
-                        modifier = Modifier.size(22.dp)
+                        tint = Color.Gray
                     )
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
+                    Spacer(Modifier.width(8.dp))
                     Icon(
-                        imageVector = Icons.Default.Add,
+                        Icons.Default.Add,
                         contentDescription = null,
                         tint = Color.Gray,
-                        modifier = Modifier
-                            .size(22.dp)
-                            .clickable { onAddClick() }
+                        modifier = Modifier.clickable { onAddClick() }
                     )
                 }
             }
@@ -215,118 +265,199 @@ fun TopDeviceBox(
     }
 }
 
-// ---------------------------------------------------------------------------
-// BOTTOM SHEET
-// ---------------------------------------------------------------------------
 @Composable
-fun BoxScope.DeviceReportBottomSheet(
-    isExpanded: Boolean,
-    onExpandToggle: () -> Unit
+fun DeviceSelectorPanelWithData(
+    devices: List<Device>,
+    onDeviceSelected: (Device) -> Unit,
+    onAddDevice: () -> Unit,
+    onDismiss: () -> Unit
 ) {
-    val sheetHeight = if (isExpanded) 0.90f else 0.40f // Expand → 90%, minimize → 40%
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0x55000000))
+            .zIndex(999f)
+            .clickable { onDismiss() },
+        contentAlignment = Alignment.TopCenter
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .padding(top = 80.dp)
+                .clickable(enabled = false) {},
+            shape = RoundedCornerShape(18.dp),
+            color = Color.White,
+            shadowElevation = 8.dp
+        ) {
+            Column(
+                Modifier
+                    .padding(18.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text("Select Device", fontSize = 16.sp, color = Color.Gray)
+                Spacer(Modifier.height(16.dp))
+
+                devices.forEach { device ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onDeviceSelected(device) }
+                            .padding(vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            Modifier
+                                .size(10.dp)
+                                .background(
+                                    statusColor(device.status ?: "Stopped"),
+                                    RoundedCornerShape(50)
+                                )
+                        )
+
+                        Spacer(Modifier.width(12.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(device.device_name, fontSize = 16.sp)
+                            Text(
+                                "Device ID: ${device.device_id}",
+                                fontSize = 12.sp,
+                                color = Color.Gray,
+                                maxLines = 1
+                            )
+                        }
+
+                        Text(
+                            device.status ?: "Unknown",
+                            color = statusColor(device.status ?: "Stopped"),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(20.dp))
+
+                Button(
+                    onClick = onAddDevice,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    shape = RoundedCornerShape(50),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3EBB3E))
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = null, tint = Color.White)
+                    Spacer(Modifier.width(8.dp))
+                    Text("Add Device", color = Color.White)
+                }
+
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun BoxScope.DeviceReportBottomSheetWithData(
+    device: Device,
+    liveLocation: LiveLocationResponse?,
+    isExpanded: Boolean,
+    onExpandToggle: () -> Unit,
+    viewModel: DeviceReportViewModel
+) {
+    val sheetHeight = if (isExpanded) 0.90f else 0.40f
 
     Surface(
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         modifier = Modifier
             .align(Alignment.BottomCenter)
             .padding(horizontal = 12.dp, vertical = 12.dp)
             .fillMaxWidth()
             .fillMaxHeight(sheetHeight)
             .animateContentSize(),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         color = Color.White,
         tonalElevation = 6.dp
     ) {
+        Column(Modifier.verticalScroll(rememberScrollState())) {
+            // Report Header
+            ReportHeaderWithData(
+                deviceName = device.device_name,
+                speed = liveLocation?.data?.latestLocation?.speed?.toString() ?: "0"
+            )
 
-        Column(
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-        ) {
-
-            // -----------------------------------------
-            // TOP HEADER
-            // -----------------------------------------
-            ReportHeader()
-
-            // -----------------------------------------
-            // DEVICE INFO
-            // -----------------------------------------
-            DeviceBasicInfo()
+            // Device Basic Info
+            DeviceBasicInfoWithData(
+                liveLocation = liveLocation,
+                device = device,
+                viewModel = viewModel
+            )
 
             Spacer(Modifier.height(8.dp))
 
-            Divider(Modifier.padding(horizontal = 18.dp))
+            HorizontalDivider(Modifier.padding(horizontal = 18.dp))
 
-            // -----------------------------------------
-            // DEVICE ANALYSIS ROW (View / Hide)
-            // -----------------------------------------
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onExpandToggle() }
-                    .padding(horizontal = 18.dp, vertical = 12.dp),
+                    .padding(18.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Device Analysis",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Text("Device Analysis", fontSize = 16.sp, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.weight(1f))
-                Text(
-                    text = if (isExpanded) "Hide" else "View",
-                    fontSize = 14.sp,
-                    color = Color(0xFF3EBB3E)
-                )
-                Spacer(Modifier.width(2.dp))
+                Text(if (isExpanded) "Hide" else "View", color = Color(0xFF3EBB3E))
                 Icon(
-                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowDown
-                    else Icons.Default.KeyboardArrowUp,
+                    if (isExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
                     contentDescription = null,
                     tint = Color(0xFF3EBB3E)
                 )
             }
 
-            // -----------------------------------------
-            // FULL ANALYTICS ONLY IN EXPANDED STATE
-            // -----------------------------------------
             if (isExpanded) {
-                DeviceAnalysisContent()
+                DeviceAnalysisContentWithData(liveLocation)
             }
         }
     }
 }
 
-
-// ---------------------------------------------------------------------------
-// HEADER SECTION (Name + Speed)
-// ---------------------------------------------------------------------------
 @Composable
-fun ReportHeader() {
+fun ReportHeaderWithData(
+    deviceName: String,
+    speed: String
+) {
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = 18.dp, vertical = 16.dp),
+            .padding(18.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("•  Name 2", fontSize = 20.sp, color = Color.Black)
+        Text("• $deviceName", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.weight(1f))
-        Text("65 km/h", fontSize = 18.sp, color = Color.Black)
+        Text("$speed km/h", fontSize = 18.sp, fontWeight = FontWeight.Medium)
     }
 }
 
-
-// ---------------------------------------------------------------------------
-// ADDRESS + Buttons
-// ---------------------------------------------------------------------------
 @Composable
-fun DeviceBasicInfo() {
+fun DeviceBasicInfoWithData(
+    liveLocation: LiveLocationResponse?,
+    device: Device,
+    viewModel: DeviceReportViewModel
+) {
+    val latest = liveLocation?.data?.latestLocation
+
+    // jab bhi location change ho, address fetch karo
+    LaunchedEffect(latest?.latitude, latest?.longitude) {
+        latest?.let {
+            viewModel.getAddressFromLatLng(it.latitude.toDouble(), it.longitude.toDouble())
+        }
+    }
+
+    val address by viewModel.address.collectAsState()
 
     Text(
-        "Live Location\nB-120, Saket, D-Mart Complex,\nPress Enclave Road, Delhi 110017",
+        "Live Location\n${address ?: "Fetching..."}",
         fontSize = 14.sp,
-        lineHeight = 18.sp,
-        modifier = Modifier.padding(horizontal = 18.dp)
+        modifier = Modifier.padding(horizontal = 18.dp),
+        color = Color.DarkGray
     )
 
     Spacer(Modifier.height(10.dp))
@@ -337,17 +468,20 @@ fun DeviceBasicInfo() {
             .padding(horizontal = 18.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        val currentStatus = latest?.status ?: device.status
+
         OutlinedButton(
-            onClick = {},
-            enabled = false,
+            onClick = { /* Handle Turn On */ },
+            enabled = currentStatus != "moving" && currentStatus != "Running",
             modifier = Modifier.weight(1f)
         ) {
             Text("Turn On")
         }
 
         Button(
-            onClick = {},
+            onClick = { /* Handle Turn Off */ },
             modifier = Modifier.weight(1f),
+            enabled = currentStatus == "moving" || currentStatus == "Running",
             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF6B6B))
         ) {
             Text("Turn Off")
@@ -356,46 +490,107 @@ fun DeviceBasicInfo() {
 
     Spacer(Modifier.height(12.dp))
 
+    val activeTime = latest?.timestamp ?: "N/A"
+    val lastSeenMinutes = latest?.lastSeenMinutesAgo
+    val displayTime = if (lastSeenMinutes != null) {
+        when {
+            lastSeenMinutes == 0 -> "Just now"
+            lastSeenMinutes < 60 -> "$lastSeenMinutes minutes ago"
+            else -> "${lastSeenMinutes / 60} hours ago"
+        }
+    } else activeTime
+
     Text(
-        "Active from: Yesterday, 5:43pm",
-        modifier = Modifier.padding(horizontal = 18.dp),
+        "Active from: $displayTime",
         color = Color.Gray,
-        fontSize = 13.sp
+        fontSize = 12.sp,
+        modifier = Modifier.padding(horizontal = 18.dp)
     )
 }
 
-
-// ---------------------------------------------------------------------------
-// FULL DEVICE ANALYSIS
-// ---------------------------------------------------------------------------
 @Composable
-fun DeviceAnalysisContent() {
-
+fun DeviceAnalysisContentWithData(liveLocation: LiveLocationResponse?) {
     Spacer(Modifier.height(8.dp))
-
-    // Filter chips
     FilterChipsBar()
-
     Spacer(Modifier.height(16.dp))
 
+    // You can calculate total distance from device data later
     TotalDistanceCard()
-
     Spacer(Modifier.height(16.dp))
 
-    HeadingGraphCard()
-
+    // Pass status count to the graph
+    HeadingGraphCardWithData(liveLocation?.data?.statusCount)
     Spacer(Modifier.height(40.dp))
 }
 
+@Composable
+fun HeadingGraphCardWithData(statusCount: com.developer.ev2z.data.local.remote.StatusCount?) {
+    Surface(
+        Modifier
+            .padding(horizontal = 18.dp)
+            .fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = Color(0xFFF2F4F2)
+    ) {
+        Column(Modifier.padding(18.dp)) {
+            Text("Device Status Summary", fontSize = 18.sp, fontWeight = FontWeight.Medium)
 
-// ---------------------------------------------------------------------------
-// FILTER CHIPS
-// ---------------------------------------------------------------------------
+            Spacer(Modifier.height(12.dp))
+
+            Box(
+                Modifier
+                    .size(160.dp)
+                    .align(Alignment.CenterHorizontally)
+                    .background(Color.LightGray, RoundedCornerShape(100.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Chart Placeholder", fontSize = 12.sp, color = Color.Gray)
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            if (statusCount != null) {
+                val total = statusCount.moving + statusCount.idle + statusCount.parked + statusCount.offline
+                if (total > 0) {
+                    Text("Moving - ${statusCount.moving} (${(statusCount.moving * 100 / total)}%)")
+                    Text("Idle - ${statusCount.idle} (${(statusCount.idle * 100 / total)}%)")
+                    Text("Parked - ${statusCount.parked} (${(statusCount.parked * 100 / total)}%)")
+                    Text("Offline - ${statusCount.offline} (${(statusCount.offline * 100 / total)}%)")
+                } else {
+                    Text("No status data available", color = Color.Gray)
+                }
+            } else {
+                Text("Loading status data...", color = Color.Gray)
+            }
+        }
+    }
+}
+
+// Keep the original composables for backward compatibility
+@Composable
+fun MapArea() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFEFF3EF))
+    )
+}
+
+@Composable
+fun DeviceAnalysisContent() {
+    Spacer(Modifier.height(8.dp))
+    FilterChipsBar()
+    Spacer(Modifier.height(16.dp))
+    TotalDistanceCard()
+    Spacer(Modifier.height(16.dp))
+    HeadingGraphCard()
+    Spacer(Modifier.height(40.dp))
+}
+
 @Composable
 fun FilterChipsBar() {
     Row(
-        Modifier
-            .padding(horizontal = 18.dp),
+        Modifier.padding(horizontal = 18.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Chip("Today")
@@ -412,16 +607,12 @@ fun Chip(text: String) {
     ) {
         Text(
             text,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.padding(12.dp),
             fontSize = 13.sp
         )
     }
 }
 
-
-// ---------------------------------------------------------------------------
-// TOTAL DISTANCE CARD
-// ---------------------------------------------------------------------------
 @Composable
 fun TotalDistanceCard() {
     Surface(
@@ -432,17 +623,13 @@ fun TotalDistanceCard() {
         color = Color(0xFFF2F4F2)
     ) {
         Column(Modifier.padding(18.dp)) {
-            Text("Total Distance", fontSize = 16.sp, color = Color.Gray)
+            Text("Total Distance", color = Color.Gray)
             Spacer(Modifier.height(4.dp))
             Text("70 km", fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
 
-
-// ---------------------------------------------------------------------------
-// HEADING GRAPH SECTION
-// ---------------------------------------------------------------------------
 @Composable
 fun HeadingGraphCard() {
     Surface(
@@ -453,7 +640,6 @@ fun HeadingGraphCard() {
         color = Color(0xFFF2F4F2)
     ) {
         Column(Modifier.padding(18.dp)) {
-
             Text("Heading", fontSize = 18.sp)
 
             Spacer(Modifier.height(12.dp))

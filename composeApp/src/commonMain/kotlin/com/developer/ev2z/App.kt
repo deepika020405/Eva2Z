@@ -21,11 +21,15 @@ import com.developer.ev2z.ui.screens.AuthPagerScreen
 import com.developer.ev2z.ui.screens.homeScreen.HomeViewModel
 import com.developer.ev2z.viewmodel.AuthViewModel
 import com.developer.ev2z.navigation.HomeNavGraph
+import com.developer.ev2z.repository.DeviceReportRepository
 import com.developer.ev2z.repository.HomeRepository
 import com.developer.ev2z.ui.screens.AddDevice.AddDeviceViewModel
 import com.developer.ev2z.ui.screens.AddDevice.AddDeviceResult
 //import com.developer.ev2z.ui.screens.AddDevice.BottomSheet
 import com.developer.ev2z.ui.screens.AddDeviceSuccess.AddDeviceSuccessScreen
+import com.developer.ev2z.ui.screens.device_Report.DeviceReportScreen
+import com.developer.ev2z.ui.screens.device_Report.DeviceReportViewModel
+import com.developer.ev2z.ui.screens.device_Report.PlatformAddressProvider
 import kotlinx.coroutines.delay
 
 @Composable
@@ -33,16 +37,27 @@ fun App() {
     val apiService = remember { ApiService() }
     val authRepository = remember { AuthRepository(apiService) }
     val homeRepository = remember { HomeRepository(apiService) }
+    val deviceReportRepository = remember { DeviceReportRepository(apiService) } // ✅ Added
     val storage = remember { createStorageManager() }
     val userPrefs = remember { UserPrefs(storage) }
     val authViewModel = remember { AuthViewModel(authRepository, storage) }
     val homeViewModel = remember { HomeViewModel(homeRepository) }
     val addDeviceViewModel = remember { AddDeviceViewModel() }
+    val platformContext = getPlatformContext()
+    val addressProvider = remember { PlatformAddressProvider(platformContext) }
+
+    val deviceReportViewModel = remember {
+        DeviceReportViewModel(
+            repository = deviceReportRepository,
+            platformAddressProvider = addressProvider
+        )
+    }
 
     var isLoading by remember { mutableStateOf(true) }
     var isLoggedIn by remember { mutableStateOf(false) }
     var authToken by remember { mutableStateOf("") }
     var showAddDevice by remember { mutableStateOf(false) }
+    var showDeviceReport by remember { mutableStateOf(false) }
     var showAddDeviceSuccess by remember { mutableStateOf(false) }
 
     // Success screen data
@@ -139,6 +154,18 @@ fun App() {
 //                )
             }
 
+            showDeviceReport -> {
+                println("📱 Rendering: Device Report Screen") // ✅ Added log
+                DeviceReportScreen(
+                    viewModel = deviceReportViewModel, // ✅ Pass ViewModel
+                    token = authToken, // ✅ Pass token
+                    onBack = {
+                        println("🔙 Back from Device Report to Home")
+                        showDeviceReport = false
+                    }
+                )
+            }
+
             isLoggedIn && authToken.isNotEmpty() -> {
                 println("📱 Rendering: Home Screen")
                 HomeNavGraph(
@@ -147,6 +174,11 @@ fun App() {
                     onNavigateToAddDevice = {
                         println("➕ Navigate to Add Device triggered")
                         showAddDevice = true
+                    },
+                    onNavigateToDeviceReport = {
+                        println("➕ Navigate to  Device Report triggered")
+                        showDeviceReport = true
+
                     },
                     onLogout = {
                         println("🚪 Logging out...")
