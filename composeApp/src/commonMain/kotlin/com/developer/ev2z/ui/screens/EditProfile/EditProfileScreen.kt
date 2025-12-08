@@ -229,17 +229,6 @@ fun EditProfileScreenContent(
                     enabled = false
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
-
-                // Password Field (Hidden)
-                ProfileInputField(
-                    label = "Password",
-                    value = "••••••••••",
-                    onValueChange = {},
-                    placeholder = "Password",
-                    enabled = false
-                )
-
                 Spacer(modifier = Modifier.height(48.dp))
 
                 // Update Button

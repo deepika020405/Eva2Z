@@ -39,7 +39,13 @@ class EditProfileViewModel(
         val name = storageManager.getString("name", "")
         val email = storageManager.getString("email", "")
         val phone = storageManager.getString("phone", "")
-        val image = storageManager.getString("profile_image", "")
+        val image = storageManager.getString("photo", "") // ✅ Changed from "profile_image" to "photo"
+
+        println("📱 Loading user data from storage:")
+        println("   Name: $name")
+        println("   Email: $email")
+        println("   Phone: $phone")
+        println("   Photo: $image")
 
         _state.value = _state.value.copy(
             userName = name,
@@ -57,12 +63,12 @@ class EditProfileViewModel(
         _state.value = _state.value.copy(userEmail = email)
     }
 
-    // ✅ New: Handle image selection
+    // ✅ Handle image selection
     fun updateProfileWithImage(imageBytes: ByteArray) {
         selectedImageBytes = imageBytes
-        println("✅ Image selected, size: ${imageBytes.size} bytes")
+        println("✅ Image selected for upload, size: ${imageBytes.size} bytes")
 
-        // Update immediately to show image
+        // Automatically trigger profile update with image
         updateProfile()
     }
 
@@ -76,7 +82,7 @@ class EditProfileViewModel(
                 if (token.isEmpty()) {
                     _state.value = _state.value.copy(
                         isLoading = false,
-                        error = "Token not found"
+                        error = "Token not found. Please login again."
                     )
                     return@launch
                 }
@@ -85,66 +91,82 @@ class EditProfileViewModel(
                 println("   Name: ${_state.value.userName}")
                 println("   Email: ${_state.value.userEmail}")
                 println("   Has Image: ${selectedImageBytes != null}")
+                println("   Image size: ${selectedImageBytes?.size ?: 0} bytes")
 
                 val response = apiService.updateProfile(
                     token = "Bearer $token",
                     name = _state.value.userName,
                     email = _state.value.userEmail,
-                    photo = selectedImageBytes  // ✅ Pass image bytes
+                    photo = selectedImageBytes
                 )
 
-                // Parse response
-                val newName = response["name"]?.toString()?.trim('"')
-                val newEmail = response["email"]?.toString()?.trim('"')
-                val newPhoto = response["photo"]?.toString()?.trim('"')
+                println("✅ API Response received:")
+                println("   Response: $response")
 
-                println("✅ Profile update response:")
-                println("   Name: $newName")
-                println("   Email: $newEmail")
-                println("   Photo: $newPhoto")
+                // Parse response - your API returns JsonObject
+                val userObject = response["user"] as? Map<*, *>
+                val photoUrl = response["photo_url"]?.toString()?.trim('"')
 
-                // Build full URL if relative path
-                val fullPhotoUrl = if (!newPhoto.isNullOrEmpty()) {
-                    if (newPhoto.startsWith("http")) {
-                        newPhoto
-                    } else {
-                        "https://gps.eva2z.in$newPhoto"
+                if (userObject != null) {
+                    val newName = userObject["name"]?.toString()?.trim('"') ?: _state.value.userName
+                    val newEmail = userObject["email"]?.toString()?.trim('"') ?: _state.value.userEmail
+                    val newPhoto = userObject["photo"]?.toString()?.trim('"')
+
+                    println("✅ Parsed user data:")
+                    println("   Name: $newName")
+                    println("   Email: $newEmail")
+                    println("   Photo: $newPhoto")
+                    println("   Photo URL: $photoUrl")
+
+                    // Build full photo URL
+                    val fullPhotoUrl = when {
+                        photoUrl != null && photoUrl.startsWith("http") -> photoUrl
+                        photoUrl != null -> "https://gps.eva2z.in$photoUrl"
+                        newPhoto != null && newPhoto.startsWith("http") -> newPhoto
+                        newPhoto != null -> "https://gps.eva2z.in/storage/$newPhoto"
+                        else -> null
                     }
-                } else null
 
-                // Save to storage
-                if (!newName.isNullOrEmpty()) {
+                    println("✅ Final photo URL: $fullPhotoUrl")
+
+                    // ✅ Save to storage with correct keys matching UserPrefs
                     storageManager.saveString("name", newName)
-                }
-
-                if (!newEmail.isNullOrEmpty()) {
                     storageManager.saveString("email", newEmail)
+                    if (fullPhotoUrl != null) {
+                        storageManager.saveString("photo", fullPhotoUrl) // ✅ Use "photo" not "profile_image"
+                    }
+
+                    println("✅ Saved to local storage")
+
+                    // ✅ Update state
+                    _state.value = _state.value.copy(
+                        isLoading = false,
+                        userName = newName,
+                        userEmail = newEmail,
+                        userImage = fullPhotoUrl,
+                        updateSuccess = true,
+                        error = null
+                    )
+
+                    // Clear selected image after successful upload
+                    selectedImageBytes = null
+
+                    println("✅ Profile update completed successfully!")
+                } else {
+                    println("❌ Invalid response structure")
+                    _state.value = _state.value.copy(
+                        isLoading = false,
+                        error = "Invalid response from server"
+                    )
                 }
-
-                if (fullPhotoUrl != null) {
-                    storageManager.saveString("profile_image", fullPhotoUrl)
-                    println("✅ Saved profile image: $fullPhotoUrl")
-                }
-
-                _state.value = _state.value.copy(
-                    isLoading = false,
-                    userName = newName ?: _state.value.userName,
-                    userEmail = newEmail ?: _state.value.userEmail,
-                    userImage = fullPhotoUrl,
-                    updateSuccess = true,
-                    error = null
-                )
-
-                // ✅ Clear image bytes after successful upload
-                selectedImageBytes = null
 
             } catch (e: Exception) {
+                println("❌ Profile update error: ${e.message}")
+                e.printStackTrace()
                 _state.value = _state.value.copy(
                     isLoading = false,
                     error = e.message ?: "Failed to update profile"
                 )
-                println("❌ Profile update error: ${e.message}")
-                e.printStackTrace()
             }
         }
     }
