@@ -32,7 +32,7 @@ class ProfileViewModel(
         fetchProfilePicture()
     }
 
-    private fun loadUserData() {
+    fun loadUserData() {
         val name = storageManager.getString("name", "User")
         val phone = storageManager.getString("phone", "")
         val image = storageManager.getString("profile_image", "")
@@ -40,7 +40,7 @@ class ProfileViewModel(
         _state.value = _state.value.copy(
             userName = name,
             userPhone = phone,
-            userImage = image.ifEmpty { null }
+            userImage = image
         )
     }
 

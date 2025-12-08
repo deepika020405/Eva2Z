@@ -39,11 +39,13 @@ fun ProfileScreen(
 
     // Handle logout navigation
     LaunchedEffect(state.logoutSuccess) {
+        viewModel.loadUserData()
         if (state.logoutSuccess) {
             onLogout()
         }
     }
 
+    
     ProfileScreenContent(
         state = state,
         onRefresh = { viewModel.fetchProfilePicture() },
