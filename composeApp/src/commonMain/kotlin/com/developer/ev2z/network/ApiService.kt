@@ -185,6 +185,61 @@ class ApiService {
         }
     }
 
+    suspend fun deleteDevice(deviceId: String, token: String): JsonObject {
+        println("🌐 API: Deleting device: $deviceId")
+
+        try {
+            val response = client.delete("${baseUrl}api/delete-device/$deviceId") {
+                headers {
+                    append(HttpHeaders.Authorization, token)
+                }
+            }
+
+            println("🌐 API: Response status: ${response.status}")
+            val result: JsonObject = response.body()
+            println("🌐 API: Device deleted successfully")
+            return result
+
+        } catch (e: Exception) {
+            println("❌ API Error: ${e.message}")
+            e.printStackTrace()
+            throw e
+        }
+    }
+
+    suspend fun mobilizeDevice(
+        token: String,
+        terminalId: String,
+        command: String
+    ): JsonObject {
+        println("🌐 API: Mobilizing device - Terminal: $terminalId, Command: $command")
+
+        try {
+            val response = client.submitForm(
+                url = "${baseUrl}api/mobilize",
+                formParameters = parameters {
+                    append("terminal_id", terminalId)
+                    append("command", command)
+                }
+            ) {
+                headers {
+                    append(HttpHeaders.Authorization, token)
+                    append(HttpHeaders.Accept, "application/json")
+                }
+            }
+
+            println("🌐 API: Response status: ${response.status}")
+            val result: JsonObject = response.body()
+            println("🌐 API: Device mobilized successfully")
+            return result
+
+        } catch (e: Exception) {
+            println("❌ API Error: ${e.message}")
+            e.printStackTrace()
+            throw e
+        }
+    }
+
 
 
 //    suspend fun updateProfile(

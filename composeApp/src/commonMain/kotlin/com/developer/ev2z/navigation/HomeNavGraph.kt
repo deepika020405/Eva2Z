@@ -21,6 +21,7 @@ import com.developer.ev2z.ui.screens.EditProfile.EditProfileScreen
 import com.developer.ev2z.ui.screens.Profile.ProfileScreen
 import com.developer.ev2z.ui.screens.homeScreen.HomeScreen
 import com.developer.ev2z.ui.screens.homeScreen.HomeViewModel
+import com.developer.ev2z.ui.screens.ManageDevices.ManageDeviceScreen
 import kotlinx.coroutines.launch
 
 // ------------------ TABS -------------------
@@ -74,6 +75,7 @@ class ProfileTab(
     private val apiService: ApiService,
     private val storageManager: StorageManager,
     private val onNavigateToEditProfile: () -> Unit,
+    private val onNavigateToManageDevice: () -> Unit,
     private val onLogout: () -> Unit
 ) : Tab {
     @Composable
@@ -82,6 +84,7 @@ class ProfileTab(
             apiService = apiService,
             storageManager = storageManager,
             onEditProfile = onNavigateToEditProfile,
+            onManageDevice = onNavigateToManageDevice,
             onLogout = onLogout
         )
     }
@@ -96,6 +99,44 @@ class ProfileTab(
 
 // ------------------ MAIN NAV GRAPH -------------------
 
+//@OptIn(ExperimentalFoundationApi::class)
+//@Composable
+//fun HomeNavGraph(
+//    viewModel: HomeViewModel,
+//    apiService: ApiService,
+//    storageManager: StorageManager,
+//    token: String,
+//    onNavigateToAddDevice: () -> Unit,
+//    onLogout: () -> Unit = {}
+//) {
+//    SetupStatusBar()
+//
+//    var showEditProfile by remember { mutableStateOf(false) }
+//
+//    // ✅ Main content with tabs
+//    Box(modifier = Modifier.fillMaxSize()) {
+//        HomeNavGraphContent(
+//            viewModel = viewModel,
+//            apiService = apiService,
+//            storageManager = storageManager,
+//            token = token,
+//            onNavigateToAddDevice = onNavigateToAddDevice,
+//            onNavigateToEditProfile = { showEditProfile = true }
+//            onNavigateToManageDevice = { showManageDevice = true },
+//            onLogout = onLogout
+//        )
+//
+//        // ✅ EditProfile as full-screen overlay
+//        if (showEditProfile) {
+//            EditProfileScreen(
+//                apiService = apiService,
+//                storageManager = storageManager,
+//                onBackPressed = { showEditProfile = false }
+//            )
+//        }
+//    }
+//}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeNavGraph(
@@ -109,6 +150,7 @@ fun HomeNavGraph(
     SetupStatusBar()
 
     var showEditProfile by remember { mutableStateOf(false) }
+    var showManageDevice by remember { mutableStateOf(false) }  // ✅ ADD THIS
 
     // ✅ Main content with tabs
     Box(modifier = Modifier.fillMaxSize()) {
@@ -119,6 +161,7 @@ fun HomeNavGraph(
             token = token,
             onNavigateToAddDevice = onNavigateToAddDevice,
             onNavigateToEditProfile = { showEditProfile = true },
+            onNavigateToManageDevice = { showManageDevice = true },  // ✅ ADD THIS
             onLogout = onLogout
         )
 
@@ -130,8 +173,28 @@ fun HomeNavGraph(
                 onBackPressed = { showEditProfile = false }
             )
         }
+
+        // ✅ ADD THIS: ManageDevice as full-screen overlay
+        if (showManageDevice) {
+            ManageDeviceScreen(
+                apiService = apiService,
+                storageManager = storageManager,
+                onBackClick = { showManageDevice = false },
+                onProfileClick = {
+                    showManageDevice = false
+                    // Optionally navigate to profile tab
+                },
+                onAddDeviceClick = {
+                    showManageDevice = false
+                    onNavigateToAddDevice()
+                }
+            )
+        }
     }
 }
+
+
+
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -142,6 +205,7 @@ fun HomeNavGraphContent(
     token: String,
     onNavigateToAddDevice: () -> Unit,
     onNavigateToEditProfile: () -> Unit,
+    onNavigateToManageDevice: () -> Unit,
     onLogout: () -> Unit
 ) {
     val homeTab = remember { HomeTab(viewModel, token, onNavigateToAddDevice) }
@@ -150,6 +214,7 @@ fun HomeNavGraphContent(
             apiService,
             storageManager,
             onNavigateToEditProfile,
+            onNavigateToManageDevice,
             onLogout
         )
     }

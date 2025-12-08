@@ -382,19 +382,19 @@ fun ProfileImageZoomDialog(
                 contentScale = ContentScale.Crop
             )
 
-            IconButton(
-                onClick = onDismiss,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(16.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Close",
-                    tint = Color.White,
-                    modifier = Modifier.size(32.dp)
-                )
-            }
+//            IconButton(
+//                onClick = onDismiss,
+//                modifier = Modifier
+//                    .align(Alignment.TopEnd)
+//                    .padding(16.dp)
+//            ) {
+//                Icon(
+//                    imageVector = Icons.Default.Close,
+//                    contentDescription = "Close",
+//                    tint = Color.White,
+//                    modifier = Modifier.size(32.dp)
+//                )
+//            }
         }
     }
 }

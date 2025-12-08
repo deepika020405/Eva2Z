@@ -30,6 +30,7 @@ fun ProfileScreen(
     apiService: ApiService,
     storageManager: StorageManager,
     onEditProfile: () -> Unit = {},
+    onManageDevice: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     val viewModel = remember { ProfileViewModel(apiService, storageManager) }
@@ -45,7 +46,7 @@ fun ProfileScreen(
         }
     }
 
-    
+
     ProfileScreenContent(
         state = state,
         onRefresh = { viewModel.fetchProfilePicture() },
@@ -55,7 +56,7 @@ fun ProfileScreen(
         onAccountActivity = { /* Navigate to account activity */ },
         onReferAndEarn = { /* Navigate to ReferAndEarnActivity */ },
         onChangePassword = { /* Navigate to PasswordChangeActivity */ },
-        onManageDevice = { /* Navigate to ManageDevicesActivity */ },
+        onManageDevice = onManageDevice,
         onAddFence = { /* Navigate to FenceActivity */ },
         onHistoryPlayback = { /* Navigate to HistoryPlaybackActivity */ },
         onRateApp = { /* Open Play Store */ },
@@ -177,7 +178,7 @@ fun ProfileScreenContent(
                     ProfileMenuCard(
                         items = listOf(
                             ProfileMenuItem("Manage Device", "device", onManageDevice),
-                            ProfileMenuItem("Add Fence", "fence", onAddFence),
+                            ProfileMenuItem("Manage Geo Fence", "fence", onAddFence),
                             ProfileMenuItem("History Playback", "history", onHistoryPlayback)
                         )
                     )
@@ -370,19 +371,19 @@ fun ProfileImageZoomDialog(
             }
 
             // Close Button
-            IconButton(
-                onClick = onDismiss,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(16.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Close",
-                    tint = Color.White,
-                    modifier = Modifier.size(32.dp)
-                )
-            }
+//            IconButton(
+//                onClick = onDismiss,
+//                modifier = Modifier
+//                    .align(Alignment.TopEnd)
+//                    .padding(16.dp)
+//            ) {
+//                Icon(
+//                    imageVector = Icons.Default.Close,
+//                    contentDescription = "Close",
+//                    tint = Color.White,
+//                    modifier = Modifier.size(32.dp)
+//                )
+//            }
         }
     }
 }

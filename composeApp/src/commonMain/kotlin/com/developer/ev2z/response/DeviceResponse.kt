@@ -1,5 +1,6 @@
 package com.developer.ev2z.response
 
+import kotlinx.serialization.Serializable
 
 data class DeviceResponse(
     val success: Boolean,
@@ -23,17 +24,20 @@ data class DeviceItem(
     val last_seen_minutes_ago: Int?
 )
 
+@Serializable
 data class MyDevicesResponse(
     val success: Boolean,
     val total_devices: Int,
     val devices: List<Device>
 )
 
+@Serializable
 data class Device(
     val id: Int,
     val device_id: String,
     val device_name: String,
     val sim_no: String?,
+    val device_type: String?,
     val engine_status: String,
     val status: String,
     val created_at: String
