@@ -6,6 +6,7 @@ import com.developer.ev2z.response.LoginResponse
 import com.developer.ev2z.response.MyDevicesResponse
 import io.ktor.client.call.*
 import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import kotlinx.serialization.json.JsonObject
 
@@ -36,7 +37,6 @@ class ApiService {
             throw e
         }
     }
-
 
     suspend fun getDevicesLatestLocations(token: String): DeviceResponse {
         println("🌐 API: Fetching latest device locations")
@@ -121,6 +121,54 @@ class ApiService {
             println("🌐 API: Response status: ${response.status}")
             val result: MyDevicesResponse = response.body()
             println("🌐 API: Total devices: ${result.total_devices}")
+            return result
+
+        } catch (e: Exception) {
+            println("❌ API Error: ${e.message}")
+            e.printStackTrace()
+            throw e
+        }
+    }
+
+    // ✅ Get Profile Picture API
+    suspend fun getProfilePicture(token: String): JsonObject {
+        return client.get("${baseUrl}profile-picture") {
+            header("Authorization", token)
+        }.body()
+    }
+
+    // ✅ NEW: Update Profile API with Multipart
+    suspend fun updateProfile(
+        token: String,
+        name: String,
+        email: String,
+        photo: ByteArray? = null
+    ): JsonObject {
+        println("🌐 API: Updating profile - name: $name, email: $email")
+
+        try {
+            val response = client.submitFormWithBinaryData(
+                url = "${baseUrl}update-profile",
+                formData = formData {
+                    append("name", name)
+                    append("email", email)
+
+                    photo?.let {
+                        append("photo", it, Headers.build {
+                            append(HttpHeaders.ContentType, "image/jpeg")
+                            append(HttpHeaders.ContentDisposition, "filename=profile.jpg")
+                        })
+                    }
+                }
+            ) {
+                headers {
+                    append(HttpHeaders.Authorization, token)
+                }
+            }
+
+            println("🌐 API: Response status: ${response.status}")
+            val result: JsonObject = response.body()
+            println("🌐 API: Profile updated successfully")
             return result
 
         } catch (e: Exception) {

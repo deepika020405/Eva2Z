@@ -15,6 +15,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.tab.*
+import com.developer.ev2z.data.local.StorageManager
+import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.ui.screens.EditProfile.EditProfileScreen
+import com.developer.ev2z.ui.screens.Profile.ProfileScreen
 import com.developer.ev2z.ui.screens.homeScreen.HomeScreen
 import com.developer.ev2z.ui.screens.homeScreen.HomeViewModel
 import kotlinx.coroutines.launch
@@ -65,9 +69,22 @@ object OrdersTab : Tab {
         )
 }
 
-object ProfileTab : Tab {
+// ✅ Fixed ProfileTab - uses callback-based navigation
+class ProfileTab(
+    private val apiService: ApiService,
+    private val storageManager: StorageManager,
+    private val onNavigateToEditProfile: () -> Unit,
+    private val onLogout: () -> Unit
+) : Tab {
     @Composable
-    override fun Content() = ProfileScreen()
+    override fun Content() {
+        ProfileScreen(
+            apiService = apiService,
+            storageManager = storageManager,
+            onEditProfile = onNavigateToEditProfile,
+            onLogout = onLogout
+        )
+    }
 
     override val options: TabOptions
         @Composable get() = TabOptions(
@@ -77,20 +94,66 @@ object ProfileTab : Tab {
         )
 }
 
-// ------------------ NAV GRAPH WITH SWIPE -------------------
+// ------------------ MAIN NAV GRAPH -------------------
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeNavGraph(
     viewModel: HomeViewModel,
+    apiService: ApiService,
+    storageManager: StorageManager,
     token: String,
     onNavigateToAddDevice: () -> Unit,
     onLogout: () -> Unit = {}
 ) {
     SetupStatusBar()
 
+    var showEditProfile by remember { mutableStateOf(false) }
+
+    // ✅ Main content with tabs
+    Box(modifier = Modifier.fillMaxSize()) {
+        HomeNavGraphContent(
+            viewModel = viewModel,
+            apiService = apiService,
+            storageManager = storageManager,
+            token = token,
+            onNavigateToAddDevice = onNavigateToAddDevice,
+            onNavigateToEditProfile = { showEditProfile = true },
+            onLogout = onLogout
+        )
+
+        // ✅ EditProfile as full-screen overlay
+        if (showEditProfile) {
+            EditProfileScreen(
+                apiService = apiService,
+                storageManager = storageManager,
+                onBackPressed = { showEditProfile = false }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun HomeNavGraphContent(
+    viewModel: HomeViewModel,
+    apiService: ApiService,
+    storageManager: StorageManager,
+    token: String,
+    onNavigateToAddDevice: () -> Unit,
+    onNavigateToEditProfile: () -> Unit,
+    onLogout: () -> Unit
+) {
     val homeTab = remember { HomeTab(viewModel, token, onNavigateToAddDevice) }
-    val tabs = listOf(homeTab, WalletTab, OrdersTab, ProfileTab)
+    val profileTab = remember {
+        ProfileTab(
+            apiService,
+            storageManager,
+            onNavigateToEditProfile,
+            onLogout
+        )
+    }
+    val tabs = listOf(homeTab, WalletTab, OrdersTab, profileTab)
     val pagerState = rememberPagerState(pageCount = { tabs.size })
     val coroutineScope = rememberCoroutineScope()
 
@@ -179,18 +242,5 @@ fun WalletScreen() {
 fun OrdersScreen() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text("Shop Screen", style = MaterialTheme.typography.headlineMedium)
-    }
-}
-
-@Composable
-fun ProfileScreen() {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text("Profile Screen", style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(16.dp))
-        Button(onClick = {}) { Text("Logout") }
     }
 }

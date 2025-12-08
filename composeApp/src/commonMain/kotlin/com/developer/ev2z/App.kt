@@ -49,7 +49,7 @@ fun App() {
     var successDeviceName by remember { mutableStateOf("") }
     var successDeviceId by remember { mutableStateOf("") }
     var successSimNumber by remember { mutableStateOf("") }
-    var successDeviceType by remember { mutableStateOf("") } // ✅ Added this line
+    var successDeviceType by remember { mutableStateOf("") }
 
     val loginSuccess by authViewModel.loginSuccess.collectAsState()
     val addDeviceResult by addDeviceViewModel.addDeviceResult.collectAsState()
@@ -143,12 +143,14 @@ fun App() {
                 println("📱 Rendering: Home Screen")
                 HomeNavGraph(
                     viewModel = homeViewModel,
+                    apiService = apiService,        // ✅ Fixed: Added apiService
+                    storageManager = storage,       // ✅ Fixed: Added storageManager
                     token = authToken,
                     onNavigateToAddDevice = {
                         println("➕ Navigate to Add Device triggered")
                         showAddDevice = true
                     },
-                    onLogout = {
+                    onLogout = {                    // ✅ Fixed: Changed from EditonLogout to onLogout
                         println("🚪 Logging out...")
                         userPrefs.clear()
                         isLoggedIn = false

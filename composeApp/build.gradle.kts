@@ -93,6 +93,8 @@ kotlin {
             implementation(libs.lifecycle.viewmodel.compose.v296)
             implementation(libs.lifecycle.runtime.compose.v296)
 
+            implementation("io.coil-kt.coil3:coil-compose:3.0.0-rc01")
+            implementation("io.coil-kt.coil3:coil-network-ktor3:3.0.0-rc01")
 
 //            implementation(libs.components.map)
 //            implementation(libs.maplibre)
