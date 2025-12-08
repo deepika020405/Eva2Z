@@ -28,18 +28,18 @@ class EditProfileViewModel(
     private val _state = MutableStateFlow(EditProfileState())
     val state: StateFlow<EditProfileState> = _state.asStateFlow()
 
-    // ✅ Store selected image bytes temporarily
+    // ✅ Store selected image bytes temporarily - DON'T auto-upload
     private var selectedImageBytes: ByteArray? = null
 
     init {
         loadUserData()
     }
 
-    private fun loadUserData() {
+    fun loadUserData() {
         val name = storageManager.getString("name", "")
         val email = storageManager.getString("email", "")
         val phone = storageManager.getString("phone", "")
-        val image = storageManager.getString("photo", "") // ✅ Changed from "profile_image" to "photo"
+        val image = storageManager.getString("photo", "")
 
         println("📱 Loading user data from storage:")
         println("   Name: $name")
@@ -63,18 +63,27 @@ class EditProfileViewModel(
         _state.value = _state.value.copy(userEmail = email)
     }
 
-    // ✅ Handle image selection
+    // ✅ FIX 1: Just store image bytes, DON'T upload automatically
     fun updateProfileWithImage(imageBytes: ByteArray) {
         selectedImageBytes = imageBytes
-        println("✅ Image selected for upload, size: ${imageBytes.size} bytes")
+        println("✅ Image selected, size: ${imageBytes.size} bytes (will upload on button click)")
 
-        // Automatically trigger profile update with image
-        updateProfile()
+        // ✅ Just show preview, don't upload yet
+        // Convert bytes to temporary URL for preview (optional)
+        // For now, just store it
     }
 
-    // ✅ Update profile (with or without image)
+    // ✅ FIX 2: Email is optional now
     fun updateProfile() {
         viewModelScope.launch {
+            // Validate: Name is required
+            if (_state.value.userName.trim().isEmpty()) {
+                _state.value = _state.value.copy(
+                    error = "Name is required"
+                )
+                return@launch
+            }
+
             _state.value = _state.value.copy(isLoading = true, error = null)
 
             try {
@@ -96,25 +105,27 @@ class EditProfileViewModel(
                 val response = apiService.updateProfile(
                     token = "Bearer $token",
                     name = _state.value.userName,
-                    email = _state.value.userEmail,
+                    email = _state.value.userEmail.ifEmpty { "" }, // ✅ Email optional
                     photo = selectedImageBytes
                 )
 
                 println("✅ API Response received:")
                 println("   Response: $response")
 
-                // Parse response - your API returns JsonObject
+                // Parse response
                 val userObject = response["user"] as? Map<*, *>
                 val photoUrl = response["photo_url"]?.toString()?.trim('"')
 
                 if (userObject != null) {
                     val newName = userObject["name"]?.toString()?.trim('"') ?: _state.value.userName
-                    val newEmail = userObject["email"]?.toString()?.trim('"') ?: _state.value.userEmail
+                    val newEmail = userObject["email"]?.toString()?.trim('"') ?: ""
+                    val newPhone = userObject["phone"]?.toString()?.trim('"') ?: _state.value.userPhone
                     val newPhoto = userObject["photo"]?.toString()?.trim('"')
 
                     println("✅ Parsed user data:")
                     println("   Name: $newName")
                     println("   Email: $newEmail")
+                    println("   Phone: $newPhone")
                     println("   Photo: $newPhoto")
                     println("   Photo URL: $photoUrl")
 
@@ -124,32 +135,36 @@ class EditProfileViewModel(
                         photoUrl != null -> "https://gps.eva2z.in$photoUrl"
                         newPhoto != null && newPhoto.startsWith("http") -> newPhoto
                         newPhoto != null -> "https://gps.eva2z.in/storage/$newPhoto"
-                        else -> null
+                        else -> _state.value.userImage // Keep existing if no new photo
                     }
 
                     println("✅ Final photo URL: $fullPhotoUrl")
 
-                    // ✅ Save to storage with correct keys matching UserPrefs
+                    // ✅ Save to storage
                     storageManager.saveString("name", newName)
                     storageManager.saveString("email", newEmail)
+                    storageManager.saveString("phone", newPhone)
                     if (fullPhotoUrl != null) {
-                        storageManager.saveString("photo", fullPhotoUrl) // ✅ Use "photo" not "profile_image"
+                        storageManager.saveString("photo", fullPhotoUrl)
                     }
 
                     println("✅ Saved to local storage")
 
-                    // ✅ Update state
+                    // ✅ FIX 3: Update state BEFORE marking success
                     _state.value = _state.value.copy(
                         isLoading = false,
                         userName = newName,
                         userEmail = newEmail,
+                        userPhone = newPhone,
                         userImage = fullPhotoUrl,
-                        updateSuccess = true,
                         error = null
                     )
 
                     // Clear selected image after successful upload
                     selectedImageBytes = null
+
+                    // ✅ Set success flag AFTER state is updated
+                    _state.value = _state.value.copy(updateSuccess = true)
 
                     println("✅ Profile update completed successfully!")
                 } else {

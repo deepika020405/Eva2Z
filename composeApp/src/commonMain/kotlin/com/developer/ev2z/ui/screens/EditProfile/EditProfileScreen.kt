@@ -30,6 +30,7 @@ import coil3.compose.AsyncImage
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.util.rememberImagePicker
+import kotlinx.coroutines.delay
 
 @Composable
 fun EditProfileScreen(
@@ -41,18 +42,29 @@ fun EditProfileScreen(
     val state by viewModel.state.collectAsState()
 
     var showImageZoom by remember { mutableStateOf(false) }
+    var showSuccessDialog by remember { mutableStateOf(false) }
 
-    // ✅ Image Picker Launcher
+    // ✅ Reload data when screen is opened
+    LaunchedEffect(Unit) {
+        viewModel.loadUserData()
+    }
+
+    // ✅ Image Picker Launcher - NO auto upload
     val imagePickerLauncher = rememberImagePicker { imageBytes ->
         if (imageBytes != null) {
+            println("✅ Image selected: ${imageBytes.size} bytes (waiting for Update button)")
             viewModel.updateProfileWithImage(imageBytes)
         }
     }
 
-    // Handle update success
+    // ✅ Handle update success with delay
     LaunchedEffect(state.updateSuccess) {
         if (state.updateSuccess) {
+            showSuccessDialog = true
+            delay(1500) // Show success for 1.5 seconds
+            showSuccessDialog = false
             viewModel.resetUpdateSuccess()
+            delay(200) // Small delay before navigation
             onBackPressed()
         }
     }
@@ -63,8 +75,8 @@ fun EditProfileScreen(
         onNameChange = { viewModel.updateName(it) },
         onEmailChange = { viewModel.updateEmail(it) },
         onImageClick = { showImageZoom = true },
-        onImageEditClick = { imagePickerLauncher.launch() },  // ✅ Launch picker
-        onUpdateProfile = { viewModel.updateProfile() },
+        onImageEditClick = { imagePickerLauncher.launch() },
+        onUpdateProfile = { viewModel.updateProfile() }, // ✅ Manual upload only
         onDismissError = { viewModel.clearError() }
     )
 
@@ -74,6 +86,42 @@ fun EditProfileScreen(
             imageUrl = state.userImage!!,
             onDismiss = { showImageZoom = false }
         )
+    }
+
+    // ✅ Success Dialog
+    if (showSuccessDialog) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Card(
+                modifier = Modifier.padding(32.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color.White
+                ),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "✓ Success",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF4CAF50)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Profile updated successfully",
+                        fontSize = 14.sp,
+                        color = Color.Gray
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -135,12 +183,11 @@ fun EditProfileScreenContent(
             ) {
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // ✅ Profile Image with Edit Button & Click to Zoom
+                // Profile Image with Edit Button
                 Box(
                     modifier = Modifier.size(120.dp),
                     contentAlignment = Alignment.BottomEnd
                 ) {
-                    // Profile Image (Clickable to zoom)
                     Box(
                         modifier = Modifier
                             .size(120.dp)
@@ -169,7 +216,7 @@ fun EditProfileScreenContent(
                         }
                     }
 
-                    // ✅ Edit Icon Button (Opens Image Picker)
+                    // Edit Icon Button
                     Box(
                         modifier = Modifier
                             .size(36.dp)
@@ -189,7 +236,6 @@ fun EditProfileScreenContent(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // User Name Display
                 Text(
                     text = state.userName,
                     fontSize = 20.sp,
@@ -199,22 +245,22 @@ fun EditProfileScreenContent(
 
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // Full Name Field
+                // Full Name Field (Required)
                 ProfileInputField(
-                    label = "Full Name",
+                    label = "Full Name *",
                     value = state.userName,
                     onValueChange = onNameChange,
-                    placeholder = "Enter your name"
+                    placeholder = "Enter your name (required)"
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Email Field
+                // Email Field (Optional)
                 ProfileInputField(
-                    label = "Email",
+                    label = "Email (Optional)",
                     value = state.userEmail,
                     onValueChange = onEmailChange,
-                    placeholder = "Enter your email",
+                    placeholder = "Enter your email (optional)",
                     keyboardType = KeyboardType.Email
                 )
 
@@ -241,7 +287,7 @@ fun EditProfileScreenContent(
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFF4CAF50)
                     ),
-                    enabled = !state.isLoading
+                    enabled = !state.isLoading && state.userName.isNotEmpty()
                 ) {
                     if (state.isLoading) {
                         CircularProgressIndicator(
@@ -277,13 +323,35 @@ fun EditProfileScreenContent(
     // Error Snackbar
     state.error?.let { error ->
         LaunchedEffect(error) {
-            // Show error toast/snackbar
+            println("❌ Error: $error")
+            delay(3000)
             onDismissError()
+        }
+
+        // Show error at bottom
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFF44336)
+                ),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(
+                    text = error,
+                    color = Color.White,
+                    modifier = Modifier.padding(16.dp),
+                    fontSize = 14.sp
+                )
+            }
         }
     }
 }
 
-// ✅ Profile Image Zoom Dialog
 @Composable
 fun ProfileImageZoomDialog(
     imageUrl: String,
@@ -304,7 +372,6 @@ fun ProfileImageZoomDialog(
                 .clickable { onDismiss() },
             contentAlignment = Alignment.Center
         ) {
-            // Zoomed Image
             AsyncImage(
                 model = imageUrl,
                 contentDescription = "Profile Picture Zoomed",
@@ -315,7 +382,6 @@ fun ProfileImageZoomDialog(
                 contentScale = ContentScale.Crop
             )
 
-            // Close Button
             IconButton(
                 onClick = onDismiss,
                 modifier = Modifier
