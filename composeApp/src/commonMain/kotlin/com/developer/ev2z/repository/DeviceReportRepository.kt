@@ -2,6 +2,7 @@ package com.developer.ev2z.repository
 
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
 import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.response.DeviceAnalyticsResponse
 import com.developer.ev2z.response.MobilizeResponse
 import com.developer.ev2z.response.MyDevicesResponse
 import com.developer.ev2z.response.TotalMilagesResponse
@@ -35,5 +36,14 @@ class DeviceReportRepository(
         command: String
     ): MobilizeResponse {
         return apiService.sendMobilizeCommand(token, terminalId, command)
+    }
+
+
+    suspend fun getDeviceAnalytics(
+        token: String,
+        deviceId: String,
+        range: String
+    ): DeviceAnalyticsResponse {
+        return apiService.getDeviceAnalytics(token, deviceId, range)
     }
 }

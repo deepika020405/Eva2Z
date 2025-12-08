@@ -2,7 +2,9 @@ package com.developer.ev2z.network
 
 import com.developer.ev2z.data.local.model.DeviceResponse
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
+import com.developer.ev2z.request.DeviceAnalyticsRequest
 import com.developer.ev2z.request.LoginRequest
+import com.developer.ev2z.response.DeviceAnalyticsResponse
 import com.developer.ev2z.response.LoginResponse
 import com.developer.ev2z.response.MyDevicesResponse
 import io.ktor.client.call.*
@@ -234,5 +236,35 @@ class ApiService {
         }
     }
 
+
+    suspend fun getDeviceAnalytics(
+        token: String,
+        deviceId: String,
+        range: String
+    ): DeviceAnalyticsResponse {
+
+        println("🌐 API: Fetching analytics for device_id=$deviceId, range=$range")
+
+        try {
+            val response = client.post("${baseUrl}device/analytics") {
+                headers {
+                    append(HttpHeaders.Authorization, "Bearer $token")
+                    append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    append(HttpHeaders.Accept, ContentType.Application.Json.toString())
+                }
+                setBody(DeviceAnalyticsRequest(device_id = deviceId, range = range))
+            }
+
+            println("🌐 API: Analytics status: ${response.status}")
+            val result: DeviceAnalyticsResponse = response.body()
+            println("🌐 API: Analytics total distance = ${result.data?.totalDistanceKm}")
+            return result
+
+        } catch (e: Exception) {
+            println("❌ Analytics API Error: ${e.message}")
+            e.printStackTrace()
+            throw e
+        }
+    }
 
 }

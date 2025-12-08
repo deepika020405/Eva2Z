@@ -5,11 +5,18 @@ import androidx.lifecycle.viewModelScope
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
 import com.developer.ev2z.repository.DeviceReportRepository
 import com.developer.ev2z.response.Device
+import com.developer.ev2z.response.DeviceAnalyticsData
 import com.developer.ev2z.response.TotalMilagesData
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+
+enum class AnalyticsRange(val apiValue: String) {
+    TODAY("today"),
+    WEEK("week"),
+    MONTH("month")
+}
 
 class DeviceReportViewModel(
     private val repository: DeviceReportRepository,
@@ -45,6 +52,26 @@ class DeviceReportViewModel(
 
     private val _showConfirmationDialog = MutableStateFlow<MobilizeDialogData?>(null)
     val showConfirmationDialog = _showConfirmationDialog.asStateFlow()
+
+
+
+    private val _selectedAnalyticsRange =
+        MutableStateFlow(AnalyticsRange.TODAY)
+    val selectedAnalyticsRange: StateFlow<AnalyticsRange> =
+        _selectedAnalyticsRange.asStateFlow()
+
+    private val _deviceAnalytics =
+        MutableStateFlow<DeviceAnalyticsData?>(null)
+    val deviceAnalytics: StateFlow<DeviceAnalyticsData?> =
+        _deviceAnalytics.asStateFlow()
+
+    private val _isAnalyticsLoading = MutableStateFlow(false)
+    val isAnalyticsLoading: StateFlow<Boolean> =
+        _isAnalyticsLoading.asStateFlow()
+
+    private val _analyticsError = MutableStateFlow<String?>(null)
+    val analyticsError: StateFlow<String?> = _analyticsError.asStateFlow()
+
 
     data class MobilizeDialogData(
         val command: String,   // "cut" or "restore"
@@ -153,6 +180,50 @@ class DeviceReportViewModel(
     fun closeMobilizeDialog() {
         _showConfirmationDialog.value = null
     }
+
+
+    fun fetchDeviceAnalytics(
+        token: String,
+        deviceId: String,
+        range: AnalyticsRange = _selectedAnalyticsRange.value
+    ) {
+        viewModelScope.launch {
+            _isAnalyticsLoading.value = true
+            _analyticsError.value = null
+
+            try {
+                val response = repository.getDeviceAnalytics(
+                    token = token,
+                    deviceId = deviceId,
+                    range = range.apiValue   // "today" / "week" / "month"
+                )
+
+                if (response.success && response.data != null) {
+                    _deviceAnalytics.value = response.data
+                    _selectedAnalyticsRange.value = range
+                } else {
+                    _analyticsError.value =
+                        response.message ?: "Failed to fetch analytics"
+                }
+            } catch (e: Exception) {
+                _analyticsError.value =
+                    e.message ?: "Unknown error while fetching analytics"
+            } finally {
+                _isAnalyticsLoading.value = false
+            }
+        }
+    }
+
+    fun onAnalyticsRangeSelected(token: String, range: AnalyticsRange) {
+        val deviceId = _selectedDevice.value?.device_id ?: return
+        fetchDeviceAnalytics(token, deviceId, range)
+    }
+
+    fun refreshAnalytics(token: String) {
+        val deviceId = _selectedDevice.value?.device_id ?: return
+        fetchDeviceAnalytics(token, deviceId, _selectedAnalyticsRange.value)
+    }
+
 }
 
 sealed class DeviceReportUiState {
