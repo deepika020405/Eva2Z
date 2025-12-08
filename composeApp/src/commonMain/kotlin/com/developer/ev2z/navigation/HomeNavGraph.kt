@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.tab.*
 import com.developer.ev2z.ui.screens.homeScreen.HomeScreen
 import com.developer.ev2z.ui.screens.homeScreen.HomeViewModel
+import com.developer.ev2z.ui.screens.market_screen.ShopScreenHost
 import kotlinx.coroutines.launch
 
 // ------------------ TABS -------------------
@@ -57,8 +58,8 @@ object WalletTab : Tab {
 
 object OrdersTab : Tab {
     @Composable
-    override fun Content() = OrdersScreen()
-//    override fun Content() = DeviceReportScreen()
+//    override fun Content() = OrdersScreen()
+    override fun Content() = ShopScreenHost()
 
     override val options: TabOptions
         @Composable get() = TabOptions(
