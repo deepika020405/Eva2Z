@@ -15,8 +15,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.navigator.tab.*
+import com.developer.ev2z.data.local.StorageManager
+import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.ui.screens.EditProfile.EditProfileScreen
+import com.developer.ev2z.ui.screens.Profile.ProfileScreen
 import com.developer.ev2z.ui.screens.homeScreen.HomeScreen
 import com.developer.ev2z.ui.screens.homeScreen.HomeViewModel
+import com.developer.ev2z.ui.screens.ManageDevices.ManageDeviceScreen
 import com.developer.ev2z.ui.screens.market_screen.ShopScreenHost
 import kotlinx.coroutines.launch
 
@@ -58,7 +63,6 @@ object WalletTab : Tab {
 
 object OrdersTab : Tab {
     @Composable
-//    override fun Content() = OrdersScreen()
     override fun Content() = ShopScreenHost()
 
     override val options: TabOptions
@@ -69,9 +73,23 @@ object OrdersTab : Tab {
         )
 }
 
-object ProfileTab : Tab {
+class ProfileTab(
+    private val apiService: ApiService,
+    private val storageManager: StorageManager,
+    private val onNavigateToEditProfile: () -> Unit,
+    private val onNavigateToManageDevice: () -> Unit,
+    private val onLogout: () -> Unit
+) : Tab {
     @Composable
-    override fun Content() = ProfileScreen()
+    override fun Content() {
+        ProfileScreen(
+            apiService = apiService,
+            storageManager = storageManager,
+            onEditProfile = onNavigateToEditProfile,
+            onManageDevice = onNavigateToManageDevice,
+            onLogout = onLogout
+        )
+    }
 
     override val options: TabOptions
         @Composable get() = TabOptions(
@@ -81,12 +99,14 @@ object ProfileTab : Tab {
         )
 }
 
-// ------------------ NAV GRAPH WITH SWIPE -------------------
+// ------------------ MAIN NAV GRAPH -------------------
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeNavGraph(
     viewModel: HomeViewModel,
+    apiService: ApiService,
+    storageManager: StorageManager,
     token: String,
     onNavigateToAddDevice: () -> Unit,
     onNavigateToDeviceReport: () -> Unit,
@@ -94,8 +114,71 @@ fun HomeNavGraph(
 ) {
     SetupStatusBar()
 
-    val homeTab = remember { HomeTab(viewModel, token, onNavigateToAddDevice,onNavigateToDeviceReport) }
-    val tabs = listOf(homeTab, WalletTab, OrdersTab, ProfileTab)
+    var showEditProfile by remember { mutableStateOf(false) }
+    var showManageDevice by remember { mutableStateOf(false) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        HomeNavGraphContent(
+            viewModel = viewModel,
+            apiService = apiService,
+            storageManager = storageManager,
+            token = token,
+            onNavigateToAddDevice = onNavigateToAddDevice,
+            onNavigateToDeviceReport = onNavigateToDeviceReport,
+            onNavigateToEditProfile = { showEditProfile = true },
+            onNavigateToManageDevice = { showManageDevice = true },
+            onLogout = onLogout
+        )
+
+        if (showEditProfile) {
+            EditProfileScreen(
+                apiService = apiService,
+                storageManager = storageManager,
+                onBackPressed = { showEditProfile = false }
+            )
+        }
+
+        if (showManageDevice) {
+            ManageDeviceScreen(
+                apiService = apiService,
+                storageManager = storageManager,
+                onBackClick = { showManageDevice = false },
+                onProfileClick = {
+                    showManageDevice = false
+                },
+                onAddDeviceClick = {
+                    showManageDevice = false
+                    onNavigateToAddDevice()
+                }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun HomeNavGraphContent(
+    viewModel: HomeViewModel,
+    apiService: ApiService,
+    storageManager: StorageManager,
+    token: String,
+    onNavigateToAddDevice: () -> Unit,
+    onNavigateToDeviceReport: () -> Unit,
+    onNavigateToEditProfile: () -> Unit,
+    onNavigateToManageDevice: () -> Unit,
+    onLogout: () -> Unit
+) {
+    val homeTab = remember { HomeTab(viewModel, token, onNavigateToAddDevice, onNavigateToDeviceReport) }
+    val profileTab = remember {
+        ProfileTab(
+            apiService,
+            storageManager,
+            onNavigateToEditProfile,
+            onNavigateToManageDevice,
+            onLogout
+        )
+    }
+    val tabs = listOf(homeTab, WalletTab, OrdersTab, profileTab)
     val pagerState = rememberPagerState(pageCount = { tabs.size })
     val coroutineScope = rememberCoroutineScope()
 
@@ -177,25 +260,5 @@ expect fun SetupStatusBar()
 fun WalletScreen() {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text("Explore Screen", style = MaterialTheme.typography.headlineMedium)
-    }
-}
-
-@Composable
-fun OrdersScreen() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text("Shop Screen", style = MaterialTheme.typography.headlineMedium)
-    }
-}
-
-@Composable
-fun ProfileScreen() {
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text("Profile Screen", style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(16.dp))
-        Button(onClick = {}) { Text("Logout") }
     }
 }

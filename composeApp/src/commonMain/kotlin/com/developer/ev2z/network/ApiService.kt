@@ -4,210 +4,176 @@ import com.developer.ev2z.data.local.model.DeviceResponse
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
 import com.developer.ev2z.request.DeviceAnalyticsRequest
 import com.developer.ev2z.request.LoginRequest
-import com.developer.ev2z.response.DeviceAnalyticsResponse
-import com.developer.ev2z.response.LoginResponse
-import com.developer.ev2z.response.MyDevicesResponse
+import com.developer.ev2z.response.*
 import io.ktor.client.call.*
 import io.ktor.client.request.*
-import io.ktor.http.*
-import kotlinx.serialization.json.JsonObject
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
-import io.ktor.http.Parameters
-import com.developer.ev2z.response.TotalMilagesResponse
-import com.developer.ev2z.response.MobilizeResponse
-
+import io.ktor.http.*
+import kotlinx.serialization.json.JsonObject
 
 class ApiService {
 
     private val client = KtorClient.client
     private val baseUrl = KtorClient.BASE_URL
 
-    suspend fun login(request: LoginRequest): LoginResponse {
-        println("🌐 API: Sending login request to ${baseUrl}login")
-        println("🌐 API: Request body: $request")
+    // ---------------- LOGIN ----------------
 
-        try {
+    suspend fun login(request: LoginRequest): LoginResponse {
+        println("🌐 API: Sending login request")
+
+        return try {
             val response = client.post("${baseUrl}login") {
                 contentType(ContentType.Application.Json)
                 setBody(request)
             }
 
-            println("🌐 API: Response status: ${response.status}")
-            val result: LoginResponse = response.body()
-            println("🌐 API: Response body: $result")
-            return result
+            println("✔️ API Login status: ${response.status}")
+            response.body()
 
         } catch (e: Exception) {
-            println("❌ API Error: ${e.message}")
-            e.printStackTrace()
+            println("❌ API Login Error: ${e.message}")
             throw e
         }
     }
 
+    // ---------------- LATEST LOCATIONS ----------------
 
     suspend fun getDevicesLatestLocations(token: String): DeviceResponse {
-        println("🌐 API: Fetching latest device locations")
-        println("🌐 API: Token: $token")
+        println("🌐 API: Fetching latest locations")
 
-        try {
+        return try {
             val response = client.get("${baseUrl}user/devices/latest-locations") {
-                headers {
-                    append(HttpHeaders.Authorization, "Bearer $token")
-                }
+                header(HttpHeaders.Authorization, "Bearer $token")
             }
 
-            println("🌐 API: Response status: ${response.status}")
-            val result: DeviceResponse = response.body()
-            println("🌐 API: Devices fetched: ${result.totalDevices}")
-            return result
+            println("✔️ Latest Locations Status: ${response.status}")
+            response.body()
 
         } catch (e: Exception) {
-            println("❌ API Error: ${e.message}")
-            e.printStackTrace()
+            println("❌ Latest Location Error: ${e.message}")
             throw e
         }
     }
 
+    // ---------------- ADD DEVICE ----------------
 
     suspend fun addDevice(token: String, body: JsonObject): JsonObject {
         println("🌐 API: Adding device")
 
-        try {
+        return try {
             val response = client.post("${baseUrl}add-device") {
-                headers {
-                    append(HttpHeaders.Authorization, "Bearer $token")
-                }
+                header(HttpHeaders.Authorization, "Bearer $token")
                 contentType(ContentType.Application.Json)
                 setBody(body)
             }
 
-            println("🌐 API: Response status: ${response.status}")
-            val result: JsonObject = response.body()
-            return result
+            println("✔️ Add Device Status: ${response.status}")
+            response.body()
 
         } catch (e: Exception) {
-            println("❌ API Error: ${e.message}")
-            e.printStackTrace()
+            println("❌ Add Device Error: ${e.message}")
             throw e
         }
     }
+
+    // ---------------- UPDATE DEVICE ----------------
 
     suspend fun updateDevice(token: String, body: JsonObject): JsonObject {
         println("🌐 API: Updating device")
 
-        try {
+        return try {
             val response = client.post("${baseUrl}update-device") {
-                headers {
-                    append(HttpHeaders.Authorization, "Bearer $token")
-                }
+                header(HttpHeaders.Authorization, "Bearer $token")
                 contentType(ContentType.Application.Json)
                 setBody(body)
             }
 
-            println("🌐 API: Response status: ${response.status}")
-            val result: JsonObject = response.body()
-            return result
+            println("✔️ Update Device Status: ${response.status}")
+            response.body()
 
         } catch (e: Exception) {
-            println("❌ API Error: ${e.message}")
-            e.printStackTrace()
+            println("❌ Update Device Error: ${e.message}")
             throw e
         }
     }
+
+    // ---------------- MY DEVICES ----------------
 
     suspend fun getMyDevices(token: String): MyDevicesResponse {
         println("🌐 API: Fetching my devices")
 
-        try {
+        return try {
             val response = client.get("${baseUrl}devices/my-devices") {
-                headers {
-                    append(HttpHeaders.Authorization, "Bearer $token")
-                }
+                header(HttpHeaders.Authorization, "Bearer $token")
             }
 
-            println("🌐 API: Response status: ${response.status}")
-            val result: MyDevicesResponse = response.body()
-            println("🌐 API: Total devices: ${result.total_devices}")
-            return result
+            println("✔️ My Devices Status: ${response.status}")
+            response.body()
 
         } catch (e: Exception) {
-            println("❌ API Error: ${e.message}")
-            e.printStackTrace()
+            println("❌ My Devices Error: ${e.message}")
             throw e
         }
     }
 
+    // ---------------- LIVE LOCATION ----------------
 
     suspend fun getDeviceLiveLocation(
         token: String,
         deviceId: String
     ): LiveLocationResponse {
-        println("🌐 API: Fetching live location for deviceId=$deviceId")
 
-        try {
+        return try {
             val response = client.get("${baseUrl}live-location/$deviceId") {
-                headers {
-                    append(HttpHeaders.Authorization, "Bearer $token")
-                }
+                header(HttpHeaders.Authorization, "Bearer $token")
             }
 
-            println("🌐 API: Live location status: ${response.status}")
-            val result: LiveLocationResponse = response.body()
-            return result
+            println("✔️ Live Location Status: ${response.status}")
+            response.body()
 
         } catch (e: Exception) {
-            println("❌ Live Location API Error: ${e.message}")
-            e.printStackTrace()
+            println("❌ Live Location Error: ${e.message}")
             throw e
         }
     }
 
+    // ---------------- TOTAL MILAGES ----------------
 
-    // ------------------ TOTAL MILAGES ------------------
+    suspend fun getTotalMilages(token: String, terminalId: String): TotalMilagesResponse {
+        println("🌐 API: Fetching total milages")
 
-    suspend fun getTotalMilages(
-        token: String,
-        terminalId: String
-    ): TotalMilagesResponse {
-        println("🌐 API: Fetching total milages for terminal_id=$terminalId")
-
-        try {
+        return try {
             val response = client.submitForm(
                 url = "${baseUrl}total-milages",
                 formParameters = Parameters.build {
                     append("terminal_id", terminalId)
                 }
             ) {
-                headers {
-                    append(HttpHeaders.Authorization, "Bearer $token")
-                    append(HttpHeaders.Accept, ContentType.Application.Json.toString())
-                }
+                header(HttpHeaders.Authorization, "Bearer $token")
+                header(HttpHeaders.Accept, ContentType.Application.Json.toString())
             }
 
-            println("🌐 API: Total milages status: ${response.status}")
-            val result: TotalMilagesResponse = response.body()
-            println("🌐 API: Total distance: ${result.data?.total_distance_km}, Today: ${result.data?.today_distance_km}")
-            return result
+            println("✔️ Total Milages Status: ${response.status}")
+            response.body()
 
         } catch (e: Exception) {
-            println("❌ Total Milages API Error: ${e.message}")
-            e.printStackTrace()
+            println("❌ Total Milages Error: ${e.message}")
             throw e
         }
     }
 
-    // ------------------ MOBILIZE (CUT / RESTORE) ------------------
+    // ---------------- MOBILIZE (CUT / RESTORE) ----------------
 
     suspend fun sendMobilizeCommand(
         token: String,
         terminalId: String,
-        command: String   // "cut" or "restore"
+        command: String
     ): MobilizeResponse {
 
-        println("🌐 API: Sending mobilize command=$command for terminal_id=$terminalId")
+        println("🌐 API: Mobilize command: $command")
 
-        try {
+        return try {
             val response = client.submitForm(
                 url = "${baseUrl}mobilize",
                 formParameters = Parameters.build {
@@ -215,27 +181,20 @@ class ApiService {
                     append("command", command)
                 }
             ) {
-                headers {
-                    append(HttpHeaders.Authorization, "Bearer $token")
-                    append(HttpHeaders.Accept, ContentType.Application.Json.toString())
-                }
+                header(HttpHeaders.Authorization, "Bearer $token")
+                header(HttpHeaders.Accept, ContentType.Application.Json.toString())
             }
 
-            println("🌐 API: Mobilize status: ${response.status}")
-
-            val result: MobilizeResponse = response.body()
-
-            println("🌐 API: Mobilize message: ${result.message}")
-
-            return result
+            println("✔️ Mobilize Status: ${response.status}")
+            response.body()
 
         } catch (e: Exception) {
-            println("❌ Mobilize API Error: ${e.message}")
-            e.printStackTrace()
+            println("❌ Mobilize Error: ${e.message}")
             throw e
         }
     }
 
+    // ---------------- ANALYTICS ----------------
 
     suspend fun getDeviceAnalytics(
         token: String,
@@ -243,28 +202,123 @@ class ApiService {
         range: String
     ): DeviceAnalyticsResponse {
 
-        println("🌐 API: Fetching analytics for device_id=$deviceId, range=$range")
+        println("🌐 API: Device Analytics")
 
-        try {
+        return try {
             val response = client.post("${baseUrl}device/analytics") {
-                headers {
-                    append(HttpHeaders.Authorization, "Bearer $token")
-                    append(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-                    append(HttpHeaders.Accept, ContentType.Application.Json.toString())
-                }
+                header(HttpHeaders.Authorization, "Bearer $token")
+                contentType(ContentType.Application.Json)
                 setBody(DeviceAnalyticsRequest(device_id = deviceId, range = range))
             }
 
-            println("🌐 API: Analytics status: ${response.status}")
-            val result: DeviceAnalyticsResponse = response.body()
-            println("🌐 API: Analytics total distance = ${result.data?.totalDistanceKm}")
-            return result
+            println("✔️ Analytics Status: ${response.status}")
+            response.body()
 
         } catch (e: Exception) {
-            println("❌ Analytics API Error: ${e.message}")
-            e.printStackTrace()
+            println("❌ Analytics Error: ${e.message}")
             throw e
         }
     }
+
+    // ---------------- PROFILE PICTURE ----------------
+
+    suspend fun getProfilePicture(token: String): JsonObject {
+        return client.get("${baseUrl}profile-picture") {
+            header(HttpHeaders.Authorization, token)
+        }.body()
+    }
+
+    // ---------------- UPDATE PROFILE (MULTIPART) ----------------
+
+    suspend fun updateProfile(
+        token: String,
+        name: String,
+        email: String,
+        photo: ByteArray? = null
+    ): JsonObject {
+
+        println("🌐 API: Updating profile")
+
+        return try {
+            val response = client.submitFormWithBinaryData(
+                url = "${baseUrl}update-profile",
+                formData = formData {
+                    append("name", name)
+
+                    if (email.isNotEmpty()) {
+                        append("email", email)
+                    }
+
+                    photo?.let {
+                        append("photo", it, Headers.build {
+                            append(HttpHeaders.ContentType, "image/jpeg")
+                            append(HttpHeaders.ContentDisposition, "filename=profile.jpg")
+                        })
+                    }
+                }
+            ) {
+                header(HttpHeaders.Authorization, token)
+            }
+
+            println("✔️ Profile Update Status: ${response.status}")
+            response.body()
+
+        } catch (e: Exception) {
+            println("❌ Profile Update Error: ${e.message}")
+            throw e
+        }
+    }
+
+    // ---------------- DELETE DEVICE ----------------
+
+    suspend fun deleteDevice(deviceId: String, token: String): JsonObject {
+
+        println("🌐 API: Deleting device: $deviceId")
+
+        return try {
+            val response = client.delete("${baseUrl}delete-device/$deviceId") {
+                header(HttpHeaders.Authorization, token)
+            }
+
+            println("✔️ Delete Status: ${response.status}")
+            response.body()
+
+        } catch (e: Exception) {
+            println("❌ Delete Error: ${e.message}")
+            throw e
+        }
+    }
+
+    // ---------------- MOBILIZE (2nd API) ----------------
+
+    suspend fun mobilizeDevice(
+        token: String,
+        terminalId: String,
+        command: String
+    ): JsonObject {
+
+        println("🌐 API: Mobilizing second method")
+
+        return try {
+            val response = client.submitForm(
+                url = "${baseUrl}mobilize",
+                formParameters = Parameters.build {
+                    append("terminal_id", terminalId)
+                    append("command", command)
+                }
+            ) {
+                header(HttpHeaders.Authorization, token)
+                header(HttpHeaders.Accept, "application/json")
+            }
+
+            println("✔️ Mobilize Device Status: ${response.status}")
+            response.body()
+
+        } catch (e: Exception) {
+            println("❌ Mobilize Device Error: ${e.message}")
+            throw e
+        }
+    }
+
 
 }

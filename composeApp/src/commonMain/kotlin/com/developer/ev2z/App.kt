@@ -25,7 +25,7 @@ import com.developer.ev2z.repository.DeviceReportRepository
 import com.developer.ev2z.repository.HomeRepository
 import com.developer.ev2z.ui.screens.AddDevice.AddDeviceViewModel
 import com.developer.ev2z.ui.screens.AddDevice.AddDeviceResult
-//import com.developer.ev2z.ui.screens.AddDevice.BottomSheet
+import com.developer.ev2z.ui.screens.AddDevice.BottomSheet
 import com.developer.ev2z.ui.screens.AddDeviceSuccess.AddDeviceSuccessScreen
 import com.developer.ev2z.ui.screens.device_Report.DeviceReportScreen
 import com.developer.ev2z.ui.screens.device_Report.DeviceReportViewModel
@@ -37,7 +37,7 @@ fun App() {
     val apiService = remember { ApiService() }
     val authRepository = remember { AuthRepository(apiService) }
     val homeRepository = remember { HomeRepository(apiService) }
-    val deviceReportRepository = remember { DeviceReportRepository(apiService) } // ✅ Added
+    val deviceReportRepository = remember { DeviceReportRepository(apiService) }
     val storage = remember { createStorageManager() }
     val userPrefs = remember { UserPrefs(storage) }
     val authViewModel = remember { AuthViewModel(authRepository, storage) }
@@ -65,7 +65,7 @@ fun App() {
     var successDeviceName by remember { mutableStateOf("") }
     var successDeviceId by remember { mutableStateOf("") }
     var successSimNumber by remember { mutableStateOf("") }
-    var successDeviceType by remember { mutableStateOf("") } // ✅ Added this line
+    var successDeviceType by remember { mutableStateOf("") }
 
     val loginSuccess by authViewModel.loginSuccess.collectAsState()
     val addDeviceResult by addDeviceViewModel.addDeviceResult.collectAsState()
@@ -139,28 +139,28 @@ fun App() {
 
             showAddDevice -> {
                 println("📱 Rendering: Add Device Screen")
-//                BottomSheet(
-//                    onNavigate = { route ->
-//                        when (route) {
-//                            "home" -> {
-//                                println("🏠 Navigating back to home from add device")
-//                                showAddDevice = false
-//                                addDeviceViewModel.clearData()
-//                            }
-//                            "addDeviceDeteails" -> {
-//                                println("📝 Staying on add device details")
-//                            }
-//                        }
-//                    },
-//                    viewModel = addDeviceViewModel
-//                )
+                BottomSheet(
+                    onNavigate = { route ->
+                        when (route) {
+                            "home" -> {
+                                println("🏠 Navigating back to home from add device")
+                                showAddDevice = false
+                                addDeviceViewModel.clearData()
+                            }
+                            "addDeviceDeteails" -> {
+                                println("📝 Staying on add device details")
+                            }
+                        }
+                    },
+                    viewModel = addDeviceViewModel
+                )
             }
 
             showDeviceReport -> {
-                println("📱 Rendering: Device Report Screen") // ✅ Added log
+                println("📱 Rendering: Device Report Screen")
                 DeviceReportScreen(
-                    viewModel = deviceReportViewModel, // ✅ Pass ViewModel
-                    token = authToken, // ✅ Pass token
+                    viewModel = deviceReportViewModel,
+                    token = authToken,
                     username = username,
                     onBack = {
                         println("🔙 Back from Device Report to Home")
@@ -173,15 +173,16 @@ fun App() {
                 println("📱 Rendering: Home Screen")
                 HomeNavGraph(
                     viewModel = homeViewModel,
+                    apiService = apiService,
+                    storageManager = storage,
                     token = authToken,
                     onNavigateToAddDevice = {
                         println("➕ Navigate to Add Device triggered")
                         showAddDevice = true
                     },
                     onNavigateToDeviceReport = {
-                        println("➕ Navigate to  Device Report triggered")
+                        println("➕ Navigate to Device Report triggered")
                         showDeviceReport = true
-
                     },
                     onLogout = {
                         println("🚪 Logging out...")

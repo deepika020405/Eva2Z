@@ -3,6 +3,8 @@ package com.developer.ev2z.response
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+// ---------------------- DeviceResponse (Dashboard) ----------------------
+
 @Serializable
 data class DeviceResponse(
     val success: Boolean,
@@ -37,6 +39,9 @@ data class DeviceItem(
     val last_seen_minutes_ago: Int? = null
 )
 
+
+// ---------------------- MyDevicesResponse (Devices List) ----------------------
+
 @Serializable
 data class MyDevicesResponse(
     val success: Boolean,
@@ -54,6 +59,8 @@ data class Device(
     val device_name: String,
     @SerialName("sim_no")
     val sim_no: String? = null,
+    @SerialName("device_type")
+    val device_type: String? = null,
     @SerialName("engine_status")
     val engine_status: String,
     val status: String,
