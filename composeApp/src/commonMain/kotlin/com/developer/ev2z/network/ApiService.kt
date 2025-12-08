@@ -9,6 +9,11 @@ import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.http.*
 import kotlinx.serialization.json.JsonObject
+import io.ktor.client.request.forms.*
+import io.ktor.client.statement.*
+import io.ktor.http.Parameters
+import com.developer.ev2z.response.TotalMilagesResponse
+import com.developer.ev2z.response.MobilizeResponse
 
 
 class ApiService {
@@ -155,4 +160,79 @@ class ApiService {
             throw e
         }
     }
+
+
+    // ------------------ TOTAL MILAGES ------------------
+
+    suspend fun getTotalMilages(
+        token: String,
+        terminalId: String
+    ): TotalMilagesResponse {
+        println("🌐 API: Fetching total milages for terminal_id=$terminalId")
+
+        try {
+            val response = client.submitForm(
+                url = "${baseUrl}total-milages",
+                formParameters = Parameters.build {
+                    append("terminal_id", terminalId)
+                }
+            ) {
+                headers {
+                    append(HttpHeaders.Authorization, "Bearer $token")
+                    append(HttpHeaders.Accept, ContentType.Application.Json.toString())
+                }
+            }
+
+            println("🌐 API: Total milages status: ${response.status}")
+            val result: TotalMilagesResponse = response.body()
+            println("🌐 API: Total distance: ${result.data?.total_distance_km}, Today: ${result.data?.today_distance_km}")
+            return result
+
+        } catch (e: Exception) {
+            println("❌ Total Milages API Error: ${e.message}")
+            e.printStackTrace()
+            throw e
+        }
+    }
+
+    // ------------------ MOBILIZE (CUT / RESTORE) ------------------
+
+    suspend fun sendMobilizeCommand(
+        token: String,
+        terminalId: String,
+        command: String   // "cut" or "restore"
+    ): MobilizeResponse {
+
+        println("🌐 API: Sending mobilize command=$command for terminal_id=$terminalId")
+
+        try {
+            val response = client.submitForm(
+                url = "${baseUrl}mobilize",
+                formParameters = Parameters.build {
+                    append("terminal_id", terminalId)
+                    append("command", command)
+                }
+            ) {
+                headers {
+                    append(HttpHeaders.Authorization, "Bearer $token")
+                    append(HttpHeaders.Accept, ContentType.Application.Json.toString())
+                }
+            }
+
+            println("🌐 API: Mobilize status: ${response.status}")
+
+            val result: MobilizeResponse = response.body()
+
+            println("🌐 API: Mobilize message: ${result.message}")
+
+            return result
+
+        } catch (e: Exception) {
+            println("❌ Mobilize API Error: ${e.message}")
+            e.printStackTrace()
+            throw e
+        }
+    }
+
+
 }

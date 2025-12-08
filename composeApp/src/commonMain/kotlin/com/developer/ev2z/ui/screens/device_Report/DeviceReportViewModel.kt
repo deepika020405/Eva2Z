@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
 import com.developer.ev2z.repository.DeviceReportRepository
 import com.developer.ev2z.response.Device
+import com.developer.ev2z.response.TotalMilagesData
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,6 +34,22 @@ class DeviceReportViewModel(
     // 👇 NEW: address state
     private val _address = MutableStateFlow<String?>(null)
     val address: StateFlow<String?> = _address.asStateFlow()
+
+    // 👉 total milage state
+    private val _totalMilages = MutableStateFlow<TotalMilagesData?>(null)
+    val totalMilages: StateFlow<TotalMilagesData?> = _totalMilages.asStateFlow()
+
+    // 👉 engine cut/restore command state
+    private val _mobilizeMessage = MutableStateFlow<String?>(null)
+    val mobilizeMessage: StateFlow<String?> = _mobilizeMessage.asStateFlow()
+
+    private val _showConfirmationDialog = MutableStateFlow<MobilizeDialogData?>(null)
+    val showConfirmationDialog = _showConfirmationDialog.asStateFlow()
+
+    data class MobilizeDialogData(
+        val command: String,   // "cut" or "restore"
+        val terminalId: String
+    )
 
     fun fetchMyDevices(token: String) {
         viewModelScope.launch {
@@ -95,6 +112,46 @@ class DeviceReportViewModel(
                 _address.value = address ?: "Address not found"
             }
         }
+    }
+
+
+
+    fun fetchTotalMilages(token: String, terminalId: String) {
+        viewModelScope.launch {
+            try {
+                val response = repository.getTotalMilages(token, terminalId)
+                if (response.success && response.data != null) {
+                    _totalMilages.value = response.data
+                } else {
+                    _mobilizeMessage.value = "Failed to fetch total milages"
+                }
+            } catch (e: Exception) {
+                _mobilizeMessage.value = e.message ?: "Unknown error while fetching total milages"
+            }
+        }
+    }
+
+    fun sendMobilizeCommand(token: String, terminalId: String, command: String) {
+        viewModelScope.launch {
+            try {
+                val response = repository.sendMobilizeCommand(token, terminalId, command)
+                if (response.success) {
+                    _mobilizeMessage.value = response.message
+                } else {
+                    _mobilizeMessage.value = "Failed to send command"
+                }
+            } catch (e: Exception) {
+                _mobilizeMessage.value = e.message ?: "Unknown error while sending command"
+            }
+        }
+    }
+
+    fun openMobilizeDialog(command: String, terminalId: String) {
+        _showConfirmationDialog.value = MobilizeDialogData(command, terminalId)
+    }
+
+    fun closeMobilizeDialog() {
+        _showConfirmationDialog.value = null
     }
 }
 

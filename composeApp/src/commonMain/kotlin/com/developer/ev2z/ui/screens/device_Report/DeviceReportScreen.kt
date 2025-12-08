@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.developer.ev2z.BackPressHandler
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
 import com.developer.ev2z.response.Device
@@ -93,6 +95,7 @@ fun DeviceReportScreen(
                 onDeviceSelected = { device -> viewModel.selectDevice(device, token) },
                 onBack = onBack,
                 username = username,
+                token = token,
                 viewModel = viewModel// 👈 NEW
             )
         }
@@ -109,6 +112,7 @@ fun DeviceReportContent(
     onDeviceSelected: (Device) -> Unit,
     onBack: () -> Unit,
     username: String,
+    token: String,
     viewModel: DeviceReportViewModel
 ) {
     var isExpanded by remember { mutableStateOf(false) }
@@ -164,6 +168,7 @@ fun DeviceReportContent(
                 device = selectedDevice,
                 liveLocation = liveLocation,
                 isExpanded = isExpanded,
+                token = token,
                 onExpandToggle = { isExpanded = !isExpanded },
                 viewModel = viewModel
             )
@@ -372,6 +377,7 @@ fun BoxScope.DeviceReportBottomSheetWithData(
     device: Device,
     liveLocation: LiveLocationResponse?,
     isExpanded: Boolean,
+    token : String,
     onExpandToggle: () -> Unit,
     viewModel: DeviceReportViewModel
 ) {
@@ -398,6 +404,7 @@ fun BoxScope.DeviceReportBottomSheetWithData(
             // Device Basic Info
             DeviceBasicInfoWithData(
                 liveLocation = liveLocation,
+                token = token,
                 device = device,
                 viewModel = viewModel
             )
@@ -424,7 +431,7 @@ fun BoxScope.DeviceReportBottomSheetWithData(
             }
 
             if (isExpanded) {
-                DeviceAnalysisContentWithData(liveLocation)
+                DeviceAnalysisContentWithData(liveLocation,viewModel)
             }
         }
     }
@@ -447,18 +454,154 @@ fun ReportHeaderWithData(
     }
 }
 
+//@Composable
+//fun DeviceBasicInfoWithData(
+//    liveLocation: LiveLocationResponse?,
+//    device: Device,
+//    token: String,
+//    viewModel: DeviceReportViewModel
+//) {
+//    val latest = liveLocation?.data?.latestLocation
+//    val currentStatus = latest?.status ?: device.status
+//    val dialogState by viewModel.showConfirmationDialog.collectAsState()
+//    // jab bhi location change ho, address fetch karo
+//    LaunchedEffect(latest?.latitude, latest?.longitude) {
+//        latest?.let {
+//            viewModel.getAddressFromLatLng(it.latitude.toDouble(), it.longitude.toDouble())
+//        }
+//    }
+//
+//    val address by viewModel.address.collectAsState()
+//
+//    Text(
+//        "Live Location\n${address ?: "Fetching..."}",
+//        fontSize = 14.sp,
+//        modifier = Modifier.padding(horizontal = 18.dp),
+//        color = Color.DarkGray
+//    )
+//
+//    Spacer(Modifier.height(10.dp))
+//
+////    Row(
+////        Modifier
+////            .fillMaxWidth()
+////            .padding(horizontal = 18.dp),
+////        horizontalArrangement = Arrangement.spacedBy(14.dp)
+////    ) {
+////        val currentStatus = latest?.status ?: device.status
+////
+////        OutlinedButton(
+////            onClick = { /* Handle Turn On */ },
+////            enabled = currentStatus != "moving" && currentStatus != "Running",
+////            modifier = Modifier.weight(1f)
+////        ) {
+////            Text("Turn On")
+////        }
+////
+////        Button(
+////            onClick = { /* Handle Turn Off */ },
+////            modifier = Modifier.weight(1f),
+////            enabled = currentStatus == "moving" || currentStatus == "Running",
+////            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF6B6B))
+////        ) {
+////            Text("Turn Off")
+////        }
+////    }
+//
+//    Row(
+//        Modifier
+//            .fillMaxWidth()
+//            .padding(horizontal = 18.dp),
+//        horizontalArrangement = Arrangement.spacedBy(14.dp)
+//    ) {
+//        val isMoving = currentStatus == "moving" || currentStatus == "Running"
+//
+//        // TURN ON → restore
+//        OutlinedButton(
+//            onClick = {
+//                viewModel.openMobilizeDialog("restore", device.device_id)
+//            },
+//            enabled = !isMoving,   // cannot ON when already moving
+//            modifier = Modifier.weight(1f),
+//            colors = ButtonDefaults.outlinedButtonColors(
+//                contentColor = if (!isMoving) Color(0xFF3EBB3E) else Color.Gray
+//            )
+//        ) {
+//            Text("Turn On")
+//        }
+//
+//        // TURN OFF → cut
+//        Button(
+//            onClick = {
+//                viewModel.openMobilizeDialog("cut", device.device_id)
+//            },
+//            enabled = isMoving,  // Off only allowed if running
+//            modifier = Modifier.weight(1f),
+//            colors = ButtonDefaults.buttonColors(
+//                containerColor = if (isMoving) Color(0xFFFF4E4E) else Color.Gray
+//            )
+//        ) {
+//            Text("Turn Off", color = Color.White)
+//        }
+//    }
+//
+//    Spacer(Modifier.height(12.dp))
+//
+//    val activeTime = latest?.timestamp ?: "N/A"
+//    val lastSeenMinutes = latest?.lastSeenMinutesAgo
+//    val displayTime = if (lastSeenMinutes != null) {
+//        when {
+//            lastSeenMinutes == 0 -> "Just now"
+//            lastSeenMinutes < 60 -> "$lastSeenMinutes minutes ago"
+//            else -> "${lastSeenMinutes / 60} hours ago"
+//        }
+//    } else activeTime
+//
+//    Text(
+//        "Active from: $displayTime",
+//        color = Color.Gray,
+//        fontSize = 12.sp,
+//        modifier = Modifier.padding(horizontal = 18.dp)
+//    )
+//
+//    val dialogData by viewModel.showConfirmationDialog.collectAsState()
+//
+//    if (dialogData != null) {
+//        MobilizeConfirmationDialog(
+//            command = dialogData!!.command,
+//            onConfirm = {
+//                viewModel.sendMobilizeCommand(
+//                    token,
+//                    dialogData!!.terminalId,
+//                    dialogData!!.command
+//                )
+//                viewModel.closeMobilizeDialog()
+//            },
+//            onCancel = {
+//                viewModel.closeMobilizeDialog()
+//            }
+//        )
+//    }
+//}
+
+
 @Composable
 fun DeviceBasicInfoWithData(
     liveLocation: LiveLocationResponse?,
     device: Device,
+    token: String,
     viewModel: DeviceReportViewModel
 ) {
     val latest = liveLocation?.data?.latestLocation
+    val currentStatus = latest?.status ?: device.status
 
     // jab bhi location change ho, address fetch karo
     LaunchedEffect(latest?.latitude, latest?.longitude) {
         latest?.let {
-            viewModel.getAddressFromLatLng(it.latitude.toDouble(), it.longitude.toDouble())
+            viewModel.getAddressFromLatLng(
+                it.latitude.toDouble(),
+                it.longitude.toDouble()
+            )
         }
     }
 
@@ -473,29 +616,63 @@ fun DeviceBasicInfoWithData(
 
     Spacer(Modifier.height(10.dp))
 
+    // --------- BUTTON STATE LOGIC ----------
+    // backend se initial status
+    val backendIsOn = currentStatus == "moving" || currentStatus == "Running"
+
+    // local UI state (optimistic) – status change hone par reset
+    var isOnState by remember(currentStatus) { mutableStateOf(backendIsOn) }
+
+    val isTurnOnEnabled = !isOnState   // OFF hai → Turn On enable
+    val isTurnOffEnabled = isOnState   // ON hai → Turn Off enable
+
     Row(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 18.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        val currentStatus = latest?.status ?: device.status
 
+        // TURN ON → restore
         OutlinedButton(
-            onClick = { /* Handle Turn On */ },
-            enabled = currentStatus != "moving" && currentStatus != "Running",
-            modifier = Modifier.weight(1f)
+            onClick = {
+                viewModel.openMobilizeDialog("restore", device.device_id)
+            },
+            enabled = isTurnOnEnabled,
+            modifier = Modifier.weight(1f),
+            colors =
+                if (isTurnOnEnabled) {
+                    // Enabled: Green text
+                    ButtonDefaults.outlinedButtonColors(
+                        contentColor = Color(0xFF3EBB3E)
+                    )
+                } else {
+                    // Disabled: default Material color (no custom color)
+                    ButtonDefaults.outlinedButtonColors()
+                }
         ) {
             Text("Turn On")
         }
 
+        // TURN OFF → cut
         Button(
-            onClick = { /* Handle Turn Off */ },
+            onClick = {
+                viewModel.openMobilizeDialog("cut", device.device_id)
+            },
+            enabled = isTurnOffEnabled,
             modifier = Modifier.weight(1f),
-            enabled = currentStatus == "moving" || currentStatus == "Running",
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF6B6B))
+            colors =
+                if (isTurnOffEnabled) {
+                    // Enabled: Red background
+                    ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFFFF4E4E)
+                    )
+                } else {
+                    // Disabled: default Material colors
+                    ButtonDefaults.buttonColors()
+                }
         ) {
-            Text("Turn Off")
+            Text("Turn Off", color = Color.White)
         }
     }
 
@@ -517,16 +694,44 @@ fun DeviceBasicInfoWithData(
         fontSize = 12.sp,
         modifier = Modifier.padding(horizontal = 18.dp)
     )
-}
 
+    // --------- DIALOG HANDLING ----------
+    val dialogData by viewModel.showConfirmationDialog.collectAsState()
+
+    dialogData?.let { data ->
+        MobilizeConfirmationDialog(
+            command = data.command,
+            onConfirm = { cmd ->
+                // API call
+                viewModel.sendMobilizeCommand(
+                    token,
+                    data.terminalId,
+                    cmd
+                )
+
+                // Optimistic UI update:
+                // restore => ON, cut => OFF
+                isOnState = cmd == "restore"
+
+                viewModel.closeMobilizeDialog()
+            },
+            onCancel = {
+                viewModel.closeMobilizeDialog()
+            }
+        )
+    }
+}
 @Composable
-fun DeviceAnalysisContentWithData(liveLocation: LiveLocationResponse?) {
+fun DeviceAnalysisContentWithData(liveLocation: LiveLocationResponse?,viewModel: DeviceReportViewModel) {
     Spacer(Modifier.height(8.dp))
     FilterChipsBar()
     Spacer(Modifier.height(16.dp))
 
     // You can calculate total distance from device data later
-    TotalDistanceCard()
+//    TotalDistanceCard()
+    TotalDistanceCard(
+        totalKm = viewModel.totalMilages.collectAsState().value?.total_distance_km ?: 0.0
+    )
     Spacer(Modifier.height(16.dp))
 
     // Pass status count to the graph
@@ -577,26 +782,8 @@ fun HeadingGraphCardWithData(statusCount: com.developer.ev2z.data.local.remote.S
     }
 }
 
-// Keep the original composables for backward compatibility
-@Composable
-fun MapArea() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFEFF3EF))
-    )
-}
 
-@Composable
-fun DeviceAnalysisContent() {
-    Spacer(Modifier.height(8.dp))
-    FilterChipsBar()
-    Spacer(Modifier.height(16.dp))
-    TotalDistanceCard()
-    Spacer(Modifier.height(16.dp))
-    HeadingGraphCard()
-    Spacer(Modifier.height(40.dp))
-}
+
 
 @Composable
 fun FilterChipsBar() {
@@ -624,8 +811,10 @@ fun Chip(text: String) {
     }
 }
 
+
 @Composable
-fun TotalDistanceCard() {
+fun TotalDistanceCard(totalKm: Double) {
+
     Surface(
         Modifier
             .padding(horizontal = 18.dp)
@@ -636,37 +825,68 @@ fun TotalDistanceCard() {
         Column(Modifier.padding(18.dp)) {
             Text("Total Distance", color = Color.Gray)
             Spacer(Modifier.height(4.dp))
-            Text("70 km", fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
+            Text("${(totalKm)} km", fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
 
+
 @Composable
-fun HeadingGraphCard() {
-    Surface(
-        Modifier
-            .padding(horizontal = 18.dp)
-            .fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        color = Color(0xFFF2F4F2)
-    ) {
-        Column(Modifier.padding(18.dp)) {
-            Text("Heading", fontSize = 18.sp)
+fun MobilizeConfirmationDialog(
+    command: String,
+    onConfirm: (String) -> Unit,
+    onCancel: () -> Unit
+) {
+    val isCut = command == "cut"
 
-            Spacer(Modifier.height(12.dp))
-
-            Box(
-                Modifier
-                    .size(160.dp)
-                    .align(Alignment.CenterHorizontally)
-                    .background(Color.LightGray, RoundedCornerShape(100.dp))
+    AlertDialog(
+        onDismissRequest = { onCancel() },
+        icon = {
+            Icon(
+                imageVector = Icons.Default.PowerSettingsNew,
+                contentDescription = null
             )
-
-            Spacer(Modifier.height(12.dp))
-
-            Text("Running - 5 hr (50%)")
-            Text("Stopped - 3 hr (30%)")
-            Text("Parked - 2 hr (20%)")
-        }
-    }
+        },
+        title = {
+            Text(
+                text = if (isCut) "Turn Off Device?" else "Turn On Device?",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        },
+        text = {
+            Column {
+                Text(
+                    text = if (isCut)
+                        "Do you really want to turn off this device?"
+                    else
+                        "Do you want to restore engine power for this device?"
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "You can change this later from the device report screen.",
+                    fontSize = 12.sp,
+                    color = Color.Gray
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(command) },
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isCut) Color(0xFFFF4E4E) else Color(0xFF3EBB3E)
+                )
+            ) {
+                Text(
+                    text = if (isCut) "Yes, Turn Off" else "Yes, Turn On"
+                )
+            }
+        },
+        dismissButton = {
+            OutlinedButton(onClick = onCancel) {
+                Text("Cancel")
+            }
+        },
+        shape = RoundedCornerShape(16.dp)
+    )
 }
