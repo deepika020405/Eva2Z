@@ -11,6 +11,7 @@ import platform.UIKit.*
 import platform.Foundation.NSData
 import platform.posix.memcpy
 import androidx.compose.ui.interop.LocalUIViewController
+import platform.darwin.NSObject
 
 @OptIn(ExperimentalForeignApi::class)
 @Composable
