@@ -3,7 +3,9 @@ package com.developer.ev2z
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.Composable
 import com.developer.ev2z.data.local.initStorageManager
+import com.developer.ev2z.ui.screens.Profile.GlobalContext
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -12,10 +14,19 @@ class MainActivity : ComponentActivity() {
         // Initialize storage for Android
         initStorageManager(this)
 
+        //GlobalContext.set(this)
+        GlobalContext.set(this)
+
         setContent {
             App()
         }
     }
+}
+
+
+@Composable
+fun AppAndroidPreview() {
+    App()
 }
 
 

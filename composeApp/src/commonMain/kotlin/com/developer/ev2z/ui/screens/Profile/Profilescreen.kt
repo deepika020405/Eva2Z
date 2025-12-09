@@ -7,28 +7,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.rounded.Assessment
-import androidx.compose.material.icons.rounded.CardGiftcard
-import androidx.compose.material.icons.rounded.Contacts
-import androidx.compose.material.icons.rounded.Description
-import androidx.compose.material.icons.rounded.DeviceHub
-import androidx.compose.material.icons.rounded.Devices
-import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.Feedback
-import androidx.compose.material.icons.rounded.History
-import androidx.compose.material.icons.rounded.ImportantDevices
-import androidx.compose.material.icons.rounded.LocationCity
-import androidx.compose.material.icons.rounded.LocationOn
-import androidx.compose.material.icons.rounded.ManageAccounts
-import androidx.compose.material.icons.rounded.Password
-import androidx.compose.material.icons.rounded.PrivacyTip
-import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Star
-import androidx.compose.material.icons.rounded.Support
+import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -45,6 +25,9 @@ import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.ui.screens.PrivacyPolicy_TandC.PrivacyPolicy_TandCScreen
+import com.developer.ev2z.ui.screens.PrivacyPolicy_TandC.WebViewType
+
 
 @Composable
 fun ProfileScreen(
@@ -57,6 +40,8 @@ fun ProfileScreen(
     val viewModel = remember { ProfileViewModel(apiService, storageManager) }
     val state by viewModel.state.collectAsState()
 
+    var showPrivacyPolicy by remember { mutableStateOf(false) }
+    var showTermsConditions by remember { mutableStateOf(false) }
     var showImageZoom by remember { mutableStateOf(false) }
 
     // Handle logout navigation
@@ -67,35 +52,65 @@ fun ProfileScreen(
         }
     }
 
-
-    ProfileScreenContent(
-        state = state,
-        onRefresh = { viewModel.fetchProfilePicture() },
-        onProfileImageClick = { showImageZoom = true },
-        onEditProfile = onEditProfile,
-        onGeneralSettings = { /* Navigate to SettingActivity */ },
-        onAccountActivity = { /* Navigate to account activity */ },
-        onReferAndEarn = { /* Navigate to ReferAndEarnActivity */ },
-        onChangePassword = { /* Navigate to PasswordChangeActivity */ },
-        onManageDevice = onManageDevice,
-        onAddFence = { /* Navigate to FenceActivity */ },
-        onHistoryPlayback = { /* Navigate to HistoryPlaybackActivity */ },
-        onRateApp = { /* Open Play Store */ },
-        onFeedback = { /* Open feedback */ },
-        onPrivacyPolicy = { /* Navigate to TermsConditionActivity with PrivacyPolicy */ },
-        onTermsConditions = { /* Navigate to TermsConditionActivity */ },
-        onContactUs = { /* WhatsApp support */ },
-        onLogout = { viewModel.logout() },
-        onDismissError = { viewModel.clearError() }
-    )
-
-    // ✅ Image Zoom Dialog
-    if (showImageZoom && !state.userImage.isNullOrEmpty()) {
-        ProfileImageZoomDialog(
-            imageUrl = state.userImage!!,
-            userName = state.userName,
-            onDismiss = { showImageZoom = false }
+    // Main content
+    Box(modifier = Modifier.fillMaxSize()) {
+        ProfileScreenContent(
+            state = state,
+            onRefresh = { viewModel.fetchProfilePicture() },
+            onProfileImageClick = { showImageZoom = true },
+            onEditProfile = onEditProfile,
+            onGeneralSettings = { /* Navigate to SettingActivity */ },
+            onAccountActivity = { /* Navigate to account activity */ },
+            onReferAndEarn = { /* Navigate to ReferAndEarnActivity */ },
+            onChangePassword = { /* Navigate to PasswordChangeActivity */ },
+            onManageDevice = onManageDevice,
+            onAddFence = { /* Navigate to FenceActivity */ },
+            onHistoryPlayback = { /* Navigate to HistoryPlaybackActivity */ },
+            onRateApp = { viewModel.openPlayStore() },
+            onFeedback = { viewModel.openFeedback() },
+            onPrivacyPolicy = { showPrivacyPolicy = true },
+            onTermsConditions = { showTermsConditions = true },
+            onContactUs = { viewModel.openWhatsApp() },
+            onLogout = { viewModel.logout() },
+            onDismissError = { viewModel.clearError() }
         )
+
+        // Image Zoom Dialog
+        if (showImageZoom && !state.userImage.isNullOrEmpty()) {
+            ProfileImageZoomDialog(
+                imageUrl = state.userImage!!,
+                userName = state.userName,
+                onDismiss = { showImageZoom = false }
+            )
+        }
+
+        // Privacy Policy - Full screen overlay
+        if (showPrivacyPolicy) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.White)
+            ) {
+                PrivacyPolicy_TandCScreen(
+                    type = WebViewType.PRIVACY_POLICY,
+                    onBackPressed = { showPrivacyPolicy = false }
+                )
+            }
+        }
+
+        // Terms & Conditions - Full screen overlay
+        if (showTermsConditions) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.White)
+            ) {
+                PrivacyPolicy_TandCScreen(
+                    type = WebViewType.TERMS_CONDITIONS,
+                    onBackPressed = { showTermsConditions = false }
+                )
+            }
+        }
     }
 }
 
@@ -263,7 +278,6 @@ fun ProfileScreenContent(
     // Error Snackbar
     state.error?.let { error ->
         LaunchedEffect(error) {
-            // Show snackbar or toast
             onDismissError()
         }
     }
@@ -291,7 +305,6 @@ fun ProfileScreenContent(
     }
 }
 
-// ✅ Profile Header with clickable image
 @Composable
 fun ProfileHeader(
     userName: String,
@@ -305,7 +318,6 @@ fun ProfileHeader(
             .padding(vertical = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // ✅ Profile Image (Clickable to zoom)
         Box(
             modifier = Modifier
                 .size(100.dp)
@@ -344,7 +356,6 @@ fun ProfileHeader(
     }
 }
 
-// ✅ Profile Image Zoom Dialog
 @Composable
 fun ProfileImageZoomDialog(
     imageUrl: String,
@@ -369,7 +380,6 @@ fun ProfileImageZoomDialog(
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Zoomed Image
                 AsyncImage(
                     model = imageUrl,
                     contentDescription = "Profile Picture Zoomed",
@@ -382,7 +392,6 @@ fun ProfileImageZoomDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // User Name
                 Text(
                     text = userName,
                     fontSize = 24.sp,
@@ -390,21 +399,6 @@ fun ProfileImageZoomDialog(
                     color = Color.White
                 )
             }
-
-            // Close Button
-//            IconButton(
-//                onClick = onDismiss,
-//                modifier = Modifier
-//                    .align(Alignment.TopEnd)
-//                    .padding(16.dp)
-//            ) {
-//                Icon(
-//                    imageVector = Icons.Default.Close,
-//                    contentDescription = "Close",
-//                    tint = Color.White,
-//                    modifier = Modifier.size(32.dp)
-//                )
-//            }
         }
     }
 }
@@ -461,13 +455,6 @@ fun ProfileMenuItemRow(
             .padding(horizontal = 16.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-//        Box(
-//            modifier = Modifier
-//                .size(20.dp)
-//                .clip(CircleShape)
-//                .background(Color(0xFF666666))
-//        )
-
         Icon(
             imageVector = icon,
             contentDescription = title,
@@ -516,7 +503,7 @@ fun AboutSection(
                 modifier = Modifier.padding(horizontal = 16.dp),
                 color = Color(0xFFE0E0E0)
             )
-            AboutMenuItem("Feedback", Icons.Rounded.Feedback,onFeedback)
+            AboutMenuItem("Feedback", Icons.Rounded.Feedback, onFeedback)
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp),
                 color = Color(0xFFE0E0E0)
@@ -549,7 +536,6 @@ fun AboutMenuItem(
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-
         Icon(
             imageVector = icon,
             contentDescription = title,

@@ -60,11 +60,9 @@ class ProfileViewModel(
 
                 val response = apiService.getProfilePicture("Bearer $token")
 
-                // Parse profile picture URL
                 val profilePicUrl = response["profile_picture_url"]?.toString()?.trim('"')
                 val newName = response["name"]?.toString()?.trim('"')
 
-                // Build full URL if relative path
                 val fullUrl = if (!profilePicUrl.isNullOrEmpty()) {
                     if (profilePicUrl.startsWith("http")) {
                         profilePicUrl
@@ -73,7 +71,6 @@ class ProfileViewModel(
                     }
                 } else null
 
-                // Save to storage
                 if (fullUrl != null) {
                     storageManager.saveString("profile_image", fullUrl)
                 }
@@ -102,7 +99,6 @@ class ProfileViewModel(
     fun logout() {
         viewModelScope.launch {
             try {
-                // Clear all user data
                 storageManager.clear()
 
                 _state.value = _state.value.copy(
@@ -123,4 +119,32 @@ class ProfileViewModel(
     fun clearError() {
         _state.value = _state.value.copy(error = null)
     }
+
+    fun openPlayStore() {
+        openUrl("market://details?id=com.developer.ev2z")
+    }
+
+    fun openFeedback() {
+        openUrl("market://details?id=com.developer.ev2z")
+    }
+
+    fun openWhatsApp() {
+        val name = storageManager.getString("name") ?: ""
+        val phone = storageManager.getString("phone") ?: ""
+        val message = "My name is $name\nMy contact number is $phone"
+
+        val encodedMessage = message.replace(" ", "%20")
+            .replace("\n", "%0A")
+
+        val supportNumber = "9625141731"
+        val url = "https://wa.me/$supportNumber?text=$encodedMessage"
+        openUrl(url)
+    }
+
+    fun openUrl(url: String) {
+        platformOpenUrl(url)
+    }
 }
+
+// Expect function for platform-specific URL opening
+expect fun platformOpenUrl(url: String)
