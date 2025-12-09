@@ -38,7 +38,7 @@ class ManageDeviceViewModel(
                         isLoading = false,
                         error = null
                     )
-                    println("✅ Devices loaded: ${response.devices.size}")
+                    println("Devices loaded: ${response.devices.size}")
                 } else {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
@@ -63,7 +63,7 @@ class ManageDeviceViewModel(
             try {
                 val response = apiService.deleteDevice(deviceId, "Bearer $token")
 
-                println("✅ Device deleted successfully")
+                println("Device deleted successfully")
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     deleteSuccess = true,
@@ -89,14 +89,15 @@ class ManageDeviceViewModel(
 
         viewModelScope.launch {
             try {
-                val response = apiService.mobilizeDevice(
+                val response = apiService.sendMobilizeCommand(
+//                val response = apiService.mobilizeDevice(
                     token = "Bearer $token",
                     terminalId = deviceId,
                     command = command
                 )
 
                 val action = if (command == "cut") "turned off" else "turned on"
-                println("✅ Device $action successfully")
+                println("Device $action successfully")
 
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -108,7 +109,7 @@ class ManageDeviceViewModel(
                 loadDevices(token)
 
             } catch (e: Exception) {
-                println("❌ Mobilize Error: ${e.message}")
+                println("Mobilize Error: ${e.message}")
                 e.printStackTrace()
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
