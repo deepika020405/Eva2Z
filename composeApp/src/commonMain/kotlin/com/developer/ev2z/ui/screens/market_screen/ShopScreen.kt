@@ -25,6 +25,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo // apna drawable
 import org.jetbrains.compose.resources.painterResource
@@ -38,7 +39,8 @@ data class ShopProduct(
     val priceText: String,
     val rating: Double,
     val ratingCount: Int,
-    val isFavorite: Boolean = false
+    val isFavorite: Boolean = false,
+    val imageUrl: String = ""   // ADD THIS
 )
 
 // ------------ ROOT SCREEN ------------
@@ -52,19 +54,11 @@ fun ShopScreen(
     onPlaceOrder: (ShopProduct) -> Unit = {},
     onCartClick: () -> Unit = {}
 ) {
-    Scaffold(
-        bottomBar = {
-            CartBottomBar(
-                count = cartCount,
-                onClick = onCartClick
-            )
-        }
-    ) { paddingValues ->
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color(0xFFF6F6F6))
-                .padding(paddingValues)
         ) {
             ShopTopBar()
             Spacer(Modifier.height(12.dp))
@@ -80,22 +74,42 @@ fun ShopScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            LazyColumn(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(products) { product ->
-                    ProductCard(
-                        product = product,
-                        onToggleFavorite = { onToggleFavorite(product) },
-                        onPlaceOrder = { onPlaceOrder(product) }
+            ){
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(products) { product ->
+                        ProductCard(
+                            product = product,
+                            onToggleFavorite = { onToggleFavorite(product) },
+                            onPlaceOrder = { onPlaceOrder(product) }
+                        )
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)   // ALWAYS stay at bottom
+                ) {
+                    CartBottomBar(
+                        count = cartCount,
+                        onClick = onCartClick
                     )
                 }
             }
+
+
+
+
         }
-    }
+
 }
 
 // ------------ TOP BAR ------------
@@ -208,15 +222,25 @@ private fun ProductCard(
             }
 
             // Product image
-            Image(
-                painter = painterResource(Res.drawable.app_logo),
+//            Image(
+//                painter = painterResource(Res.drawable.app_logo),
+//                contentDescription = product.title,
+//                modifier = Modifier
+//                    .size(60.dp)
+//                    .clip(RoundedCornerShape(50)),
+//                contentScale = ContentScale.Crop
+//            )
+
+            AsyncImage(
+                model = product.imageUrl,
                 contentDescription = product.title,
                 modifier = Modifier
                     .size(60.dp)
                     .clip(RoundedCornerShape(50)),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                placeholder = painterResource(Res.drawable.app_logo),
+                error = painterResource(Res.drawable.app_logo)
             )
-
             Spacer(Modifier.width(12.dp))
 
             Column(
@@ -276,7 +300,6 @@ private fun CartBottomBar(
 
         Box(
             modifier = Modifier
-                .fillMaxWidth()
                 .padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -284,7 +307,6 @@ private fun CartBottomBar(
                 onClick = onClick,
                 shape = RoundedCornerShape(30.dp),
                 modifier = Modifier
-                    .fillMaxWidth(0.8f)
                     .height(48.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF34A853))
             ) {
@@ -317,85 +339,39 @@ private fun CartBottomBar(
 
 
 @Composable
-fun ShopScreenHost() {
-    var products by remember {
-        mutableStateOf(
-            listOf(
-                ShopProduct(
-                    id = "1",
-                    title = "E22go (Android Device Smart Tag)",
-                    subtitle = "Location Tracker",
-                    priceText = "Rs. 999",
-                    rating = 4.8,
-                    ratingCount = 38
-                ),
-                ShopProduct(
-                    id = "2",
-                    title = "E2 (Android Device Smart Tag)",
-                    subtitle = "Location Tracker",
-                    priceText = "Rs. 989",
-                    rating = 4.8,
-                    ratingCount = 38
-                ),ShopProduct(
-                    id = "1",
-                    title = "E22go (Android Device Smart Tag)",
-                    subtitle = "Location Tracker",
-                    priceText = "Rs. 999",
-                    rating = 4.8,
-                    ratingCount = 38
-                ),
-                ShopProduct(
-                    id = "2",
-                    title = "E2 (Android Device Smart Tag)",
-                    subtitle = "Location Tracker",
-                    priceText = "Rs. 989",
-                    rating = 4.8,
-                    ratingCount = 38
-                ),ShopProduct(
-                    id = "1",
-                    title = "E22go (Android Device Smart Tag)",
-                    subtitle = "Location Tracker",
-                    priceText = "Rs. 999",
-                    rating = 4.8,
-                    ratingCount = 38
-                ),
-                ShopProduct(
-                    id = "2",
-                    title = "E2 (Android Device Smart Tag)",
-                    subtitle = "Location Tracker",
-                    priceText = "Rs. 989",
-                    rating = 4.8,
-                    ratingCount = 38
-                ),ShopProduct(
-                    id = "1",
-                    title = "E22go (Android Device Smart Tag)",
-                    subtitle = "Location Tracker",
-                    priceText = "Rs. 999",
-                    rating = 4.8,
-                    ratingCount = 38
-                ),
-                ShopProduct(
-                    id = "2",
-                    title = "E2 (Android Device Smart Tag)",
-                    subtitle = "Location Tracker",
-                    priceText = "Rs. 989",
-                    rating = 4.8,
-                    ratingCount = 38
-                ),
-                // aur items…
-            )
-        )
+fun ShopScreenHost(viewModel: ShopViewModel) {
+
+    val state by viewModel.state.collectAsState()
+
+    LaunchedEffect(Unit) { viewModel.loadData() }
+
+    if (state.loading) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator()
+        }
+        return
     }
 
     ShopScreen(
-        products = products,
+        products = state.products.map { dto ->
+            ShopProduct(
+                id = dto.id.toString(),
+                title = dto.name,
+                subtitle = dto.device_type ?: "",
+                priceText = "Rs. ${dto.sale_price}",
+                rating = 4.8,
+                ratingCount = 50,
+                isFavorite = viewModel.isFavorite(dto.id),
+                imageUrl = dto.image ?: ""    // SET API IMAGE
+            )
+        },
         cartCount = 1,
         onToggleFavorite = { p ->
-            products = products.map {
-                if (it.id == p.id) it.copy(isFavorite = !it.isFavorite) else it
-            }
-        },
-        onPlaceOrder = { /* TODO */ },
-        onCartClick = { /* TODO */ }
+            viewModel.toggleWishlist(p.id.toInt())
+        }
     )
 }

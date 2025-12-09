@@ -14,15 +14,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import cafe.adriel.voyager.navigator.tab.*
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.repository.ProductRepository
 import com.developer.ev2z.ui.screens.EditProfile.EditProfileScreen
 import com.developer.ev2z.ui.screens.Profile.ProfileScreen
 import com.developer.ev2z.ui.screens.homeScreen.HomeScreen
 import com.developer.ev2z.ui.screens.homeScreen.HomeViewModel
 import com.developer.ev2z.ui.screens.ManageDevices.ManageDeviceScreen
 import com.developer.ev2z.ui.screens.market_screen.ShopScreenHost
+import com.developer.ev2z.ui.screens.market_screen.ShopViewModel
 import kotlinx.coroutines.launch
 
 // ------------------ TABS -------------------
@@ -61,9 +64,16 @@ object WalletTab : Tab {
         )
 }
 
-object OrdersTab : Tab {
+class OrdersTab(
+    private val shopViewModel: ShopViewModel,
+    private val token: String
+) : Tab {
     @Composable
-    override fun Content() = ShopScreenHost()
+    override fun Content() = ShopScreenHost(
+        shopViewModel
+        // If ShopScreenHost accepts a viewModel param, pass it,
+        // otherwise it will create its own — adapt to your implementation.
+    )
 
     override val options: TabOptions
         @Composable get() = TabOptions(
@@ -72,6 +82,7 @@ object OrdersTab : Tab {
             icon = rememberVectorPainter(Icons.Default.ShoppingCart)
         )
 }
+
 
 class ProfileTab(
     private val apiService: ApiService,
@@ -168,6 +179,19 @@ fun HomeNavGraphContent(
     onNavigateToManageDevice: () -> Unit,
     onLogout: () -> Unit
 ) {
+    // === Create Shop repository + viewmodel here (or inject via DI) ===
+    val productRepository = remember { ProductRepository(apiService) }
+
+    // Token provider lambda — adapt to your StorageManager API if the method differs
+    val tokenProvider: () -> String = remember {
+        { storageManager.getString("token","") } // <-- replace getToken() with actual method if different
+    }
+
+    // Create ShopViewModel (remember so it's not recreated every recomposition)
+    val shopViewModel = remember {
+        ShopViewModel(repo = productRepository, tokenProvider = tokenProvider)
+    }
+
     val homeTab = remember { HomeTab(viewModel, token, onNavigateToAddDevice, onNavigateToDeviceReport) }
     val profileTab = remember {
         ProfileTab(
@@ -178,7 +202,8 @@ fun HomeNavGraphContent(
             onLogout
         )
     }
-    val tabs = listOf(homeTab, WalletTab, OrdersTab, profileTab)
+    val ordersTab = remember { OrdersTab(shopViewModel, token) }
+    val tabs = listOf(homeTab, WalletTab, ordersTab, profileTab)
     val pagerState = rememberPagerState(pageCount = { tabs.size })
     val coroutineScope = rememberCoroutineScope()
 

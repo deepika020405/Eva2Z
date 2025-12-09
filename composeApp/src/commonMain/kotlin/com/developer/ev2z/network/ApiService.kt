@@ -6,6 +6,7 @@ import com.developer.ev2z.request.DeviceAnalyticsRequest
 import com.developer.ev2z.request.LoginRequest
 import com.developer.ev2z.response.*
 import io.ktor.client.call.*
+import io.ktor.client.plugins.ResponseException
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
@@ -320,5 +321,100 @@ class ApiService {
         }
     }
 
+
+    // imports you may need
+
+    // ---------------- GET PRODUCTS ----------------
+    suspend fun getProducts(token: String): List<ProductDto> {
+        println("🌐 API: getProducts()")
+        return try {
+            val res: List<ProductDto> = client.get("${baseUrl}products") {
+                header(HttpHeaders.Authorization, "Bearer $token")
+            }.body()
+            println("✔️ getProducts: received ${res.size} items")
+            res
+        } catch (e: ResponseException) {
+            // Ktor HTTP error with response available
+            val status = e.response.status
+            val text = try { e.response.bodyAsText() } catch (_: Exception) { "unable-to-read-body" }
+            println("❌ getProducts - HTTP error: $status")
+            println("   response body: $text")
+            emptyList()
+        } catch (e: Exception) {
+            // network / serialization / other errors
+            println("❌ getProducts - error: ${e.message}")
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    // ---------------- GET WISHLIST ----------------
+    suspend fun getWishlist(token: String): WishlistResponse {
+        println("🌐 API: getWishlist()")
+        return try {
+            val res: WishlistResponse = client.get("${baseUrl}wishlist") {
+                header(HttpHeaders.Authorization, "Bearer $token")
+            }.body()
+            println("✔️ getWishlist: success=${res.success} items=${res.wishlist.size}")
+            res
+        } catch (e: ResponseException) {
+            val status = e.response.status
+            val text = try { e.response.bodyAsText() } catch (_: Exception) { "unable-to-read-body" }
+            println("❌ getWishlist - HTTP error: $status")
+            println("   response body: $text")
+            // Return a safe fallback
+            WishlistResponse(success = false, wishlist = emptyList())
+        } catch (e: Exception) {
+            println("❌ getWishlist - error: ${e.message}")
+            e.printStackTrace()
+            WishlistResponse(success = false, wishlist = emptyList())
+        }
+    }
+
+    // ---------------- ADD WISHLIST ----------------
+    suspend fun addToWishlist(token: String, productId: Int): WishlistActionResponse {
+        println("🌐 API: addToWishlist(productId=$productId)")
+        return try {
+            val res: WishlistActionResponse = client.post("${baseUrl}wishlist/add") {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(mapOf("product_id" to productId))
+            }.body()
+            println("✔️ addToWishlist: success=${res.success} message='${res.message}'")
+            res
+        } catch (e: ResponseException) {
+            val status = e.response.status
+            val text = try { e.response.bodyAsText() } catch (_: Exception) { "unable-to-read-body" }
+            println("❌ addToWishlist - HTTP error: $status")
+            println("   response body: $text")
+            WishlistActionResponse(success = false, message = "HTTP ${status.value}")
+        } catch (e: Exception) {
+            println("❌ addToWishlist - error: ${e.message}")
+            e.printStackTrace()
+            WishlistActionResponse(success = false, message = e.message ?: "Unknown error")
+        }
+    }
+
+    // ---------------- REMOVE WISHLIST ----------------
+    suspend fun removeFromWishlist(token: String, productId: Int): WishlistActionResponse {
+        println("🌐 API: removeFromWishlist(productId=$productId)")
+        return try {
+            val res: WishlistActionResponse = client.delete("${baseUrl}wishlist/remove/$productId") {
+                header(HttpHeaders.Authorization, "Bearer $token")
+            }.body()
+            println("✔️ removeFromWishlist: success=${res.success} message='${res.message}'")
+            res
+        } catch (e: ResponseException) {
+            val status = e.response.status
+            val text = try { e.response.bodyAsText() } catch (_: Exception) { "unable-to-read-body" }
+            println("❌ removeFromWishlist - HTTP error: $status")
+            println("   response body: $text")
+            WishlistActionResponse(success = false, message = "HTTP ${status.value}")
+        } catch (e: Exception) {
+            println("❌ removeFromWishlist - error: ${e.message}")
+            e.printStackTrace()
+            WishlistActionResponse(success = false, message = e.message ?: "Unknown error")
+        }
+    }
 
 }
