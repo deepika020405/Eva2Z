@@ -1,3 +1,4 @@
+// ProfileScreen.kt - UPDATED
 package com.developer.ev2z.ui.screens.Profile
 
 import androidx.compose.foundation.background
@@ -25,9 +26,6 @@ import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.network.ApiService
-import com.developer.ev2z.ui.screens.PrivacyPolicy_TandC.PrivacyPolicy_TandCScreen
-import com.developer.ev2z.ui.screens.PrivacyPolicy_TandC.WebViewType
-
 
 @Composable
 fun ProfileScreen(
@@ -35,13 +33,12 @@ fun ProfileScreen(
     storageManager: StorageManager,
     onEditProfile: () -> Unit = {},
     onManageDevice: () -> Unit = {},
+    onPrivacyPolicy: () -> Unit = {},
+    onTermsConditions: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     val viewModel = remember { ProfileViewModel(apiService, storageManager) }
     val state by viewModel.state.collectAsState()
-
-    var showPrivacyPolicy by remember { mutableStateOf(false) }
-    var showTermsConditions by remember { mutableStateOf(false) }
     var showImageZoom by remember { mutableStateOf(false) }
 
     // Handle logout navigation
@@ -52,65 +49,34 @@ fun ProfileScreen(
         }
     }
 
-    // Main content
-    Box(modifier = Modifier.fillMaxSize()) {
-        ProfileScreenContent(
-            state = state,
-            onRefresh = { viewModel.fetchProfilePicture() },
-            onProfileImageClick = { showImageZoom = true },
-            onEditProfile = onEditProfile,
-            onGeneralSettings = { /* Navigate to SettingActivity */ },
-            onAccountActivity = { /* Navigate to account activity */ },
-            onReferAndEarn = { /* Navigate to ReferAndEarnActivity */ },
-            onChangePassword = { /* Navigate to PasswordChangeActivity */ },
-            onManageDevice = onManageDevice,
-            onAddFence = { /* Navigate to FenceActivity */ },
-            onHistoryPlayback = { /* Navigate to HistoryPlaybackActivity */ },
-            onRateApp = { viewModel.openPlayStore() },
-            onFeedback = { viewModel.openFeedback() },
-            onPrivacyPolicy = { showPrivacyPolicy = true },
-            onTermsConditions = { showTermsConditions = true },
-            onContactUs = { viewModel.openWhatsApp() },
-            onLogout = { viewModel.logout() },
-            onDismissError = { viewModel.clearError() }
+    ProfileScreenContent(
+        state = state,
+        onRefresh = { viewModel.fetchProfilePicture() },
+        onProfileImageClick = { showImageZoom = true },
+        onEditProfile = onEditProfile,
+        onGeneralSettings = { /* Navigate to SettingActivity */ },
+        onAccountActivity = { /* Navigate to account activity */ },
+        onReferAndEarn = { /* Navigate to ReferAndEarnActivity */ },
+        onChangePassword = { /* Navigate to PasswordChangeActivity */ },
+        onManageDevice = onManageDevice,
+        onAddFence = { /* Navigate to FenceActivity */ },
+        onHistoryPlayback = { /* Navigate to HistoryPlaybackActivity */ },
+        onRateApp = { viewModel.openPlayStore() },
+        onFeedback = { viewModel.openFeedback() },
+        onPrivacyPolicy = onPrivacyPolicy,
+        onTermsConditions = onTermsConditions,
+        onContactUs = { viewModel.openWhatsApp() },
+        onLogout = { viewModel.logout() },
+        onDismissError = { viewModel.clearError() }
+    )
+
+    // Image Zoom Dialog
+    if (showImageZoom && !state.userImage.isNullOrEmpty()) {
+        ProfileImageZoomDialog(
+            imageUrl = state.userImage!!,
+            userName = state.userName,
+            onDismiss = { showImageZoom = false }
         )
-
-        // Image Zoom Dialog
-        if (showImageZoom && !state.userImage.isNullOrEmpty()) {
-            ProfileImageZoomDialog(
-                imageUrl = state.userImage!!,
-                userName = state.userName,
-                onDismiss = { showImageZoom = false }
-            )
-        }
-
-        // Privacy Policy - Full screen overlay
-        if (showPrivacyPolicy) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.White)
-            ) {
-                PrivacyPolicy_TandCScreen(
-                    type = WebViewType.PRIVACY_POLICY,
-                    onBackPressed = { showPrivacyPolicy = false }
-                )
-            }
-        }
-
-        // Terms & Conditions - Full screen overlay
-        if (showTermsConditions) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.White)
-            ) {
-                PrivacyPolicy_TandCScreen(
-                    type = WebViewType.TERMS_CONDITIONS,
-                    onBackPressed = { showTermsConditions = false }
-                )
-            }
-        }
     }
 }
 
@@ -165,7 +131,6 @@ fun ProfileScreenContent(
                     .background(Color(0xFFF5F5F5)),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Profile Header
                 item {
                     ProfileHeader(
                         userName = state.userName,
@@ -174,7 +139,6 @@ fun ProfileScreenContent(
                     )
                 }
 
-                // Profile Settings Section
                 item {
                     Text(
                         text = "Profile Settings",
@@ -198,7 +162,6 @@ fun ProfileScreenContent(
                     )
                 }
 
-                // Device Settings Section
                 item {
                     Text(
                         text = "Device Settings",
@@ -220,7 +183,6 @@ fun ProfileScreenContent(
                     )
                 }
 
-                // About A2Z Section
                 item {
                     Text(
                         text = "About A2Z",
@@ -242,7 +204,6 @@ fun ProfileScreenContent(
                     )
                 }
 
-                // Logout Button
                 item {
                     Spacer(modifier = Modifier.height(24.dp))
                     Button(
@@ -266,7 +227,6 @@ fun ProfileScreenContent(
                 }
             }
 
-            // Loading indicator
             if (state.isLoading) {
                 CircularProgressIndicator(
                     modifier = Modifier.align(Alignment.Center)
@@ -275,14 +235,12 @@ fun ProfileScreenContent(
         }
     }
 
-    // Error Snackbar
     state.error?.let { error ->
         LaunchedEffect(error) {
             onDismissError()
         }
     }
 
-    // Logout Dialog
     if (showLogoutDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
@@ -410,17 +368,13 @@ data class ProfileMenuItem(
 )
 
 @Composable
-fun ProfileMenuCard(
-    items: List<ProfileMenuItem>
-) {
+fun ProfileMenuCard(items: List<ProfileMenuItem>) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 24.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        ),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column {
@@ -430,7 +384,6 @@ fun ProfileMenuCard(
                     icon = item.icon,
                     onClick = item.onClick
                 )
-
                 if (index < items.size - 1) {
                     HorizontalDivider(
                         modifier = Modifier.padding(horizontal = 16.dp),
@@ -492,9 +445,7 @@ fun AboutSection(
             .fillMaxWidth()
             .padding(horizontal = 24.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        ),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column {

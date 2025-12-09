@@ -1,4 +1,4 @@
-// composeApp/src/commonMain/kotlin/com/developer/ev2z/navigation/HomeNavGraph.kt
+// HomeNavGraph.kt - UPDATED WITH PRIVACY/TERMS SCREENS
 package com.developer.ev2z.navigation
 
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -23,6 +23,8 @@ import com.developer.ev2z.ui.screens.homeScreen.HomeScreen
 import com.developer.ev2z.ui.screens.homeScreen.HomeViewModel
 import com.developer.ev2z.ui.screens.ManageDevices.ManageDeviceScreen
 import com.developer.ev2z.ui.screens.market_screen.ShopScreenHost
+import com.developer.ev2z.ui.screens.PrivacyPolicy_TandC.PrivacyPolicy_TandCScreen
+import com.developer.ev2z.ui.screens.PrivacyPolicy_TandC.WebViewType
 import kotlinx.coroutines.launch
 
 // ------------------ TABS -------------------
@@ -78,6 +80,8 @@ class ProfileTab(
     private val storageManager: StorageManager,
     private val onNavigateToEditProfile: () -> Unit,
     private val onNavigateToManageDevice: () -> Unit,
+    private val onNavigateToPrivacyPolicy: () -> Unit,
+    private val onNavigateToTermsConditions: () -> Unit,
     private val onLogout: () -> Unit
 ) : Tab {
     @Composable
@@ -87,6 +91,8 @@ class ProfileTab(
             storageManager = storageManager,
             onEditProfile = onNavigateToEditProfile,
             onManageDevice = onNavigateToManageDevice,
+            onPrivacyPolicy = onNavigateToPrivacyPolicy,
+            onTermsConditions = onNavigateToTermsConditions,
             onLogout = onLogout
         )
     }
@@ -116,6 +122,8 @@ fun HomeNavGraph(
 
     var showEditProfile by remember { mutableStateOf(false) }
     var showManageDevice by remember { mutableStateOf(false) }
+    var showPrivacyPolicy by remember { mutableStateOf(false) }
+    var showTermsConditions by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         HomeNavGraphContent(
@@ -127,9 +135,12 @@ fun HomeNavGraph(
             onNavigateToDeviceReport = onNavigateToDeviceReport,
             onNavigateToEditProfile = { showEditProfile = true },
             onNavigateToManageDevice = { showManageDevice = true },
+            onNavigateToPrivacyPolicy = { showPrivacyPolicy = true },
+            onNavigateToTermsConditions = { showTermsConditions = true },
             onLogout = onLogout
         )
 
+        // Edit Profile Screen
         if (showEditProfile) {
             EditProfileScreen(
                 apiService = apiService,
@@ -138,6 +149,7 @@ fun HomeNavGraph(
             )
         }
 
+        // Manage Device Screen
         if (showManageDevice) {
             ManageDeviceScreen(
                 apiService = apiService,
@@ -150,6 +162,22 @@ fun HomeNavGraph(
                     showManageDevice = false
                     onNavigateToAddDevice()
                 }
+            )
+        }
+
+        // Privacy Policy Screen
+        if (showPrivacyPolicy) {
+            PrivacyPolicy_TandCScreen(
+                type = WebViewType.PRIVACY_POLICY,
+                onBackPressed = { showPrivacyPolicy = false }
+            )
+        }
+
+        // Terms & Conditions Screen
+        if (showTermsConditions) {
+            PrivacyPolicy_TandCScreen(
+                type = WebViewType.TERMS_CONDITIONS,
+                onBackPressed = { showTermsConditions = false }
             )
         }
     }
@@ -166,6 +194,8 @@ fun HomeNavGraphContent(
     onNavigateToDeviceReport: () -> Unit,
     onNavigateToEditProfile: () -> Unit,
     onNavigateToManageDevice: () -> Unit,
+    onNavigateToPrivacyPolicy: () -> Unit,
+    onNavigateToTermsConditions: () -> Unit,
     onLogout: () -> Unit
 ) {
     val homeTab = remember { HomeTab(viewModel, token, onNavigateToAddDevice, onNavigateToDeviceReport) }
@@ -175,6 +205,8 @@ fun HomeNavGraphContent(
             storageManager,
             onNavigateToEditProfile,
             onNavigateToManageDevice,
+            onNavigateToPrivacyPolicy,
+            onNavigateToTermsConditions,
             onLogout
         )
     }

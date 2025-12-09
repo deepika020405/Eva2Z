@@ -25,7 +25,7 @@ fun PrivacyPolicy_TandCScreen(
 ) {
     val url = when (type) {
         WebViewType.PRIVACY_POLICY -> "https://www.eva2z.com/privacy-policy"
-        WebViewType.TERMS_CONDITIONS -> "https://www.eva2z.com/about"
+        WebViewType.TERMS_CONDITIONS -> "https://eva2z.com/term-condition/"
     }
 
     val title = when (type) {
