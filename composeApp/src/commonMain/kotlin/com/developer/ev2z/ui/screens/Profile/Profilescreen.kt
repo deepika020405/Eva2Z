@@ -7,14 +7,35 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.rounded.Assessment
+import androidx.compose.material.icons.rounded.CardGiftcard
+import androidx.compose.material.icons.rounded.Contacts
+import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.DeviceHub
+import androidx.compose.material.icons.rounded.Devices
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Feedback
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.ImportantDevices
+import androidx.compose.material.icons.rounded.LocationCity
+import androidx.compose.material.icons.rounded.LocationOn
+import androidx.compose.material.icons.rounded.ManageAccounts
+import androidx.compose.material.icons.rounded.Password
+import androidx.compose.material.icons.rounded.PrivacyTip
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.Support
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -153,11 +174,11 @@ fun ProfileScreenContent(
                 item {
                     ProfileMenuCard(
                         items = listOf(
-                            ProfileMenuItem("Edit Profile", "edit_profile", onEditProfile),
-                            ProfileMenuItem("General Settings", "settings", onGeneralSettings),
-                            ProfileMenuItem("Account Activity", "activity", onAccountActivity),
-                            ProfileMenuItem("Refer And Earn", "refer", onReferAndEarn),
-                            ProfileMenuItem("Change Password", "password", onChangePassword)
+                            ProfileMenuItem("Edit Profile", Icons.Rounded.Edit, onEditProfile),
+                            ProfileMenuItem("General Settings", Icons.Rounded.Settings, onGeneralSettings),
+                            ProfileMenuItem("Account Activity", Icons.Rounded.ManageAccounts, onAccountActivity),
+                            ProfileMenuItem("Refer And Earn", Icons.Rounded.CardGiftcard, onReferAndEarn),
+                            ProfileMenuItem("Change Password", Icons.Rounded.Password, onChangePassword)
                         )
                     )
                 }
@@ -177,9 +198,9 @@ fun ProfileScreenContent(
                 item {
                     ProfileMenuCard(
                         items = listOf(
-                            ProfileMenuItem("Manage Device", "device", onManageDevice),
-                            ProfileMenuItem("Manage Geo Fence", "fence", onAddFence),
-                            ProfileMenuItem("History Playback", "history", onHistoryPlayback)
+                            ProfileMenuItem("Manage Device", Icons.Rounded.Devices, onManageDevice),
+                            ProfileMenuItem("Manage Geo Fence", Icons.Rounded.LocationOn, onAddFence),
+                            ProfileMenuItem("History Playback", Icons.Rounded.History, onHistoryPlayback)
                         )
                     )
                 }
@@ -390,7 +411,7 @@ fun ProfileImageZoomDialog(
 
 data class ProfileMenuItem(
     val title: String,
-    val icon: String,
+    val icon: ImageVector,
     val onClick: () -> Unit
 )
 
@@ -412,6 +433,7 @@ fun ProfileMenuCard(
             items.forEachIndexed { index, item ->
                 ProfileMenuItemRow(
                     title = item.title,
+                    icon = item.icon,
                     onClick = item.onClick
                 )
 
@@ -429,6 +451,7 @@ fun ProfileMenuCard(
 @Composable
 fun ProfileMenuItemRow(
     title: String,
+    icon: ImageVector,
     onClick: () -> Unit
 ) {
     Row(
@@ -438,11 +461,18 @@ fun ProfileMenuItemRow(
             .padding(horizontal = 16.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(20.dp)
-                .clip(CircleShape)
-                .background(Color(0xFF666666))
+//        Box(
+//            modifier = Modifier
+//                .size(20.dp)
+//                .clip(CircleShape)
+//                .background(Color(0xFF666666))
+//        )
+
+        Icon(
+            imageVector = icon,
+            contentDescription = title,
+            tint = Color(0xFF4CAF50),
+            modifier = Modifier.size(24.dp)
         )
 
         Spacer(modifier = Modifier.width(16.dp))
@@ -481,27 +511,27 @@ fun AboutSection(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column {
-            AboutMenuItem("Rate EVA2Z On Play Store", onRateApp)
+            AboutMenuItem("Rate EVA2Z On Play Store", Icons.Rounded.Star, onRateApp)
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp),
                 color = Color(0xFFE0E0E0)
             )
-            AboutMenuItem("Feedback", onFeedback)
+            AboutMenuItem("Feedback", Icons.Rounded.Feedback,onFeedback)
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp),
                 color = Color(0xFFE0E0E0)
             )
-            AboutMenuItem("Privacy Policy", onPrivacyPolicy)
+            AboutMenuItem("Privacy Policy", Icons.Rounded.PrivacyTip, onPrivacyPolicy)
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp),
                 color = Color(0xFFE0E0E0)
             )
-            AboutMenuItem("Terms & Conditions", onTermsConditions)
+            AboutMenuItem("Terms & Conditions", Icons.Rounded.Description, onTermsConditions)
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp),
                 color = Color(0xFFE0E0E0)
             )
-            AboutMenuItem("Contact Us", onContactUs)
+            AboutMenuItem("Contact Us", Icons.Rounded.Support, onContactUs)
         }
     }
 }
@@ -509,6 +539,7 @@ fun AboutSection(
 @Composable
 fun AboutMenuItem(
     title: String,
+    icon: ImageVector,
     onClick: () -> Unit
 ) {
     Row(
@@ -518,6 +549,16 @@ fun AboutMenuItem(
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+
+        Icon(
+            imageVector = icon,
+            contentDescription = title,
+            tint = Color(0xFF4CAF50),
+            modifier = Modifier.size(16.dp)
+        )
+
+        Spacer(modifier = Modifier.width(8.dp))
+
         Text(
             text = title,
             fontSize = 14.sp,
