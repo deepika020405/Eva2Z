@@ -15,6 +15,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import cafe.adriel.voyager.core.screen.Screen
+import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.navigator.tab.*
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.network.ApiService
@@ -64,16 +66,35 @@ object WalletTab : Tab {
         )
 }
 
+//class OrdersTab(
+//    private val shopViewModel: ShopViewModel,
+//    private val token: String
+//) : Tab {
+//    @Composable
+//    override fun Content() = ShopScreenHost(
+//        shopViewModel
+//        // If ShopScreenHost accepts a viewModel param, pass it,
+//        // otherwise it will create its own — adapt to your implementation.
+//    )
+//
+//    override val options: TabOptions
+//        @Composable get() = TabOptions(
+//            index = 2u,
+//            title = "Shop",
+//            icon = rememberVectorPainter(Icons.Default.ShoppingCart)
+//        )
+//}
+
+
 class OrdersTab(
     private val shopViewModel: ShopViewModel,
     private val token: String
 ) : Tab {
     @Composable
-    override fun Content() = ShopScreenHost(
-        shopViewModel
-        // If ShopScreenHost accepts a viewModel param, pass it,
-        // otherwise it will create its own — adapt to your implementation.
-    )
+    override fun Content() {
+        // ✅ WRAP with Navigator so LocalNavigator works
+        Navigator(screen = ShopScreenWrapper(shopViewModel))
+    }
 
     override val options: TabOptions
         @Composable get() = TabOptions(
@@ -83,7 +104,15 @@ class OrdersTab(
         )
 }
 
-
+// ✅ NEW: Wrapper Screen for Shop
+class ShopScreenWrapper(
+    private val viewModel: ShopViewModel
+) : Screen {
+    @Composable
+    override fun Content() {
+        ShopScreenHost(viewModel = viewModel)
+    }
+}
 class ProfileTab(
     private val apiService: ApiService,
     private val storageManager: StorageManager,

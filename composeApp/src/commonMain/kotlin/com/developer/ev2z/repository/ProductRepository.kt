@@ -1,6 +1,7 @@
 package com.developer.ev2z.repository
 
 import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.response.CartResponse
 import com.developer.ev2z.response.ProductDto
 import com.developer.ev2z.response.WishlistProductWrapper
 
@@ -22,5 +23,13 @@ class ProductRepository(
 
     suspend fun removeWishlist(token: String, productId: Int): Boolean {
         return api.removeFromWishlist(token, productId).success
+    }
+
+    suspend fun getCart(token: String): CartResponse {
+        return api.getCart(token)
+    }
+
+    suspend fun addToCart(token: String, productId: Int, quantity: Int = 1): Boolean {
+        return api.addToCart(token, productId, quantity, "android").success
     }
 }

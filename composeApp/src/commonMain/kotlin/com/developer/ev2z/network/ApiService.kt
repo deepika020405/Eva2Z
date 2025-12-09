@@ -417,4 +417,44 @@ class ApiService {
         }
     }
 
+    // ---------------- GET CART ----------------
+    suspend fun getCart(token: String): CartResponse {
+        println("🌐 API: getCart()")
+        return try {
+            val resp: CartResponse = client.get("${baseUrl}cart") {
+                header(io.ktor.http.HttpHeaders.Authorization, "Bearer $token")
+            }.body()
+            println("✔️ getCart: items=${resp.cart.size} totalPrice=${resp.totalPrice}")
+            resp
+        } catch (e: Exception) {
+            println("❌ getCart error: ${e.message}")
+            e.printStackTrace()
+            // safe fallback
+            CartResponse(success = false, cart = emptyList(), totalPrice = "0.00")
+        }
+    }
+
+
+    suspend fun addToCart(
+        token: String,
+        productId: Int,
+        quantity: Int = 1,
+        deviceType: String = "android" // or ios
+    ): CartActionResponse {
+
+        return client.post("${baseUrl}cart") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+
+            setBody(
+                mapOf(
+                    "action" to "add",
+                    "product_id" to productId,
+                    "quantity" to quantity,
+                    "device_type" to deviceType
+                )
+            )
+        }.body()
+    }
+
 }

@@ -4,6 +4,7 @@ package com.developer.ev2z.ui.screens.market_screen
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.developer.ev2z.repository.ProductRepository
+import com.developer.ev2z.response.CartItemDto
 import com.developer.ev2z.response.ProductDto
 import com.developer.ev2z.response.WishlistProductWrapper
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,6 +15,9 @@ data class ShopUiState(
     val loading: Boolean = false,
     val products: List<ProductDto> = emptyList(),
     val wishlist: List<WishlistProductWrapper> = emptyList(),
+    val cart: List<CartItemDto> = emptyList(),       // new
+    val cartCount: Int = 0,                          // new (sum of quantities)
+    val totalPrice: String? = null,                  // new
     val error: String? = null
 )
 
@@ -25,6 +29,30 @@ class ShopViewModel(
     private val _state = MutableStateFlow(ShopUiState())
     val state: StateFlow<ShopUiState> = _state
 
+//    fun loadData() {
+//        _state.value = _state.value.copy(loading = true)
+//        val token = tokenProvider()
+//
+//        viewModelScope.launch {
+//            try {
+//                val products = repo.getProducts(token)
+//                val wishlist = repo.getWishlist(token)
+//
+//                _state.value = ShopUiState(
+//                    loading = false,
+//                    products = products,
+//                    wishlist = wishlist
+//                )
+//
+//            } catch (e: Exception) {
+//                _state.value = ShopUiState(
+//                    loading = false,
+//                    error = e.message ?: "Unknown Error"
+//                )
+//            }
+//        }
+//    }
+
     fun loadData() {
         _state.value = _state.value.copy(loading = true)
         val token = tokenProvider()
@@ -33,11 +61,18 @@ class ShopViewModel(
             try {
                 val products = repo.getProducts(token)
                 val wishlist = repo.getWishlist(token)
+                val cartResp = repo.getCart(token)
+
+                // compute cart count as sum of quantities
+                val count = cartResp.cart.sumOf { it.quantity }
 
                 _state.value = ShopUiState(
                     loading = false,
                     products = products,
-                    wishlist = wishlist
+                    wishlist = wishlist,
+                    cart = cartResp.cart,
+                    cartCount = count,
+                    totalPrice = cartResp.totalPrice
                 )
 
             } catch (e: Exception) {
@@ -67,5 +102,43 @@ class ShopViewModel(
 
     fun isFavorite(productId: Int): Boolean {
         return _state.value.wishlist.any { it.product_id == productId }
+    }
+
+
+    fun refreshCart() {
+        val token = tokenProvider()
+        viewModelScope.launch {
+            try {
+                val cartResp = repo.getCart(token)
+                val count = cartResp.cart.sumOf { it.quantity }
+                _state.value = _state.value.copy(
+                    cart = cartResp.cart,
+                    cartCount = count,
+                    totalPrice = cartResp.totalPrice
+                )
+            } catch (e: Exception) {
+                // ignore or set error
+            }
+        }
+    }
+
+
+    fun addToCart(productId: Int, quantity: Int = 1) {
+        val token = tokenProvider()
+
+        viewModelScope.launch {
+            try {
+                val ok = repo.addToCart(token, productId, quantity)
+
+                if (ok) {
+                    refreshCart() // update cart count UI
+                } else {
+                    println("❌ Failed to add to cart")
+                }
+
+            } catch (e: Exception) {
+                println("❌ addToCart error: ${e.message}")
+            }
+        }
     }
 }

@@ -25,13 +25,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import cafe.adriel.voyager.navigator.LocalNavigator
 import coil3.compose.AsyncImage
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo // apna drawable
 import org.jetbrains.compose.resources.painterResource
 
 // ------------ DATA MODEL ------------
-
+@kotlinx.serialization.Serializable
 data class ShopProduct(
     val id: String,
     val title: String,
@@ -221,16 +222,6 @@ private fun ProductCard(
                 )
             }
 
-            // Product image
-//            Image(
-//                painter = painterResource(Res.drawable.app_logo),
-//                contentDescription = product.title,
-//                modifier = Modifier
-//                    .size(60.dp)
-//                    .clip(RoundedCornerShape(50)),
-//                contentScale = ContentScale.Crop
-//            )
-
             AsyncImage(
                 model = product.imageUrl,
                 contentDescription = product.title,
@@ -251,11 +242,11 @@ private fun ProductCard(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold
                 )
-                Text(
-                    product.subtitle,
-                    fontSize = 12.sp,
-                    color = Color.Gray
-                )
+//                Text(
+//                    product.subtitle,
+//                    fontSize = 12.sp,
+//                    color = Color.Gray
+//                )
 
                 Spacer(Modifier.height(4.dp))
 
@@ -277,13 +268,15 @@ private fun ProductCard(
                     )
                 }
             }
-
             Button(
-                onClick = onPlaceOrder,
+                onClick = {
+                    println("🟢 Button clicked for: ${product.title}")
+                    onPlaceOrder()
+                },
                 shape = RoundedCornerShape(30.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF34A853))
             ) {
-                Text("Place Order", fontSize = 12.sp)
+                Text("View Details", fontSize = 12.sp)
             }
         }
     }
@@ -338,19 +331,67 @@ private fun CartBottomBar(
 
 
 
+//@Composable
+//fun ShopScreenHost(viewModel: ShopViewModel) {
+//
+//    val state by viewModel.state.collectAsState()
+//
+//    LaunchedEffect(Unit) { viewModel.loadData() }
+//
+////    LaunchedEffect(state.cart) {
+////        viewModel.refreshCart()
+////    }
+//
+//    if (state.loading) {
+//        Box(
+//            modifier = Modifier
+//                .fillMaxSize(),
+//            contentAlignment = Alignment.Center
+//        ) {
+//            CircularProgressIndicator()
+//        }
+//        return
+//    }
+//
+//    ShopScreen(
+//        products = state.products.map { dto ->
+//            ShopProduct(
+//                id = dto.id.toString(),
+//                title = dto.name,
+//                subtitle = dto.device_type ?: "",
+//                priceText = "Rs. ${dto.sale_price}",
+//                rating = 4.8,
+//                ratingCount = 50,
+//                isFavorite = viewModel.isFavorite(dto.id),
+//                imageUrl = dto.image ?: ""
+//            )
+//        },
+//        cartCount = state.cartCount,      // <-- use real count
+//        onToggleFavorite = { p ->
+//            viewModel.toggleWishlist(p.id.toInt())
+//        },
+//        onCartClick = {
+//            // navigate to cart screen
+//        },
+//        onPlaceOrder = { ProductDetailsScreen(product = products) }
+//    )
+//}
+
+
+
 @Composable
 fun ShopScreenHost(viewModel: ShopViewModel) {
-
     val state by viewModel.state.collectAsState()
+    val navigator = LocalNavigator.current
 
-    LaunchedEffect(Unit) { viewModel.loadData() }
+    // ✅ Debug: Check if navigator is null
+    LaunchedEffect(Unit) {
+        println("🔍 Navigator is: ${if (navigator == null) "NULL ❌" else "Available ✅"}")
+        viewModel.loadData()
+    }
 
     if (state.loading) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
         }
         return
@@ -366,12 +407,22 @@ fun ShopScreenHost(viewModel: ShopViewModel) {
                 rating = 4.8,
                 ratingCount = 50,
                 isFavorite = viewModel.isFavorite(dto.id),
-                imageUrl = dto.image ?: ""    // SET API IMAGE
+                imageUrl = dto.image ?: ""
             )
         },
-        cartCount = 1,
+        cartCount = state.cartCount,
         onToggleFavorite = { p ->
             viewModel.toggleWishlist(p.id.toInt())
+        },
+        onCartClick = {
+            println("🛒 Cart clicked")
+        },
+        onPlaceOrder = { product ->
+            println("🔘 View Details clicked for: ${product.title}")
+            println("🧭 Navigator: ${navigator != null}")
+
+            // ✅ Navigation
+            navigator?.push(ProductDetailsScreen(product = product, viewModel = viewModel))
         }
     )
 }
