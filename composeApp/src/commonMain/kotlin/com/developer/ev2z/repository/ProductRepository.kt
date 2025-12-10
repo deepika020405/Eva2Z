@@ -29,7 +29,16 @@ class ProductRepository(
         return api.getCart(token)
     }
 
-    suspend fun addToCart(token: String, productId: Int, quantity: Int = 1): Boolean {
-        return api.addToCart(token, productId, quantity, "android").success
+    suspend fun addToCart(
+        token: String,
+        productId: Int,
+        quantity: Int,
+        plan_type: String,
+        device_type: String
+    ): Boolean {
+
+        val resp = api.addToCart(token, productId, quantity, plan_type, device_type)
+
+        return resp.success == true   // <-- null handled
     }
 }

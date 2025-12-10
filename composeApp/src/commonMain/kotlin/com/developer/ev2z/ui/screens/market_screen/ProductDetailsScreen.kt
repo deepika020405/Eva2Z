@@ -1,6 +1,7 @@
 package com.developer.ev2z.ui.screens.market_screen
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -18,6 +19,7 @@ import coil3.compose.AsyncImage
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import cafe.adriel.voyager.navigator.LocalNavigator
 
 class ProductDetailsScreen(
@@ -38,139 +40,208 @@ fun ProductDetailsContent(
 ) {
     val navigator = LocalNavigator.current
 
-    // Local screen states
     var selectedType by remember { mutableStateOf<String?>(null) }
     var withRecharge by remember { mutableStateOf(false) }
 
     val finalPrice = product.price + if (withRecharge) product.rechargePrice else 0.0
+    val fakeOldPrice = (finalPrice * 1.5).toInt() // Example old price = +50%
+    val discountPercent = (((fakeOldPrice - finalPrice) / fakeOldPrice) * 100).toInt()
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-    ) {
+    Box(Modifier.fillMaxSize()) {
 
-        // Top bar
-        Row(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 90.dp) // space for Add to Cart button
         ) {
-            IconButton(onClick = { navigator?.pop() }) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+
+            // Top Bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { navigator?.pop() }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                }
+                Text("Product Details", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
             }
-            Text("Product Details", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-        }
 
-        // Product Image
-        AsyncImage(
-            model = product.imageUrl,
-            contentDescription = null,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(230.dp)
-                .padding(16.dp)
-                .clip(RoundedCornerShape(12.dp))
-        )
-
-        Spacer(Modifier.height(12.dp))
-
-        // Product Details
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(product.title, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-            Text(
-                "₹${finalPrice.toInt()}",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF1B9F4A)
+            // Product image
+            AsyncImage(
+                model = product.imageUrl,
+                contentDescription = null,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(230.dp)
+                    .padding(16.dp)
+                    .clip(RoundedCornerShape(12.dp))
             )
 
-            Text("★★★★★ (${product.ratingCount})", color = Color(0xFFFFC107))
-            Spacer(Modifier.height(16.dp))
+            Column(Modifier.padding(16.dp)) {
 
-            // Recharge Option
-            if (product.rechargePrice > 0) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(
-                        checked = withRecharge,
-                        onCheckedChange = { withRecharge = it }
-                    )
-                    Text("With Recharge (+₹${product.rechargePrice.toInt()})")
-                }
-                Spacer(Modifier.height(12.dp))
-            }
+                // Title
+                Text(product.title, fontSize = 22.sp, fontWeight = FontWeight.Bold)
 
-            // Device Type Selection (Android / iOS)
-            if (product.deviceType != "none") {
-                Text("Select Device Type", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 Spacer(Modifier.height(8.dp))
 
-                Row {
-                    FilterChip(
-                        selected = selectedType == "android",
-                        onClick = { selectedType = "android" },
-                        label = { Text("Android") }
+                // Price Row (Fake discount)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFF1B9F4A))
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text("Rs. ${finalPrice.toInt()}", color = Color.White, fontSize = 16.sp)
+                    }
+
+                    Spacer(Modifier.width(10.dp))
+
+                    Text(
+                        "Rs. $fakeOldPrice",
+                        fontSize = 14.sp,
+                        color = Color.Black,
+                        fontWeight = FontWeight.Medium,
+                        textDecoration = TextDecoration.LineThrough
                     )
-                    Spacer(Modifier.width(12.dp))
-                    FilterChip(
-                        selected = selectedType == "ios",
-                        onClick = { selectedType = "ios" },
-                        label = { Text("iOS") }
+
+                    Spacer(Modifier.width(10.dp))
+
+                    Text(
+                        "${discountPercent}% OFF",
+                        color = Color(0xFF1B9F4A),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
                     )
                 }
 
-                Spacer(Modifier.height(16.dp))
-            }
+                Spacer(Modifier.height(14.dp))
 
-            // Description
-            Text("Description", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(8.dp))
-            Text(
-                product.description,
-                fontSize = 14.sp,
-                color = Color.DarkGray
-            )
+                // Quick Info (7 Days Replacement + 24/7 Support)
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    InfoBox(
+                        title = "7-Days",
+                        subtitle = "Replacement",
+                        modifier = Modifier.weight(1f)
+                    )
+                    InfoBox(
+                        title = "24/7",
+                        subtitle = "Customer Support",
+                        modifier = Modifier.weight(1f)
+                    )
+                }
 
-            Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(20.dp))
 
-            // Features Section
-            Text("Features", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(8.dp))
+                // Recharge option
+                if (product.rechargePrice > 0) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = withRecharge,
+                            onCheckedChange = { withRecharge = it }
+                        )
+                        Text("With Recharge (+₹${product.rechargePrice.toInt()})")
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
 
-            product.features.forEach { feature ->
-                Text("• $feature", fontSize = 14.sp, color = Color.Black)
+                // Device type
+                if (product.deviceType != "none") {
+                    Text("Select Device Type", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    Spacer(Modifier.height(8.dp))
+
+                    Row {
+                        FilterChip(
+                            selected = selectedType == "android",
+                            onClick = { selectedType = "android" },
+                            label = { Text("Android") }
+                        )
+                        Spacer(Modifier.width(12.dp))
+                        FilterChip(
+                            selected = selectedType == "ios",
+                            onClick = { selectedType = "ios" },
+                            label = { Text("iOS") }
+                        )
+                    }
+                    Spacer(Modifier.height(16.dp))
+                }
+
+                // Description
+                Text("Description", fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(6.dp))
-            }
+                Text(product.description, fontSize = 14.sp, color = Color.DarkGray)
 
-            Spacer(Modifier.height(100.dp)) // Space for bottom button
+                Spacer(Modifier.height(16.dp))
+
+                // Features
+                Text("Features", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(6.dp))
+
+                product.features.forEach {
+                    Text("• $it", fontSize = 14.sp)
+                    Spacer(Modifier.height(4.dp))
+                }
+            }
+        }
+
+        // BOTTOM FIXED BUTTON (Now Visible Always)
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Button(
+                enabled = product.deviceType == "none" || selectedType != null,
+                onClick = {
+                    val planType = if (withRecharge) "with_recharge" else "without_recharge"
+
+                    viewModel.addToCart(
+                        productId = product.id,
+                        quantity = 1,
+                        plan_type = planType,
+                        device_type = selectedType ?: ""
+                    )
+                    navigator?.pop()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1B9F4A)),
+                shape = RoundedCornerShape(26.dp)
+            ) {
+                Text("Add to Cart", fontSize = 16.sp)
+            }
         }
     }
+}
 
-    // BOTTOM: Add to Cart Button
+
+@Composable
+fun InfoBox(
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier
+) {
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color(0xFFEFF7F0))
+            .padding(vertical = 16.dp),
         contentAlignment = Alignment.Center
     ) {
-        Button(
-            enabled = product.deviceType == "none" || selectedType != null,
-            onClick = {
-//                viewModel.addToCart(
-//                    productId = product.id,
-//                    withRecharge = withRecharge,
-//                    deviceType = selectedType
-//                )
-                navigator?.pop()
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1B9F4A)),
-            shape = RoundedCornerShape(26.dp)
-        ) {
-            Text("Add to Cart", fontSize = 16.sp)
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(title, color = Color(0xFF1B9F4A), fontWeight = FontWeight.Bold)
+            Text(subtitle, fontSize = 12.sp, color = Color.Black)
         }
     }
 }

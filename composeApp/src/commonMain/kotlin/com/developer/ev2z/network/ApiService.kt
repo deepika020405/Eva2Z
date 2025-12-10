@@ -2,6 +2,7 @@ package com.developer.ev2z.network
 
 import com.developer.ev2z.data.local.model.DeviceResponse
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
+import com.developer.ev2z.request.CartAddRequest
 import com.developer.ev2z.request.DeviceAnalyticsRequest
 import com.developer.ev2z.request.LoginRequest
 import com.developer.ev2z.response.*
@@ -439,22 +440,49 @@ class ApiService {
         token: String,
         productId: Int,
         quantity: Int = 1,
-        deviceType: String = "android" // or ios
+        plan_type: String,
+        deviceType: String
     ): CartActionResponse {
 
-        return client.post("${baseUrl}cart") {
+        val url = "${baseUrl}cart"
+
+        // ---- PRINT REQUEST BEFORE SENDING ----
+        val bodyToSend = CartAddRequest(
+            action = "add",
+            product_id = productId,
+            quantity = quantity,
+            plan_type = plan_type,
+            device_type = deviceType
+        )
+
+        println("🌐 POST URL = $url")
+        println("📦 REQUEST BODY = ${kotlinx.serialization.json.Json.encodeToString(CartAddRequest.serializer(), bodyToSend)}")
+
+        // ---- DO REQUEST ----
+        val response = client.post(url) {
             header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
 
-            setBody(
-                mapOf(
-                    "action" to "add",
-                    "product_id" to productId,
-                    "quantity" to quantity,
-                    "device_type" to deviceType
-                )
+            setBody(bodyToSend)
+        }
+
+        // ---- PRINT RAW RESPONSE ----
+        val raw = response.bodyAsText()
+        println("📝 RAW RESPONSE = $raw")
+        println("📡 RESPONSE STATUS = ${response.status}")
+
+        // ---- TRY PARSE ----
+        return try {
+            response.body<CartActionResponse>()
+        } catch (e: Exception) {
+            println("❌ Parsing Error: ${e.message}")
+
+            CartActionResponse(
+                success = false,
+                action = null,
+                message = raw
             )
-        }.body()
+        }
     }
 
 }

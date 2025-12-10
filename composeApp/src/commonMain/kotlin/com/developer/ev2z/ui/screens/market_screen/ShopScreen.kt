@@ -112,6 +112,32 @@ fun ShopScreen(
                 }
             }
 
+//            Box(modifier = Modifier.fillMaxSize()) {
+//
+//                LazyColumn(
+//                    modifier = Modifier
+//                        .fillMaxSize()
+//                        .padding(bottom = 90.dp),   // ⭐ reserve space for bottom bar
+//                    verticalArrangement = Arrangement.spacedBy(12.dp)
+//                ) {
+//                    items(products) { product ->
+//                        ProductCard(
+//                            product = product,
+//                            onToggleFavorite = { onToggleFavorite(product) },
+//                            onPlaceOrder = { onPlaceOrder(product) }
+//                        )
+//                    }
+//                }
+//
+//                CartBottomBar(
+//                    count = cartCount,
+//                    onClick = onCartClick,
+//                    modifier = Modifier
+//                        .align(Alignment.BottomCenter)
+//                        .padding(16.dp)
+//                )
+//            }
+
 
 
 
@@ -290,6 +316,45 @@ private fun ProductCard(
 
 // ------------ BOTTOM CART BAR ------------
 
+
+//@Composable
+//private fun CartBottomBar(
+//    count: Int,
+//    onClick: () -> Unit,
+//    modifier: Modifier = Modifier
+//) {
+//    Box(
+//        modifier = modifier,
+//        contentAlignment = Alignment.Center
+//    ) {
+//        Button(
+//            onClick = onClick,
+//            shape = RoundedCornerShape(30.dp),
+//            modifier = Modifier.height(48.dp),
+//            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF34A853))
+//        ) {
+//            Icon(Icons.Default.ShoppingCart, contentDescription = null)
+//            Spacer(Modifier.width(8.dp))
+//            Text("Go To Cart", fontSize = 14.sp)
+//            Spacer(Modifier.width(8.dp))
+//            Box(
+//                modifier = Modifier
+//                    .size(20.dp)
+//                    .clip(CircleShape)
+//                    .background(Color.White),
+//                contentAlignment = Alignment.Center
+//            ) {
+//                Text(
+//                    count.toString(),
+//                    fontSize = 11.sp,
+//                    fontWeight = FontWeight.Bold,
+//                    color = Color(0xFF34A853)
+//                )
+//            }
+//        }
+//    }
+//}
+
 @Composable
 private fun CartBottomBar(
     count: Int,
@@ -333,56 +398,6 @@ private fun CartBottomBar(
             }
         }
     }
-
-
-
-
-//@Composable
-//fun ShopScreenHost(viewModel: ShopViewModel) {
-//
-//    val state by viewModel.state.collectAsState()
-//
-//    LaunchedEffect(Unit) { viewModel.loadData() }
-//
-////    LaunchedEffect(state.cart) {
-////        viewModel.refreshCart()
-////    }
-//
-//    if (state.loading) {
-//        Box(
-//            modifier = Modifier
-//                .fillMaxSize(),
-//            contentAlignment = Alignment.Center
-//        ) {
-//            CircularProgressIndicator()
-//        }
-//        return
-//    }
-//
-//    ShopScreen(
-//        products = state.products.map { dto ->
-//            ShopProduct(
-//                id = dto.id.toString(),
-//                title = dto.name,
-//                subtitle = dto.device_type ?: "",
-//                priceText = "Rs. ${dto.sale_price}",
-//                rating = 4.8,
-//                ratingCount = 50,
-//                isFavorite = viewModel.isFavorite(dto.id),
-//                imageUrl = dto.image ?: ""
-//            )
-//        },
-//        cartCount = state.cartCount,      // <-- use real count
-//        onToggleFavorite = { p ->
-//            viewModel.toggleWishlist(p.id.toInt())
-//        },
-//        onCartClick = {
-//            // navigate to cart screen
-//        },
-//        onPlaceOrder = { ProductDetailsScreen(product = products) }
-//    )
-//}
-
 
 
 @Composable
