@@ -1,0 +1,367 @@
+package com.developer.ev2z.ui.screens.market_screen
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import cafe.adriel.voyager.core.screen.Screen
+import coil3.compose.AsyncImage
+import com.developer.ev2z.response.CartItemDto
+
+
+class CartScreen(private val shopViewModel: ShopViewModel): Screen{
+
+    @Composable
+    override fun Content() {
+        CartScreenContent(shopViewModel)
+    }
+
+
+}
+@Composable
+fun CartScreenContent(viewModel: ShopViewModel) {
+    val state by viewModel.state.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.loadCart()
+    }
+
+    if (state.loading) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(bottom = 90.dp)
+    ) {
+        CartHeader(state.cartCount)
+        Spacer(Modifier.height(12.dp))
+
+        state.cart.forEach { item ->
+            CartItemCard(item)
+            Spacer(Modifier.height(12.dp))
+        }
+
+        DeliveryDetailsSection()
+
+        CouponsSection()
+
+        PaymentSummarySection(
+            totalAmount = state.totalPrice ?: "0"
+        )
+    }
+
+    CheckoutBottomBar(totalAmount = state.totalPrice ?: "0")
+}
+
+
+@Composable
+fun CartHeader(count: Int) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+
+        Text("Cart ($count item)", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+
+        Text(
+            "Continue Shopping ✕",
+            color = Color.Gray,
+            fontSize = 14.sp
+        )
+    }
+}
+
+@Composable
+fun CartItemCard(item: CartItemDto) {
+
+    val salePrice = item.product?.sale_price?.toDoubleOrNull() ?: 0.0
+
+    // ⭐ Fake old price — same logic as ProductDetails
+    val fakeOldPrice = (salePrice * 1.5).toInt()
+
+    // ⭐ Discount %
+    val discountPercent = (((fakeOldPrice - salePrice) / fakeOldPrice) * 100).toInt()
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFf2f5f0))
+    ) {
+        Row(
+            Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+
+            AsyncImage(
+                model = item.product?.image.orEmpty(),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(70.dp)
+                    .clip(RoundedCornerShape(12.dp)),
+                contentScale = ContentScale.Crop
+            )
+
+            Spacer(Modifier.width(12.dp))
+
+            Column(Modifier.weight(1f)) {
+
+                Text(item.product?.name ?: "", fontWeight = FontWeight.Bold)
+
+                Spacer(Modifier.height(4.dp))
+
+                val planType = when (item.plan_type?.lowercase()) {
+                    "with_recharge" -> "With Recharge"
+                    "without_recharge" -> "Without Recharge"
+                    else -> null
+                }
+
+                val deviceType = when (item.device_type?.lowercase()) {
+                    "android" -> "Android"
+                    "ios" -> "iOS"
+                    else -> null
+                }
+
+                val displayText = planType ?: deviceType ?: ""
+
+                Text(displayText , fontWeight = FontWeight.Bold)
+
+                Spacer(Modifier.height(4.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+
+                    // 🔥 SALE PRICE
+                    Box(
+                        Modifier
+                            .background(Color(0xFF1B9F4A), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text("Rs. $salePrice", color = Color.White)
+                    }
+
+                    Spacer(Modifier.width(8.dp))
+
+                    // 🔥 FAKE OLD PRICE
+                    Text(
+                        "Rs. $fakeOldPrice",
+                        textDecoration = TextDecoration.LineThrough,
+                        color = Color.Gray,
+                        fontSize = 12.sp
+                    )
+
+                    Spacer(Modifier.width(6.dp))
+
+                    // 🔥 DISCOUNT %
+                    Text(
+                        "$discountPercent% OFF",
+                        color = Color(0xFF1B9F4A),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+
+            QuantityController(item)
+        }
+    }
+}
+
+@Composable
+fun QuantityController(item: CartItemDto) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Button(
+            onClick = { /* Increase */ },
+            contentPadding = PaddingValues(0.dp),
+            modifier = Modifier.size(28.dp),
+            shape = CircleShape
+        ) {
+            Text("+")
+        }
+
+        Text(item.quantity.toString(), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+
+        Button(
+            onClick = { /* Decrease */ },
+            contentPadding = PaddingValues(0.dp),
+            modifier = Modifier.size(28.dp),
+            shape = CircleShape
+        ) {
+            Text("-")
+        }
+    }
+}
+
+
+@Composable
+fun DeliveryDetailsSection() {
+    Column(Modifier.padding(16.dp)) {
+
+        Text("Delivery Details", fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(12.dp))
+
+        DeliveryCard("📍", "B-120, Saket, D-Mart, New Delhi")
+        DeliveryCard("🚚", "Delivery by 7 Nov, Fri")
+        DeliveryCard("🏭", "Fulfilled by DELIVERY PARTNER NAME")
+    }
+}
+
+
+@Composable
+fun DeliveryCard(icon: String, text: String) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color(0xFFEFF7F0))
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(icon, fontSize = 18.sp)
+        Spacer(Modifier.width(12.dp))
+        Text(text)
+    }
+}
+
+
+@Composable
+fun CouponsSection() {
+    Column(Modifier.padding(16.dp)) {
+        Text("Coupons Available", fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(12.dp))
+
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(Color(0xFF4CAF50))
+        ) {
+            Column(Modifier.padding(16.dp)) {
+                Text("Flat ₹25 off*", color = Color.White)
+                Text("FINFIRST25", fontWeight = FontWeight.Bold, color = Color.White)
+
+                Spacer(Modifier.height(12.dp))
+                Text("Get Flat ₹25 off on all transactions above ₹250.", color = Color.White)
+
+                Spacer(Modifier.height(16.dp))
+
+                Button(
+                    onClick = {},
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(Color.White)
+                ) {
+                    Text("Apply Code", color = Color(0xFF4CAF50))
+                }
+            }
+        }
+    }
+}
+
+
+@Composable
+fun PaymentSummarySection(totalAmount: String) {
+    Column(Modifier.padding(16.dp)) {
+
+        Text("Payment Summary", fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(8.dp))
+
+        SummaryRow("Order Total", "228.80")
+        SummaryRow("Items Discount", "-28.80")
+        SummaryRow("Coupon Discount", "-15.80")
+        SummaryRow("Shipping", "Free")
+
+        Divider(Modifier.padding(vertical = 12.dp))
+
+        SummaryRow("Total", totalAmount, isBold = true)
+    }
+}
+
+
+
+@Composable
+fun SummaryRow(label: String, value: String, isBold: Boolean = false) {
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal)
+        Text(value, fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal)
+    }
+}
+
+@Composable
+fun CheckoutBottomBar(
+    totalAmount: String,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+    ) {
+
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(30.dp))
+                .background(Color.White)
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column {
+                Text("Total Amount", color = Color.Gray)
+                Text("₹$totalAmount", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            }
+
+            Button(
+                onClick = {},
+                shape = RoundedCornerShape(30.dp),
+                colors = ButtonDefaults.buttonColors(Color(0xFF34A853))
+            ) {
+                Text("Checkout", color = Color.White)
+            }
+        }
+    }
+}

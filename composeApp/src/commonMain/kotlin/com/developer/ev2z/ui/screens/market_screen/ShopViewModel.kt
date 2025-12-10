@@ -131,13 +131,39 @@ class ShopViewModel(
                 val ok = repo.addToCart(token, productId, quantity,plan_type,device_type)
 
                 if (ok) {
-                    refreshCart() // update cart count UI
+//                    refreshCart() // update cart count UI
                 } else {
                     println("❌ Failed to add to cart")
                 }
 
             } catch (e: Exception) {
                 println("❌ addToCart error: ${e.message}")
+            }
+        }
+    }
+
+
+    fun loadCart() {
+        val token = tokenProvider()
+        _state.value = _state.value.copy(loading = true)
+
+        viewModelScope.launch {
+            try {
+                val cartResp = repo.getCart(token)
+                val count = cartResp.cart.sumOf { it.quantity }
+
+                _state.value = _state.value.copy(
+                    loading = false,
+                    cart = cartResp.cart,
+                    cartCount = count,
+                    totalPrice = cartResp.totalPrice
+                )
+
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(
+                    loading = false,
+                    error = e.message
+                )
             }
         }
     }

@@ -94,6 +94,7 @@ class OrdersTab(
     override fun Content() {
         // ✅ WRAP with Navigator so LocalNavigator works
         Navigator(screen = ShopScreenWrapper(shopViewModel))
+//        Navigator(screen = ShopScreenWrapper(shopViewModel))
     }
 
     override val options: TabOptions

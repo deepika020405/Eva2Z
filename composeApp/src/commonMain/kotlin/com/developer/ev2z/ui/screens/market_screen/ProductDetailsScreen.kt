@@ -203,12 +203,17 @@ fun ProductDetailsContent(
             Button(
                 enabled = product.deviceType == "none" || selectedType != null,
                 onClick = {
-                    val planType = if (withRecharge) "with_recharge" else "without_recharge"
+                    val planType =
+                        if (product.id == 10 || product.id == 11) {
+                            if (withRecharge) "with_recharge" else "without_recharge"
+                        } else {
+                            null   // ⭐ For all other products, DO NOT send plan_type
+                        }
 
                     viewModel.addToCart(
                         productId = product.id,
                         quantity = 1,
-                        plan_type = planType,
+                        plan_type = planType ?: "",  // backend expects string OR empty
                         device_type = selectedType ?: ""
                     )
                     navigator?.pop()

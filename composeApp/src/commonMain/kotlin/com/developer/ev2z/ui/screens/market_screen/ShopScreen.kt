@@ -446,6 +446,7 @@ fun ShopScreenHost(viewModel: ShopViewModel) {
         },
         onCartClick = {
             println("🛒 Cart clicked")
+            navigator?.push(CartScreen(shopViewModel = viewModel))
         },
         onPlaceOrder = { product ->
             println("🔘 View Details clicked for: ${product.title}")
