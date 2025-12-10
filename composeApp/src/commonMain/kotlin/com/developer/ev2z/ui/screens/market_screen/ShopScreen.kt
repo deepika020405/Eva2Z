@@ -34,14 +34,20 @@ import org.jetbrains.compose.resources.painterResource
 // ------------ DATA MODEL ------------
 @kotlinx.serialization.Serializable
 data class ShopProduct(
-    val id: String,
+    val id: Int,
     val title: String,
-    val subtitle: String,
-    val priceText: String,
-    val rating: Double,
-    val ratingCount: Int,
-    val isFavorite: Boolean = false,
-    val imageUrl: String = ""   // ADD THIS
+    val subtitle: String,        // device_type
+    val price: Double,           // sale_price
+    val rechargePrice: Double,   // recharge_price
+    val promoAmount: Double,     // promo_amt
+    val promoCode: String,       // promo_code
+    val imageUrl: String,
+    val description: String,
+    val features: List<String>,  // features1–features7 merged
+    val deviceType: String,      // "none" / "available"
+    val rating: Double = 4.8,
+    val ratingCount: Int = 50,
+    val isFavorite: Boolean = false
 )
 
 // ------------ ROOT SCREEN ------------
@@ -251,7 +257,7 @@ private fun ProductCard(
                 Spacer(Modifier.height(4.dp))
 
                 Text(
-                    product.priceText,
+                    product.price.toString(),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -400,14 +406,23 @@ fun ShopScreenHost(viewModel: ShopViewModel) {
     ShopScreen(
         products = state.products.map { dto ->
             ShopProduct(
-                id = dto.id.toString(),
-                title = dto.name,
+                id = dto.id,
+                title = dto.name ?: "",
                 subtitle = dto.device_type ?: "",
-                priceText = "Rs. ${dto.sale_price}",
+                price = dto.sale_price?.toDoubleOrNull() ?: 0.0,
+                rechargePrice = dto.recharge_price?.toDoubleOrNull() ?: 0.0,
+                promoAmount = dto.promo_amt?.toDoubleOrNull() ?: 0.0,
+                promoCode = dto.promo_code ?: "",
+                imageUrl = dto.image ?: "",
+                description = dto.description ?: "",
+                features = listOfNotNull(
+                    dto.features1, dto.features2, dto.features3,
+                    dto.features4, dto.features5, dto.features6, dto.features7
+                ),
+                deviceType = dto.device_type ?: "",
                 rating = 4.8,
                 ratingCount = 50,
-                isFavorite = viewModel.isFavorite(dto.id),
-                imageUrl = dto.image ?: ""
+                isFavorite = viewModel.isFavorite(dto.id)
             )
         },
         cartCount = state.cartCount,
