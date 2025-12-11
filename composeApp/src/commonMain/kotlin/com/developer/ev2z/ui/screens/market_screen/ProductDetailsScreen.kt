@@ -211,6 +211,7 @@ fun ProductDetailsContent(
                         }
 
                     viewModel.addToCart(
+                        add = "add",
                         productId = product.id,
                         quantity = 1,
                         plan_type = planType ?: "",  // backend expects string OR empty

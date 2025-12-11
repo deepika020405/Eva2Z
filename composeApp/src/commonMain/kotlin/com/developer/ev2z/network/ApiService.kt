@@ -438,6 +438,7 @@ class ApiService {
 
     suspend fun addToCart(
         token: String,
+        add: String,
         productId: Int,
         quantity: Int = 1,
         plan_type: String,
@@ -448,7 +449,7 @@ class ApiService {
 
         // ---- PRINT REQUEST BEFORE SENDING ----
         val bodyToSend = CartAddRequest(
-            action = "add",
+            action = add,
             product_id = productId,
             quantity = quantity,
             plan_type = plan_type,

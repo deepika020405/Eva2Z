@@ -31,13 +31,14 @@ class ProductRepository(
 
     suspend fun addToCart(
         token: String,
+        add: String,
         productId: Int,
         quantity: Int,
         plan_type: String,
         device_type: String
     ): Boolean {
 
-        val resp = api.addToCart(token, productId, quantity, plan_type, device_type)
+        val resp = api.addToCart(token, add,productId, quantity, plan_type, device_type)
 
         return resp.success == true   // <-- null handled
     }

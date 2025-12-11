@@ -123,12 +123,12 @@ class ShopViewModel(
     }
 
 
-    fun addToCart(productId: Int, quantity: Int = 1,plan_type: String,device_type: String) {
+    fun addToCart(add: String,productId: Int, quantity: Int = 1,plan_type: String,device_type: String) {
         val token = tokenProvider()
 
         viewModelScope.launch {
             try {
-                val ok = repo.addToCart(token, productId, quantity,plan_type,device_type)
+                val ok = repo.addToCart(token, add,productId, quantity,plan_type,device_type)
 
                 if (ok) {
 //                    refreshCart() // update cart count UI
