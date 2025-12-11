@@ -37,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import cafe.adriel.voyager.core.screen.Screen
 import coil3.compose.AsyncImage
 import com.developer.ev2z.response.CartItemDto
@@ -76,7 +77,7 @@ fun CartScreenContent(viewModel: ShopViewModel) {
         Spacer(Modifier.height(12.dp))
 
         state.cart.forEach { item ->
-            CartItemCard(item)
+            CartItemCard(item,viewModel)
             Spacer(Modifier.height(12.dp))
         }
 
@@ -114,7 +115,7 @@ fun CartHeader(count: Int) {
 }
 
 @Composable
-fun CartItemCard(item: CartItemDto) {
+fun CartItemCard(item: CartItemDto,viewModel: ShopViewModel) {
 
     val salePrice = item.product?.sale_price?.toDoubleOrNull() ?: 0.0
 
@@ -204,16 +205,21 @@ fun CartItemCard(item: CartItemDto) {
                 }
             }
 
-            QuantityController(item)
+            QuantityController(item, viewModel )
         }
     }
 }
 
 @Composable
-fun QuantityController(item: CartItemDto) {
+fun QuantityController(item: CartItemDto,viewModel: ShopViewModel) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Button(
-            onClick = { /* Increase */ },
+            onClick = { viewModel.updateQuantity(
+                productId = item.product_id,
+                newQty = item.quantity + 1,
+                plan_type = item.plan_type,
+                device_type = item.device_type
+            ) },
             contentPadding = PaddingValues(0.dp),
             modifier = Modifier.size(28.dp),
             shape = CircleShape
@@ -224,7 +230,14 @@ fun QuantityController(item: CartItemDto) {
         Text(item.quantity.toString(), fontWeight = FontWeight.Bold, fontSize = 14.sp)
 
         Button(
-            onClick = { /* Decrease */ },
+            onClick = { if (item.quantity > 1) {
+                viewModel.updateQuantity(
+                    productId = item.product_id,
+                    newQty = item.quantity - 1,
+                    plan_type = item.plan_type,
+                    device_type = item.device_type
+                )
+            } },
             contentPadding = PaddingValues(0.dp),
             modifier = Modifier.size(28.dp),
             shape = CircleShape

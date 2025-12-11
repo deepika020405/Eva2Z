@@ -42,4 +42,22 @@ class ProductRepository(
 
         return resp.success == true   // <-- null handled
     }
+
+
+    suspend fun updateCartQuantity(
+        token: String,
+        productId: Int,
+        quantity: Int,
+        plan_type: String?,
+        device_type: String?
+    ): Boolean {
+        return api.updateCartQuantity(
+            token = token,
+            productId = productId,
+            quantity = quantity,
+            planType = plan_type,
+            deviceType = device_type
+        ).success == true
+    }
+
 }

@@ -486,4 +486,30 @@ class ApiService {
         }
     }
 
+
+
+    suspend fun updateCartQuantity(
+        token: String,
+        productId: Int,
+        quantity: Int,
+        planType: String?,
+        deviceType: String?
+    ): CartActionResponse {
+
+        val body = CartAddRequest(
+            action = "update_qty",
+            product_id = productId,
+            quantity = quantity,
+            plan_type = planType,
+            device_type = deviceType
+        )
+
+        return client.post("${baseUrl}cart") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(body)
+        }.body()
+    }
+
+
 }

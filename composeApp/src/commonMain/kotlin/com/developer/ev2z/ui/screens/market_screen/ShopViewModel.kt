@@ -167,4 +167,56 @@ class ShopViewModel(
             }
         }
     }
+
+
+
+    fun updateQuantity(
+        productId: Int,
+        newQty: Int,
+        plan_type: String?,
+        device_type: String?
+    ) {
+        val token = tokenProvider()
+
+        viewModelScope.launch {
+
+            // ⭐ SAME LOGIC APPLY AS ADD TO CART
+            val finalPlan = if (productId == 10 || productId == 11) {
+                when (plan_type?.lowercase()) {
+                    "with_recharge" -> "with_recharge"
+                    "without_recharge" -> "without_recharge"
+                    else -> ""
+                }
+            } else {
+                ""   // ⭐ OTHER PRODUCTS MUST NOT SEND PLAN TYPE
+            }
+
+            val finalDevice = when (device_type?.lowercase()) {
+                "android" -> "android"
+                "ios" -> "ios"
+                else -> ""
+            }
+
+            try {
+                val ok = repo.updateCartQuantity(
+                    token = token,
+                    productId = productId,
+                    quantity = newQty,
+                    plan_type = finalPlan,
+                    device_type = finalDevice
+                )
+
+                if (ok) {
+                    refreshCart()
+                } else {
+                    println("❌ Failed to update quantity (Server Reject)")
+                }
+
+            } catch (e: Exception) {
+                println("❌ updateQuantity error: ${e.message}")
+            }
+        }
+    }
+
+
 }
