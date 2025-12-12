@@ -49,6 +49,8 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import coil3.compose.AsyncImage
+import com.developer.ev2z.getPlatformContext
+import com.developer.ev2z.phonepe.openPhonePeCheckout
 import com.developer.ev2z.response.CartItemDto
 
 
@@ -61,6 +63,57 @@ class CartScreen(private val shopViewModel: ShopViewModel): Screen{
 
 
 }
+//@Composable
+//fun CartScreenContent(viewModel: ShopViewModel) {
+//    val state by viewModel.state.collectAsState()
+//    val navigator = LocalNavigator.currentOrThrow
+//
+//    LaunchedEffect(Unit) {
+//        viewModel.loadCart()
+//        viewModel.loadBillingAddresses()
+//    }
+//
+//    if (state.loading) {
+//        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+//            CircularProgressIndicator()
+//        }
+//        return
+//    }
+//
+//
+//    Column(
+//        modifier = Modifier
+//            .fillMaxSize()
+//            .verticalScroll(rememberScrollState())
+//            .padding(bottom = 90.dp)
+//    ) {
+//        CartHeader(state.cartCount)
+//        Spacer(Modifier.height(12.dp))
+//
+//        state.cart.forEach { item ->
+//            CartItemCard(item,viewModel)
+//            Spacer(Modifier.height(12.dp))
+//        }
+//
+//
+//        AddressSection(
+//            selectedAddress = state.selectedAddress,
+//            addresses = state.addresses,
+//            onSelect = { viewModel.selectAddress(it) },
+//            onAddNew = {
+//                navigator.push(AddNewAddressScreen(viewModel))
+//            },
+//            viewModel = viewModel
+//        )
+//        CouponsSection(viewModel = viewModel)
+//
+//        PaymentSummarySection(viewModel = viewModel)
+//    }
+//
+//    CheckoutBottomBar(viewModel)
+//}
+
+
 @Composable
 fun CartScreenContent(viewModel: ShopViewModel) {
     val state by viewModel.state.collectAsState()
@@ -78,39 +131,42 @@ fun CartScreenContent(viewModel: ShopViewModel) {
         return
     }
 
-
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(bottom = 90.dp)
+        modifier = Modifier.fillMaxSize()
     ) {
-        CartHeader(state.cartCount)
-        Spacer(Modifier.height(12.dp))
-
-        state.cart.forEach { item ->
-            CartItemCard(item,viewModel)
+        // ⭐ Scrollable content
+        Column(
+            modifier = Modifier
+                .weight(1f)     // VERY IMPORTANT!
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 16.dp)
+        ) {
+            CartHeader(state.cartCount)
             Spacer(Modifier.height(12.dp))
+
+            state.cart.forEach { item ->
+                CartItemCard(item, viewModel)
+                Spacer(Modifier.height(12.dp))
+            }
+
+            AddressSection(
+                selectedAddress = state.selectedAddress,
+                addresses = state.addresses,
+                onSelect = { viewModel.selectAddress(it) },
+                onAddNew = {
+                    navigator.push(AddNewAddressScreen(viewModel))
+                },
+                viewModel = viewModel
+            )
+
+            CouponsSection(viewModel)
+            PaymentSummarySection(viewModel)
         }
 
-
-        AddressSection(
-            selectedAddress = state.selectedAddress,
-            addresses = state.addresses,
-            onSelect = { viewModel.selectAddress(it) },
-            onAddNew = {
-                navigator.push(AddNewAddressScreen(viewModel))
-            },
-            viewModel = viewModel
-        )
-        CouponsSection(viewModel = viewModel)
-
-        PaymentSummarySection(viewModel = viewModel)
+        // ⭐ Fixed Bottom Bar always visible
+        CheckoutBottomBar(viewModel)
     }
-
-    CheckoutBottomBar(totalAmount = state.totalPrice ?: "0")
 }
-
 
 @Composable
 fun CartHeader(count: Int) {
@@ -644,13 +700,72 @@ fun SummaryRow(label: String, value: String, isBold: Boolean = false) {
     }
 }
 
+
+
+
+//@Composable
+//fun CheckoutBottomBar(viewModel: ShopViewModel) {
+//    val state by viewModel.state.collectAsState()
+//    val navigator = LocalNavigator.currentOrThrow
+//
+//    Box(
+//        Modifier
+//            .fillMaxWidth()
+//            .padding(16.dp)
+//    ) {
+//
+//        Row(
+//            Modifier
+//                .fillMaxWidth()
+//                .clip(RoundedCornerShape(30.dp))
+//                .background(Color.White)
+//                .padding(16.dp),
+//            horizontalArrangement = Arrangement.SpaceBetween,
+//            verticalAlignment = Alignment.CenterVertically
+//        ) {
+//
+//            Column {
+//                Text("Total Amount", color = Color.Gray)
+//                Text(
+//                    "₹${state.finalAmount ?: state.totalPrice ?: "0"}",
+//                    fontSize = 20.sp,
+//                    fontWeight = FontWeight.Bold
+//                )
+//            }
+//
+//            Button(
+//                onClick = {
+//                    viewModel.createOrder { merchantId, phonePeOrderId, token ->
+//
+//                        println("🚀 Starting PhonePe Checkout")
+//                        println("merchantOrderId = $merchantId")
+//                        println("phonePeOrderId = $phonePeOrderId")
+//                        println("token = $token")
+//
+//                        PhonePeKt.startCheckoutPage(
+//                            context = navigator.lastItem.key.context,
+//                            token = token,
+//                            orderId = phonePeOrderId
+//                        )
+//                    }
+//                },
+//                shape = RoundedCornerShape(30.dp),
+//                colors = ButtonDefaults.buttonColors(Color(0xFF34A853))
+//            ) {
+//                Text("Checkout", color = Color.White)
+//            }
+//        }
+//    }
+//}
+
+
 @Composable
-fun CheckoutBottomBar(
-    totalAmount: String,
-    modifier: Modifier = Modifier
-) {
+fun CheckoutBottomBar(viewModel: ShopViewModel) {
+    val state by viewModel.state.collectAsState()
+    val ctx = getPlatformContext()
+
     Box(
-        modifier = modifier
+        Modifier
             .fillMaxWidth()
             .padding(16.dp)
     ) {
@@ -661,16 +776,25 @@ fun CheckoutBottomBar(
                 .clip(RoundedCornerShape(30.dp))
                 .background(Color.White)
                 .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
+
             Column {
                 Text("Total Amount", color = Color.Gray)
-                Text("₹$totalAmount", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    "₹${state.finalAmount ?: state.totalPrice ?: "0"}",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold
+                )
             }
 
             Button(
-                onClick = {},
+                onClick = {
+                    viewModel.createOrder { redirectUrl ->
+                        openPhonePeCheckout(redirectUrl)
+                    }
+                },
                 shape = RoundedCornerShape(30.dp),
                 colors = ButtonDefaults.buttonColors(Color(0xFF34A853))
             ) {
@@ -678,6 +802,4 @@ fun CheckoutBottomBar(
             }
         }
     }
-
-
 }

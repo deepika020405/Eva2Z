@@ -1,6 +1,7 @@
 package com.developer.ev2z.repository
 
 import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.request.CreateOrderRequest
 import com.developer.ev2z.response.BillingDto
 import com.developer.ev2z.response.CartResponse
 import com.developer.ev2z.response.ProductDto
@@ -119,5 +120,23 @@ class ProductRepository(
         code: String
     ): PromoResponse {
         return api.applyPromo(token, amount, code.uppercase())
+    }
+
+
+
+
+    suspend fun createPhonePeOrder(
+        token: String,
+        amount: Double,
+        billingId: Int
+    ): JsonObject {
+
+        val body = CreateOrderRequest(
+            amount = amount,
+            final_amount = amount,
+            billing_id = billingId
+        )
+
+        return api.createPhonePeOrder(token, body)
     }
 }

@@ -4,12 +4,14 @@ package com.developer.ev2z.ui.screens.market_screen
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.developer.ev2z.repository.ProductRepository
+import com.developer.ev2z.request.CreateOrderRequest
 import com.developer.ev2z.response.CartItemDto
 import com.developer.ev2z.response.ProductDto
 import com.developer.ev2z.response.WishlistProductWrapper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.jsonPrimitive
 
 data class ShopUiState(
     val loading: Boolean = false,
@@ -26,7 +28,12 @@ data class ShopUiState(
     val originalAmount: String? = null,
     val finalAmount: String? = null,
     val discountApplied: Double? = null,
-    val promoError: String? = null
+    val promoError: String? = null,
+    val orderLoading: Boolean = false,
+    val orderToken: String? = null,
+    val merchantOrderId: String? = null,
+    val phonePeOrderId: String? = null,
+    val orderError: String? = null
 )
 
 
@@ -376,5 +383,45 @@ class ShopViewModel(
 
     fun clearPromoError() {
         _state.value = _state.value.copy(promoError = null)
+    }
+
+
+
+    fun createOrder(onReady: (redirectUrl: String) -> Unit) {
+        val s = _state.value
+        val token = tokenProvider()
+
+        val amount = (s.finalAmount ?: s.totalPrice ?: "0").toDouble()
+        val billingId = s.selectedAddress?.id ?: return
+
+        viewModelScope.launch {
+            try {
+                val resp = repo.createPhonePeOrder(
+                    token = token,
+                    amount = amount,
+                    billingId = billingId
+                )
+
+                println("📦 SERVER ORDER RESPONSE = $resp")
+
+                val merchantId = resp["merchantId"]?.jsonPrimitive?.content
+                    ?: error("merchantId missing")
+
+                val orderId = resp["phonepeOrderId"]?.jsonPrimitive?.content
+                    ?: error("phonepeOrderId missing")
+
+                val tokenKey = resp["orderToken"]?.jsonPrimitive?.content
+                    ?: error("orderToken missing")
+
+                // ⭐ CREATE REDIRECT URL (PhonePe standard format)
+                val redirectUrl =
+                    "https://mercury.phonepe.com/transact/pg/$merchantId/$orderId?token=$tokenKey"
+
+                onReady(redirectUrl)
+
+            } catch (e: Exception) {
+                println("❌ createOrder ERROR = ${e.message}")
+            }
+        }
     }
 }

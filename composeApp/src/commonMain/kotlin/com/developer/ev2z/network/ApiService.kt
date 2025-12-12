@@ -3,6 +3,7 @@ package com.developer.ev2z.network
 import com.developer.ev2z.data.local.model.DeviceResponse
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
 import com.developer.ev2z.request.CartAddRequest
+import com.developer.ev2z.request.CreateOrderRequest
 import com.developer.ev2z.request.DeviceAnalyticsRequest
 import com.developer.ev2z.request.LoginRequest
 import com.developer.ev2z.response.*
@@ -608,4 +609,20 @@ class ApiService {
             throw e
         }
     }
+
+
+
+
+    suspend fun createPhonePeOrder(token: String, req: CreateOrderRequest): JsonObject {
+        val url = "${baseUrl}phonepe/create-orders"
+
+        val response = client.post(url) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(req)   // ⭐ DTO passed safely
+        }
+
+        return response.body()
+    }
+
 }
