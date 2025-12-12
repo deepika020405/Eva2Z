@@ -567,4 +567,45 @@ class ApiService {
             JsonObject(mapOf("status" to Json.encodeToJsonElement("error")))
         }
     }
+
+
+
+    suspend fun applyPromo(
+        token: String,
+        amount: String,
+        code: String
+    ): PromoResponse {
+
+        val upper = code.trim().uppercase()
+
+        val applyPromoValue = if (upper.startsWith("WELCOME")) upper else ""
+        val referralValue   = if (upper.startsWith("REFER")) upper else ""
+
+        val url = "${baseUrl}phonepe/apply-promo"
+
+        val body = mapOf(
+            "amount" to amount,
+            "referral_code" to referralValue,
+            "apply_promo" to applyPromoValue
+        )
+
+        println("📤 APPLY PROMO FINAL BODY = $body")
+
+        return try {
+            val response = client.post(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(body)
+            }
+
+            val raw = response.bodyAsText()
+            println("📥 RAW APPLY PROMO RESPONSE = $raw")
+
+            response.body()
+
+        } catch (e: Exception) {
+            println("❌ applyPromo ERROR = ${e.message}")
+            throw e
+        }
+    }
 }

@@ -4,6 +4,7 @@ import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.response.BillingDto
 import com.developer.ev2z.response.CartResponse
 import com.developer.ev2z.response.ProductDto
+import com.developer.ev2z.response.PromoResponse
 import com.developer.ev2z.response.WishlistProductWrapper
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -108,5 +109,15 @@ class ProductRepository(
             println("❌ AddBillingAddress Error: ${e.message}")
             false
         }
+    }
+
+
+
+    suspend fun applyPromo(
+        token: String,
+        amount: String,
+        code: String
+    ): PromoResponse {
+        return api.applyPromo(token, amount, code.uppercase())
     }
 }

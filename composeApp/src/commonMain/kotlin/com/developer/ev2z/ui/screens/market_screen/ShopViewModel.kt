@@ -20,7 +20,13 @@ data class ShopUiState(
     val totalPrice: String? = null,
     val addresses: List<BillingAddress> = emptyList(),   // ⭐ NEW
     val selectedAddress: BillingAddress? = null,         // ⭐ NEW
-    val error: String? = null
+    val error: String? = null,
+    val promoApplied: Boolean = false,
+    val appliedPromoCode: String? = null,
+    val originalAmount: String? = null,
+    val finalAmount: String? = null,
+    val discountApplied: Double? = null,
+    val promoError: String? = null
 )
 
 
@@ -319,5 +325,56 @@ class ShopViewModel(
                 println("❌ Failed to Add Address")
             }
         }
+    }
+
+
+    fun applyPromo(code: String) {
+        val token = tokenProvider()
+        val amount = _state.value.totalPrice ?: "0"
+        val upper = code.trim().uppercase()
+
+        // ❌ Invalid format?
+        if (!upper.startsWith("WELCOME") && !upper.startsWith("REFER")) {
+            _state.value = _state.value.copy(
+                promoApplied = false,
+                promoError = "Please enter a valid coupon code"
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            try {
+                val resp = repo.applyPromo(token, amount, upper)
+
+                if (!resp.success) {
+                    _state.value = _state.value.copy(
+                        promoApplied = false,
+                        promoError = "Please enter a valid coupon code"
+                    )
+                    return@launch
+                }
+
+                // ⭐ SUCCESS
+                _state.value = _state.value.copy(
+                    promoApplied = true,
+                    appliedPromoCode = resp.appliedCode,
+                    originalAmount = resp.originalAmount,
+                    finalAmount = resp.finalAmount.toString(),
+                    discountApplied = resp.discountApplied,
+                    totalPrice = resp.finalAmount.toString(),
+                    promoError = null
+                )
+
+            } catch (e: Exception) {
+                _state.value = _state.value.copy(
+                    promoApplied = false,
+                    promoError = "Please enter a valid coupon code"
+                )
+            }
+        }
+    }
+
+    fun clearPromoError() {
+        _state.value = _state.value.copy(promoError = null)
     }
 }
