@@ -93,7 +93,6 @@ fun CartScreenContent(viewModel: ShopViewModel) {
             Spacer(Modifier.height(12.dp))
         }
 
-//        DeliveryDetailsSection()
 
         AddressSection(
             selectedAddress = state.selectedAddress,
@@ -170,64 +169,6 @@ fun CartItemCard(item: CartItemDto,viewModel: ShopViewModel) {
             )
 
             Spacer(Modifier.width(12.dp))
-
-//            Column(Modifier.weight(1f)) {
-//
-//                Text(item.product?.name ?: "", fontWeight = FontWeight.Bold)
-//
-//                Spacer(Modifier.height(4.dp))
-//
-//                val planType = when (item.plan_type?.lowercase()) {
-//                    "with_recharge" -> "With Recharge"
-//                    "without_recharge" -> "Without Recharge"
-//                    else -> null
-//                }
-//
-//                val deviceType = when (item.device_type?.lowercase()) {
-//                    "android" -> "Android"
-//                    "ios" -> "iOS"
-//                    else -> null
-//                }
-//
-//                val displayText = planType ?: deviceType ?: ""
-//
-//                Text(displayText , fontWeight = FontWeight.Bold)
-//
-//                Spacer(Modifier.height(4.dp))
-//
-//                Row(verticalAlignment = Alignment.CenterVertically) {
-//
-//                    // 🔥 SALE PRICE
-//                    Box(
-//                        Modifier
-//                            .background(Color(0xFF1B9F4A), RoundedCornerShape(6.dp))
-//                            .padding(horizontal = 8.dp, vertical = 4.dp)
-//                    ) {
-//                        Text("Rs. $salePrice", color = Color.White)
-//                    }
-//
-//                    Spacer(Modifier.width(8.dp))
-//
-//                    // 🔥 FAKE OLD PRICE
-//                    Text(
-//                        "Rs. $fakeOldPrice",
-//                        textDecoration = TextDecoration.LineThrough,
-//                        color = Color.Gray,
-//                        fontSize = 12.sp
-//                    )
-//
-//                    Spacer(Modifier.width(6.dp))
-//
-//                    // 🔥 DISCOUNT %
-//                    Text(
-//                        "$discountPercent% OFF",
-//                        color = Color(0xFF1B9F4A),
-//                        fontWeight = FontWeight.Bold,
-//                        fontSize = 12.sp
-//                    )
-//                }
-//            }
-
             Column(Modifier.weight(1f)) {
 
                 Text(item.product?.name ?: "", fontWeight = FontWeight.Bold)
@@ -507,38 +448,6 @@ fun DeliveryCard(icon: String, text: String) {
 }
 
 
-//@Composable
-//fun CouponsSection() {
-//    Column(Modifier.padding(16.dp)) {
-//        Text("Coupons Available", fontWeight = FontWeight.SemiBold)
-//        Spacer(Modifier.height(12.dp))
-//
-//        Card(
-//            shape = RoundedCornerShape(16.dp),
-//            modifier = Modifier.fillMaxWidth(),
-//            colors = CardDefaults.cardColors(Color(0xFF4CAF50))
-//        ) {
-//            Column(Modifier.padding(16.dp)) {
-//                Text("Flat ₹25 off*", color = Color.White)
-//                Text("FINFIRST25", fontWeight = FontWeight.Bold, color = Color.White)
-//
-//                Spacer(Modifier.height(12.dp))
-//                Text("Get Flat ₹25 off on all transactions above ₹250.", color = Color.White)
-//
-//                Spacer(Modifier.height(16.dp))
-//
-//                Button(
-//                    onClick = {},
-//                    modifier = Modifier.fillMaxWidth(),
-//                    colors = ButtonDefaults.buttonColors(Color.White)
-//                ) {
-//                    Text("Apply Code", color = Color(0xFF4CAF50))
-//                }
-//            }
-//        }
-//    }
-//}
-
 @Composable
 fun CouponsSection(viewModel: ShopViewModel) {
     val state by viewModel.state.collectAsState()
@@ -549,14 +458,6 @@ fun CouponsSection(viewModel: ShopViewModel) {
 
         Text("Apply Promo Code", fontWeight = FontWeight.Bold, fontSize = 18.sp)
         Spacer(Modifier.height(12.dp))
-
-//        TextField(
-//            value = code,
-//            onValueChange = { code = it },
-//            label = { Text("Enter Promo Code") },
-//            modifier = Modifier.fillMaxWidth(),
-//            shape = RoundedCornerShape(12.dp)
-//        )
 
         TextField(
             value = code,
@@ -695,24 +596,6 @@ fun CustomInput(label: String, value: String, onChange: (String) -> Unit) {
         Spacer(Modifier.height(12.dp))
     }
 }
-
-//@Composable
-//fun PaymentSummarySection(totalAmount: String) {
-//    Column(Modifier.padding(16.dp)) {
-//
-//        Text("Payment Summary", fontWeight = FontWeight.SemiBold)
-//        Spacer(Modifier.height(8.dp))
-//
-//        SummaryRow("Order Total", "228.80")
-//        SummaryRow("Items Discount", "-28.80")
-//        SummaryRow("Coupon Discount", "-15.80")
-//        SummaryRow("Shipping", "Free")
-//
-//        Divider(Modifier.padding(vertical = 12.dp))
-//
-//        SummaryRow("Total", totalAmount, isBold = true)
-//    }
-//}
 
 @Composable
 fun PaymentSummarySection(viewModel: ShopViewModel) {
