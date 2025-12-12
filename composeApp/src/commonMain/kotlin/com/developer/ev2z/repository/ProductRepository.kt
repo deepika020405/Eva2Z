@@ -1,9 +1,13 @@
 package com.developer.ev2z.repository
 
 import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.response.BillingDto
 import com.developer.ev2z.response.CartResponse
 import com.developer.ev2z.response.ProductDto
 import com.developer.ev2z.response.WishlistProductWrapper
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.encodeToJsonElement
 
 class ProductRepository(
     private val api: ApiService
@@ -60,4 +64,49 @@ class ProductRepository(
         ).success == true
     }
 
+
+    suspend fun getBillingAddresses(token: String): List<BillingDto> {
+        return try {
+            val resp = api.getGpsBilling(token)
+            println("✔ Billing API success, items: ${resp.billings.size}")
+            resp.billings
+        } catch (e: Exception) {
+            println("❌ getBillingAddresses ERROR: ${e.message}")
+            emptyList()
+        }
+    }
+
+
+    suspend fun addBillingAddress(
+        token: String,
+        fname: String,
+        phone: String,
+        email: String,
+        address: String,
+        city: String,
+        state: String,
+        pincode: String
+    ): Boolean {
+
+        val json = JsonObject(
+            mapOf(
+                "fname" to Json.encodeToJsonElement(fname),
+                "lname" to Json.encodeToJsonElement(""),
+                "phone" to Json.encodeToJsonElement(phone),
+                "email" to Json.encodeToJsonElement(email),
+                "address" to Json.encodeToJsonElement(address),
+                "city" to Json.encodeToJsonElement(city),
+                "state" to Json.encodeToJsonElement(state),
+                "pincode" to Json.encodeToJsonElement(pincode)
+            )
+        )
+
+        return try {
+            val resp = api.saveGpsBilling(token, json)
+            resp["status"]?.toString()?.contains("success", true) == true
+        } catch (e: Exception) {
+            println("❌ AddBillingAddress Error: ${e.message}")
+            false
+        }
+    }
 }

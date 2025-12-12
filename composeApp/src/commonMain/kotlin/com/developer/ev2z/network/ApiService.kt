@@ -12,7 +12,9 @@ import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.encodeToJsonElement
 
 class ApiService {
 
@@ -512,4 +514,57 @@ class ApiService {
     }
 
 
+    suspend fun getGpsBilling(token: String): BillingListResponse {
+        val url = "${baseUrl}get-gps-billing"
+
+        return try {
+            val response = client.get(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+            }
+
+            val raw = response.bodyAsText()
+            println("🌐 GET $url")
+            println("📡 Status: ${response.status}")
+            println("📝 Raw Response: $raw")
+
+            response.body()
+
+        } catch (e: ResponseException) {
+            val raw = try { e.response.bodyAsText() } catch (_: Exception) { "No Body" }
+
+            println("❌ API HTTP ERROR: ${e.response.status}")
+            println("📝 Error Body: $raw")
+
+            BillingListResponse(status = "error", billings = emptyList())
+        } catch (e: Exception) {
+            println("❌ API ERROR: ${e.message}")
+            BillingListResponse(status = "error", billings = emptyList())
+        }
+    }
+
+
+    suspend fun saveGpsBilling(
+        token: String,
+        body: JsonObject
+    ): JsonObject {
+
+        val url = "${baseUrl}gps-billing"
+
+        return try {
+            val response = client.post(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(body)
+            }
+
+            val raw = response.bodyAsText()
+            println("📤 SAVE BILLING RAW = $raw")
+
+            response.body()
+
+        } catch (e: Exception) {
+            println("❌ SaveBilling Error: ${e.message}")
+            JsonObject(mapOf("status" to Json.encodeToJsonElement("error")))
+        }
+    }
 }

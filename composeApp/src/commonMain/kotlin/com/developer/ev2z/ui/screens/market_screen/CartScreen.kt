@@ -1,6 +1,7 @@
 package com.developer.ev2z.ui.screens.market_screen
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -24,10 +26,15 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,8 +44,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import cafe.adriel.voyager.core.screen.Screen
+import cafe.adriel.voyager.navigator.LocalNavigator
+import cafe.adriel.voyager.navigator.currentOrThrow
 import coil3.compose.AsyncImage
 import com.developer.ev2z.response.CartItemDto
 
@@ -55,9 +65,11 @@ class CartScreen(private val shopViewModel: ShopViewModel): Screen{
 @Composable
 fun CartScreenContent(viewModel: ShopViewModel) {
     val state by viewModel.state.collectAsState()
+    val navigator = LocalNavigator.currentOrThrow
 
     LaunchedEffect(Unit) {
         viewModel.loadCart()
+        viewModel.loadBillingAddresses()
     }
 
     if (state.loading) {
@@ -66,6 +78,8 @@ fun CartScreenContent(viewModel: ShopViewModel) {
         }
         return
     }
+
+    var showDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -81,8 +95,17 @@ fun CartScreenContent(viewModel: ShopViewModel) {
             Spacer(Modifier.height(12.dp))
         }
 
-        DeliveryDetailsSection()
+//        DeliveryDetailsSection()
 
+        AddressSection(
+            selectedAddress = state.selectedAddress,
+            addresses = state.addresses,
+            onSelect = { viewModel.selectAddress(it) },
+            onAddNew = {
+                navigator.push(AddNewAddressScreen(viewModel))
+            },
+            viewModel
+        )
         CouponsSection()
 
         PaymentSummarySection(
@@ -96,6 +119,7 @@ fun CartScreenContent(viewModel: ShopViewModel) {
 
 @Composable
 fun CartHeader(count: Int) {
+    val navigator = LocalNavigator.currentOrThrow
     Row(
         Modifier
             .fillMaxWidth()
@@ -106,10 +130,13 @@ fun CartHeader(count: Int) {
 
         Text("Cart ($count item)", fontSize = 20.sp, fontWeight = FontWeight.Bold)
 
+
+
         Text(
             "Continue Shopping ✕",
             color = Color.Gray,
-            fontSize = 14.sp
+            fontSize = 14.sp,
+            modifier = Modifier.clickable { navigator.pop() }
         )
     }
 }
@@ -248,18 +275,150 @@ fun QuantityController(item: CartItemDto,viewModel: ShopViewModel) {
 }
 
 
+
+
 @Composable
-fun DeliveryDetailsSection() {
+fun AddressSection(
+    selectedAddress: BillingAddress?,
+    addresses: List<BillingAddress>,
+    onSelect: (BillingAddress) -> Unit,
+    onAddNew: () -> Unit,
+    viewModel: ShopViewModel
+) {
+    var showDialog by remember { mutableStateOf(false) }
+    val navigator = LocalNavigator.currentOrThrow
     Column(Modifier.padding(16.dp)) {
 
-        Text("Delivery Details", fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(12.dp))
+        Text(
+            "Delivery Address",
+            fontWeight = FontWeight.Bold,
+            fontSize = 18.sp
+        )
 
-        DeliveryCard("📍", "B-120, Saket, D-Mart, New Delhi")
-        DeliveryCard("🚚", "Delivery by 7 Nov, Fri")
-        DeliveryCard("🏭", "Fulfilled by DELIVERY PARTNER NAME")
+        Spacer(Modifier.height(10.dp))
+
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(Color(0xFFEFF7F0)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showDialog = true }
+        ) {
+            Column(Modifier.padding(16.dp)) {
+
+                Text("📍 Selected Address", fontWeight = FontWeight.SemiBold)
+
+                Spacer(Modifier.height(6.dp))
+
+                if (selectedAddress == null) {
+                    Text("No Billing Address Found")
+                } else {
+                    Text(
+                        "${selectedAddress.fullName} | ${selectedAddress.phone}",
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(4.dp))
+                    Text("${selectedAddress.address}, ${selectedAddress.city}")
+                    Text("${selectedAddress.state} - ${selectedAddress.pincode}")
+                }
+
+                Spacer(Modifier.height(10.dp))
+
+                Text(
+                    "Change / Select Address",
+                    color = Color(0xFF1B9F4A),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp
+                )
+            }
+        }
+    }
+
+    if (showDialog) {
+        AddressDialog(
+            list = addresses,
+            onSelect = {
+                onSelect(it)
+                showDialog = false
+            },
+            onAddNew = {
+                showDialog = false
+                navigator.push(AddNewAddressScreen(viewModel))
+            },
+            onDismiss = { showDialog = false }
+        )
     }
 }
+
+
+@Composable
+fun AddressDialog(
+    list: List<BillingAddress>,
+    onSelect: (BillingAddress) -> Unit,
+    onAddNew: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+
+        Card(
+            shape = RoundedCornerShape(18.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp)
+        ) {
+
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+
+                Text("Select Address", fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                Spacer(Modifier.height(12.dp))
+
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 350.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    list.forEach { addr ->
+
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(Color(0xFFF4F7F4)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp)
+                                .clickable { onSelect(addr) }
+                        ) {
+                            Column(Modifier.padding(12.dp)) {
+
+                                Text(addr.fullName, fontWeight = FontWeight.Bold)
+                                Text("📞 ${addr.phone}")
+                                Spacer(Modifier.height(4.dp))
+                                Text("${addr.address}, ${addr.city}")
+                                Text("${addr.state} - ${addr.pincode}")
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(16.dp))
+
+                Button(
+                    onClick = onAddNew,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(Color(0xFF1B9F4A))
+                ) {
+                    Text("➕ Add New Address", color = Color.White)
+                }
+            }
+        }
+    }
+}
+
+
 
 
 @Composable
@@ -311,6 +470,76 @@ fun CouponsSection() {
     }
 }
 
+
+@Composable
+fun AddAddressUI(
+    onSave: (
+        String, String, String, String, String, String, String
+    ) -> Unit,
+    onCancel: () -> Unit
+) {
+    var fname by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var address by remember { mutableStateOf("") }
+    var city by remember { mutableStateOf("") }
+    var state by remember { mutableStateOf("") }
+    var pincode by remember { mutableStateOf("") }
+
+    Column(
+        Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState())
+    ) {
+
+        Text("Add New Address", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(16.dp))
+
+        CustomInput("Full Name", fname) { fname = it }
+        CustomInput("Phone Number", phone) { phone = it }
+        CustomInput("Email Address", email) { email = it }
+        CustomInput("House / Street", address) { address = it }
+        CustomInput("City", city) { city = it }
+        CustomInput("State", state) { state = it }
+        CustomInput("Pincode", pincode) { pincode = it }
+
+        Spacer(Modifier.height(20.dp))
+
+        Button(
+            onClick = {
+                onSave(fname, phone, email, address, city, state, pincode)
+            },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(Color(0xFF34A853))
+        ) {
+            Text("Save Address", color = Color.White)
+        }
+
+        Spacer(Modifier.height(10.dp))
+
+        TextButton(onClick = onCancel) {
+            Text("Cancel")
+        }
+    }
+}
+
+@Composable
+fun CustomInput(label: String, value: String, onChange: (String) -> Unit) {
+    Column {
+        Text(label, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(6.dp))
+
+        TextField(
+            value = value,
+            onValueChange = onChange,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(8.dp)
+        )
+        Spacer(Modifier.height(12.dp))
+    }
+}
 
 @Composable
 fun PaymentSummarySection(totalAmount: String) {
@@ -377,4 +606,6 @@ fun CheckoutBottomBar(
             }
         }
     }
+
+
 }
