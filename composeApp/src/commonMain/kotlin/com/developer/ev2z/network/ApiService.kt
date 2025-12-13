@@ -2,15 +2,20 @@ package com.developer.ev2z.network
 
 import com.developer.ev2z.data.local.model.DeviceResponse
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
+import com.developer.ev2z.request.CartAddRequest
+import com.developer.ev2z.request.CreateOrderRequest
 import com.developer.ev2z.request.DeviceAnalyticsRequest
 import com.developer.ev2z.request.LoginRequest
 import com.developer.ev2z.response.*
 import io.ktor.client.call.*
+import io.ktor.client.plugins.ResponseException
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.encodeToJsonElement
 
 class ApiService {
 
@@ -320,5 +325,304 @@ class ApiService {
         }
     }
 
+
+    // imports you may need
+
+    // ---------------- GET PRODUCTS ----------------
+    suspend fun getProducts(token: String): List<ProductDto> {
+        println("🌐 API: getProducts()")
+        return try {
+            val res: List<ProductDto> = client.get("${baseUrl}products") {
+                header(HttpHeaders.Authorization, "Bearer $token")
+            }.body()
+            println("✔️ getProducts: received ${res.size} items")
+            res
+        } catch (e: ResponseException) {
+            // Ktor HTTP error with response available
+            val status = e.response.status
+            val text = try { e.response.bodyAsText() } catch (_: Exception) { "unable-to-read-body" }
+            println("❌ getProducts - HTTP error: $status")
+            println("   response body: $text")
+            emptyList()
+        } catch (e: Exception) {
+            // network / serialization / other errors
+            println("❌ getProducts - error: ${e.message}")
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    // ---------------- GET WISHLIST ----------------
+    suspend fun getWishlist(token: String): WishlistResponse {
+        println("🌐 API: getWishlist()")
+        return try {
+            val res: WishlistResponse = client.get("${baseUrl}wishlist") {
+                header(HttpHeaders.Authorization, "Bearer $token")
+            }.body()
+            println("✔️ getWishlist: success=${res.success} items=${res.wishlist.size}")
+            res
+        } catch (e: ResponseException) {
+            val status = e.response.status
+            val text = try { e.response.bodyAsText() } catch (_: Exception) { "unable-to-read-body" }
+            println("❌ getWishlist - HTTP error: $status")
+            println("   response body: $text")
+            // Return a safe fallback
+            WishlistResponse(success = false, wishlist = emptyList())
+        } catch (e: Exception) {
+            println("❌ getWishlist - error: ${e.message}")
+            e.printStackTrace()
+            WishlistResponse(success = false, wishlist = emptyList())
+        }
+    }
+
+    // ---------------- ADD WISHLIST ----------------
+    suspend fun addToWishlist(token: String, productId: Int): WishlistActionResponse {
+        println("🌐 API: addToWishlist(productId=$productId)")
+        return try {
+            val res: WishlistActionResponse = client.post("${baseUrl}wishlist/add") {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(mapOf("product_id" to productId))
+            }.body()
+            println("✔️ addToWishlist: success=${res.success} message='${res.message}'")
+            res
+        } catch (e: ResponseException) {
+            val status = e.response.status
+            val text = try { e.response.bodyAsText() } catch (_: Exception) { "unable-to-read-body" }
+            println("❌ addToWishlist - HTTP error: $status")
+            println("   response body: $text")
+            WishlistActionResponse(success = false, message = "HTTP ${status.value}")
+        } catch (e: Exception) {
+            println("❌ addToWishlist - error: ${e.message}")
+            e.printStackTrace()
+            WishlistActionResponse(success = false, message = e.message ?: "Unknown error")
+        }
+    }
+
+    // ---------------- REMOVE WISHLIST ----------------
+    suspend fun removeFromWishlist(token: String, productId: Int): WishlistActionResponse {
+        println("🌐 API: removeFromWishlist(productId=$productId)")
+        return try {
+            val res: WishlistActionResponse = client.delete("${baseUrl}wishlist/remove/$productId") {
+                header(HttpHeaders.Authorization, "Bearer $token")
+            }.body()
+            println("✔️ removeFromWishlist: success=${res.success} message='${res.message}'")
+            res
+        } catch (e: ResponseException) {
+            val status = e.response.status
+            val text = try { e.response.bodyAsText() } catch (_: Exception) { "unable-to-read-body" }
+            println("❌ removeFromWishlist - HTTP error: $status")
+            println("   response body: $text")
+            WishlistActionResponse(success = false, message = "HTTP ${status.value}")
+        } catch (e: Exception) {
+            println("❌ removeFromWishlist - error: ${e.message}")
+            e.printStackTrace()
+            WishlistActionResponse(success = false, message = e.message ?: "Unknown error")
+        }
+    }
+
+    // ---------------- GET CART ----------------
+    suspend fun getCart(token: String): CartResponse {
+        println("🌐 API: getCart()")
+        return try {
+            val resp: CartResponse = client.get("${baseUrl}cart") {
+                header(io.ktor.http.HttpHeaders.Authorization, "Bearer $token")
+            }.body()
+            println("✔️ getCart: items=${resp.cart.size} totalPrice=${resp.totalPrice}")
+            resp
+        } catch (e: Exception) {
+            println("❌ getCart error: ${e.message}")
+            e.printStackTrace()
+            // safe fallback
+            CartResponse(success = false, cart = emptyList(), totalPrice = "0.00")
+        }
+    }
+
+
+    suspend fun addToCart(
+        token: String,
+        add: String,
+        productId: Int,
+        quantity: Int = 1,
+        plan_type: String,
+        deviceType: String
+    ): CartActionResponse {
+
+        val url = "${baseUrl}cart"
+
+        // ---- PRINT REQUEST BEFORE SENDING ----
+        val bodyToSend = CartAddRequest(
+            action = add,
+            product_id = productId,
+            quantity = quantity,
+            plan_type = plan_type,
+            device_type = deviceType
+        )
+
+        println("🌐 POST URL = $url")
+        println("📦 REQUEST BODY = ${kotlinx.serialization.json.Json.encodeToString(CartAddRequest.serializer(), bodyToSend)}")
+
+        // ---- DO REQUEST ----
+        val response = client.post(url) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+
+            setBody(bodyToSend)
+        }
+
+        // ---- PRINT RAW RESPONSE ----
+        val raw = response.bodyAsText()
+        println("📝 RAW RESPONSE = $raw")
+        println("📡 RESPONSE STATUS = ${response.status}")
+
+        // ---- TRY PARSE ----
+        return try {
+            response.body<CartActionResponse>()
+        } catch (e: Exception) {
+            println("❌ Parsing Error: ${e.message}")
+
+            CartActionResponse(
+                success = false,
+                action = null,
+                message = raw
+            )
+        }
+    }
+
+
+
+    suspend fun updateCartQuantity(
+        token: String,
+        productId: Int,
+        quantity: Int,
+        planType: String?,
+        deviceType: String?
+    ): CartActionResponse {
+
+        val body = CartAddRequest(
+            action = "update_qty",
+            product_id = productId,
+            quantity = quantity,
+            plan_type = planType,
+            device_type = deviceType
+        )
+
+        return client.post("${baseUrl}cart") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(body)
+        }.body()
+    }
+
+
+    suspend fun getGpsBilling(token: String): BillingListResponse {
+        val url = "${baseUrl}get-gps-billing"
+
+        return try {
+            val response = client.get(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+            }
+
+            val raw = response.bodyAsText()
+            println("🌐 GET $url")
+            println("📡 Status: ${response.status}")
+            println("📝 Raw Response: $raw")
+
+            response.body()
+
+        } catch (e: ResponseException) {
+            val raw = try { e.response.bodyAsText() } catch (_: Exception) { "No Body" }
+
+            println("❌ API HTTP ERROR: ${e.response.status}")
+            println("📝 Error Body: $raw")
+
+            BillingListResponse(status = "error", billings = emptyList())
+        } catch (e: Exception) {
+            println("❌ API ERROR: ${e.message}")
+            BillingListResponse(status = "error", billings = emptyList())
+        }
+    }
+
+
+    suspend fun saveGpsBilling(
+        token: String,
+        body: JsonObject
+    ): JsonObject {
+
+        val url = "${baseUrl}gps-billing"
+
+        return try {
+            val response = client.post(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(body)
+            }
+
+            val raw = response.bodyAsText()
+            println("📤 SAVE BILLING RAW = $raw")
+
+            response.body()
+
+        } catch (e: Exception) {
+            println("❌ SaveBilling Error: ${e.message}")
+            JsonObject(mapOf("status" to Json.encodeToJsonElement("error")))
+        }
+    }
+
+
+
+    suspend fun applyPromo(
+        token: String,
+        amount: String,
+        code: String
+    ): PromoResponse {
+
+        val upper = code.trim().uppercase()
+
+        val applyPromoValue = if (upper.startsWith("WELCOME")) upper else ""
+        val referralValue   = if (upper.startsWith("REFER")) upper else ""
+
+        val url = "${baseUrl}phonepe/apply-promo"
+
+        val body = mapOf(
+            "amount" to amount,
+            "referral_code" to referralValue,
+            "apply_promo" to applyPromoValue
+        )
+
+        println("📤 APPLY PROMO FINAL BODY = $body")
+
+        return try {
+            val response = client.post(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(body)
+            }
+
+            val raw = response.bodyAsText()
+            println("📥 RAW APPLY PROMO RESPONSE = $raw")
+
+            response.body()
+
+        } catch (e: Exception) {
+            println("❌ applyPromo ERROR = ${e.message}")
+            throw e
+        }
+    }
+
+
+
+
+    suspend fun createPhonePeOrder(token: String, req: CreateOrderRequest): JsonObject {
+        val url = "${baseUrl}phonepe/create-orders"
+
+        val response = client.post(url) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(req)   // ⭐ DTO passed safely
+        }
+
+        return response.body()
+    }
 
 }

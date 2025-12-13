@@ -25,19 +25,28 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import cafe.adriel.voyager.navigator.LocalNavigator
+import coil3.compose.AsyncImage
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo // apna drawable
 import org.jetbrains.compose.resources.painterResource
 
 // ------------ DATA MODEL ------------
-
+@kotlinx.serialization.Serializable
 data class ShopProduct(
-    val id: String,
+    val id: Int,
     val title: String,
-    val subtitle: String,
-    val priceText: String,
-    val rating: Double,
-    val ratingCount: Int,
+    val subtitle: String,        // device_type
+    val price: Double,           // sale_price
+    val rechargePrice: Double,   // recharge_price
+    val promoAmount: Double,     // promo_amt
+    val promoCode: String,       // promo_code
+    val imageUrl: String,
+    val description: String,
+    val features: List<String>,  // features1–features7 merged
+    val deviceType: String,      // "none" / "available"
+    val rating: Double = 4.8,
+    val ratingCount: Int = 50,
     val isFavorite: Boolean = false
 )
 
@@ -52,19 +61,11 @@ fun ShopScreen(
     onPlaceOrder: (ShopProduct) -> Unit = {},
     onCartClick: () -> Unit = {}
 ) {
-    Scaffold(
-        bottomBar = {
-            CartBottomBar(
-                count = cartCount,
-                onClick = onCartClick
-            )
-        }
-    ) { paddingValues ->
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color(0xFFF6F6F6))
-                .padding(paddingValues)
         ) {
             ShopTopBar()
             Spacer(Modifier.height(12.dp))
@@ -80,22 +81,68 @@ fun ShopScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            LazyColumn(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(products) { product ->
-                    ProductCard(
-                        product = product,
-                        onToggleFavorite = { onToggleFavorite(product) },
-                        onPlaceOrder = { onPlaceOrder(product) }
+            ){
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(products) { product ->
+                        ProductCard(
+                            product = product,
+                            onToggleFavorite = { onToggleFavorite(product) },
+                            onPlaceOrder = { onPlaceOrder(product) }
+                        )
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)   // ALWAYS stay at bottom
+                ) {
+                    CartBottomBar(
+                        count = cartCount,
+                        onClick = onCartClick
                     )
                 }
             }
+
+//            Box(modifier = Modifier.fillMaxSize()) {
+//
+//                LazyColumn(
+//                    modifier = Modifier
+//                        .fillMaxSize()
+//                        .padding(bottom = 90.dp),   // ⭐ reserve space for bottom bar
+//                    verticalArrangement = Arrangement.spacedBy(12.dp)
+//                ) {
+//                    items(products) { product ->
+//                        ProductCard(
+//                            product = product,
+//                            onToggleFavorite = { onToggleFavorite(product) },
+//                            onPlaceOrder = { onPlaceOrder(product) }
+//                        )
+//                    }
+//                }
+//
+//                CartBottomBar(
+//                    count = cartCount,
+//                    onClick = onCartClick,
+//                    modifier = Modifier
+//                        .align(Alignment.BottomCenter)
+//                        .padding(16.dp)
+//                )
+//            }
+
+
+
+
         }
-    }
+
 }
 
 // ------------ TOP BAR ------------
@@ -207,16 +254,16 @@ private fun ProductCard(
                 )
             }
 
-            // Product image
-            Image(
-                painter = painterResource(Res.drawable.app_logo),
+            AsyncImage(
+                model = product.imageUrl,
                 contentDescription = product.title,
                 modifier = Modifier
                     .size(60.dp)
                     .clip(RoundedCornerShape(50)),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Crop,
+                placeholder = painterResource(Res.drawable.app_logo),
+                error = painterResource(Res.drawable.app_logo)
             )
-
             Spacer(Modifier.width(12.dp))
 
             Column(
@@ -227,16 +274,16 @@ private fun ProductCard(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold
                 )
-                Text(
-                    product.subtitle,
-                    fontSize = 12.sp,
-                    color = Color.Gray
-                )
+//                Text(
+//                    product.subtitle,
+//                    fontSize = 12.sp,
+//                    color = Color.Gray
+//                )
 
                 Spacer(Modifier.height(4.dp))
 
                 Text(
-                    product.priceText,
+                    product.price.toString(),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -253,19 +300,60 @@ private fun ProductCard(
                     )
                 }
             }
-
             Button(
-                onClick = onPlaceOrder,
+                onClick = {
+                    println("🟢 Button clicked for: ${product.title}")
+                    onPlaceOrder()
+                },
                 shape = RoundedCornerShape(30.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF34A853))
             ) {
-                Text("Place Order", fontSize = 12.sp)
+                Text("View Details", fontSize = 12.sp)
             }
         }
     }
 }
 
 // ------------ BOTTOM CART BAR ------------
+
+
+//@Composable
+//private fun CartBottomBar(
+//    count: Int,
+//    onClick: () -> Unit,
+//    modifier: Modifier = Modifier
+//) {
+//    Box(
+//        modifier = modifier,
+//        contentAlignment = Alignment.Center
+//    ) {
+//        Button(
+//            onClick = onClick,
+//            shape = RoundedCornerShape(30.dp),
+//            modifier = Modifier.height(48.dp),
+//            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF34A853))
+//        ) {
+//            Icon(Icons.Default.ShoppingCart, contentDescription = null)
+//            Spacer(Modifier.width(8.dp))
+//            Text("Go To Cart", fontSize = 14.sp)
+//            Spacer(Modifier.width(8.dp))
+//            Box(
+//                modifier = Modifier
+//                    .size(20.dp)
+//                    .clip(CircleShape)
+//                    .background(Color.White),
+//                contentAlignment = Alignment.Center
+//            ) {
+//                Text(
+//                    count.toString(),
+//                    fontSize = 11.sp,
+//                    fontWeight = FontWeight.Bold,
+//                    color = Color(0xFF34A853)
+//                )
+//            }
+//        }
+//    }
+//}
 
 @Composable
 private fun CartBottomBar(
@@ -276,7 +364,6 @@ private fun CartBottomBar(
 
         Box(
             modifier = Modifier
-                .fillMaxWidth()
                 .padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
@@ -284,7 +371,6 @@ private fun CartBottomBar(
                 onClick = onClick,
                 shape = RoundedCornerShape(30.dp),
                 modifier = Modifier
-                    .fillMaxWidth(0.8f)
                     .height(48.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF34A853))
             ) {
@@ -314,88 +400,60 @@ private fun CartBottomBar(
     }
 
 
-
-
 @Composable
-fun ShopScreenHost() {
-    var products by remember {
-        mutableStateOf(
-            listOf(
-                ShopProduct(
-                    id = "1",
-                    title = "E22go (Android Device Smart Tag)",
-                    subtitle = "Location Tracker",
-                    priceText = "Rs. 999",
-                    rating = 4.8,
-                    ratingCount = 38
-                ),
-                ShopProduct(
-                    id = "2",
-                    title = "E2 (Android Device Smart Tag)",
-                    subtitle = "Location Tracker",
-                    priceText = "Rs. 989",
-                    rating = 4.8,
-                    ratingCount = 38
-                ),ShopProduct(
-                    id = "1",
-                    title = "E22go (Android Device Smart Tag)",
-                    subtitle = "Location Tracker",
-                    priceText = "Rs. 999",
-                    rating = 4.8,
-                    ratingCount = 38
-                ),
-                ShopProduct(
-                    id = "2",
-                    title = "E2 (Android Device Smart Tag)",
-                    subtitle = "Location Tracker",
-                    priceText = "Rs. 989",
-                    rating = 4.8,
-                    ratingCount = 38
-                ),ShopProduct(
-                    id = "1",
-                    title = "E22go (Android Device Smart Tag)",
-                    subtitle = "Location Tracker",
-                    priceText = "Rs. 999",
-                    rating = 4.8,
-                    ratingCount = 38
-                ),
-                ShopProduct(
-                    id = "2",
-                    title = "E2 (Android Device Smart Tag)",
-                    subtitle = "Location Tracker",
-                    priceText = "Rs. 989",
-                    rating = 4.8,
-                    ratingCount = 38
-                ),ShopProduct(
-                    id = "1",
-                    title = "E22go (Android Device Smart Tag)",
-                    subtitle = "Location Tracker",
-                    priceText = "Rs. 999",
-                    rating = 4.8,
-                    ratingCount = 38
-                ),
-                ShopProduct(
-                    id = "2",
-                    title = "E2 (Android Device Smart Tag)",
-                    subtitle = "Location Tracker",
-                    priceText = "Rs. 989",
-                    rating = 4.8,
-                    ratingCount = 38
-                ),
-                // aur items…
-            )
-        )
+fun ShopScreenHost(viewModel: ShopViewModel) {
+    val state by viewModel.state.collectAsState()
+    val navigator = LocalNavigator.current
+
+    // ✅ Debug: Check if navigator is null
+    LaunchedEffect(Unit) {
+        println("🔍 Navigator is: ${if (navigator == null) "NULL ❌" else "Available ✅"}")
+        viewModel.loadData()
+    }
+
+    if (state.loading) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
     }
 
     ShopScreen(
-        products = products,
-        cartCount = 1,
-        onToggleFavorite = { p ->
-            products = products.map {
-                if (it.id == p.id) it.copy(isFavorite = !it.isFavorite) else it
-            }
+        products = state.products.map { dto ->
+            ShopProduct(
+                id = dto.id,
+                title = dto.name ?: "",
+                subtitle = dto.device_type ?: "",
+                price = dto.sale_price?.toDoubleOrNull() ?: 0.0,
+                rechargePrice = dto.recharge_price?.toDoubleOrNull() ?: 0.0,
+                promoAmount = dto.promo_amt?.toDoubleOrNull() ?: 0.0,
+                promoCode = dto.promo_code ?: "",
+                imageUrl = dto.image ?: "",
+                description = dto.description ?: "",
+                features = listOfNotNull(
+                    dto.features1, dto.features2, dto.features3,
+                    dto.features4, dto.features5, dto.features6, dto.features7
+                ),
+                deviceType = dto.device_type ?: "",
+                rating = 4.8,
+                ratingCount = 50,
+                isFavorite = viewModel.isFavorite(dto.id)
+            )
         },
-        onPlaceOrder = { /* TODO */ },
-        onCartClick = { /* TODO */ }
+        cartCount = state.cartCount,
+        onToggleFavorite = { p ->
+            viewModel.toggleWishlist(p.id.toInt())
+        },
+        onCartClick = {
+            println("🛒 Cart clicked")
+            navigator?.push(CartScreen(shopViewModel = viewModel))
+        },
+        onPlaceOrder = { product ->
+            println("🔘 View Details clicked for: ${product.title}")
+            println("🧭 Navigator: ${navigator != null}")
+
+            // ✅ Navigation
+            navigator?.push(ProductDetailsScreen(product = product, viewModel = viewModel))
+        }
     )
 }

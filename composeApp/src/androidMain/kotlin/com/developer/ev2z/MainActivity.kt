@@ -15,7 +15,6 @@ class MainActivity : ComponentActivity() {
         initStorageManager(this)
 
         //GlobalContext.set(this)
-        GlobalContext.set(this)
 
         setContent {
             App()
@@ -70,3 +69,5 @@ fun AppAndroidPreview() {
 //        }
 //    }
 //}
+=======
+>>>>>>> agastya_dev
