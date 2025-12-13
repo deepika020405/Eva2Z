@@ -14,6 +14,7 @@ class MainActivity : ComponentActivity() {
         // Initialize storage for Android
         initStorageManager(this)
 
+        // Initialize GlobalContext for URL opening
         //GlobalContext.set(this)
 
         setContent {
@@ -69,5 +70,3 @@ fun AppAndroidPreview() {
 //        }
 //    }
 //}
-=======
->>>>>>> agastya_dev

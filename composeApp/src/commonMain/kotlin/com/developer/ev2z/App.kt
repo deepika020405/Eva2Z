@@ -1,4 +1,3 @@
-// composeApp/src/commonMain/kotlin/com/developer/ev2z/App.kt
 package com.developer.ev2z
 
 import androidx.compose.foundation.background
@@ -30,6 +29,8 @@ import com.developer.ev2z.ui.screens.AddDeviceSuccess.AddDeviceSuccessScreen
 import com.developer.ev2z.ui.screens.device_Report.DeviceReportScreen
 import com.developer.ev2z.ui.screens.device_Report.DeviceReportViewModel
 import com.developer.ev2z.ui.screens.device_Report.PlatformAddressProvider
+import com.developer.ev2z.ui.screens.AuthFlows.ForgetPasswordFlow
+import com.developer.ev2z.ui.screens.AuthFlows.RegistrationFlow
 import kotlinx.coroutines.delay
 
 @Composable
@@ -60,6 +61,13 @@ fun App() {
     var showAddDevice by remember { mutableStateOf(false) }
     var showDeviceReport by remember { mutableStateOf(false) }
     var showAddDeviceSuccess by remember { mutableStateOf(false) }
+
+    // ✅ Authentication flow states
+    var showForgetPassword by remember { mutableStateOf(false) }
+    var showRegistration by remember { mutableStateOf(false) }
+    var registrationName by remember { mutableStateOf("") }
+    var registrationPhone by remember { mutableStateOf("") }
+    var registrationEmail by remember { mutableStateOf("") }
 
     // Success screen data
     var successDeviceName by remember { mutableStateOf("") }
@@ -115,6 +123,41 @@ fun App() {
         when {
             isLoading -> {
                 SplashScreen()
+            }
+
+            // ✅ Forget Password Flow
+            showForgetPassword -> {
+                println("📱 Rendering: Forget Password Flow")
+                ForgetPasswordFlow(
+                    authViewModel = authViewModel,
+                    onBack = {
+                        println("🔙 Back to Auth from Forget Password")
+                        showForgetPassword = false
+                    },
+                    onSuccess = {
+                        println("✅ Password reset successful")
+                        showForgetPassword = false
+                    }
+                )
+            }
+
+            // ✅ Registration Flow
+            showRegistration -> {
+                println("📱 Rendering: Registration Flow")
+                RegistrationFlow(
+                    authViewModel = authViewModel,
+                    name = registrationName,
+                    phone = registrationPhone,
+                    email = registrationEmail,
+                    onBack = {
+                        println("🔙 Back to Auth from Registration")
+                        showRegistration = false
+                    },
+                    onSuccess = {
+                        println("✅ Registration successful")
+                        showRegistration = false
+                    }
+                )
             }
 
             showAddDeviceSuccess -> {
@@ -201,8 +244,22 @@ fun App() {
                     onLoginSuccess = {
                         println("🎉 onLoginSuccess triggered")
                         authViewModel.resetLoginSuccess()
-                        authViewModel.setError("")
+                        authViewModel.clearError()
                         authViewModel.setLoginSuccess(true)
+                    },
+                    onForgetPasswordClick = {
+                        println("🔑 Forget Password clicked")
+                        showForgetPassword = true
+                    },
+                    onSignupOTPClick = { name, phone, email ->
+                        println("📧 Signup OTP clicked: $name, $phone, $email")
+                        registrationName = name
+                        registrationPhone = phone
+                        registrationEmail = email
+                        // Send OTP for registration
+                        val fullPhone = "+91$phone"
+                        authViewModel.signUp(name, fullPhone, "", email) // Empty password for now
+                        showRegistration = true
                     }
                 )
             }
