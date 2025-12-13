@@ -701,62 +701,6 @@ fun SummaryRow(label: String, value: String, isBold: Boolean = false) {
 
 
 
-//@Composable
-//fun CheckoutBottomBar(viewModel: ShopViewModel) {
-//    val state by viewModel.state.collectAsState()
-//    val navigator = LocalNavigator.currentOrThrow
-//
-//    Box(
-//        Modifier
-//            .fillMaxWidth()
-//            .padding(16.dp)
-//    ) {
-//
-//        Row(
-//            Modifier
-//                .fillMaxWidth()
-//                .clip(RoundedCornerShape(30.dp))
-//                .background(Color.White)
-//                .padding(16.dp),
-//            horizontalArrangement = Arrangement.SpaceBetween,
-//            verticalAlignment = Alignment.CenterVertically
-//        ) {
-//
-//            Column {
-//                Text("Total Amount", color = Color.Gray)
-//                Text(
-//                    "₹${state.finalAmount ?: state.totalPrice ?: "0"}",
-//                    fontSize = 20.sp,
-//                    fontWeight = FontWeight.Bold
-//                )
-//            }
-//
-//            Button(
-//                onClick = {
-//                    viewModel.createOrder { merchantId, phonePeOrderId, token ->
-//
-//                        println("🚀 Starting PhonePe Checkout")
-//                        println("merchantOrderId = $merchantId")
-//                        println("phonePeOrderId = $phonePeOrderId")
-//                        println("token = $token")
-//
-//                        PhonePeKt.startCheckoutPage(
-//                            context = navigator.lastItem.key.context,
-//                            token = token,
-//                            orderId = phonePeOrderId
-//                        )
-//                    }
-//                },
-//                shape = RoundedCornerShape(30.dp),
-//                colors = ButtonDefaults.buttonColors(Color(0xFF34A853))
-//            ) {
-//                Text("Checkout", color = Color.White)
-//            }
-//        }
-//    }
-//}
-
-
 @Composable
 fun CheckoutBottomBar(viewModel: ShopViewModel) {
     val state by viewModel.state.collectAsState()

@@ -387,6 +387,45 @@ class ShopViewModel(
 
 
 
+//    fun createOrder(onReady: (redirectUrl: String) -> Unit) {
+//        val s = _state.value
+//        val token = tokenProvider()
+//
+//        val amount = (s.finalAmount ?: s.totalPrice ?: "0").toDouble()
+//        val billingId = s.selectedAddress?.id ?: return
+//
+//        viewModelScope.launch {
+//            try {
+//                val resp = repo.createPhonePeOrder(
+//                    token = token,
+//                    amount = amount,
+//                    billingId = billingId
+//                )
+//
+//                println("📦 SERVER ORDER RESPONSE = $resp")
+//
+//                val merchantId = resp["M22VRDGEOVBYAUAT"]?.jsonPrimitive?.content
+//                    ?: error("merchantId missing")
+//
+//                val orderId = resp["phonepeOrderId"]?.jsonPrimitive?.content
+//                    ?: error("phonepeOrderId missing")
+//
+//                val tokenKey = resp["orderToken"]?.jsonPrimitive?.content
+//                    ?: error("orderToken missing")
+//
+//                // ⭐ CREATE REDIRECT URL (PhonePe standard format)
+//                val redirectUrl =
+//                    "https://mercury.phonepe.com/transact/pg/$merchantId/$orderId?token=$tokenKey"
+//
+//                onReady(redirectUrl)
+//
+//            } catch (e: Exception) {
+//                println("❌ createOrder ERROR = ${e.message}")
+//            }
+//        }
+//    }
+
+
     fun createOrder(onReady: (redirectUrl: String) -> Unit) {
         val s = _state.value
         val token = tokenProvider()
@@ -404,16 +443,11 @@ class ShopViewModel(
 
                 println("📦 SERVER ORDER RESPONSE = $resp")
 
-                val merchantId = resp["merchantId"]?.jsonPrimitive?.content
-                    ?: error("merchantId missing")
+                // ✅ CORRECT KEYS
+                val merchantId = resp["merchantId"]!!.jsonPrimitive.content
+                val orderId = resp["phonepeOrderId"]!!.jsonPrimitive.content
+                val tokenKey = resp["orderToken"]!!.jsonPrimitive.content
 
-                val orderId = resp["phonepeOrderId"]?.jsonPrimitive?.content
-                    ?: error("phonepeOrderId missing")
-
-                val tokenKey = resp["orderToken"]?.jsonPrimitive?.content
-                    ?: error("orderToken missing")
-
-                // ⭐ CREATE REDIRECT URL (PhonePe standard format)
                 val redirectUrl =
                     "https://mercury.phonepe.com/transact/pg/$merchantId/$orderId?token=$tokenKey"
 
