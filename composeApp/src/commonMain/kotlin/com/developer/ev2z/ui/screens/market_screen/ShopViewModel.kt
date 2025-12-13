@@ -424,4 +424,51 @@ class ShopViewModel(
             }
         }
     }
+
+
+
+    fun removeFromCart(item: CartItemDto) {
+        val token = tokenProvider()
+
+        viewModelScope.launch {
+
+            // ⭐ PLAN TYPE — ONLY FOR RECHARGE PRODUCTS
+            val finalPlan = if (item.product_id == 10 || item.product_id == 11) {
+                when (item.plan_type?.lowercase()) {
+                    "with_recharge" -> "with_recharge"
+                    "without_recharge" -> "without_recharge"
+                    else -> ""
+                }
+            } else {
+                ""   // 🚫 others MUST NOT send plan_type
+            }
+
+            // ⭐ DEVICE TYPE — SAME AS UPDATE QUANTITY
+            val finalDevice = when (item.device_type?.lowercase()) {
+                "android" -> "android"
+                "ios" -> "ios"
+                else -> ""
+            }
+
+            try {
+                val ok = repo.addToCart(
+                    token = token,
+                    add = "remove",          // 🔥 THIS IS THE KEY
+                    productId = item.product_id,
+                    quantity = 0,            // ignored by backend for remove
+                    plan_type = finalPlan,
+                    device_type = finalDevice
+                )
+
+                if (ok) {
+                    refreshCart()
+                } else {
+                    println("❌ Failed to remove item (Server Reject)")
+                }
+
+            } catch (e: Exception) {
+                println("❌ removeFromCart error = ${e.message}")
+            }
+        }
+    }
 }

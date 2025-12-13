@@ -52,6 +52,13 @@ import coil3.compose.AsyncImage
 import com.developer.ev2z.getPlatformContext
 import com.developer.ev2z.phonepe.openPhonePeCheckout
 import com.developer.ev2z.response.CartItemDto
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.runtime.*
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.animation.core.animateIntOffsetAsState
+import androidx.compose.foundation.layout.offset
+import kotlin.math.roundToInt
 
 
 class CartScreen(private val shopViewModel: ShopViewModel): Screen{
@@ -63,55 +70,7 @@ class CartScreen(private val shopViewModel: ShopViewModel): Screen{
 
 
 }
-//@Composable
-//fun CartScreenContent(viewModel: ShopViewModel) {
-//    val state by viewModel.state.collectAsState()
-//    val navigator = LocalNavigator.currentOrThrow
-//
-//    LaunchedEffect(Unit) {
-//        viewModel.loadCart()
-//        viewModel.loadBillingAddresses()
-//    }
-//
-//    if (state.loading) {
-//        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-//            CircularProgressIndicator()
-//        }
-//        return
-//    }
-//
-//
-//    Column(
-//        modifier = Modifier
-//            .fillMaxSize()
-//            .verticalScroll(rememberScrollState())
-//            .padding(bottom = 90.dp)
-//    ) {
-//        CartHeader(state.cartCount)
-//        Spacer(Modifier.height(12.dp))
-//
-//        state.cart.forEach { item ->
-//            CartItemCard(item,viewModel)
-//            Spacer(Modifier.height(12.dp))
-//        }
-//
-//
-//        AddressSection(
-//            selectedAddress = state.selectedAddress,
-//            addresses = state.addresses,
-//            onSelect = { viewModel.selectAddress(it) },
-//            onAddNew = {
-//                navigator.push(AddNewAddressScreen(viewModel))
-//            },
-//            viewModel = viewModel
-//        )
-//        CouponsSection(viewModel = viewModel)
-//
-//        PaymentSummarySection(viewModel = viewModel)
-//    }
-//
-//    CheckoutBottomBar(viewModel)
-//}
+
 
 
 @Composable
@@ -148,6 +107,19 @@ fun CartScreenContent(viewModel: ShopViewModel) {
                 CartItemCard(item, viewModel)
                 Spacer(Modifier.height(12.dp))
             }
+
+//            state.cart.forEach { item ->
+//
+//                SwipeToRemove(
+//                    onRemove = {
+//                        viewModel.removeFromCart(item)
+//                    }
+//                ) {
+//                    CartItemCard(item, viewModel)
+//                }
+//
+//                Spacer(Modifier.height(12.dp))
+//            }
 
             AddressSection(
                 selectedAddress = state.selectedAddress,
@@ -296,9 +268,35 @@ fun CartItemCard(item: CartItemDto,viewModel: ShopViewModel) {
                         )
                     }
                 }
+
+
+            }
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+
+                // 🗑 DELETE ICON
+                Box(
+                    modifier = Modifier
+                        .size(28.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFE53935))
+                        .clickable {
+                            viewModel.removeFromCart(item)
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("🗑", color = Color.White, fontSize = 14.sp)
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                // QUANTITY
+                QuantityController(item, viewModel)
             }
 
-            QuantityController(item, viewModel )
+//            QuantityController(item, viewModel )
         }
     }
 }
@@ -801,5 +799,39 @@ fun CheckoutBottomBar(viewModel: ShopViewModel) {
                 Text("Checkout", color = Color.White)
             }
         }
+    }
+}
+
+
+
+@Composable
+fun SwipeToRemove(
+    onRemove: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    var offsetX by remember { mutableStateOf(0f) }
+
+    val animatedOffset by animateIntOffsetAsState(
+        targetValue = IntOffset(offsetX.roundToInt(), 0)
+    )
+
+    Box(
+        modifier = Modifier
+            .offset { animatedOffset }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        if (kotlin.math.abs(offsetX) > 250f) {
+                            onRemove()
+                        } else {
+                            offsetX = 0f
+                        }
+                    }
+                ) { _, dragAmount ->
+                    offsetX += dragAmount
+                }
+            }
+    ) {
+        content()
     }
 }
