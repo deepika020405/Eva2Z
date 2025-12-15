@@ -16,6 +16,8 @@ import io.ktor.http.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 class ApiService {
 
@@ -26,17 +28,19 @@ class ApiService {
     // AUTHENTICATION APIs
     // ===============================================
 
-    // ---------------- LOGIN ----------------
+    // ---------------- LOGIN - FIXED ----------------
     suspend fun login(phone: String, password: String): JsonObject {
         println("🌐 API: Sending login request for phone=$phone")
 
         return try {
-            val response = client.post("${baseUrl}login") {
-                contentType(ContentType.Application.Json)
-                setBody(mapOf(
-                    "phone" to phone,
-                    "password" to password
-                ))
+            val response = client.submitForm(
+                url = "${baseUrl}login",
+                formParameters = Parameters.build {
+                    append("phone", phone)
+                    append("password", password)
+                }
+            ) {
+                header(HttpHeaders.Accept, ContentType.Application.Json.toString())
             }
 
             println("✔️ API Login status: ${response.status}")
@@ -44,47 +48,71 @@ class ApiService {
 
         } catch (e: ResponseException) {
             val status = e.response.status
-            val text = try { e.response.bodyAsText() } catch (_: Exception) { "unable-to-read-body" }
+            val text = try {
+                e.response.bodyAsText()
+            } catch (_: Exception) {
+                """{"message":"Network error"}"""
+            }
+
             println("❌ API Login Error: HTTP $status")
             println("   response body: $text")
-            throw e
+
+            // ✅ Parse and return error JSON (don't throw here)
+            val json = Json { ignoreUnknownKeys = true }
+            val errorObj = json.parseToJsonElement(text).jsonObject
+
+            // ✅ Return error JSON as-is
+            return errorObj
+
         } catch (e: Exception) {
             println("❌ API Login Error: ${e.message}")
             throw e
         }
     }
 
-    // ---------------- SIGN UP / REGISTER ----------------
-    suspend fun signUp(
+    // ---------------- REGISTER USER ----------------
+    suspend fun registerUser(
         name: String,
         phone: String,
-        password: String,
         email: String
     ): JsonObject {
-        println("🌐 API: Sending signup request for phone=$phone")
+        println("🌐 API: Registering user (sending OTP) phone=$phone")
 
         return try {
-            val response = client.post("${baseUrl}register") {
-                contentType(ContentType.Application.Json)
-                setBody(mapOf(
-                    "name" to name,
-                    "phone" to phone,
-                    "password" to password,
-                    "email" to email
-                ))
+            val response = client.submitForm(
+                url = "${baseUrl}register",
+                formParameters = Parameters.build {
+                    append("name", name)
+                    append("phone", phone)
+                    append("email", email)
+                }
+            ) {
+                header(HttpHeaders.Accept, ContentType.Application.Json.toString())
             }
 
-            println("✔️ Signup Status: ${response.status}")
+            println("✔️ Register User Status: ${response.status}")
             response.body()
 
         } catch (e: ResponseException) {
             val status = e.response.status
-            val text = try { e.response.bodyAsText() } catch (_: Exception) { "unable-to-read-body" }
-            println("❌ Signup Error: HTTP $status")
+            val text = try {
+                e.response.bodyAsText()
+            } catch (_: Exception) {
+                """{"message":"Network error"}"""
+            }
+
+            println("❌ Register User Error: HTTP $status")
             println("   response body: $text")
-            throw e
+
+            // ✅ Parse and return error JSON (don't throw here)
+            val json = Json { ignoreUnknownKeys = true }
+            val errorObj = json.parseToJsonElement(text).jsonObject
+
+            // ✅ Return error JSON as-is
+            return errorObj
+
         } catch (e: Exception) {
-            println("❌ Signup Error: ${e.message}")
+            println("❌ Register User Error: ${e.message}")
             throw e
         }
     }
@@ -142,14 +170,49 @@ class ApiService {
         }
     }
 
+    // ---------------- SAVE PASSWORD (for registration after OTP) ----------------
+    suspend fun savePassword(
+        phone: String,
+        password: String
+    ): JsonObject {
+        println("🌐 API: Saving password for phone=$phone")
+
+        return try {
+            val response = client.post("${baseUrl}save-password") {
+                contentType(ContentType.Application.Json)
+                setBody(mapOf(
+                    "phone" to phone,
+                    "password" to password
+                ))
+            }
+
+            println("✔️ Save Password Status: ${response.status}")
+            response.body()
+
+        } catch (e: ResponseException) {
+            val status = e.response.status
+            val text = try { e.response.bodyAsText() } catch (_: Exception) { "unable-to-read-body" }
+            println("❌ Save Password Error: HTTP $status")
+            println("   response body: $text")
+            throw e
+        } catch (e: Exception) {
+            println("❌ Save Password Error: ${e.message}")
+            throw e
+        }
+    }
+
     // ---------------- FORGOT PASSWORD (send OTP) ----------------
     suspend fun forgotPassword(phone: String): JsonObject {
         println("🌐 API: Forgot password request for phone=$phone")
 
         return try {
-            val response = client.post("${baseUrl}forgot-password") {
-                contentType(ContentType.Application.Json)
-                setBody(mapOf("phone" to phone))
+            val response = client.submitForm(
+                url = "${baseUrl}forgot-password",
+                formParameters = Parameters.build {
+                    append("phone", phone)
+                }
+            ) {
+                header(HttpHeaders.Accept, ContentType.Application.Json.toString())
             }
 
             println("✔️ Forgot Password Status: ${response.status}")
@@ -157,10 +220,22 @@ class ApiService {
 
         } catch (e: ResponseException) {
             val status = e.response.status
-            val text = try { e.response.bodyAsText() } catch (_: Exception) { "unable-to-read-body" }
+            val text = try {
+                e.response.bodyAsText()
+            } catch (_: Exception) {
+                """{"message":"Network error"}"""
+            }
+
             println("❌ Forgot Password Error: HTTP $status")
             println("   response body: $text")
-            throw e
+
+            // ✅ Parse and return error JSON (don't throw here)
+            val json = Json { ignoreUnknownKeys = true }
+            val errorObj = json.parseToJsonElement(text).jsonObject
+
+            // ✅ Return error JSON as-is
+            return errorObj
+
         } catch (e: Exception) {
             println("❌ Forgot Password Error: ${e.message}")
             throw e

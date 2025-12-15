@@ -8,8 +8,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.developer.ev2z.ui.screens.OTP.OTPScreen
-import com.developer.ev2z.ui.screens.Password.PasswordScreen
+import com.developer.ev2z.ui.screens.Auth.OTPScreen
+import com.developer.ev2z.ui.screens.Auth.PasswordScreen
 import com.developer.ev2z.viewmodel.AuthViewModel
 
 enum class RegistrationStep {
@@ -73,25 +73,35 @@ fun RegistrationFlow(
                                 authViewModel.verifyOtp(fullPhone, otp)
                             },
                             onResendOTP = {
+                                // ✅ Call register API again
                                 val fullPhone = "+91$phone"
-                                authViewModel.resendOtp(fullPhone)
+                                authViewModel.signUp(name, fullPhone, "", email)
                             },
                             onBack = onBack
                         )
                     }
 
                     RegistrationStep.CREATE_PASSWORD -> {
+                        // ✅ Listen for login success after password save
+                        val loginSuccess by authViewModel.loginSuccess.collectAsState()
+
+                        LaunchedEffect(loginSuccess) {
+                            if (loginSuccess) {
+                                println("✅ Registration complete! Auto-login successful")
+                                onSuccess()
+                            }
+                        }
+
                         PasswordScreen(
                             title = "Create Password",
                             subtitle = "Secure your account with a strong password",
-                            buttonText = "Creating Account...",
+                            buttonText = "Create Account",
                             isLoading = isLoading,
                             error = error,
                             onPasswordSubmit = { password, confirmPassword ->
                                 val fullPhone = "+91$phone"
-                                // Now call signup with password
-                                authViewModel.signUp(name, fullPhone, password, email)
-                                onSuccess()
+                                println("🔐 Calling savePasswordAndLogin...")
+                                authViewModel.savePasswordAndLogin(name, fullPhone, password, email)
                             },
                             onBack = { currentStep = RegistrationStep.VERIFY_OTP }
                         )

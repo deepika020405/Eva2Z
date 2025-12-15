@@ -1,5 +1,4 @@
-// ========== UPDATED AuthPagerScreen.kt ==========
-package com.developer.ev2z.ui.screens
+package com.developer.ev2z.ui.screens.Auth
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -18,8 +17,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.developer.ev2z.ui.screens.loginScreen.LoginScreen
-import com.developer.ev2z.ui.screens.signupScreen.SignupScreen
 import com.developer.ev2z.viewmodel.AuthViewModel
 import kotlinx.coroutines.launch
 
@@ -28,12 +25,16 @@ import kotlinx.coroutines.launch
 fun AuthPagerScreen(
     viewModel: AuthViewModel,
     onLoginSuccess: () -> Unit,
-    onForgetPasswordClick: () -> Unit = {},
+    onForgetPasswordClick: (String) -> Unit = {},
     onSignupOTPClick: (String, String, String) -> Unit = { _, _, _ -> }
 ) {
     val pageCount = 2
     val pagerState = rememberPagerState(initialPage = 0) { pageCount }
     val coroutineScope = rememberCoroutineScope()
+
+    // ✅ NEW LOGIC: Separate pre-fill states
+    var preFilledPhoneLogin by remember { mutableStateOf("") }
+    var preFilledPhoneSignup by remember { mutableStateOf("") }
 
     Column(
         modifier = Modifier
@@ -64,7 +65,7 @@ fun AuthPagerScreen(
                 ) {
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // Title
+                    // ✅ OLD DESIGN: Title
                     Text(
                         text = "Log in or Sign up today",
                         modifier = Modifier.fillMaxWidth(),
@@ -79,7 +80,7 @@ fun AuthPagerScreen(
 
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // Tab Switcher
+                    // ✅ OLD DESIGN: Custom Tab Switcher
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -92,61 +93,7 @@ fun AuthPagerScreen(
                         horizontalArrangement = Arrangement.spacedBy(0.dp, Alignment.Start),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        // Login Tab
-                        if (pagerState.currentPage == 0) {
-                            Box(
-                                modifier = Modifier
-                                    .shadow(
-                                        elevation = 4.dp,
-                                        spotColor = Color(0x336A9F50),
-                                        ambientColor = Color(0x336A9F50)
-                                    )
-                                    .weight(1f)
-                                    .height(42.dp)
-                                    .background(
-                                        color = Color(0xFFFFFFFF),
-                                        shape = RoundedCornerShape(size = 40.dp)
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "Log In",
-                                    style = TextStyle(
-                                        fontSize = 18.sp,
-                                        fontWeight = FontWeight(500),
-                                        color = Color(0xFF494E47),
-                                        textAlign = TextAlign.Center,
-                                    )
-                                )
-                            }
-                        } else {
-                            TextButton(
-                                onClick = {
-                                    coroutineScope.launch {
-                                        pagerState.animateScrollToPage(0)
-                                    }
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(42.dp),
-                                colors = ButtonDefaults.textButtonColors(
-                                    contentColor = Color(0xFF5D6858)
-                                ),
-                                shape = RoundedCornerShape(40.dp)
-                            ) {
-                                Text(
-                                    text = "Log In",
-                                    style = TextStyle(
-                                        fontSize = 18.sp,
-                                        fontWeight = FontWeight(400),
-                                        color = Color(0xFF5D6858),
-                                        textAlign = TextAlign.Center,
-                                    )
-                                )
-                            }
-                        }
-
-                        // Signup Tab
+                        // Sign Up Tab (Left)
                         if (pagerState.currentPage == 1) {
                             Box(
                                 modifier = Modifier
@@ -199,11 +146,65 @@ fun AuthPagerScreen(
                                 )
                             }
                         }
+
+                        // Log In Tab (Right)
+                        if (pagerState.currentPage == 0) {
+                            Box(
+                                modifier = Modifier
+                                    .shadow(
+                                        elevation = 4.dp,
+                                        spotColor = Color(0x336A9F50),
+                                        ambientColor = Color(0x336A9F50)
+                                    )
+                                    .weight(1f)
+                                    .height(42.dp)
+                                    .background(
+                                        color = Color(0xFFFFFFFF),
+                                        shape = RoundedCornerShape(size = 40.dp)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Log In",
+                                    style = TextStyle(
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight(500),
+                                        color = Color(0xFF494E47),
+                                        textAlign = TextAlign.Center,
+                                    )
+                                )
+                            }
+                        } else {
+                            TextButton(
+                                onClick = {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(0)
+                                    }
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(42.dp),
+                                colors = ButtonDefaults.textButtonColors(
+                                    contentColor = Color(0xFF5D6858)
+                                ),
+                                shape = RoundedCornerShape(40.dp)
+                            ) {
+                                Text(
+                                    text = "Log In",
+                                    style = TextStyle(
+                                        fontSize = 18.sp,
+                                        fontWeight = FontWeight(400),
+                                        color = Color(0xFF5D6858),
+                                        textAlign = TextAlign.Center,
+                                    )
+                                )
+                            }
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // Pager Content
+                    // ✅ Pager Content with NEW LOGIC
                     HorizontalPager(
                         state = pagerState,
                         modifier = Modifier.fillMaxSize()
@@ -212,16 +213,28 @@ fun AuthPagerScreen(
                             0 -> LoginScreen(
                                 viewModel = viewModel,
                                 onLoginSuccess = onLoginSuccess,
-                                onForgetPasswordClick = onForgetPasswordClick
+                                onForgetPasswordClick = onForgetPasswordClick,
+                                onNotRegistered = { phone ->
+                                    println("📞 Login→Signup: $phone")
+                                    preFilledPhoneSignup = phone
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(1)
+                                    }
+                                },
+                                preFilledPhone = preFilledPhoneLogin
                             )
                             1 -> SignupScreen(
                                 viewModel = viewModel,
-                                onSignupSuccess = {
+                                onSignupSuccess = onLoginSuccess,
+                                onSendOTPClick = onSignupOTPClick,
+                                onAlreadyRegistered = { phone ->
+                                    println("📞 Signup→Login: $phone")
+                                    preFilledPhoneLogin = phone
                                     coroutineScope.launch {
                                         pagerState.animateScrollToPage(0)
                                     }
                                 },
-                                onSendOTPClick = onSignupOTPClick
+                                preFilledPhone = preFilledPhoneSignup
                             )
                         }
                     }

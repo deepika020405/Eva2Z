@@ -8,10 +8,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.developer.ev2z.ui.screens.ForgetPassword.ForgetPasswordPhoneScreen
-import com.developer.ev2z.ui.screens.OTP.OTPScreen
-import com.developer.ev2z.ui.screens.Password.PasswordScreen
+import com.developer.ev2z.ui.screens.Auth.OTPScreen
+import com.developer.ev2z.ui.screens.Auth.PasswordScreen
 import com.developer.ev2z.viewmodel.AuthViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 enum class ForgetPasswordStep {
     ENTER_PHONE,
@@ -22,17 +25,31 @@ enum class ForgetPasswordStep {
 @Composable
 fun ForgetPasswordFlow(
     authViewModel: AuthViewModel,
+    preFilledPhone: String = "",
     onBack: () -> Unit = {},
-    onSuccess: () -> Unit = {}
+    onSuccess: () -> Unit = {},
+    onNotRegistered: (String) -> Unit = {} // ✅ NEW: Callback for not registered
 ) {
     var currentStep by remember { mutableStateOf(ForgetPasswordStep.ENTER_PHONE) }
+
+    // ✅ Extract digits from phone number (remove +91 if present)
+    val initialPhone = remember(preFilledPhone) {
+        when {
+            preFilledPhone.startsWith("+91") -> preFilledPhone.removePrefix("+91")
+            preFilledPhone.length == 10 -> preFilledPhone
+            else -> ""
+        }
+    }
+
+    // ✅ Store full phone with country code for API calls
     var phoneNumber by remember { mutableStateOf("") }
 
     val isLoading by authViewModel.loading.collectAsState()
     val otpVerified by authViewModel.otpVerified.collectAsState()
+    val loginSuccess by authViewModel.loginSuccess.collectAsState()
     val error by authViewModel.error.collectAsState()
 
-    // ✅ Auto-navigate to password screen when OTP is verified
+    // ✅ Auto-navigate when OTP verified
     LaunchedEffect(otpVerified) {
         if (otpVerified) {
             println("✅ OTP Verified! Moving to reset password")
@@ -41,11 +58,11 @@ fun ForgetPasswordFlow(
         }
     }
 
-    // ✅ Listen for password reset success and auto-login
-    val loginSuccess by authViewModel.loginSuccess.collectAsState()
+    // ✅ Auto-login after password reset
     LaunchedEffect(loginSuccess) {
         if (loginSuccess && currentStep == ForgetPasswordStep.RESET_PASSWORD) {
             println("✅ Password reset & auto-login successful!")
+            authViewModel.resetLoginSuccess()
             onSuccess()
         }
     }
@@ -74,36 +91,26 @@ fun ForgetPasswordFlow(
                 when (currentStep) {
                     ForgetPasswordStep.ENTER_PHONE -> {
                         ForgetPasswordPhoneScreen(
-                            authViewModel = authViewModel,
-                            onContinue = { phone ->
-                                println("📞 Phone: $phone")
-                                phoneNumber = phone
-                                currentStep = ForgetPasswordStep.VERIFY_OTP
+                            viewModel = authViewModel,
+                            preFilledPhone = initialPhone,
+                            onBack = onBack,
+                            onOtpSent = { phone -> // ✅ Receive actual phone
+                                println("✅ OTP sent! Phone: $phone")
+                                phoneNumber = "+91$phone" // ✅ Store with country code
+
+                                GlobalScope.launch(Dispatchers.Main) {
+                                    delay(300)
+                                    currentStep = ForgetPasswordStep.VERIFY_OTP
+                                }
                             },
-                            onBack = onBack
+                            onNotRegistered = { phone ->
+                                println("📞 Not registered: $phone")
+                                onNotRegistered(phone)
+                            }
                         )
                     }
 
                     ForgetPasswordStep.VERIFY_OTP -> {
-                        var otp1 by remember { mutableStateOf("") }
-                        var otp2 by remember { mutableStateOf("") }
-                        var otp3 by remember { mutableStateOf("") }
-                        var otp4 by remember { mutableStateOf("") }
-                        var otp5 by remember { mutableStateOf("") }
-                        var otp6 by remember { mutableStateOf("") }
-
-                        val otpList = listOf(otp1, otp2, otp3, otp4, otp5, otp6)
-                        val isOTPComplete = otpList.all { it.isNotEmpty() }
-
-                        // ✅ Auto-submit OTP when all 6 digits filled
-                        LaunchedEffect(isOTPComplete) {
-                            if (isOTPComplete && !isLoading) {
-                                val fullOTP = "$otp1$otp2$otp3$otp4$otp5$otp6"
-                                println("🔐 Auto-submitting OTP: $fullOTP")
-                                authViewModel.verifyForgotOtp(phoneNumber, fullOTP)
-                            }
-                        }
-
                         OTPScreen(
                             title = "Verify OTP",
                             subtitle = "Enter the OTP sent to $phoneNumber",
@@ -113,9 +120,11 @@ fun ForgetPasswordFlow(
                                 authViewModel.verifyForgotOtp(phoneNumber, otp)
                             },
                             onResendOTP = {
-                                authViewModel.resendOtp(phoneNumber)
+                                authViewModel.forgotPassword(phoneNumber)
                             },
-                            onBack = { currentStep = ForgetPasswordStep.ENTER_PHONE }
+                            onBack = {
+                                currentStep = ForgetPasswordStep.ENTER_PHONE
+                            }
                         )
                     }
 
@@ -127,10 +136,13 @@ fun ForgetPasswordFlow(
                             isLoading = isLoading,
                             error = error,
                             onPasswordSubmit = { password, confirmPassword ->
-                                println("🔐 Resetting password")
+                                println("🔐 Resetting password for: $phoneNumber")
                                 authViewModel.resetPassword(phoneNumber, password, confirmPassword)
                             },
-                            onBack = { currentStep = ForgetPasswordStep.VERIFY_OTP }
+                            onBack = {
+                                println("🔙 Back to OTP screen")
+                                currentStep = ForgetPasswordStep.VERIFY_OTP
+                            }
                         )
                     }
                 }

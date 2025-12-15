@@ -16,7 +16,7 @@ import com.developer.ev2z.data.local.UserPrefs
 import com.developer.ev2z.data.local.createStorageManager
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.repository.AuthRepository
-import com.developer.ev2z.ui.screens.AuthPagerScreen
+import com.developer.ev2z.ui.screens.Auth.AuthPagerScreen
 import com.developer.ev2z.ui.screens.homeScreen.HomeViewModel
 import com.developer.ev2z.viewmodel.AuthViewModel
 import com.developer.ev2z.navigation.HomeNavGraph
@@ -77,6 +77,7 @@ fun App() {
 
     val loginSuccess by authViewModel.loginSuccess.collectAsState()
     val addDeviceResult by addDeviceViewModel.addDeviceResult.collectAsState()
+    var forgetPasswordPhone by remember { mutableStateOf("") }
 
     // Initial load
     LaunchedEffect(Unit) {
@@ -130,13 +131,25 @@ fun App() {
                 println("📱 Rendering: Forget Password Flow")
                 ForgetPasswordFlow(
                     authViewModel = authViewModel,
+                    preFilledPhone = forgetPasswordPhone,
                     onBack = {
                         println("🔙 Back to Auth from Forget Password")
                         showForgetPassword = false
+                        forgetPasswordPhone = ""
                     },
                     onSuccess = {
                         println("✅ Password reset successful")
                         showForgetPassword = false
+                        forgetPasswordPhone = ""
+                    },
+                    onNotRegistered = { phone ->
+                        println("📞 User not registered, redirecting to signup with phone: $phone")
+                        showForgetPassword = false
+                        forgetPasswordPhone = ""
+
+                        // ✅ Set up registration flow
+                        registrationPhone = phone
+                        showRegistration = true
                     }
                 )
             }
@@ -247,8 +260,9 @@ fun App() {
                         authViewModel.clearError()
                         authViewModel.setLoginSuccess(true)
                     },
-                    onForgetPasswordClick = {
-                        println("🔑 Forget Password clicked")
+                    onForgetPasswordClick = { phone ->
+                        println("🔑 Forget Password clicked with phone: $phone")
+                        forgetPasswordPhone = phone
                         showForgetPassword = true
                     },
                     onSignupOTPClick = { name, phone, email ->
@@ -256,9 +270,8 @@ fun App() {
                         registrationName = name
                         registrationPhone = phone
                         registrationEmail = email
-                        // Send OTP for registration
                         val fullPhone = "+91$phone"
-                        authViewModel.signUp(name, fullPhone, "", email) // Empty password for now
+                        authViewModel.signUp(name, fullPhone, "", email)
                         showRegistration = true
                     }
                 )

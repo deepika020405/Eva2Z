@@ -41,6 +41,12 @@ data class OtpResponse(
 )
 
 @Serializable
+data class SavePasswordResponse(
+    val status: Boolean,
+    val message: String
+)
+
+@Serializable
 data class ForgotPasswordResponse(
     val success: Boolean,
     val message: String

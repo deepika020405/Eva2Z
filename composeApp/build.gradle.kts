@@ -23,8 +23,6 @@ kotlin {
         }
     }
 
-
-
     listOf(
         iosArm64(),
         iosSimulatorArm64()
@@ -65,6 +63,9 @@ kotlin {
             // ML Kit Barcode Scanning for Android
             implementation(libs.barcode.scanning)
 
+            // ✅ SMS Retriever API for OTP Auto-read
+            implementation(libs.play.services.auth)
+            implementation(libs.play.services.auth.api.phone)
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
@@ -93,12 +94,8 @@ kotlin {
             implementation(libs.lifecycle.viewmodel.compose.v296)
             implementation(libs.lifecycle.runtime.compose.v296)
 
-            implementation("io.coil-kt.coil3:coil-compose:3.0.0-rc01")
-            implementation("io.coil-kt.coil3:coil-network-ktor3:3.0.0-rc01")
-
-//            implementation(libs.components.map)
-//            implementation(libs.maplibre)
-//            implementation(libs.accompanist.pager)
+            implementation(libs.coil.compose)
+            implementation(libs.coil.network.ktor3)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -138,4 +135,3 @@ android {
 dependencies {
     debugImplementation(compose.uiTooling)
 }
-

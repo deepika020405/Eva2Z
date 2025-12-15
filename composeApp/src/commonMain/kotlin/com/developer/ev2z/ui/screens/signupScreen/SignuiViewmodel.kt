@@ -1,3 +1,5 @@
 package com.developer.ev2z.ui.screens.signupScreen
 
-//SignuiViewmodel.kt
+// ✅ EMPTY - Uses AuthViewModel instead
+// No need for separate ViewModel - all logic handled by:
+// - AuthViewModel.registerUser() (send OTP for registration)

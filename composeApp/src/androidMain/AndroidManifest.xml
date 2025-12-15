@@ -3,13 +3,19 @@
 
     <!-- Camera permissions -->
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-feature android:name="android.hardware.camera" />
-    <uses-feature android:name="android.hardware.camera.autofocus" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
-    <!-- Internet permission (already needed for API) -->
+    <!-- Internet permission -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- ✅ SMS Permissions for OTP Auto-read -->
+    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <uses-permission android:name="android.permission.READ_SMS" />
+
+    <!-- ✅ FIX: Add telephony feature (not required, for tablets too) -->
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
     <application
         android:name=".MainApplication"
@@ -30,13 +36,21 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- ✅ OTP BroadcastReceiver -->
+        <receiver
+            android:name=".receiver.OTPBroadcastReceiver"
+            android:exported="true"
+            android:permission="com.google.android.gms.auth.api.phone.permission.SEND">
+            <intent-filter>
+                <action android:name="com.google.android.gms.auth.api.phone.SMS_RETRIEVED_ACTION" />
+            </intent-filter>
+        </receiver>
 
         <activity
             android:exported="true"
             android:name=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>

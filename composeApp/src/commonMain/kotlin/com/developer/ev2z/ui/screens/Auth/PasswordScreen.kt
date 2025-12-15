@@ -1,4 +1,4 @@
-package com.developer.ev2z.ui.screens.Password
+package com.developer.ev2z.ui.screens.Auth
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape

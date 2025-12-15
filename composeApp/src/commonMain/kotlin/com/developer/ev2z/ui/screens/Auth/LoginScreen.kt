@@ -1,4 +1,4 @@
-package com.developer.ev2z.ui.screens.loginScreen
+package com.developer.ev2z.ui.screens.Auth
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -16,21 +16,84 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.request.LoginRequest
 import com.developer.ev2z.viewmodel.AuthViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(
     viewModel: AuthViewModel,
     onLoginSuccess: () -> Unit,
-    onForgetPasswordClick: () -> Unit = {}
+    onForgetPasswordClick: (String) -> Unit = {},
+    onNotRegistered: (String) -> Unit = {},
+    preFilledPhone: String = ""
 ) {
-    var phoneNumber by remember { mutableStateOf("") }
+    var phoneNumber by remember(preFilledPhone) { mutableStateOf(preFilledPhone) }
     var password by remember { mutableStateOf("") }
+    var loginAttempts by remember { mutableStateOf(0) }
+    var showDialog by remember { mutableStateOf(false) }
+    var dialogMessage by remember { mutableStateOf("") }
 
     val isLoading by viewModel.loading.collectAsState()
     val loginSuccess by viewModel.loginSuccess.collectAsState()
     val error by viewModel.error.collectAsState()
-
     val scrollState = rememberScrollState()
+    val scope = rememberCoroutineScope()
+
+    // ✅ SIMPLE 3 CASES
+    LaunchedEffect(error) {
+        error?.let { errorMsg ->
+            when {
+                // CASE 1: User not registered
+                errorMsg.contains("not registered", ignoreCase = true) ||
+                        errorMsg.contains("not found", ignoreCase = true) -> {
+                    dialogMessage = "Phone number not registered!\nRedirecting to signup..."
+                    showDialog = true
+                    delay(2000)
+                    showDialog = false
+                    delay(300)
+                    onNotRegistered(phoneNumber)
+                }
+
+                // CASE 2: Wrong password
+                errorMsg.contains("password", ignoreCase = true) ||
+                        errorMsg.contains("incorrect", ignoreCase = true) -> {
+                    loginAttempts++
+
+                    if (loginAttempts >= 3) {
+                        dialogMessage = "Too many failed attempts.\nRedirecting to reset password..."
+                        showDialog = true
+                        delay(2000)
+                        showDialog = false
+                        delay(300)
+                        onForgetPasswordClick(phoneNumber)
+                    } else {
+                        dialogMessage = "Incorrect password!\nAttempt $loginAttempts/3"
+                        showDialog = true
+                        delay(2000)
+                        showDialog = false
+                    }
+                }
+
+                // CASE 3: Other errors
+                else -> {
+                    dialogMessage = errorMsg
+                    showDialog = true
+                    delay(3000)
+                    showDialog = false
+                }
+            }
+            viewModel.clearError()
+        }
+    }
+
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { },
+            title = { Text("Notice", fontWeight = FontWeight.Bold) },
+            text = { Text(dialogMessage) },
+            confirmButton = { }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -40,7 +103,6 @@ fun LoginScreen(
     ) {
         Spacer(modifier = Modifier.height(16.dp))
 
-        // ✅ Phone Number Label
         Text(
             text = "Phone Number*",
             fontSize = 14.sp,
@@ -50,7 +112,6 @@ fun LoginScreen(
                 .padding(start = 4.dp, bottom = 8.dp)
         )
 
-        // Phone Number Field
         OutlinedTextField(
             value = phoneNumber,
             onValueChange = {
@@ -90,7 +151,6 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // ✅ Password Label
         Text(
             text = "Password*",
             fontSize = 14.sp,
@@ -100,7 +160,6 @@ fun LoginScreen(
                 .padding(start = 4.dp, bottom = 8.dp)
         )
 
-        // Password Field
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
@@ -129,12 +188,13 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Forget Password - RIGHT ALIGNED
         Box(
             modifier = Modifier.fillMaxWidth(),
             contentAlignment = Alignment.CenterEnd
         ) {
-            TextButton(onClick = onForgetPasswordClick) {
+            TextButton(onClick = {
+                onForgetPasswordClick(phoneNumber)
+            }) {
                 Text(
                     text = "Forgot Password?",
                     fontSize = 14.sp,
@@ -145,7 +205,6 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Login Button
         Button(
             onClick = {
                 val fullPhone = "+91$phoneNumber"
@@ -175,17 +234,6 @@ fun LoginScreen(
                     fontWeight = FontWeight.SemiBold
                 )
             }
-        }
-
-        // Error Message
-        error?.let { errorMessage ->
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = errorMessage,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
         }
 
         Spacer(modifier = Modifier.height(32.dp))

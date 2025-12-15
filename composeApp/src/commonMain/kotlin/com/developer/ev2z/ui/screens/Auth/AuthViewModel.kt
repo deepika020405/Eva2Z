@@ -81,21 +81,72 @@ class AuthViewModel(
     }
 
     // ============================================
-    // SIGN UP (OLD FLOW - with password)
+    // CHECK IF PHONE IS REGISTERED - ✅ USING REGISTER API
+    // ============================================
+    fun checkPhoneRegistered(phone: String, onResult: (Boolean, String) -> Unit) {
+        viewModelScope.launch {
+            _loading.value = true
+            try {
+                // ✅ Use register API to check if phone exists
+                // If phone exists, API will return error
+                val result = repository.signUp("temp", phone, "", "temp@email.com")
+
+                // If we get success with OTP, phone is NOT registered
+                if (result.success) {
+                    println("✅ Phone not registered, can proceed")
+                    onResult(false, "")
+                } else {
+                    // Check if error message indicates phone already registered
+                    val msg = result.message.lowercase()
+                    if (msg.contains("already registered") || msg.contains("already exists")) {
+                        println("⚠️ Phone already registered")
+                        onResult(true, "This phone number is already registered!")
+                    } else {
+                        println("✅ Phone not registered")
+                        onResult(false, "")
+                    }
+                }
+
+            } catch (e: Exception) {
+                val errorMsg = (e.message ?: "").lowercase()
+
+                when {
+                    // Phone already registered
+                    errorMsg.contains("already registered") ||
+                            errorMsg.contains("already exists") ||
+                            errorMsg.contains("phone is already") -> {
+                        println("⚠️ Phone already registered")
+                        onResult(true, "This phone number is already registered!")
+                    }
+
+                    // Phone not registered - can proceed
+                    else -> {
+                        println("✅ Phone not registered, can proceed")
+                        onResult(false, "")
+                    }
+                }
+            } finally {
+                _loading.value = false
+            }
+        }
+    }
+
+    // ============================================
+    // SIGN UP
     // ============================================
     fun signUp(name: String, phone: String, password: String, email: String) {
-        println("🔥 SignUp (OLD FLOW) started with phone: $phone")
+        println("🔥 SignUp - Sending OTP for: $phone")
 
         viewModelScope.launch {
             _loading.value = true
             _error.value = null
 
             try {
-                println("🔥 Making SignUp API call...")
-                val result = repository.signUp(name, phone, password, email)
+                println("🔥 Calling registerUser API...")
+                val result = repository.signUp(name, phone, "", email) // Empty password
 
                 if (result.success) {
-                    println("🔥 SignUp successful! Message: ${result.message}")
+                    println("🔥 OTP sent successfully! Message: ${result.message}")
                     _signupSuccess.value = true
                 } else {
                     println("❌ SignUp failed: ${result.message}")
@@ -113,23 +164,23 @@ class AuthViewModel(
     }
 
     // ============================================
-    // SIGN UP WITH PASSWORD (NEW FLOW - after OTP)
+    // SAVE PASSWORD & AUTO-LOGIN (After OTP verification)
     // ============================================
-    fun signUpWithPassword(name: String, phone: String, password: String, email: String) {
-        println("🔥 SignUp WITH PASSWORD (NEW FLOW) started with phone: $phone")
+    fun savePasswordAndLogin(name: String, phone: String, password: String, email: String) {
+        println("🔥 Saving password and auto-logging in...")
 
         viewModelScope.launch {
             _loading.value = true
             _error.value = null
 
             try {
-                println("🔥 Making SignUp API call with password...")
-                val result = repository.signUp(name, phone, password, email)
+                // Step 1: Save password
+                val saveResult = repository.savePassword(phone, password)
 
-                if (result.success) {
-                    println("🔥 SignUp successful! Now auto-logging in...")
+                if (saveResult.status) {
+                    println("✅ Password saved! Now auto-logging in...")
 
-                    // ✅ AUTO-LOGIN after successful signup
+                    // Step 2: Auto-login
                     kotlinx.coroutines.delay(500)
 
                     try {
@@ -153,16 +204,15 @@ class AuthViewModel(
                         println("❌ Auto-login failed: ${loginError.message}")
                         _error.value = "Account created but login failed. Please login manually."
                     }
-
                 } else {
-                    println("❌ SignUp failed: ${result.message}")
-                    _error.value = result.message
+                    println("❌ Password save failed: ${saveResult.message}")
+                    _error.value = saveResult.message
                 }
 
             } catch (e: Exception) {
-                println("❌ SignUp error: ${e.message}")
+                println("❌ Save password error: ${e.message}")
                 e.printStackTrace()
-                _error.value = e.message ?: "SignUp failed"
+                _error.value = e.message ?: "Failed to save password"
             } finally {
                 _loading.value = false
             }

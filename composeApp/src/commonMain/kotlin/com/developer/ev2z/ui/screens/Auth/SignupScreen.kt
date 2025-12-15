@@ -1,4 +1,4 @@
-package com.developer.ev2z.ui.screens.signupScreen
+package com.developer.ev2z.ui.screens.Auth
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -7,7 +7,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
@@ -20,20 +19,49 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.utils.EmailValidator
 import com.developer.ev2z.viewmodel.AuthViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun SignupScreen(
     viewModel: AuthViewModel,
     onSignupSuccess: () -> Unit = {},
-    onSendOTPClick: (String, String, String) -> Unit = { _, _, _ -> }
+    onSendOTPClick: (String, String, String) -> Unit = { _, _, _ -> },
+    onAlreadyRegistered: (String) -> Unit = {},
+    preFilledPhone: String = "" // ✅ Accept pre-filled phone
 ) {
     var fullName by remember { mutableStateOf("") }
-    var phoneNumber by remember { mutableStateOf("") }
+
+    // ✅ Initialize with pre-filled phone
+    var phoneNumber by remember(preFilledPhone) {
+        mutableStateOf(preFilledPhone)
+    }
+
     var email by remember { mutableStateOf("") }
+    var showDialog by remember { mutableStateOf(false) }
+    var dialogMessage by remember { mutableStateOf("") }
 
     val isLoading by viewModel.loading.collectAsState()
     val error by viewModel.error.collectAsState()
     val scrollState = rememberScrollState()
+    val scope = rememberCoroutineScope()
+
+    // ✅ Clear pre-filled phone after using it
+    LaunchedEffect(preFilledPhone) {
+        if (preFilledPhone.isNotEmpty()) {
+            phoneNumber = preFilledPhone
+        }
+    }
+
+    // ✅ Show dialog when needed
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { },
+            title = { Text("Notice") },
+            text = { Text(dialogMessage) },
+            confirmButton = { }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -43,7 +71,6 @@ fun SignupScreen(
     ) {
         Spacer(modifier = Modifier.height(16.dp))
 
-        // ✅ Full Name Label
         Text(
             text = "Full Name*",
             fontSize = 14.sp,
@@ -53,7 +80,6 @@ fun SignupScreen(
                 .padding(start = 4.dp, bottom = 8.dp)
         )
 
-        // Name Field
         OutlinedTextField(
             value = fullName,
             onValueChange = {
@@ -74,7 +100,6 @@ fun SignupScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // ✅ Phone Number Label
         Text(
             text = "Phone Number*",
             fontSize = 14.sp,
@@ -84,7 +109,6 @@ fun SignupScreen(
                 .padding(start = 4.dp, bottom = 8.dp)
         )
 
-        // Phone Number Field
         OutlinedTextField(
             value = phoneNumber,
             onValueChange = {
@@ -124,7 +148,6 @@ fun SignupScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // ✅ Email Label
         Text(
             text = "Email*",
             fontSize = 14.sp,
@@ -134,7 +157,6 @@ fun SignupScreen(
                 .padding(start = 4.dp, bottom = 8.dp)
         )
 
-        // Email Field
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
@@ -163,10 +185,27 @@ fun SignupScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // Send OTP Button
         Button(
             onClick = {
-                onSendOTPClick(fullName, phoneNumber, email)
+                val fullPhone = "+91$phoneNumber"
+
+                // ✅ First check if phone is already registered
+                viewModel.checkPhoneRegistered(fullPhone) { isRegistered, message ->
+                    if (isRegistered) {
+                        scope.launch {
+                            dialogMessage = "Phone number already registered!\nRedirecting to login..."
+                            showDialog = true
+                            delay(2000)
+                            showDialog = false
+                            delay(300)
+                            // ✅ Pass ONLY digits (without +91)
+                            onAlreadyRegistered(phoneNumber)
+                        }
+                    } else {
+                        // ✅ Proceed with signup
+                        onSendOTPClick(fullName, phoneNumber, email)
+                    }
+                }
             },
             modifier = Modifier
                 .fillMaxWidth()
@@ -198,7 +237,6 @@ fun SignupScreen(
             }
         }
 
-        // Error Message
         error?.let { errorMessage ->
             Spacer(modifier = Modifier.height(16.dp))
             Text(
@@ -211,7 +249,6 @@ fun SignupScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // ✅ FIXED: Terms and Conditions (single line with clickable parts)
         val annotatedText = buildAnnotatedString {
             withStyle(style = SpanStyle(color = Color(0xFF666666), fontSize = 12.sp)) {
                 append("By signing up, you agree to the ")
