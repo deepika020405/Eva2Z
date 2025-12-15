@@ -14,6 +14,8 @@ repositories {
     google()
     mavenCentral()
     maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
+    maven("https://phonepe.mycloudrepo.io/public/repositories/phonepe-intentsdk-android") // Add this
+
 }
 
 kotlin {
@@ -64,6 +66,10 @@ kotlin {
 
             // ML Kit Barcode Scanning for Android
             implementation(libs.barcode.scanning)
+//            implementation("com.phonepe.intent.sdk:android-sdk:2.1.0")
+            // In your androidMain dependencies
+            implementation("phonepe.intentsdk.android.release:IntentSDK:2.4.1")
+
 
         }
         iosMain.dependencies {

@@ -30,6 +30,7 @@ import com.developer.ev2z.ui.screens.AddDeviceSuccess.AddDeviceSuccessScreen
 import com.developer.ev2z.ui.screens.device_Report.DeviceReportScreen
 import com.developer.ev2z.ui.screens.device_Report.DeviceReportViewModel
 import com.developer.ev2z.ui.screens.device_Report.PlatformAddressProvider
+import com.developer.ev2z.util.AppTokenProvider
 import kotlinx.coroutines.delay
 
 @Composable
@@ -78,6 +79,11 @@ fun App() {
         if (isLoggedIn) {
             authToken = userPrefs.getToken() ?: ""
             username = userPrefs.getName() ?: "User"
+            AppTokenProvider.getToken = {
+                userPrefs.getToken() ?: ""
+            }
+
+
             println("📱 Token loaded from storage: $authToken")
         }
         isLoading = false

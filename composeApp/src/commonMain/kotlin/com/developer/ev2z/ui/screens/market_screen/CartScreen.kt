@@ -50,7 +50,6 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import coil3.compose.AsyncImage
 import com.developer.ev2z.getPlatformContext
-import com.developer.ev2z.phonepe.openPhonePeCheckout
 import com.developer.ev2z.response.CartItemDto
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.runtime.*
@@ -58,23 +57,37 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.animation.core.animateIntOffsetAsState
 import androidx.compose.foundation.layout.offset
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import com.developer.ev2z.phonepe.PaymentState
+import com.developer.ev2z.phonepe.openPhonePeSdk
 import kotlin.math.roundToInt
 
 
-class CartScreen(private val shopViewModel: ShopViewModel): Screen{
+//class CartScreen(private val shopViewModel: ShopViewModel): Screen{
+//
+//    @Composable
+//    override fun Content() {
+//        CartScreenContent(shopViewModel)
+//    }
+//
+//
+//}
 
+class CartScreen : Screen {
     @Composable
     override fun Content() {
-        CartScreenContent(shopViewModel)
+        CartScreenContent()
     }
-
-
 }
 
 
 
 @Composable
-fun CartScreenContent(viewModel: ShopViewModel) {
+fun CartScreenContent() {
+    val viewModel = ShopViewModelProvider.viewModel
     val state by viewModel.state.collectAsState()
     val navigator = LocalNavigator.currentOrThrow
 
@@ -126,7 +139,7 @@ fun CartScreenContent(viewModel: ShopViewModel) {
                 addresses = state.addresses,
                 onSelect = { viewModel.selectAddress(it) },
                 onAddNew = {
-                    navigator.push(AddNewAddressScreen(viewModel))
+                    navigator.push(AddNewAddressScreen())
                 },
                 viewModel = viewModel
             )
@@ -405,9 +418,12 @@ fun AddressSection(
                 onSelect(it)
                 showDialog = false
             },
+            onDelete = {
+                viewModel.deleteBillingAddress(it.id)
+            },
             onAddNew = {
                 showDialog = false
-                navigator.push(AddNewAddressScreen(viewModel))
+                navigator.push(AddNewAddressScreen())
             },
             onDismiss = { showDialog = false }
         )
@@ -419,6 +435,7 @@ fun AddressSection(
 fun AddressDialog(
     list: List<BillingAddress>,
     onSelect: (BillingAddress) -> Unit,
+    onDelete: (BillingAddress) -> Unit,
     onAddNew: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -445,6 +462,7 @@ fun AddressDialog(
                         .heightIn(max = 350.dp)
                         .verticalScroll(rememberScrollState())
                 ) {
+
                     list.forEach { addr ->
 
                         Card(
@@ -453,15 +471,36 @@ fun AddressDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 6.dp)
-                                .clickable { onSelect(addr) }
                         ) {
-                            Column(Modifier.padding(12.dp)) {
 
-                                Text(addr.fullName, fontWeight = FontWeight.Bold)
-                                Text("📞 ${addr.phone}")
-                                Spacer(Modifier.height(4.dp))
-                                Text("${addr.address}, ${addr.city}")
-                                Text("${addr.state} - ${addr.pincode}")
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+
+                                Column(
+                                    Modifier
+                                        .weight(1f)
+                                        .clickable { onSelect(addr) }
+                                ) {
+                                    Text(addr.fullName, fontWeight = FontWeight.Bold)
+                                    Text("📞 ${addr.phone}")
+                                    Spacer(Modifier.height(4.dp))
+                                    Text("${addr.address}, ${addr.city}")
+                                    Text("${addr.state} - ${addr.pincode}")
+                                }
+
+                                IconButton(
+                                    onClick = { onDelete(addr) }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Delete Address",
+                                        tint = Color.Red
+                                    )
+                                }
                             }
                         }
                     }
@@ -481,9 +520,6 @@ fun AddressDialog(
         }
     }
 }
-
-
-
 
 @Composable
 fun DeliveryCard(icon: String, text: String) {
@@ -699,19 +735,31 @@ fun SummaryRow(label: String, value: String, isBold: Boolean = false) {
 }
 
 
-
-
 @Composable
 fun CheckoutBottomBar(viewModel: ShopViewModel) {
     val state by viewModel.state.collectAsState()
-    val ctx = getPlatformContext()
+    val paymentState by viewModel.paymentState.collectAsState()
+
+    // Handle payment state changes
+    LaunchedEffect(paymentState) {
+        when (val ps = paymentState) {
+            is PaymentState.Success -> {
+                // Payment successful - navigate to success screen
+                println("✅ Payment Success: ${ps.txnId}")
+            }
+            is PaymentState.Failed -> {
+                // Show error
+                println("❌ Payment Failed: ${ps.reason}")
+            }
+            else -> {}
+        }
+    }
 
     Box(
         Modifier
             .fillMaxWidth()
             .padding(16.dp)
     ) {
-
         Row(
             Modifier
                 .fillMaxWidth()
@@ -721,7 +769,6 @@ fun CheckoutBottomBar(viewModel: ShopViewModel) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-
             Column {
                 Text("Total Amount", color = Color.Gray)
                 Text(
@@ -731,20 +778,120 @@ fun CheckoutBottomBar(viewModel: ShopViewModel) {
                 )
             }
 
-            Button(
-                onClick = {
-                    viewModel.createOrder { redirectUrl ->
-                        openPhonePeCheckout(redirectUrl)
+            when (paymentState) {
+                PaymentState.Processing -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(36.dp),
+                        strokeWidth = 3.dp
+                    )
+                }
+                else -> {
+                    Button(
+                        onClick = {
+                            viewModel.createOrder { orderToken, merchantId ->
+                                openPhonePeSdk(
+                                    orderToken = orderToken,
+                                    merchantId = merchantId,
+                                    onResult = { result ->
+                                        viewModel.onPaymentResult(
+                                            result.success,
+                                            result.transactionId,
+                                            result.message
+                                        )
+                                    }
+                                )
+                            }
+                        },
+                        enabled = paymentState !is PaymentState.Processing,
+                        shape = RoundedCornerShape(30.dp),
+                        colors = ButtonDefaults.buttonColors(Color(0xFF34A853))
+                    ) {
+                        Text("Checkout", color = Color.White)
                     }
-                },
-                shape = RoundedCornerShape(30.dp),
-                colors = ButtonDefaults.buttonColors(Color(0xFF34A853))
-            ) {
-                Text("Checkout", color = Color.White)
+                }
             }
         }
     }
 }
+
+//@Composable
+//fun CheckoutBottomBar(viewModel: ShopViewModel) {
+//    val state by viewModel.state.collectAsState()
+//    val ctx = getPlatformContext()
+//    val paymentState by viewModel.paymentState.collectAsState()
+//
+//
+//    Box(
+//        Modifier
+//            .fillMaxWidth()
+//            .padding(16.dp)
+//    ) {
+//
+//        Row(
+//            Modifier
+//                .fillMaxWidth()
+//                .clip(RoundedCornerShape(30.dp))
+//                .background(Color.White)
+//                .padding(16.dp),
+//            horizontalArrangement = Arrangement.SpaceBetween,
+//            verticalAlignment = Alignment.CenterVertically
+//        ) {
+//
+//            Column {
+//                Text("Total Amount", color = Color.Gray)
+//                Text(
+//                    "₹${state.finalAmount ?: state.totalPrice ?: "0"}",
+//                    fontSize = 20.sp,
+//                    fontWeight = FontWeight.Bold
+//                )
+//            }
+//
+//
+////            Button(
+////                onClick = {
+////                    viewModel.createOrder { orderToken, merchantId ->
+////                        openPhonePeSdk(
+////                            orderToken = orderToken,
+////                            merchantId = merchantId
+////                        )
+////                    }
+////                },
+////                shape = RoundedCornerShape(30.dp),
+////                colors = ButtonDefaults.buttonColors(Color(0xFF34A853))
+////            ) {
+////                Text("Checkout", color = Color.White)
+////            }
+//
+//            when (paymentState) {
+//
+//                PaymentState.Processing -> {
+//                    CircularProgressIndicator(
+//                        modifier = Modifier.size(36.dp),
+//                        strokeWidth = 3.dp
+//                    )
+//                }
+//
+//                else -> {
+//                    Button(
+//                        onClick = {
+//                            viewModel.createOrder { orderToken, merchantId ->
+//                                openPhonePeSdk(
+//                                    orderToken = orderToken,
+//                                    merchantId = merchantId
+//                                )
+//                            }
+//                        },
+//                        enabled = paymentState !is PaymentState.Processing,
+//                        shape = RoundedCornerShape(30.dp),
+//                        colors = ButtonDefaults.buttonColors(Color(0xFF34A853))
+//                    ) {
+//                        Text("Checkout", color = Color.White)
+//                    }
+//                }
+//            }
+//        }
+//    }
+//}
 
 
 

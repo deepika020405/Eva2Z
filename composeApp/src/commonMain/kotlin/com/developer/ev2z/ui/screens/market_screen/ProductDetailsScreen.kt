@@ -23,12 +23,12 @@ import androidx.compose.ui.text.style.TextDecoration
 import cafe.adriel.voyager.navigator.LocalNavigator
 
 class ProductDetailsScreen(
-    private val product: ShopProduct,
-    private val viewModel: ShopViewModel
+    val product: ShopProduct
 ) : Screen {
 
     @Composable
     override fun Content() {
+        val viewModel = ShopViewModelProvider.viewModel
         ProductDetailsContent(product, viewModel)
     }
 }

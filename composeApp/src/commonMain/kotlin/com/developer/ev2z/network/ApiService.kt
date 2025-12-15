@@ -625,4 +625,23 @@ class ApiService {
         return response.body()
     }
 
+
+    // ApiService.kt
+
+    suspend fun removeGpsBilling(
+        token: String,
+        billingId: Int
+    ): JsonObject {
+
+        val url = "${baseUrl}remove-gps-billing"
+
+        return client.delete(url) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(
+                mapOf("billing_id" to billingId.toString())
+            )
+        }.body()
+    }
+
 }

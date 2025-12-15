@@ -31,6 +31,9 @@ dependencyResolutionManagement {
 
         // ⭐ REQUIRED for JetBrains Compose components (MAPS)
         maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
+//        maven {
+//            url = uri("https://phonepe.bintray.com/PhonePeIntentSDK")
+//        }
     }
 }
 

@@ -88,14 +88,11 @@ object WalletTab : Tab {
 //}
 
 
-class OrdersTab(
-    private val shopViewModel: ShopViewModel,
-    private val token: String
-) : Tab {
+class OrdersTab : Tab {
     @Composable
     override fun Content() {
         // ✅ WRAP with Navigator so LocalNavigator works
-        Navigator(screen = ShopScreenWrapper(shopViewModel))
+        Navigator(ShopScreenWrapper())
 //        Navigator(screen = ShopScreenWrapper(shopViewModel))
     }
 
@@ -108,12 +105,10 @@ class OrdersTab(
 }
 
 // ✅ NEW: Wrapper Screen for Shop
-class ShopScreenWrapper(
-    private val viewModel: ShopViewModel
-) : Screen {
+class ShopScreenWrapper : Screen {
     @Composable
     override fun Content() {
-        ShopScreenHost(viewModel = viewModel)
+        ShopScreenHost()
     }
 }
 class ProfileTab(
@@ -264,7 +259,7 @@ fun HomeNavGraphContent(
             onLogout
         )
     }
-    val ordersTab = remember { OrdersTab(shopViewModel, token) }
+    val ordersTab = remember { OrdersTab() }
     val tabs = listOf(homeTab, WalletTab, ordersTab, profileTab)
     val pagerState = rememberPagerState(pageCount = { tabs.size })
     val coroutineScope = rememberCoroutineScope()

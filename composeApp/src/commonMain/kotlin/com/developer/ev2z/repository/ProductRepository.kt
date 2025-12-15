@@ -139,4 +139,19 @@ class ProductRepository(
 
         return api.createPhonePeOrder(token, body)
     }
+
+
+    // ProductRepository.kt
+
+    suspend fun deleteBillingAddress(
+        token: String,
+        billingId: Int
+    ): Boolean {
+        return try {
+            val resp = api.removeGpsBilling(token, billingId)
+            resp["status"]?.toString()?.contains("success", true) == true
+        } catch (e: Exception) {
+            false
+        }
+    }
 }

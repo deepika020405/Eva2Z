@@ -30,6 +30,11 @@
 <key>NSPhotoLibraryUsageDescription</key>
 <string>Photo library access is required to scan barcodes from images</string>
 
+    <key>LSApplicationQueriesSchemes</key>
+    <array>
+        <string>phonepe</string>
+    </array>
+
 <key>UILaunchScreen</key>
 <dict/>
 <key>UIRequiredDeviceCapabilities</key>

@@ -11,12 +11,11 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.developer.ev2z.BackPressHandler
 
-class AddNewAddressScreen(
-    private val viewModel: ShopViewModel
-) : Screen {
+class AddNewAddressScreen : Screen {
 
     @Composable
     override fun Content() {
+        val viewModel = ShopViewModelProvider.viewModel
 
         val navigator = LocalNavigator.currentOrThrow
 
