@@ -160,14 +160,27 @@ fun OTPBox(value: String, onValueChange: (String) -> Unit, focusRequester: Focus
     BasicTextField(
         value = value,
         onValueChange = { if (it.length <= 1 && (it.isEmpty() || it.all { c -> c.isDigit() })) onValueChange(it) },
-        modifier = Modifier.width(48.dp).height(58.dp).focusRequester(focusRequester)
+        modifier = Modifier
+            .width(48.dp)
+            .height(58.dp)
+            .focusRequester(focusRequester)
             .border(1.5.dp, if (value.isNotEmpty()) Color(0xFF6A9F50) else Color(0xFFE0E0E0), RoundedCornerShape(12.dp))
             .background(Color.White, RoundedCornerShape(12.dp)),
-        textStyle = TextStyle(fontSize = 22.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, color = Color.Black),
+        textStyle = TextStyle(
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            color = Color.Black
+        ),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
         singleLine = true,
-        decorationBox = { innerTextField -> Box(Alignment.Center as Modifier,
-            Modifier.fillMaxSize() as Alignment
-        ) { innerTextField() } }
+        decorationBox = { innerTextField ->
+            Box(
+                contentAlignment = Alignment.Center, // ✅ CORRECT
+                modifier = Modifier.fillMaxSize()    // ✅ CORRECT
+            ) {
+                innerTextField()
+            }
+        }
     )
 }

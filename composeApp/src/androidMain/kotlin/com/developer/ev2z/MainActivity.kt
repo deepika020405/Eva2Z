@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
 import com.developer.ev2z.data.local.initStorageManager
 import com.developer.ev2z.ui.screens.Profile.GlobalContext
+import com.developer.ev2z.util.AppSignatureHelper
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -13,6 +14,9 @@ class MainActivity : ComponentActivity() {
 
         // Initialize storage for Android
         initStorageManager(this)
+
+        val signatureHelper = AppSignatureHelper(this)
+        signatureHelper.printAppSignaturesToLog()
 
         // Initialize GlobalContext for URL opening
         //GlobalContext.set(this)
