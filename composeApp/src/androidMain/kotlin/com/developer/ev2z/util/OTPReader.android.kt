@@ -1,10 +1,12 @@
 package com.developer.ev2z.util
 
 import android.app.Activity
+import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.IntentSender
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
@@ -33,9 +35,11 @@ actual fun OTPAutoReader(onOTPReceived: (String) -> Unit) {
     val consentLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
+        println("📱 Consent Result Code: ${result.resultCode}")
+
         if (result.resultCode == Activity.RESULT_OK) {
             val message = result.data?.getStringExtra(SmsRetriever.EXTRA_SMS_MESSAGE)
-            println("📱 SMS Message (User Approved): $message")
+            println("📱 SMS Message: $message")
 
             message?.let {
                 val otp = extractOTP(it)
@@ -45,13 +49,13 @@ actual fun OTPAutoReader(onOTPReceived: (String) -> Unit) {
                 }
             }
         } else {
-            println("❌ User denied SMS consent")
+            println("❌ User denied (code: ${result.resultCode})")
         }
     }
 
     DisposableEffect(Unit) {
         if (activity == null) {
-            println("❌ Context is not an Activity")
+            println("❌ Not an Activity")
             return@DisposableEffect onDispose { }
         }
 
@@ -59,46 +63,58 @@ actual fun OTPAutoReader(onOTPReceived: (String) -> Unit) {
 
         val smsReceiver = object : BroadcastReceiver() {
             override fun onReceive(receiverContext: Context?, intent: Intent?) {
+                println("📩 onReceive called")
+
                 if (SmsRetriever.SMS_RETRIEVED_ACTION == intent?.action) {
+                    println("📩 SMS_RETRIEVED_ACTION detected")
+
                     val extras = intent.extras
-                    val smsRetrieverStatus = extras?.get(SmsRetriever.EXTRA_STATUS) as? Status
+                    val status = extras?.get(SmsRetriever.EXTRA_STATUS) as? Status
 
-                    when (smsRetrieverStatus?.statusCode) {
+                    println("📩 Status: ${status?.statusCode}")
+
+                    when (status?.statusCode) {
                         CommonStatusCodes.SUCCESS -> {
-                            println("📩 SMS detected! Requesting user consent...")
-
-                            val consentIntent: Intent? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                extras.getParcelable(SmsRetriever.EXTRA_CONSENT_INTENT, Intent::class.java)
-                            } else {
-                                @Suppress("DEPRECATION")
-                                extras.getParcelable(SmsRetriever.EXTRA_CONSENT_INTENT)
-                            }
+                            println("📩 SMS detected!")
 
                             try {
-                                // ✅ CORRECT: Use activity.startIntentSenderForResult pattern
-                                consentIntent?.let { intent ->
-                                    activity.startIntentSenderForResult(
-                                        intent.getParcelableExtra(SmsRetriever.EXTRA_CONSENT_INTENT),
-                                        SMS_CONSENT_REQUEST,
-                                        null,
-                                        0,
-                                        0,
-                                        0
+                                // ✅ CORRECT: Extract PendingIntent directly from extras
+                                val consentIntent: PendingIntent? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    extras.getParcelable(
+                                        SmsRetriever.EXTRA_CONSENT_INTENT,
+                                        PendingIntent::class.java
                                     )
+                                } else {
+                                    @Suppress("DEPRECATION")
+                                    extras.getParcelable(SmsRetriever.EXTRA_CONSENT_INTENT)
+                                }
+
+                                println("📩 PendingIntent: $consentIntent")
+
+                                consentIntent?.let { pendingIntent ->
+                                    // ✅ Extract IntentSender from PendingIntent
+                                    val intentSender: IntentSender = pendingIntent.intentSender
+                                    println("📩 IntentSender: $intentSender")
+
+                                    // ✅ Create IntentSenderRequest
+                                    val request = IntentSenderRequest.Builder(intentSender).build()
+
+                                    println("📩 Launching consent dialog...")
+                                    consentLauncher.launch(request)
                                 } ?: run {
-                                    println("❌ Consent intent is null")
+                                    println("❌ PendingIntent is null")
                                 }
 
                             } catch (e: Exception) {
-                                println("❌ Exception launching consent: ${e.message}")
+                                println("❌ Error: ${e.message}")
                                 e.printStackTrace()
                             }
                         }
                         CommonStatusCodes.TIMEOUT -> {
-                            println("⏱️ SMS User Consent timeout")
+                            println("⏱️ Timeout (5 min)")
                         }
                         else -> {
-                            println("❌ SMS User Consent error: ${smsRetrieverStatus?.statusCode}")
+                            println("❌ Error: ${status?.statusCode}")
                         }
                     }
                 }
@@ -117,40 +133,38 @@ actual fun OTPAutoReader(onOTPReceived: (String) -> Unit) {
                 @Suppress("UnspecifiedRegisterReceiverFlag")
                 context.registerReceiver(smsReceiver, intentFilter)
             }
-            println("✅ SMS BroadcastReceiver registered")
+            println("✅ Receiver registered")
         } catch (e: Exception) {
-            println("❌ Failed to register receiver: ${e.message}")
+            println("❌ Register failed: ${e.message}")
         }
 
         val client = SmsRetriever.getClient(activity)
         val task = client.startSmsUserConsent(null)
 
         task.addOnSuccessListener {
-            println("✅ SMS User Consent API started")
+            println("✅ SMS User Consent started")
         }
 
-        task.addOnFailureListener { exception ->
-            println("❌ Failed to start SMS User Consent: ${exception.message}")
+        task.addOnFailureListener { e ->
+            println("❌ Start failed: ${e.message}")
         }
 
         onDispose {
-            println("🧹 Cleaning up SMS User Consent...")
+            println("🧹 Cleanup...")
             try {
                 context.unregisterReceiver(smsReceiver)
-                println("✅ Receiver unregistered")
+                println("✅ Unregistered")
             } catch (e: Exception) {
-                println("⚠️ Receiver already unregistered: ${e.message}")
+                println("⚠️ Already unregistered")
             }
         }
     }
 }
 
-private const val SMS_CONSENT_REQUEST = 2 // Request code
-
 private fun extractOTP(message: String): String? {
     println("🔍 Extracting OTP from: $message")
     val otpPattern = "\\b\\d{6}\\b".toRegex()
     val result = otpPattern.find(message)?.value
-    println("🎯 Extraction result: $result")
+    println("🎯 Result: $result")
     return result
 }
