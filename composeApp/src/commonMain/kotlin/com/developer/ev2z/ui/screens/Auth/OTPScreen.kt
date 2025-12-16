@@ -156,15 +156,26 @@ fun OTPScreen(
 }
 
 @Composable
-fun OTPBox(value: String, onValueChange: (String) -> Unit, focusRequester: FocusRequester) {
+fun OTPBox(
+    value: String,
+    onValueChange: (String) -> Unit,
+    focusRequester: FocusRequester
+) {
     BasicTextField(
         value = value,
-        onValueChange = { if (it.length <= 1 && (it.isEmpty() || it.all { c -> c.isDigit() })) onValueChange(it) },
+        onValueChange = {
+            if (it.length <= 1 && (it.isEmpty() || it.all { c -> c.isDigit() }))
+                onValueChange(it)
+        },
         modifier = Modifier
             .width(48.dp)
             .height(58.dp)
             .focusRequester(focusRequester)
-            .border(1.5.dp, if (value.isNotEmpty()) Color(0xFF6A9F50) else Color(0xFFE0E0E0), RoundedCornerShape(12.dp))
+            .border(
+                1.5.dp,
+                if (value.isNotEmpty()) Color(0xFF6A9F50) else Color(0xFFE0E0E0),
+                RoundedCornerShape(12.dp)
+            )
             .background(Color.White, RoundedCornerShape(12.dp)),
         textStyle = TextStyle(
             fontSize = 22.sp,
@@ -172,12 +183,14 @@ fun OTPBox(value: String, onValueChange: (String) -> Unit, focusRequester: Focus
             textAlign = TextAlign.Center,
             color = Color.Black
         ),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+        keyboardOptions = KeyboardOptions(
+            keyboardType = KeyboardType.NumberPassword
+        ),
         singleLine = true,
         decorationBox = { innerTextField ->
             Box(
-                contentAlignment = Alignment.Center, // ✅ CORRECT
-                modifier = Modifier.fillMaxSize()    // ✅ CORRECT
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.fillMaxSize()
             ) {
                 innerTextField()
             }

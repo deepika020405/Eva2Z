@@ -35,8 +35,10 @@ class OTPBroadcastReceiver : BroadcastReceiver() {
     }
 
     private fun extractOTP(message: String): String? {
-        // Extract 6-digit OTP: "Your OTP for registration is 516636"
+        println("🔍 Extracting OTP from: $message")
         val otpPattern = "\\b\\d{6}\\b".toRegex()
-        return otpPattern.find(message)?.value
+        val result = otpPattern.find(message)?.value
+        println("🎯 Result: $result")
+        return result
     }
 }

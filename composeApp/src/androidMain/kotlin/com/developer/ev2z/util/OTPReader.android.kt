@@ -163,8 +163,12 @@ actual fun OTPAutoReader(onOTPReceived: (String) -> Unit) {
 
 private fun extractOTP(message: String): String? {
     println("🔍 Extracting OTP from: $message")
+
+    // Your SMS format: "Your OTP for registration is 927030\n\nEVA2Z GPS"
+    // Extract 6-digit number
     val otpPattern = "\\b\\d{6}\\b".toRegex()
     val result = otpPattern.find(message)?.value
-    println("🎯 Result: $result")
+
+    println("🎯 Extracted OTP: $result")
     return result
 }
