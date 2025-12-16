@@ -116,6 +116,7 @@ class ShopScreenWrapper(
         ShopScreenHost(viewModel = viewModel)
     }
 }
+// ProfileTab definition - ADD onChangePassword parameter
 class ProfileTab(
     private val apiService: ApiService,
     private val storageManager: StorageManager,
@@ -123,6 +124,7 @@ class ProfileTab(
     private val onNavigateToManageDevice: () -> Unit,
     private val onNavigateToPrivacyPolicy: () -> Unit,
     private val onNavigateToTermsConditions: () -> Unit,
+    private val onNavigateToChangePassword: () -> Unit, // ✅ ALREADY HERE
     private val onLogout: () -> Unit
 ) : Tab {
     @Composable
@@ -134,6 +136,7 @@ class ProfileTab(
             onManageDevice = onNavigateToManageDevice,
             onPrivacyPolicy = onNavigateToPrivacyPolicy,
             onTermsConditions = onNavigateToTermsConditions,
+            onChangePassword = onNavigateToChangePassword, // ✅ PASS IT HERE
             onLogout = onLogout
         )
     }
@@ -157,6 +160,7 @@ fun HomeNavGraph(
     token: String,
     onNavigateToAddDevice: () -> Unit,
     onNavigateToDeviceReport: () -> Unit,
+    onNavigateToChangePassword: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     SetupStatusBar()
@@ -165,6 +169,7 @@ fun HomeNavGraph(
     var showManageDevice by remember { mutableStateOf(false) }
     var showPrivacyPolicy by remember { mutableStateOf(false) }
     var showTermsConditions by remember { mutableStateOf(false) }
+    var showChangePassword by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         HomeNavGraphContent(
@@ -178,6 +183,7 @@ fun HomeNavGraph(
             onNavigateToManageDevice = { showManageDevice = true },
             onNavigateToPrivacyPolicy = { showPrivacyPolicy = true },
             onNavigateToTermsConditions = { showTermsConditions = true },
+            onNavigateToChangePassword ={showChangePassword = true},
             onLogout = onLogout
         )
 
@@ -237,6 +243,7 @@ fun HomeNavGraphContent(
     onNavigateToManageDevice: () -> Unit,
     onNavigateToPrivacyPolicy: () -> Unit,
     onNavigateToTermsConditions: () -> Unit,
+    onNavigateToChangePassword: () -> Unit = {},
     onLogout: () -> Unit
 ) {
     // === Create Shop repository + viewmodel here (or inject via DI) ===
@@ -261,6 +268,7 @@ fun HomeNavGraphContent(
             onNavigateToManageDevice,
             onNavigateToPrivacyPolicy,
             onNavigateToTermsConditions,
+            onNavigateToChangePassword,
             onLogout
         )
     }

@@ -19,7 +19,7 @@ class MainActivity : ComponentActivity() {
         signatureHelper.printAppSignaturesToLog()
 
         // Initialize GlobalContext for URL opening
-        //GlobalContext.set(this)
+        GlobalContext.set(this)
 
         setContent {
             App()

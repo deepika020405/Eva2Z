@@ -3,11 +3,16 @@ package com.developer.ev2z.ui.screens.AuthFlows
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.developer.ev2z.BackPressHandler
 import com.developer.ev2z.ui.screens.Auth.OTPScreen
 import com.developer.ev2z.ui.screens.Auth.PasswordScreen
 import com.developer.ev2z.viewmodel.AuthViewModel
@@ -28,11 +33,11 @@ fun ForgetPasswordFlow(
     preFilledPhone: String = "",
     onBack: () -> Unit = {},
     onSuccess: () -> Unit = {},
-    onNotRegistered: (String) -> Unit = {} // ✅ NEW: Callback for not registered
+    onNotRegistered: (String) -> Unit = {}
 ) {
     var currentStep by remember { mutableStateOf(ForgetPasswordStep.ENTER_PHONE) }
+    var showExitDialog by remember { mutableStateOf(false) }
 
-    // ✅ Extract digits from phone number (remove +91 if present)
     val initialPhone = remember(preFilledPhone) {
         when {
             preFilledPhone.startsWith("+91") -> preFilledPhone.removePrefix("+91")
@@ -41,7 +46,6 @@ fun ForgetPasswordFlow(
         }
     }
 
-    // ✅ Store full phone with country code for API calls
     var phoneNumber by remember { mutableStateOf("") }
 
     val isLoading by authViewModel.loading.collectAsState()
@@ -49,7 +53,34 @@ fun ForgetPasswordFlow(
     val loginSuccess by authViewModel.loginSuccess.collectAsState()
     val error by authViewModel.error.collectAsState()
 
-    // ✅ Auto-navigate when OTP verified
+    // ✅ Cross-platform back button - ONLY on first screen
+    if (currentStep == ForgetPasswordStep.ENTER_PHONE) {
+        BackPressHandler {
+            showExitDialog = true
+        }
+    }
+
+    if (showExitDialog) {
+        AlertDialog(
+            onDismissRequest = { showExitDialog = false },
+            title = { Text("Exit?", fontWeight = FontWeight.Bold) },
+            text = { Text("Return to login screen?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showExitDialog = false
+                    onBack()
+                }) {
+                    Text("Yes", color = Color(0xFF6A9F50), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExitDialog = false }) {
+                    Text("No", fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
+
     LaunchedEffect(otpVerified) {
         if (otpVerified) {
             println("✅ OTP Verified! Moving to reset password")
@@ -58,7 +89,6 @@ fun ForgetPasswordFlow(
         }
     }
 
-    // ✅ Auto-login after password reset
     LaunchedEffect(loginSuccess) {
         if (loginSuccess && currentStep == ForgetPasswordStep.RESET_PASSWORD) {
             println("✅ Password reset & auto-login successful!")
@@ -94,9 +124,9 @@ fun ForgetPasswordFlow(
                             viewModel = authViewModel,
                             preFilledPhone = initialPhone,
                             onBack = onBack,
-                            onOtpSent = { phone -> // ✅ Receive actual phone
+                            onOtpSent = { phone ->
                                 println("✅ OTP sent! Phone: $phone")
-                                phoneNumber = "+91$phone" // ✅ Store with country code
+                                phoneNumber = "+91$phone"
 
                                 GlobalScope.launch(Dispatchers.Main) {
                                     delay(300)

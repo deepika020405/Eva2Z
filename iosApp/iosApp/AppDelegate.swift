@@ -30,13 +30,13 @@ class AppDelegate: NSObject, UIApplicationDelegate {
             .first(where: { $0.name == "transactionId" })?.value
 
         let success = status == "SUCCESS"
-
-        // 🔥 KMP bridge call
-        PaymentBus.shared.onResult(
-            success: success,
-            txnId: txnId,
-            reason: status
-        )
+//
+//         // 🔥 KMP bridge call
+//         PaymentBus.shared.onResult(
+//             success: success,
+//             txnId: txnId,
+//             reason: status
+//         )
 
         return true
     }

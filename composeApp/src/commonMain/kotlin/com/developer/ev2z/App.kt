@@ -17,6 +17,7 @@ import com.developer.ev2z.data.local.createStorageManager
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.repository.AuthRepository
 import com.developer.ev2z.ui.screens.Auth.AuthPagerScreen
+import com.developer.ev2z.ui.screens.Auth.UpdatePasswordViewModel
 import com.developer.ev2z.ui.screens.homeScreen.HomeViewModel
 import com.developer.ev2z.viewmodel.AuthViewModel
 import com.developer.ev2z.navigation.HomeNavGraph
@@ -31,6 +32,7 @@ import com.developer.ev2z.ui.screens.device_Report.DeviceReportViewModel
 import com.developer.ev2z.ui.screens.device_Report.PlatformAddressProvider
 import com.developer.ev2z.ui.screens.AuthFlows.ForgetPasswordFlow
 import com.developer.ev2z.ui.screens.AuthFlows.RegistrationFlow
+import com.developer.ev2z.ui.screens.AuthFlows.ChangePasswordFlow
 import kotlinx.coroutines.delay
 
 @Composable
@@ -44,6 +46,10 @@ fun App() {
     val authViewModel = remember { AuthViewModel(authRepository, storage) }
     val homeViewModel = remember { HomeViewModel(homeRepository) }
     val addDeviceViewModel = remember { AddDeviceViewModel() }
+
+    // ✅ NEW: UpdatePasswordViewModel
+    val updatePasswordViewModel = remember { UpdatePasswordViewModel(apiService, storage) }
+
     val platformContext = getPlatformContext()
     val addressProvider = remember { PlatformAddressProvider(platformContext) }
 
@@ -62,12 +68,15 @@ fun App() {
     var showDeviceReport by remember { mutableStateOf(false) }
     var showAddDeviceSuccess by remember { mutableStateOf(false) }
 
-    // ✅ Authentication flow states
+    // Authentication flow states
     var showForgetPassword by remember { mutableStateOf(false) }
     var showRegistration by remember { mutableStateOf(false) }
     var registrationName by remember { mutableStateOf("") }
     var registrationPhone by remember { mutableStateOf("") }
     var registrationEmail by remember { mutableStateOf("") }
+
+    // ✅ NEW: Change Password state
+    var showChangePassword by remember { mutableStateOf(false) }
 
     // Success screen data
     var successDeviceName by remember { mutableStateOf("") }
@@ -126,7 +135,23 @@ fun App() {
                 SplashScreen()
             }
 
-            // ✅ Forget Password Flow
+            // ✅ NEW: Change Password Flow
+            showChangePassword -> {
+                println("📱 Rendering: Change Password Flow")
+                ChangePasswordFlow(
+                    viewModel = updatePasswordViewModel,
+                    onBack = {
+                        showChangePassword = false
+                        updatePasswordViewModel.resetState()
+                    },
+                    onSuccess = {
+                        showChangePassword = false
+                        updatePasswordViewModel.resetState()
+                    }
+                )
+            }
+
+            // Forget Password Flow
             showForgetPassword -> {
                 println("📱 Rendering: Forget Password Flow")
                 ForgetPasswordFlow(
@@ -141,20 +166,11 @@ fun App() {
                         println("✅ Password reset successful")
                         showForgetPassword = false
                         forgetPasswordPhone = ""
-                    },
-                    onNotRegistered = { phone ->
-                        println("📞 User not registered, redirecting to signup with phone: $phone")
-                        showForgetPassword = false
-                        forgetPasswordPhone = ""
-
-                        // ✅ Set up registration flow
-                        registrationPhone = phone
-                        showRegistration = true
                     }
                 )
             }
 
-            // ✅ Registration Flow
+            // Registration Flow
             showRegistration -> {
                 println("📱 Rendering: Registration Flow")
                 RegistrationFlow(
@@ -239,6 +255,10 @@ fun App() {
                     onNavigateToDeviceReport = {
                         println("➕ Navigate to Device Report triggered")
                         showDeviceReport = true
+                    },
+                    onNavigateToChangePassword = { // ✅ NEW
+                        println("🔑 Navigate to Change Password triggered")
+                        showChangePassword = true
                     },
                     onLogout = {
                         println("🚪 Logging out...")

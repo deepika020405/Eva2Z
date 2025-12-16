@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,6 +21,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.developer.ev2z.BackPressHandler
 import com.developer.ev2z.util.OTPAutoReader
 
 @Composable
@@ -45,6 +48,11 @@ fun OTPScreen(
     val focusRequester5 = remember { FocusRequester() }
     val focusRequester6 = remember { FocusRequester() }
 
+    var showBackDialog by remember { mutableStateOf(false) }
+
+    // ✅ Cross-platform back button handler
+    BackPressHandler { showBackDialog = true }
+
     // ✅ Cross-platform OTP Auto-read
     OTPAutoReader { receivedOTP ->
         println("📱 Auto-filling OTP: $receivedOTP")
@@ -70,12 +78,51 @@ fun OTPScreen(
         }
     }
 
+    // ✅ Back confirmation dialog
+    if (showBackDialog) {
+        AlertDialog(
+            onDismissRequest = { showBackDialog = false },
+            title = { Text("Confirm", fontWeight = FontWeight.Bold) },
+            text = { Text("Are you sure you want to go back?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showBackDialog = false
+                    onBack()
+                }) {
+                    Text("Yes", color = Color(0xFF6A9F50), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBackDialog = false }) {
+                    Text("No", fontWeight = FontWeight.Bold)
+                }
+            }
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 24.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // ✅ HEADER
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = { showBackDialog = true }) {
+                Icon(Icons.Default.ArrowBack, "Back", tint = Color.Black)
+            }
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = "Enter OTP",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
+            )
+        }
+
         Spacer(modifier = Modifier.height(24.dp))
 
         Text(

@@ -140,13 +140,6 @@ fun ForgetPasswordPhoneScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp, vertical = 16.dp)
         ) {
-            Text(
-                text = "Enter your phone number",
-                fontSize = 16.sp,
-                color = Color.Gray
-            )
-
-            Spacer(Modifier.height(24.dp))
 
             Text(
                 text = "Phone Number*",

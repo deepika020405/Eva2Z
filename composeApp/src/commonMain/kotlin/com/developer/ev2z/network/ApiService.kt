@@ -554,6 +554,57 @@ class ApiService {
         }
     }
 
+    // ---------------- CHANGE PASSWORD ----------------
+    suspend fun changePassword(
+        token: String,
+        currentPassword: String,
+        newPassword: String,
+        confirmNewPassword: String
+    ): JsonObject {
+        println("🌐 API: Change Password Request")
+
+        return try {
+            val response = client.submitForm(
+                url = "${baseUrl}change-password",
+                formParameters = Parameters.build {
+                    append("current_password", currentPassword)
+                    append("new_password", newPassword)
+                    append("confirm_new_password", confirmNewPassword)
+                }
+            ) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+            }
+
+            println("✔️ Change Password Status: ${response.status}")
+            val responseBody: JsonObject = response.body()
+
+            println("📝 Response: $responseBody")
+            responseBody
+
+        } catch (e: ResponseException) {
+            val status = e.response.status
+            val text = try {
+                e.response.bodyAsText()
+            } catch (_: Exception) {
+                """{"error":"Network error"}"""
+            }
+
+            println("❌ Change Password Error: HTTP $status")
+            println("   response body: $text")
+
+            // ✅ Parse and return error JSON (don't throw here)
+            val json = Json { ignoreUnknownKeys = true }
+            val errorObj = json.parseToJsonElement(text).jsonObject
+
+            return errorObj
+
+        } catch (e: Exception) {
+            println("❌ Change Password Error: ${e.message}")
+            throw e
+        }
+    }
+
     // ---------------- DELETE DEVICE ----------------
     suspend fun deleteDevice(deviceId: String, token: String): JsonObject {
 

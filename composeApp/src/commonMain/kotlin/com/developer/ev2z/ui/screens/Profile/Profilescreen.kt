@@ -1,4 +1,4 @@
-// ProfileScreen.kt - UPDATED
+// ProfileScreen.kt - COMPLETE FIXED VERSION
 package com.developer.ev2z.ui.screens.Profile
 
 import androidx.compose.foundation.background
@@ -35,6 +35,7 @@ fun ProfileScreen(
     onManageDevice: () -> Unit = {},
     onPrivacyPolicy: () -> Unit = {},
     onTermsConditions: () -> Unit = {},
+    onChangePassword: () -> Unit = {}, // ✅ Parameter exists
     onLogout: () -> Unit = {}
 ) {
     val viewModel = remember { ProfileViewModel(apiService, storageManager) }
@@ -57,7 +58,7 @@ fun ProfileScreen(
         onGeneralSettings = { /* Navigate to SettingActivity */ },
         onAccountActivity = { /* Navigate to account activity */ },
         onReferAndEarn = { /* Navigate to ReferAndEarnActivity */ },
-        onChangePassword = { /* Navigate to PasswordChangeActivity */ },
+        onChangePassword = onChangePassword, // ✅ PASS IT TO CONTENT
         onManageDevice = onManageDevice,
         onAddFence = { /* Navigate to FenceActivity */ },
         onHistoryPlayback = { /* Navigate to HistoryPlaybackActivity */ },
@@ -90,7 +91,7 @@ fun ProfileScreenContent(
     onGeneralSettings: () -> Unit = {},
     onAccountActivity: () -> Unit = {},
     onReferAndEarn: () -> Unit = {},
-    onChangePassword: () -> Unit = {},
+    onChangePassword: () -> Unit = {}, // ✅ RECEIVE CALLBACK
     onManageDevice: () -> Unit = {},
     onAddFence: () -> Unit = {},
     onHistoryPlayback: () -> Unit = {},
@@ -157,7 +158,7 @@ fun ProfileScreenContent(
                             ProfileMenuItem("General Settings", Icons.Rounded.Settings, onGeneralSettings),
                             ProfileMenuItem("Account Activity", Icons.Rounded.ManageAccounts, onAccountActivity),
                             ProfileMenuItem("Refer And Earn", Icons.Rounded.CardGiftcard, onReferAndEarn),
-                            ProfileMenuItem("Change Password", Icons.Rounded.Password, onChangePassword)
+                            ProfileMenuItem("Change Password", Icons.Rounded.Password, onChangePassword) // ✅ WORKING NOW
                         )
                     )
                 }
