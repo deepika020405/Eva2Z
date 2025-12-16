@@ -16,7 +16,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import com.developer.ev2z.util.encodeUrl
+
 
 data class ShopUiState(
     val loading: Boolean = false,
@@ -413,8 +416,65 @@ class ShopViewModel(
 //    }
 
     // ========== ShopViewModel.kt - Updated createOrder ==========
+//    fun createOrder(
+//        onReady: (paymentUrl: String) -> Unit
+//    ) {
+//        val s = _state.value
+//        val token = tokenProvider()
+//        val amount = (s.finalAmount ?: s.totalPrice ?: "0").toDouble()
+//        val billingId = s.selectedAddress?.id
+//
+//        if (billingId == null) {
+//            _paymentState.value = PaymentState.Failed("Please select delivery address")
+//            return
+//        }
+//
+//        _paymentState.value = PaymentState.Processing
+//
+//        scope.launch {
+//            try {
+//                val resp = repo.createPhonePeOrder(
+//                    token = token,
+//                    amount = amount,
+//                    billingId = billingId
+//                )
+//                println("🧾 RAW RESPONSE STRING")
+//                println(resp.toString())
+//
+////                val paymentUrl = resp["paymentUrl"]?.jsonPrimitive?.content
+////                    ?: throw Exception("paymentUrl missing in response")
+////                val paymentUrl =
+////                    resp["paymentUrl"]?.jsonPrimitive?.content
+////                        ?: resp["redirectUrl"]?.jsonPrimitive?.content
+////                        ?: resp["data"]?.jsonObject
+////                            ?.get("paymentUrl")?.jsonPrimitive?.content
+////                        ?: resp["data"]?.jsonObject
+////                            ?.get("instrumentResponse")?.jsonObject
+////                            ?.get("redirectInfo")?.jsonObject
+////                            ?.get("url")?.jsonPrimitive?.content
+////                        ?: throw Exception("Payment URL not found in PhonePe response")
+////
+////                println("🌐 Final Payment URL = $paymentUrl")
+//                val paymentUrl = "https://mercury.phonepe.com/transact/$orderToken"
+//
+//                println("🌐 Generated Payment URL = $paymentUrl")
+//
+////                onReady(paymentUrl)
+//
+//
+//                println("✅ Payment URL received")
+//                onReady(paymentUrl)
+//
+//            } catch (e: Exception) {
+//                _paymentState.value =
+//                    PaymentState.Failed(e.message ?: "Order creation failed")
+//            }
+//        }
+//    }
+
+
     fun createOrder(
-        onReady: (orderToken: String, merchantId: String) -> Unit
+        onReady: (orderToken: String) -> Unit
     ) {
         val s = _state.value
         val token = tokenProvider()
@@ -422,7 +482,8 @@ class ShopViewModel(
         val billingId = s.selectedAddress?.id
 
         if (billingId == null) {
-            _paymentState.value = PaymentState.Failed("Please select delivery address")
+            _paymentState.value =
+                PaymentState.Failed("Please select delivery address")
             return
         }
 
@@ -430,36 +491,28 @@ class ShopViewModel(
 
         scope.launch {
             try {
-                println("🛒 Creating order: amount=$amount, billingId=$billingId")
-
                 val resp = repo.createPhonePeOrder(
                     token = token,
                     amount = amount,
                     billingId = billingId
                 )
 
-                println("📦 Response: $resp")
-
-                val merchantId = resp["merchantId"]?.jsonPrimitive?.content
-                    ?: throw Exception("merchantId missing in response")
-
                 val orderToken = resp["orderToken"]?.jsonPrimitive?.content
-                    ?: throw Exception("orderToken missing in response")
+                    ?: throw Exception("orderToken missing")
 
-                println("✅ Order created successfully")
-                println("Merchant: $merchantId")
-                println("Token: ${orderToken.take(50)}...")
+                println("✅ ORDER TOKEN = $orderToken")
 
-                // Launch payment
-                onReady(orderToken, merchantId)
+                // 🔥 ONLY PASS TOKEN
+                onReady(orderToken)
 
             } catch (e: Exception) {
-                println("❌ Failed to create order: ${e.message}")
-                e.printStackTrace()
-                _paymentState.value = PaymentState.Failed(e.message ?: "Order creation failed")
+                _paymentState.value =
+                    PaymentState.Failed(e.message ?: "Order creation failed")
             }
         }
     }
+
+
 
     // ✅ Handle payment result - bas SUCCESS ya FAILED
     fun onPaymentResult(success: Boolean, txnId: String?, reason: String?) {

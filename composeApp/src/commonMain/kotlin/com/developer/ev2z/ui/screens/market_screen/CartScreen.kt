@@ -778,10 +778,9 @@ fun CheckoutBottomBar(viewModel: ShopViewModel) {
                 else -> {
                     Button(
                         onClick = {
-                            viewModel.createOrder { orderToken, merchantId ->
+                            viewModel.createOrder { orderToken ->
                                 openPhonePeSdk(
-                                    orderToken = orderToken,
-                                    merchantId = merchantId,
+                                    paymentUrl = orderToken, // 👈 token pass ho raha hai
                                     onResult = { result ->
                                         viewModel.onPaymentResult(
                                             result.success,
@@ -791,6 +790,8 @@ fun CheckoutBottomBar(viewModel: ShopViewModel) {
                                     }
                                 )
                             }
+
+
                         },
                         enabled = paymentState !is PaymentState.Processing,
                         shape = RoundedCornerShape(30.dp),
