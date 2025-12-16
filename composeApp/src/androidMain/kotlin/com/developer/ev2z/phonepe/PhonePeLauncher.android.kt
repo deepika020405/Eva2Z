@@ -2,60 +2,49 @@
 package com.developer.ev2z.phonepe
 
 import android.app.Activity
+import android.content.Intent
+import android.net.Uri
 import android.util.Log
 import com.developer.ev2z.ActivityProvider
-import com.phonepe.intent.sdk.api.PhonePe
-import com.phonepe.intent.sdk.api.PhonePeInitException
+import java.net.URLEncoder
 
 actual fun openPhonePeSdk(
     orderToken: String,
     merchantId: String,
     onResult: (PaymentResult) -> Unit
 ) {
-    // ✅ ActivityProvider se Activity lo
     val activity = ActivityProvider.getActivity() ?: run {
-        Log.e("PhonePe", "Activity not found in ActivityProvider")
+        Log.e("PhonePe", "❌ Activity not found")
         onResult(PaymentResult(false, null, "Activity not available"))
         return
     }
 
     try {
-        // Get list of UPI apps
-        val upiApps = PhonePe.getUpiApps()
+        Log.d("PhonePe", "🚀 Starting payment")
 
-        if (upiApps.isEmpty()) {
-            Log.e("PhonePe", "No UPI apps found")
-            onResult(PaymentResult(false, null, "No UPI apps installed"))
-            return
-        }
-
-        Log.d("PhonePe", "Available UPI apps: ${upiApps.map { it.packageName }}")
-
-        // Store callback for later
+        // Register callback FIRST
         PaymentBus.register { success, txnId, reason ->
+            Log.d("PhonePe", "💰 Callback: success=$success, txn=$txnId, reason=$reason")
             onResult(PaymentResult(success, txnId, reason))
         }
 
-        // Start PhonePe transaction
-        val intent = PhonePe.getImplicitIntent(
-            activity.applicationContext,
-            orderToken,
-            null
-        )
+        // ✅ URL ENCODE the token
+        val encodedToken = URLEncoder.encode(orderToken, "UTF-8")
+        val paymentUrl = "https://mercury.phonepe.com/transact/$encodedToken"
 
-        if (intent != null) {
-            activity.startActivityForResult(intent, PHONEPE_REQUEST_CODE)
-            Log.d("PhonePe", "✅ Payment intent launched successfully")
-        } else {
-            Log.e("PhonePe", "Failed to create PhonePe intent")
-            PaymentBus.notify(false, null, "Failed to start payment")
-        }
+        Log.d("PhonePe", "🌐 Opening payment URL")
+        Log.d("PhonePe", "Original token: ${orderToken.take(50)}...")
+        Log.d("PhonePe", "Encoded URL: ${paymentUrl.take(100)}...")
 
-    } catch (e: PhonePeInitException) {
-        Log.e("PhonePe", "Init failed: ${e.message}", e)
-        onResult(PaymentResult(false, null, "PhonePe initialization failed"))
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(paymentUrl))
+//        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+        activity.startActivity(intent)
+
+        Log.d("PhonePe", "✅ Browser opened")
+
     } catch (e: Exception) {
-        Log.e("PhonePe", "Payment failed: ${e.message}", e)
+        Log.e("PhonePe", "❌ Error: ${e.message}", e)
         onResult(PaymentResult(false, null, e.message))
     }
 }

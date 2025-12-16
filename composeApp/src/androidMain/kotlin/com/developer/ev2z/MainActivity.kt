@@ -10,27 +10,13 @@ import androidx.compose.runtime.Composable
 import com.developer.ev2z.data.local.initStorageManager
 import com.developer.ev2z.phonepe.PHONEPE_REQUEST_CODE
 import com.developer.ev2z.phonepe.PaymentBus
-import com.phonepe.intent.sdk.api.PhonePe
-import com.phonepe.intent.sdk.api.models.PhonePeEnvironment
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         initStorageManager(this)
 
-        // Initialize PhonePe SDK here (one time)
-        try {
-            PhonePe.init(
-                this,
-                PhonePeEnvironment.RELEASE, // Use SANDBOX for testing
-                "M22VRDGEOVBYAUAT", // Your merchant ID
-                null
-            )
-            Log.d("PhonePe", "SDK initialized successfully")
-        } catch (e: Exception) {
-            Log.e("PhonePe", "SDK init failed: ${e.message}")
-        }
-
+        // ✅ Activity ko set karo
         ActivityProvider.setActivity(this)
 
         setContent {
@@ -40,34 +26,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // ✅ Memory leak avoid karne ke liye clear karo
         ActivityProvider.clearActivity()
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-
-        if (requestCode == PHONEPE_REQUEST_CODE) {
-            Log.d("PhonePe", "Payment result: resultCode=$resultCode")
-
-            when (resultCode) {
-                Activity.RESULT_OK -> {
-                    val transactionId = data?.getStringExtra("transactionId")
-                    Log.d("PhonePe", "Payment SUCCESS: txnId=$transactionId")
-                    PaymentBus.onResult(true, transactionId, "SUCCESS")
-                }
-                Activity.RESULT_CANCELED -> {
-                    Log.d("PhonePe", "Payment CANCELLED")
-                    PaymentBus.onResult(false, null, "CANCELLED")
-                }
-                else -> {
-                    val error = data?.getStringExtra("error") ?: "Unknown error"
-                    Log.d("PhonePe", "Payment FAILED: $error")
-                    PaymentBus.onResult(false, null, error)
-                }
-            }
-        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -75,18 +34,39 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
 
         intent.data?.let { uri ->
-            Log.d("PhonePe", "Deep link callback: $uri")
+            Log.d("PhonePe", "🔗 Callback URI: $uri")
 
+            // Extract payment info from URL
+            // Example: ev2z://payment/callback?status=SUCCESS&transactionId=TX123
             val status = uri.getQueryParameter("status")
             val txnId = uri.getQueryParameter("transactionId")
+                ?: uri.getQueryParameter("providerReferenceId")
+            val code = uri.getQueryParameter("code")
 
-            PaymentBus.onResult(
-                success = status == "SUCCESS",
-                txnId = txnId,
-                reason = status
-            )
+            Log.d("PhonePe", "Status: $status, TxnId: $txnId, Code: $code")
+
+            when (status?.uppercase()) {
+                "SUCCESS" -> {
+                    Log.d("PhonePe", "✅ Payment SUCCESS")
+                    PaymentBus.notify(true, txnId, "SUCCESS")
+                }
+                "FAILED" -> {
+                    Log.d("PhonePe", "❌ Payment FAILED")
+                    PaymentBus.notify(false, txnId, "FAILED")
+                }
+                "PENDING" -> {
+                    Log.d("PhonePe", "⏳ Payment PENDING")
+                    PaymentBus.notify(false, txnId, "PENDING")
+                }
+                else -> {
+                    Log.d("PhonePe", "❓ Unknown status: $status")
+                    PaymentBus.notify(false, txnId, code ?: "UNKNOWN")
+                }
+            }
         }
     }
+
+
 }
 
 @Composable

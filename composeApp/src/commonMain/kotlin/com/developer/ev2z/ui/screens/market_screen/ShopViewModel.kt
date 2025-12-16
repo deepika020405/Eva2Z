@@ -371,19 +371,18 @@ class ShopViewModel(
     fun clearPromoError() {
         _state.value = _state.value.copy(promoError = null)
     }
-
+    
 
 //    fun createOrder(
-//        onReady: (
-//            orderToken: String,
-//            merchantId: String
-//        ) -> Unit
+//        onReady: (orderToken: String, merchantId: String) -> Unit
 //    ) {
 //        val s = _state.value
 //        val token = tokenProvider()
 //
 //        val amount = (s.finalAmount ?: s.totalPrice ?: "0").toDouble()
 //        val billingId = s.selectedAddress?.id ?: return
+//
+//        _paymentState.value = PaymentState.Processing
 //
 //        scope.launch {
 //            try {
@@ -393,70 +392,90 @@ class ShopViewModel(
 //                    billingId = billingId
 //                )
 //
-//                println("📦 SERVER ORDER RESPONSE = $resp")
+//                val merchantId = resp["merchantId"]?.jsonPrimitive?.content
+//                    ?: throw Exception("merchantId missing")
 //
-//                // ✅ REQUIRED FOR SDK
-//                val merchantId =
-//                    resp["merchantId"]?.jsonPrimitive?.content ?: return@launch
+//                val orderToken = resp["orderToken"]?.jsonPrimitive?.content
+//                    ?: throw Exception("orderToken missing")
 //
-//                val orderToken =
-//                    resp["orderToken"]?.jsonPrimitive?.content ?: return@launch
+//                // Register payment callback BEFORE opening SDK
+//                PaymentBus.register { success, txnId, reason ->
+//                    onPaymentResult(success, txnId, reason)
+//                }
 //
-//                // 🚀 NO WEB URL
+//                // Open PhonePe SDK
 //                onReady(orderToken, merchantId)
 //
 //            } catch (e: Exception) {
-//                println("❌ createOrder ERROR = ${e.message}")
+//                _paymentState.value = PaymentState.Failed(e.message)
 //            }
 //        }
 //    }
 
+    // ========== ShopViewModel.kt - Updated createOrder ==========
     fun createOrder(
         onReady: (orderToken: String, merchantId: String) -> Unit
     ) {
         val s = _state.value
         val token = tokenProvider()
-
         val amount = (s.finalAmount ?: s.totalPrice ?: "0").toDouble()
-        val billingId = s.selectedAddress?.id ?: return
+        val billingId = s.selectedAddress?.id
+
+        if (billingId == null) {
+            _paymentState.value = PaymentState.Failed("Please select delivery address")
+            return
+        }
 
         _paymentState.value = PaymentState.Processing
 
         scope.launch {
             try {
+                println("🛒 Creating order: amount=$amount, billingId=$billingId")
+
                 val resp = repo.createPhonePeOrder(
                     token = token,
                     amount = amount,
                     billingId = billingId
                 )
 
+                println("📦 Response: $resp")
+
                 val merchantId = resp["merchantId"]?.jsonPrimitive?.content
-                    ?: throw Exception("merchantId missing")
+                    ?: throw Exception("merchantId missing in response")
 
                 val orderToken = resp["orderToken"]?.jsonPrimitive?.content
-                    ?: throw Exception("orderToken missing")
+                    ?: throw Exception("orderToken missing in response")
 
-                // Register payment callback BEFORE opening SDK
-                PaymentBus.register { success, txnId, reason ->
-                    onPaymentResult(success, txnId, reason)
-                }
+                println("✅ Order created successfully")
+                println("Merchant: $merchantId")
+                println("Token: ${orderToken.take(50)}...")
 
-                // Open PhonePe SDK
+                // Launch payment
                 onReady(orderToken, merchantId)
 
             } catch (e: Exception) {
-                _paymentState.value = PaymentState.Failed(e.message)
+                println("❌ Failed to create order: ${e.message}")
+                e.printStackTrace()
+                _paymentState.value = PaymentState.Failed(e.message ?: "Order creation failed")
             }
         }
     }
 
+    // ✅ Handle payment result - bas SUCCESS ya FAILED
     fun onPaymentResult(success: Boolean, txnId: String?, reason: String?) {
+        println("📊 Payment Result: success=$success, txn=$txnId, reason=$reason")
+
         _paymentState.value = if (success) {
-            PaymentState.Success(txnId)
+            println("✅ Payment successful!")
+            // Backend already cleared cart when order was created
+            PaymentState.Success(txnId ?: "")
         } else {
-            PaymentState.Failed(reason)
+            println("❌ Payment failed: $reason")
+            PaymentState.Failed(reason ?: "Payment failed")
         }
     }
+
+
 
 
 

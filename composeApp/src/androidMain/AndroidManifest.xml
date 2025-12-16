@@ -10,6 +10,34 @@
     <!-- Internet permission (already needed for API) -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- ✅ CRITICAL: Add queries for UPI apps (Android 11+) -->
+    <queries>
+        <!-- PhonePe -->
+        <package android:name="com.phonepe.app" />
+
+        <!-- Google Pay -->
+        <package android:name="com.google.android.apps.nbu.paisa.user" />
+
+        <!-- Paytm -->
+        <package android:name="net.one97.paytm" />
+
+        <!-- BHIM UPI -->
+        <package android:name="in.org.npci.upiapp" />
+
+        <!-- Amazon Pay -->
+        <package android:name="in.amazon.mShop.android.shopping" />
+
+        <!-- WhatsApp -->
+        <package android:name="com.whatsapp" />
+
+        <!-- Generic UPI intent -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="upi" />
+        </intent>
+    </queries>
+
 
     <application
         android:name=".MainApplication"
@@ -33,7 +61,8 @@
 
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTop">
 
             <!-- ✅ LAUNCHER -->
             <intent-filter>
@@ -46,8 +75,14 @@
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="phonepe" />
+
+                <!-- MUST MATCH backend redirectUrl -->
+                <data
+                    android:scheme="ev2z"
+                    android:host="payment"
+                    android:pathPrefix="/callback" />
             </intent-filter>
+
 
         </activity>
 

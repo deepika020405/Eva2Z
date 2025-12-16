@@ -1,3 +1,4 @@
+// This is CMP new code Android Ios Both
 package com.developer.ev2z.ui.screens.market_screen
 
 import androidx.compose.foundation.background
@@ -64,17 +65,6 @@ import androidx.compose.material3.IconButton
 import com.developer.ev2z.phonepe.PaymentState
 import com.developer.ev2z.phonepe.openPhonePeSdk
 import kotlin.math.roundToInt
-
-
-//class CartScreen(private val shopViewModel: ShopViewModel): Screen{
-//
-//    @Composable
-//    override fun Content() {
-//        CartScreenContent(shopViewModel)
-//    }
-//
-//
-//}
 
 class CartScreen : Screen {
     @Composable
@@ -813,85 +803,6 @@ fun CheckoutBottomBar(viewModel: ShopViewModel) {
         }
     }
 }
-
-//@Composable
-//fun CheckoutBottomBar(viewModel: ShopViewModel) {
-//    val state by viewModel.state.collectAsState()
-//    val ctx = getPlatformContext()
-//    val paymentState by viewModel.paymentState.collectAsState()
-//
-//
-//    Box(
-//        Modifier
-//            .fillMaxWidth()
-//            .padding(16.dp)
-//    ) {
-//
-//        Row(
-//            Modifier
-//                .fillMaxWidth()
-//                .clip(RoundedCornerShape(30.dp))
-//                .background(Color.White)
-//                .padding(16.dp),
-//            horizontalArrangement = Arrangement.SpaceBetween,
-//            verticalAlignment = Alignment.CenterVertically
-//        ) {
-//
-//            Column {
-//                Text("Total Amount", color = Color.Gray)
-//                Text(
-//                    "₹${state.finalAmount ?: state.totalPrice ?: "0"}",
-//                    fontSize = 20.sp,
-//                    fontWeight = FontWeight.Bold
-//                )
-//            }
-//
-//
-////            Button(
-////                onClick = {
-////                    viewModel.createOrder { orderToken, merchantId ->
-////                        openPhonePeSdk(
-////                            orderToken = orderToken,
-////                            merchantId = merchantId
-////                        )
-////                    }
-////                },
-////                shape = RoundedCornerShape(30.dp),
-////                colors = ButtonDefaults.buttonColors(Color(0xFF34A853))
-////            ) {
-////                Text("Checkout", color = Color.White)
-////            }
-//
-//            when (paymentState) {
-//
-//                PaymentState.Processing -> {
-//                    CircularProgressIndicator(
-//                        modifier = Modifier.size(36.dp),
-//                        strokeWidth = 3.dp
-//                    )
-//                }
-//
-//                else -> {
-//                    Button(
-//                        onClick = {
-//                            viewModel.createOrder { orderToken, merchantId ->
-//                                openPhonePeSdk(
-//                                    orderToken = orderToken,
-//                                    merchantId = merchantId
-//                                )
-//                            }
-//                        },
-//                        enabled = paymentState !is PaymentState.Processing,
-//                        shape = RoundedCornerShape(30.dp),
-//                        colors = ButtonDefaults.buttonColors(Color(0xFF34A853))
-//                    ) {
-//                        Text("Checkout", color = Color.White)
-//                    }
-//                }
-//            }
-//        }
-//    }
-//}
 
 
 
