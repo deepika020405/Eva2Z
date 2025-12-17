@@ -29,6 +29,7 @@ import com.developer.ev2z.ui.screens.ManageDevices.ManageDeviceScreen
 import com.developer.ev2z.ui.screens.market_screen.ShopScreenHost
 import com.developer.ev2z.ui.screens.PrivacyPolicy_TandC.PrivacyPolicy_TandCScreen
 import com.developer.ev2z.ui.screens.PrivacyPolicy_TandC.WebViewType
+import com.developer.ev2z.ui.screens.community.CommunityScreenWrapper
 import com.developer.ev2z.ui.screens.market_screen.ShopViewModel
 import kotlinx.coroutines.launch
 
@@ -56,37 +57,34 @@ class HomeTab(
         )
 }
 
-object WalletTab : Tab {
+//object WalletTab : Tab {
+//    @Composable
+//    override fun Content() = WalletScreen()
+//
+//    override val options: TabOptions
+//        @Composable get() = TabOptions(
+//            index = 1u,
+//            title = "Community",
+//            icon = rememberVectorPainter(Icons.Default.GridView)
+//        )
+//}
+
+
+object CommunityTab : Tab {
+
     @Composable
-    override fun Content() = WalletScreen()
+    override fun Content() {
+        // ✅ Navigator so future screens (create post, comments) work
+        Navigator(CommunityScreenWrapper())
+    }
 
     override val options: TabOptions
         @Composable get() = TabOptions(
             index = 1u,
-            title = "Explore",
+            title = "Community",
             icon = rememberVectorPainter(Icons.Default.GridView)
         )
 }
-
-//class OrdersTab(
-//    private val shopViewModel: ShopViewModel,
-//    private val token: String
-//) : Tab {
-//    @Composable
-//    override fun Content() = ShopScreenHost(
-//        shopViewModel
-//        // If ShopScreenHost accepts a viewModel param, pass it,
-//        // otherwise it will create its own — adapt to your implementation.
-//    )
-//
-//    override val options: TabOptions
-//        @Composable get() = TabOptions(
-//            index = 2u,
-//            title = "Shop",
-//            icon = rememberVectorPainter(Icons.Default.ShoppingCart)
-//        )
-//}
-
 
 class OrdersTab : Tab {
     @Composable
@@ -260,7 +258,7 @@ fun HomeNavGraphContent(
         )
     }
     val ordersTab = remember { OrdersTab() }
-    val tabs = listOf(homeTab, WalletTab, ordersTab, profileTab)
+    val tabs = listOf(homeTab, CommunityTab, ordersTab, profileTab)
     val pagerState = rememberPagerState(pageCount = { tabs.size })
     val coroutineScope = rememberCoroutineScope()
 

@@ -7,6 +7,7 @@ import com.developer.ev2z.request.CreateOrderRequest
 import com.developer.ev2z.request.DeviceAnalyticsRequest
 import com.developer.ev2z.request.LoginRequest
 import com.developer.ev2z.response.*
+import com.developer.ev2z.util.AppTokenProvider
 import io.ktor.client.call.*
 import io.ktor.client.plugins.ResponseException
 import io.ktor.client.request.*
@@ -641,6 +642,58 @@ class ApiService {
             setBody(
                 mapOf("billing_id" to billingId.toString())
             )
+        }.body()
+    }
+
+
+    // ---------------- COMMUNITY POSTS ----------------
+    suspend fun getCommunityPosts(): CommunityResponse {
+        val token = AppTokenProvider.getToken()
+
+        println("🌐 API: Fetching community posts")
+
+        return try {
+            val response = client.get("${baseUrl}posts") {
+                header(HttpHeaders.Authorization, "Bearer $token")
+            }
+
+            println("✔️ Posts Status: ${response.status}")
+            response.body()
+
+        } catch (e: Exception) {
+            println("❌ Community Posts Error: ${e.message}")
+            throw e
+        }
+    }
+
+
+    suspend fun createCommunityPost(
+        title: String,
+        body: String,
+        images: List<ByteArray>
+    ): JsonObject {
+
+        val token = AppTokenProvider.getToken()
+
+        return client.submitFormWithBinaryData(
+            url = "${baseUrl}posts",
+            formData = formData {
+                append("title", title)
+                append("body", body)
+
+                images.forEachIndexed { index, bytes ->
+                    append(
+                        key = "media[]",
+                        value = bytes,
+                        headers = Headers.build {
+                            append(HttpHeaders.ContentType, "image/jpeg")
+                            append(HttpHeaders.ContentDisposition, "filename=image_$index.jpg")
+                        }
+                    )
+                }
+            }
+        ) {
+            header(HttpHeaders.Authorization, "Bearer $token")
         }.body()
     }
 
