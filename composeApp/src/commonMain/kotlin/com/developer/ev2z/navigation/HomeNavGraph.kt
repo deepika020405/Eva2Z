@@ -21,6 +21,8 @@ import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.repository.ProductRepository
 import com.developer.ev2z.ui.screens.EditProfile.EditProfileScreen
+import com.developer.ev2z.ui.screens.GeoFencing.GeoFencingScreen
+import com.developer.ev2z.ui.screens.HistoryPlayback.HistoryPlaybackScreen
 import com.developer.ev2z.ui.screens.Profile.ProfileScreen
 import com.developer.ev2z.ui.screens.homeScreen.HomeScreen
 import com.developer.ev2z.ui.screens.homeScreen.HomeViewModel
@@ -101,6 +103,8 @@ class ProfileTab(
     private val onNavigateToPrivacyPolicy: () -> Unit,
     private val onNavigateToTermsConditions: () -> Unit,
     private val onNavigateToChangePassword: () -> Unit,
+    private val onNavigateToGeoFencing: () -> Unit,
+    private val onNavigateToHistoryPlayback: () -> Unit,
     private val onLogout: () -> Unit
 ) : Tab {
     @Composable
@@ -113,6 +117,8 @@ class ProfileTab(
             onPrivacyPolicy = onNavigateToPrivacyPolicy,
             onTermsConditions = onNavigateToTermsConditions,
             onChangePassword = onNavigateToChangePassword,
+            onGeoFencing = onNavigateToGeoFencing,
+            onHistoryPlayback = onNavigateToHistoryPlayback,
             onLogout = onLogout
         )
     }
@@ -145,6 +151,8 @@ fun HomeNavGraph(
     var showManageDevice by remember { mutableStateOf(false) }
     var showPrivacyPolicy by remember { mutableStateOf(false) }
     var showTermsConditions by remember { mutableStateOf(false) }
+    var showGeoFencing by remember { mutableStateOf(false) }
+    var showHistoryPlayback by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         HomeNavGraphContent(
@@ -158,7 +166,9 @@ fun HomeNavGraph(
             onNavigateToManageDevice = { showManageDevice = true },
             onNavigateToPrivacyPolicy = { showPrivacyPolicy = true },
             onNavigateToTermsConditions = { showTermsConditions = true },
-            onNavigateToChangePassword = onNavigateToChangePassword, // ✅ PASS TO PROFILE
+            onNavigateToChangePassword = onNavigateToChangePassword,
+            onNavigateToGeoFencing = { showGeoFencing = true },
+            onNavigateToHistoryPlayback = { showHistoryPlayback = true },
             onLogout = onLogout
         )
 
@@ -200,10 +210,27 @@ fun HomeNavGraph(
                 onBackPressed = { showTermsConditions = false }
             )
         }
+
+        // GeoFencing Screen
+        if (showGeoFencing) {
+            GeoFencingScreen(
+                apiService = apiService,
+                storageManager = storageManager,
+                onBackPressed = { showGeoFencing = false }
+            )
+        }
+
+// History Playback Screen
+        if (showHistoryPlayback) {
+            HistoryPlaybackScreen(
+                apiService = apiService,
+                storageManager = storageManager,
+                onBackPressed = { showHistoryPlayback = false }
+            )
+        }
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeNavGraphContent(
     viewModel: HomeViewModel,
@@ -217,6 +244,8 @@ fun HomeNavGraphContent(
     onNavigateToPrivacyPolicy: () -> Unit,
     onNavigateToTermsConditions: () -> Unit,
     onNavigateToChangePassword: () -> Unit = {},
+    onNavigateToGeoFencing: () -> Unit = {},
+    onNavigateToHistoryPlayback: () -> Unit = {},
     onLogout: () -> Unit
 ) {
     val productRepository = remember { ProductRepository(apiService) }
@@ -236,10 +265,13 @@ fun HomeNavGraphContent(
             onNavigateToManageDevice,
             onNavigateToPrivacyPolicy,
             onNavigateToTermsConditions,
-            onNavigateToChangePassword, // ✅ PASS CALLBACK
+            onNavigateToChangePassword,
+            onNavigateToGeoFencing,
+            onNavigateToHistoryPlayback,
             onLogout
         )
     }
+
     val ordersTab = remember { OrdersTab(shopViewModel, token) }
     val tabs = listOf(homeTab, WalletTab, ordersTab, profileTab)
     val pagerState = rememberPagerState(pageCount = { tabs.size })

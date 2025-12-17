@@ -654,6 +654,37 @@ class ApiService {
         }
     }
 
+    // ---------------- GEO FENCING ----------------
+
+
+    // ---------------- HISTORY PLAYBACK ----------------
+    suspend fun getRouteHistory(
+        token: String,
+        startDate: String,
+        endDate: String,
+        terminalId: String
+    ): RouteHistoryResponse {
+        println("🌐 API: Fetching route history")
+
+        return try {
+            val response = client.post("${baseUrl}route-history") {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(mapOf(
+                    "start_date" to startDate,
+                    "end_date" to endDate,
+                    "terminal_id" to terminalId
+                ))
+            }
+
+            println("✔️ Route History Status: ${response.status}")
+            response.body()
+
+        } catch (e: Exception) {
+            println("❌ Route History Error: ${e.message}")
+            throw e
+        }
+    }
     // ===============================================
     // SHOP / PRODUCT APIs (existing code)
     // ===============================================

@@ -35,7 +35,9 @@ fun ProfileScreen(
     onManageDevice: () -> Unit = {},
     onPrivacyPolicy: () -> Unit = {},
     onTermsConditions: () -> Unit = {},
-    onChangePassword: () -> Unit = {}, // ✅ Parameter exists
+    onChangePassword: () -> Unit = {},
+    onGeoFencing: () -> Unit = {},
+    onHistoryPlayback: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     val viewModel = remember { ProfileViewModel(apiService, storageManager) }
@@ -58,10 +60,10 @@ fun ProfileScreen(
         onGeneralSettings = { /* Navigate to SettingActivity */ },
         onAccountActivity = { /* Navigate to account activity */ },
         onReferAndEarn = { /* Navigate to ReferAndEarnActivity */ },
-        onChangePassword = onChangePassword, // ✅ PASS IT TO CONTENT
+        onChangePassword = onChangePassword,
         onManageDevice = onManageDevice,
-        onAddFence = { /* Navigate to FenceActivity */ },
-        onHistoryPlayback = { /* Navigate to HistoryPlaybackActivity */ },
+        onAddFence = onGeoFencing,
+        onHistoryPlayback = onHistoryPlayback,
         onRateApp = { viewModel.openPlayStore() },
         onFeedback = { viewModel.openFeedback() },
         onPrivacyPolicy = onPrivacyPolicy,
