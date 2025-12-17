@@ -23,46 +23,27 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.BackPressHandler
 
-enum class PasswordScreenMode {
-    CREATE,      // For registration (2 fields)
-    CHANGE       // For updating password (3 fields)
-}
-
 @Composable
 fun PasswordScreen(
-    mode: PasswordScreenMode = PasswordScreenMode.CREATE,
-    title: String = if (mode == PasswordScreenMode.CREATE) "Create Password" else "Change Password",
-    subtitle: String = if (mode == PasswordScreenMode.CREATE)
-        "Create a secure password for your account"
-    else "Update your account password",
-    buttonText: String = if (mode == PasswordScreenMode.CREATE) "Submit" else "Update Password",
+    title: String = "Create Password",
+    subtitle: String = "Create a secure password for your account",
+    buttonText: String = "Submit",
     isLoading: Boolean = false,
     error: String? = null,
-    onPasswordSubmit: (String, String) -> Unit = { _, _ -> }, // For CREATE mode (new, confirm)
-    onChangePasswordSubmit: (String, String, String) -> Unit = { _, _, _ -> }, // For CHANGE mode (current, new, confirm)
+    onPasswordSubmit: (String, String) -> Unit = { _, _ -> }, // For CREATE mode only
     onBack: () -> Unit = {}
 ) {
-    // Common password states
     var newPassword by remember { mutableStateOf("") }
     var confirmPassword by remember { mutableStateOf("") }
     var newPasswordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
-
-    // Change password specific state
-    var currentPassword by remember { mutableStateOf("") }
-    var currentPasswordVisible by remember { mutableStateOf(false) }
 
     var showBackDialog by remember { mutableStateOf(false) }
 
     // Validation
     val isNewPasswordValid = newPassword.length >= 6
     val doPasswordsMatch = newPassword == confirmPassword && confirmPassword.isNotEmpty()
-    val isCurrentPasswordValid = mode == PasswordScreenMode.CREATE || currentPassword.length >= 6
-
-    val isFormValid = when (mode) {
-        PasswordScreenMode.CREATE -> isNewPasswordValid && doPasswordsMatch
-        PasswordScreenMode.CHANGE -> isCurrentPasswordValid && isNewPasswordValid && doPasswordsMatch
-    }
+    val isFormValid = isNewPasswordValid && doPasswordsMatch
 
     val scrollState = rememberScrollState()
 
@@ -138,51 +119,11 @@ fun PasswordScreen(
 
         Spacer(modifier = Modifier.height(48.dp))
 
-        // ✅ CURRENT PASSWORD (Only for CHANGE mode)
-        if (mode == PasswordScreenMode.CHANGE) {
-            OutlinedTextField(
-                value = currentPassword,
-                onValueChange = { currentPassword = it },
-                label = { Text("Current Password*") },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(120.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = Color.LightGray,
-                    focusedBorderColor = Color(0xFF6A9F50)
-                ),
-                visualTransformation = if (currentPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                singleLine = true,
-                trailingIcon = {
-                    IconButton(onClick = { currentPasswordVisible = !currentPasswordVisible }) {
-                        Icon(
-                            imageVector = if (currentPasswordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                            contentDescription = if (currentPasswordVisible) "Hide password" else "Show password"
-                        )
-                    }
-                },
-                isError = currentPassword.isNotEmpty() && currentPassword.length < 6
-            )
-
-            if (currentPassword.isNotEmpty() && currentPassword.length < 6) {
-                Text(
-                    text = "Password must be at least 6 characters",
-                    color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, top = 4.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-        }
-
         // ✅ NEW PASSWORD
         OutlinedTextField(
             value = newPassword,
             onValueChange = { newPassword = it },
-            label = { Text(if (mode == PasswordScreenMode.CHANGE) "New Password*" else "Password*") },
+            label = { Text("Password*") },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(120.dp),
             colors = OutlinedTextFieldDefaults.colors(
@@ -214,28 +155,13 @@ fun PasswordScreen(
             )
         }
 
-        // Check if new password is different from current (CHANGE mode only)
-        if (mode == PasswordScreenMode.CHANGE &&
-            currentPassword.isNotEmpty() &&
-            newPassword.isNotEmpty() &&
-            currentPassword == newPassword) {
-            Text(
-                text = "New password must be different from current password",
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 16.dp, top = 4.dp)
-            )
-        }
-
         Spacer(modifier = Modifier.height(16.dp))
 
         // ✅ CONFIRM PASSWORD
         OutlinedTextField(
             value = confirmPassword,
             onValueChange = { confirmPassword = it },
-            label = { Text(if (mode == PasswordScreenMode.CHANGE) "Confirm New Password*" else "Confirm Password*") },
+            label = { Text("Confirm Password*") },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(120.dp),
             colors = OutlinedTextFieldDefaults.colors(
@@ -273,14 +199,7 @@ fun PasswordScreen(
         Button(
             onClick = {
                 if (isFormValid) {
-                    when (mode) {
-                        PasswordScreenMode.CREATE -> {
-                            onPasswordSubmit(newPassword, confirmPassword)
-                        }
-                        PasswordScreenMode.CHANGE -> {
-                            onChangePasswordSubmit(currentPassword, newPassword, confirmPassword)
-                        }
-                    }
+                    onPasswordSubmit(newPassword, confirmPassword)
                 }
             },
             modifier = Modifier

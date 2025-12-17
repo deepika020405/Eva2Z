@@ -1,4 +1,4 @@
-package com.developer.ev2z.ui.screens.Auth
+package com.developer.ev2z.ui.screens.ChangePassword
 
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.network.ApiService

@@ -1,4 +1,4 @@
-// HomeNavGraph.kt - UPDATED WITH PRIVACY/TERMS SCREENS
+// HomeNavGraph.kt - FINAL FIXED VERSION
 package com.developer.ev2z.navigation
 
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -14,7 +14,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.navigator.tab.*
@@ -32,7 +31,7 @@ import com.developer.ev2z.ui.screens.PrivacyPolicy_TandC.WebViewType
 import com.developer.ev2z.ui.screens.market_screen.ShopViewModel
 import kotlinx.coroutines.launch
 
-// ------------------ TABS -------------------
+// ------------------ TABS (same as before) -------------------
 
 class HomeTab(
     private val viewModel: HomeViewModel,
@@ -68,35 +67,13 @@ object WalletTab : Tab {
         )
 }
 
-//class OrdersTab(
-//    private val shopViewModel: ShopViewModel,
-//    private val token: String
-//) : Tab {
-//    @Composable
-//    override fun Content() = ShopScreenHost(
-//        shopViewModel
-//        // If ShopScreenHost accepts a viewModel param, pass it,
-//        // otherwise it will create its own — adapt to your implementation.
-//    )
-//
-//    override val options: TabOptions
-//        @Composable get() = TabOptions(
-//            index = 2u,
-//            title = "Shop",
-//            icon = rememberVectorPainter(Icons.Default.ShoppingCart)
-//        )
-//}
-
-
 class OrdersTab(
     private val shopViewModel: ShopViewModel,
     private val token: String
 ) : Tab {
     @Composable
     override fun Content() {
-        // ✅ WRAP with Navigator so LocalNavigator works
         Navigator(screen = ShopScreenWrapper(shopViewModel))
-//        Navigator(screen = ShopScreenWrapper(shopViewModel))
     }
 
     override val options: TabOptions
@@ -107,7 +84,6 @@ class OrdersTab(
         )
 }
 
-// ✅ NEW: Wrapper Screen for Shop
 class ShopScreenWrapper(
     private val viewModel: ShopViewModel
 ) : Screen {
@@ -116,7 +92,7 @@ class ShopScreenWrapper(
         ShopScreenHost(viewModel = viewModel)
     }
 }
-// ProfileTab definition - ADD onChangePassword parameter
+
 class ProfileTab(
     private val apiService: ApiService,
     private val storageManager: StorageManager,
@@ -124,7 +100,7 @@ class ProfileTab(
     private val onNavigateToManageDevice: () -> Unit,
     private val onNavigateToPrivacyPolicy: () -> Unit,
     private val onNavigateToTermsConditions: () -> Unit,
-    private val onNavigateToChangePassword: () -> Unit, // ✅ ALREADY HERE
+    private val onNavigateToChangePassword: () -> Unit,
     private val onLogout: () -> Unit
 ) : Tab {
     @Composable
@@ -136,7 +112,7 @@ class ProfileTab(
             onManageDevice = onNavigateToManageDevice,
             onPrivacyPolicy = onNavigateToPrivacyPolicy,
             onTermsConditions = onNavigateToTermsConditions,
-            onChangePassword = onNavigateToChangePassword, // ✅ PASS IT HERE
+            onChangePassword = onNavigateToChangePassword,
             onLogout = onLogout
         )
     }
@@ -160,7 +136,7 @@ fun HomeNavGraph(
     token: String,
     onNavigateToAddDevice: () -> Unit,
     onNavigateToDeviceReport: () -> Unit,
-    onNavigateToChangePassword: () -> Unit = {},
+    onNavigateToChangePassword: () -> Unit = {}, // ✅ RECEIVE FROM APP
     onLogout: () -> Unit = {}
 ) {
     SetupStatusBar()
@@ -169,7 +145,6 @@ fun HomeNavGraph(
     var showManageDevice by remember { mutableStateOf(false) }
     var showPrivacyPolicy by remember { mutableStateOf(false) }
     var showTermsConditions by remember { mutableStateOf(false) }
-    var showChangePassword by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         HomeNavGraphContent(
@@ -183,7 +158,7 @@ fun HomeNavGraph(
             onNavigateToManageDevice = { showManageDevice = true },
             onNavigateToPrivacyPolicy = { showPrivacyPolicy = true },
             onNavigateToTermsConditions = { showTermsConditions = true },
-            onNavigateToChangePassword ={showChangePassword = true},
+            onNavigateToChangePassword = onNavigateToChangePassword, // ✅ PASS TO PROFILE
             onLogout = onLogout
         )
 
@@ -202,9 +177,7 @@ fun HomeNavGraph(
                 apiService = apiService,
                 storageManager = storageManager,
                 onBackClick = { showManageDevice = false },
-                onProfileClick = {
-                    showManageDevice = false
-                },
+                onProfileClick = { showManageDevice = false },
                 onAddDeviceClick = {
                     showManageDevice = false
                     onNavigateToAddDevice()
@@ -246,15 +219,10 @@ fun HomeNavGraphContent(
     onNavigateToChangePassword: () -> Unit = {},
     onLogout: () -> Unit
 ) {
-    // === Create Shop repository + viewmodel here (or inject via DI) ===
     val productRepository = remember { ProductRepository(apiService) }
-
-    // Token provider lambda — adapt to your StorageManager API if the method differs
     val tokenProvider: () -> String = remember {
-        { storageManager.getString("token","") } // <-- replace getToken() with actual method if different
+        { storageManager.getString("token","") }
     }
-
-    // Create ShopViewModel (remember so it's not recreated every recomposition)
     val shopViewModel = remember {
         ShopViewModel(repo = productRepository, tokenProvider = tokenProvider)
     }
@@ -268,7 +236,7 @@ fun HomeNavGraphContent(
             onNavigateToManageDevice,
             onNavigateToPrivacyPolicy,
             onNavigateToTermsConditions,
-            onNavigateToChangePassword,
+            onNavigateToChangePassword, // ✅ PASS CALLBACK
             onLogout
         )
     }
@@ -321,7 +289,6 @@ fun CustomBottomNavBar(
             NavigationBarItem(
                 selected = selected,
                 onClick = { onTabSelected(index) },
-
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = green,
                     selectedTextColor = green,
@@ -329,14 +296,12 @@ fun CustomBottomNavBar(
                     unselectedIconColor = Color.Gray,
                     unselectedTextColor = Color.Gray
                 ),
-
                 icon = {
                     Icon(
                         painter = tab.options.icon!!,
                         contentDescription = tab.options.title
                     )
                 },
-
                 label = {
                     Text(
                         text = tab.options.title,

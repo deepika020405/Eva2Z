@@ -17,7 +17,7 @@ import com.developer.ev2z.data.local.createStorageManager
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.repository.AuthRepository
 import com.developer.ev2z.ui.screens.Auth.AuthPagerScreen
-import com.developer.ev2z.ui.screens.Auth.UpdatePasswordViewModel
+import com.developer.ev2z.ui.screens.ChangePassword.UpdatePasswordViewModel
 import com.developer.ev2z.ui.screens.homeScreen.HomeViewModel
 import com.developer.ev2z.viewmodel.AuthViewModel
 import com.developer.ev2z.navigation.HomeNavGraph
@@ -27,12 +27,12 @@ import com.developer.ev2z.ui.screens.AddDevice.AddDeviceViewModel
 import com.developer.ev2z.ui.screens.AddDevice.AddDeviceResult
 import com.developer.ev2z.ui.screens.AddDevice.BottomSheet
 import com.developer.ev2z.ui.screens.AddDeviceSuccess.AddDeviceSuccessScreen
+import com.developer.ev2z.ui.screens.ChangePassword.ChangePasswordScreen
 import com.developer.ev2z.ui.screens.device_Report.DeviceReportScreen
 import com.developer.ev2z.ui.screens.device_Report.DeviceReportViewModel
 import com.developer.ev2z.ui.screens.device_Report.PlatformAddressProvider
 import com.developer.ev2z.ui.screens.AuthFlows.ForgetPasswordFlow
 import com.developer.ev2z.ui.screens.AuthFlows.RegistrationFlow
-import com.developer.ev2z.ui.screens.AuthFlows.ChangePasswordFlow
 import kotlinx.coroutines.delay
 
 @Composable
@@ -135,18 +135,15 @@ fun App() {
                 SplashScreen()
             }
 
-            // ✅ NEW: Change Password Flow
+            // UPDATE showChangePassword rendering
             showChangePassword -> {
-                println("📱 Rendering: Change Password Flow")
-                ChangePasswordFlow(
-                    viewModel = updatePasswordViewModel,
-                    onBack = {
+                println("📱 Rendering: Change Password Screen")
+                ChangePasswordScreen(
+                    apiService = apiService,
+                    storageManager = storage,
+                    onBackPressed = {
+                        println("🔙 Back from Change Password")
                         showChangePassword = false
-                        updatePasswordViewModel.resetState()
-                    },
-                    onSuccess = {
-                        showChangePassword = false
-                        updatePasswordViewModel.resetState()
                     }
                 )
             }
