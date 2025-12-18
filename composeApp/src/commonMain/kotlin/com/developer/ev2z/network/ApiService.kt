@@ -16,7 +16,10 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 class ApiService {
 
@@ -697,4 +700,30 @@ class ApiService {
         }.body()
     }
 
+
+    // ---------------- POST LIKE ----------------
+    suspend fun togglePostLike(postId: Int): Boolean {
+
+        val token = AppTokenProvider.getToken()
+        val url = "${baseUrl}posts/$postId/like"
+
+        println("🌐 API: Toggle like for postId=$postId")
+
+        return try {
+            val response = client.post(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+            }
+
+            val raw = response.bodyAsText()
+            println("📥 LIKE RAW RESPONSE = $raw")
+
+            // response: { "liked": true/false }
+            val json = Json.parseToJsonElement(raw).jsonObject
+            json["liked"]?.jsonPrimitive?.boolean ?: false
+
+        } catch (e: Exception) {
+            println("❌ Like API Error: ${e.message}")
+            throw e
+        }
+    }
 }

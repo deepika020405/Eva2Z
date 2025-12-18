@@ -23,6 +23,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -46,6 +48,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import cafe.adriel.voyager.core.screen.Screen
+import cafe.adriel.voyager.navigator.LocalNavigator
+import cafe.adriel.voyager.navigator.currentOrThrow
 import coil3.compose.AsyncImage
 import com.developer.ev2z.response.Post
 import com.developer.ev2z.response.Users
@@ -53,7 +57,8 @@ import com.developer.ev2z.response.Users
 @Composable
 fun CommunityScreen(
     posts: List<Post>,
-    onCreatePostClick: () -> Unit
+    onCreatePostClick: () -> Unit,
+    onLikeClick: (Int) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier
@@ -67,7 +72,11 @@ fun CommunityScreen(
         }
 
         items(posts) { post ->
-            PostItem(post,BASE_IMAGE_URL)
+            PostItem(
+                post = post,
+                BASE_IMAGE_URL = BASE_IMAGE_URL,
+                onLikeClick = onLikeClick   // ✅ pass-through
+            )
         }
     }
 }
@@ -113,7 +122,7 @@ fun CreatePostCard(onClick: () -> Unit) {
 
 
 @Composable
-fun PostItem(post: Post,BASE_IMAGE_URL: String) {
+fun PostItem(post: Post,BASE_IMAGE_URL: String,onLikeClick: (Int) -> Unit) {
     Card(
         modifier = Modifier
             .padding(horizontal = 12.dp, vertical = 6.dp)
@@ -144,8 +153,8 @@ fun PostItem(post: Post,BASE_IMAGE_URL: String) {
             }
 
             PostFooter(
-                likes = post.likes_count,
-                comments = post.comments_count
+                post = post,
+                onLikeClick = onLikeClick
             )
         }
     }
@@ -285,148 +294,55 @@ fun FullScreenImage(
     }
 }
 @Composable
-fun PostFooter(likes: Int, comments: Int) {
+fun PostFooter(
+    post: Post,
+    onLikeClick: (Int) -> Unit
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("👍 $likes Likes", color = Color.Gray)
-        Text("💬 $comments Comments", color = Color.Gray)
-    }
-}
 
-
-
-
-@Composable
-fun CreatePostDialog(
-    onDismiss: () -> Unit,
-    onPostClick: (title: String, body: String, images: List<ByteArray>) -> Unit
-) {
-    var title by remember { mutableStateOf("") }
-    var body by remember { mutableStateOf("") }
-    var images by remember { mutableStateOf<List<ByteArray>>(emptyList()) }
-
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(16.dp)
-            ) {
-
-                Text(
-                    "Create Post",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Spacer(Modifier.height(12.dp))
-
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    placeholder = { Text("Title (optional)") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(Modifier.height(8.dp))
-
-                OutlinedTextField(
-                    value = body,
-                    onValueChange = { body = it },
-                    placeholder = { Text("What's on your mind?") },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp)
-                )
-
-                Spacer(Modifier.height(12.dp))
-
-                // 📷 Image Preview
-                if (images.isNotEmpty()) {
-                    LazyRow {
-                        itemsIndexed(images) { index, _ ->
-                            Box(
-                                modifier = Modifier
-                                    .size(80.dp)
-                                    .padding(end = 8.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color.LightGray),
-                                contentAlignment = Alignment.TopEnd
-                            ) {
-                                Text(
-                                    "🖼",
-                                    modifier = Modifier.align(Alignment.Center)
-                                )
-
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = "Remove",
-                                    modifier = Modifier
-                                        .size(18.dp)
-                                        .clickable {
-                                            images = images.toMutableList().also {
-                                                it.removeAt(index)
-                                            }
-                                        }
-                                )
-                            }
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                }
-
-                // 📎 Attach button
-                TextButton(
-                    enabled = images.size < 5,
-                    onClick = {
-                        // Android me gallery / camera launcher yahan lagega
-                        // Abhi placeholder
-                    }
-                ) {
-                    Text("📎 Attach images (${images.size}/5)")
-                }
-
-                Spacer(Modifier.height(16.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    TextButton(onClick = onDismiss) {
-                        Text("Cancel")
-                    }
-
-                    Spacer(Modifier.width(8.dp))
-
-                    Button(
-                        enabled = body.isNotBlank(),
-                        onClick = {
-                            onPostClick(title, body, images)
-                        }
-                    ) {
-                        Text("Post")
-                    }
-                }
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.clickable {
+                onLikeClick(post.id)
             }
+        ) {
+            Icon(
+                imageVector =
+                    if (post.liked) Icons.Filled.Favorite
+                    else Icons.Outlined.FavoriteBorder,
+                contentDescription = "Like",
+                tint = if (post.liked) Color.Red else Color.Gray
+            )
+
+            Spacer(Modifier.width(6.dp))
+
+            Text(
+                text = post.likes_count.toString(),
+                color = Color.Gray
+            )
         }
+
+        Text(
+            text = "💬 ${post.comments_count} Comments",
+            color = Color.Gray
+        )
     }
 }
-
 
 class CommunityScreenWrapper : Screen {
 
     @Composable
     override fun Content() {
 
-        var showCreateDialog by remember { mutableStateOf(false) }
 
         val viewModel = CommunityViewModelProvider.viewModel
         val state = viewModel.state
+        val navigator = LocalNavigator.currentOrThrow
+
 
         // 👇 refresh-aware API call
         val refreshKey = viewModel.observeRefreshKey()
@@ -458,24 +374,16 @@ class CommunityScreenWrapper : Screen {
                 CommunityScreen(
                     posts = state.posts,
                     onCreatePostClick = {
-                        // future me yahin se trigger hoga
-                        showCreateDialog = true
+                        navigator.push(
+                            CreatePostScreen()
+                        )
+                    },
+                    onLikeClick = { postId ->
+                        viewModel.toggleLike(postId)
                     }
                 )
             }
 
-        }
-        if (showCreateDialog) {
-            CreatePostDialog(
-                onDismiss = { showCreateDialog = false },
-                onPostClick = { title, body, images ->
-                    // 🔥 API CALL HERE
-                     viewModel.createPost(title, body, images)
-                    // success → refresh
-                    viewModel.refreshPosts()
-                    showCreateDialog = false
-                }
-            )
         }
     }
 }

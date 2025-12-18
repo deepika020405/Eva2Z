@@ -17,6 +17,7 @@ data class Post(
     val created_at: String,
     val comments_count: Int,
     val likes_count: Int,
+    val liked: Boolean,
     val user: Users
 )
 

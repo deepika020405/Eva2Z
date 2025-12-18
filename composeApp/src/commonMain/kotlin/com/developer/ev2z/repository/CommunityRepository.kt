@@ -22,4 +22,9 @@ class CommunityRepository(
     ) {
         apiService.createCommunityPost(title, body, images)
     }
+
+
+    suspend fun toggleLike(postId: Int): Boolean {
+        return apiService.togglePostLike(postId)
+    }
 }

@@ -75,4 +75,57 @@ class CommunityViewModel(
             }
         }
     }
+
+
+
+    fun toggleLike(postId: Int) {
+
+        // 🔥 Optimistic UI (instant feel)
+        val currentPost = _state.posts.find { it.id == postId } ?: return
+
+        val optimisticLiked = !currentPost.liked
+        val optimisticCount =
+            if (optimisticLiked) currentPost.likes_count + 1
+            else maxOf(0, currentPost.likes_count - 1)
+
+        _state = _state.copy(
+            posts = _state.posts.map { post ->
+                if (post.id == postId) {
+                    post.copy(
+                        liked = optimisticLiked,
+                        likes_count = optimisticCount
+                    )
+                } else post
+            }
+        )
+
+        // 🔁 API call
+        scope.launch {
+            try {
+                val serverLiked = repository.toggleLike(postId)
+
+                // 🔄 Sync with server response
+                _state = _state.copy(
+                    posts = _state.posts.map { post ->
+                        if (post.id == postId) {
+                            post.copy(
+                                liked = serverLiked,
+                                likes_count =
+                                    if (serverLiked) optimisticCount
+                                    else maxOf(0, optimisticCount - 1)
+                            )
+                        } else post
+                    }
+                )
+
+            } catch (e: Exception) {
+                // ❌ Revert on error
+                _state = _state.copy(
+                    posts = _state.posts.map { post ->
+                        if (post.id == postId) currentPost else post
+                    }
+                )
+            }
+        }
+    }
 }
