@@ -5,9 +5,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.interop.UIKitView
 import com.developer.ev2z.response.RoutePoint
-import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.*
 import platform.CoreLocation.CLLocationCoordinate2DMake
 import platform.MapKit.*
+import platform.UIKit.UIEdgeInsetsMake
 
 @OptIn(ExperimentalForeignApi::class)
 @Composable
@@ -24,43 +25,42 @@ actual fun HistoryMapView(
             val mapView = MKMapView()
             mapView.setShowsUserLocation(false)
 
-            // ✅ Create polyline coordinates
             val coordinates = routePoints.mapNotNull { point ->
                 val lat = point.getLatDouble()
                 val lng = point.getLngDouble()
                 if (lat != null && lng != null) {
                     CLLocationCoordinate2DMake(lat, lng)
                 } else null
-            }.toTypedArray()
+            }
 
             if (coordinates.isNotEmpty()) {
-                // ✅ Add polyline overlay
-                val polyline = MKPolyline.polylineWithCoordinates(
-                    coordinates = coordinates,
-                    count = coordinates.size.toULong()
-                )
-                mapView.addOverlay(polyline)
+                memScoped {
+                    val coordsPointer = allocArrayOf(coordinates.toTypedArray())
+                    val polyline = MKPolyline.polylineWithCoordinates(
+                        coords = coordsPointer,
+                        count = coordinates.size.toULong()
+                    )
+                    mapView.addOverlay(polyline)
 
-                // ✅ Fit map to show entire route
-                mapView.setVisibleMapRect(
-                    polyline.boundingMapRect,
-                    animated = false
-                )
+                    val padding = UIEdgeInsetsMake(50.0, 50.0, 50.0, 50.0)
+                    mapView.setVisibleMapRect(
+                        polyline.boundingMapRect,
+                        edgePadding = padding,
+                        animated = false
+                    )
+                }
             }
 
             mapView
         },
         update = { mapView ->
-            // ✅ Update marker position during playback
             if (currentIndex in routePoints.indices) {
                 val point = routePoints[currentIndex]
                 val lat = point.getLatDouble() ?: return@UIKitView
                 val lng = point.getLngDouble() ?: return@UIKitView
 
-                // Remove old annotations
                 mapView.removeAnnotations(mapView.annotations)
 
-                // Add current position marker
                 val annotation = MKPointAnnotation().apply {
                     setCoordinate(CLLocationCoordinate2DMake(lat, lng))
                     setTitle("Point ${currentIndex + 1}")
@@ -68,7 +68,6 @@ actual fun HistoryMapView(
                 }
                 mapView.addAnnotation(annotation)
 
-                // Center on current point
                 val region = MKCoordinateRegionMake(
                     annotation.coordinate,
                     MKCoordinateSpanMake(0.01, 0.01)

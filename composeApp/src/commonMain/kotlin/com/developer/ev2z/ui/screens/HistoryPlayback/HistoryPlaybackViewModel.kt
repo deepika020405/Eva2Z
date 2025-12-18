@@ -8,6 +8,7 @@ import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.repository.HistoryPlaybackRepository
 import com.developer.ev2z.response.Device
 import com.developer.ev2z.response.RoutePoint
+import io.ktor.util.date.getTimeMillis
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,21 +41,20 @@ class HistoryPlaybackViewModel(
     private val _selectedDevice = MutableStateFlow<Device?>(null)
     val selectedDevice: StateFlow<Device?> = _selectedDevice.asStateFlow()
 
-    // ✅ DATE RANGE: Start and End Date
-    private val today = Clock.System.now()
+    // ✅ FIXED: Initialize with YESTERDAY's date
+    private val today = Instant.fromEpochMilliseconds(getTimeMillis())
         .toLocalDateTime(TimeZone.currentSystemDefault())
         .date
 
-    private val _startDate = MutableStateFlow(today.toString())
+    private val yesterday = today.minus(1, DateTimeUnit.DAY)
+
+    private val _startDate = MutableStateFlow(yesterday.toString())
     val startDate: StateFlow<String> = _startDate.asStateFlow()
 
-    private val _endDate = MutableStateFlow(today.toString())
+    private val _endDate = MutableStateFlow(yesterday.toString())
     val endDate: StateFlow<String> = _endDate.asStateFlow()
 
-    // ✅ MAX DATE: Yesterday
     val maxSelectableDate = today.minus(1, DateTimeUnit.DAY)
-
-    // ✅ MIN DATE: 3 months ago
     val minSelectableDate = today.minus(3, DateTimeUnit.MONTH)
 
     private val _routePoints = MutableStateFlow<List<RoutePoint>>(emptyList())
@@ -169,6 +169,9 @@ class HistoryPlaybackViewModel(
 
                         if (validPoints.isEmpty()) {
                             _showNoDataDialog.value = true
+                            _routePoints.value = emptyList()
+                            _totalDistance.value = 0.0
+                            _averageSpeed.value = 0.0
                             _uiState.value = HistoryPlaybackUiState.Idle
                         } else {
                             _routePoints.value = validPoints
@@ -177,12 +180,18 @@ class HistoryPlaybackViewModel(
                         }
                     },
                     onFailure = { error ->
+                        _routePoints.value = emptyList()
+                        _totalDistance.value = 0.0
+                        _averageSpeed.value = 0.0
                         _uiState.value = HistoryPlaybackUiState.Error(
                             error.message ?: "Failed to fetch history"
                         )
                     }
                 )
             } catch (e: Exception) {
+                _routePoints.value = emptyList()
+                _totalDistance.value = 0.0
+                _averageSpeed.value = 0.0
                 _uiState.value = HistoryPlaybackUiState.Error(e.message ?: "Unknown error")
             } finally {
                 _isLoading.value = false
@@ -270,6 +279,26 @@ class HistoryPlaybackViewModel(
 
     fun seekTo(index: Int) {
         _currentPlaybackIndex.value = index.coerceIn(0, _routePoints.value.size - 1)
+    }
+
+    fun navigateToPreviousDate() {
+        val currentDate = LocalDate.parse(_startDate.value)
+        val previousDate = currentDate.minus(1, DateTimeUnit.DAY)
+
+        if (previousDate >= minSelectableDate) {
+            _startDate.value = previousDate.toString()
+            _endDate.value = previousDate.toString()
+        }
+    }
+
+    fun navigateToNextDate() {
+        val currentDate = LocalDate.parse(_startDate.value)
+        val nextDate = currentDate.plus(1, DateTimeUnit.DAY)
+
+        if (nextDate <= maxSelectableDate) {
+            _startDate.value = nextDate.toString()
+            _endDate.value = nextDate.toString()
+        }
     }
 
     override fun onCleared() {

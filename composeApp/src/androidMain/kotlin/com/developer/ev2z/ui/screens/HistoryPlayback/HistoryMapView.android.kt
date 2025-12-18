@@ -18,7 +18,6 @@ actual fun HistoryMapView(
 ) {
     if (routePoints.isEmpty()) return
 
-    // Get valid coordinates
     val latLngList = routePoints.mapNotNull { point ->
         val lat = point.getLatDouble()
         val lng = point.getLngDouble()
@@ -37,7 +36,6 @@ actual fun HistoryMapView(
         position = CameraPosition.fromLatLngZoom(currentPoint, 15f)
     }
 
-    // ✅ Move camera to current playback position
     LaunchedEffect(currentIndex) {
         if (currentIndex in latLngList.indices) {
             cameraPositionState.animate(
@@ -53,14 +51,12 @@ actual fun HistoryMapView(
         properties = MapProperties(isMyLocationEnabled = false),
         uiSettings = MapUiSettings(zoomControlsEnabled = true)
     ) {
-        // ✅ Draw route polyline
         Polyline(
             points = latLngList,
             color = androidx.compose.ui.graphics.Color(0xFF4CAF50),
             width = 10f
         )
 
-        // ✅ Current position marker (animated)
         Marker(
             state = MarkerState(position = currentPoint),
             title = "Point ${currentIndex + 1}",
