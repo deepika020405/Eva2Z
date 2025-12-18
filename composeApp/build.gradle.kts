@@ -106,6 +106,8 @@ kotlin {
 //            implementation(libs.components.map)
 //            implementation(libs.maplibre)
 //            implementation(libs.accompanist.pager)
+            implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
+
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
