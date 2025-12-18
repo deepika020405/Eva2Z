@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -46,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -58,6 +60,9 @@ import coil3.compose.AsyncImage
 import com.developer.ev2z.response.Comment
 import com.developer.ev2z.response.Post
 import com.developer.ev2z.response.Users
+import io.ktor.util.date.getTimeMillis
+import kotlinx.datetime.*
+import kotlin.time.ExperimentalTime
 
 @Composable
 fun CommunityScreen(
@@ -69,7 +74,7 @@ fun CommunityScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF5F6FA))
+            .background(Color(0xFFf2f5f0))
     ) {
          val BASE_IMAGE_URL = "https://gps.eva2z.in"
 
@@ -97,7 +102,10 @@ fun CreatePostCard(onClick: () -> Unit) {
             .fillMaxWidth()
             .clickable { onClick() },
         shape = RoundedCornerShape(14.dp),
-        elevation = CardDefaults.cardElevation(4.dp)
+        elevation = CardDefaults.cardElevation(4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White
+        )
     ) {
         Row(
             modifier = Modifier.padding(14.dp),
@@ -135,7 +143,10 @@ fun PostItem(post: Post,BASE_IMAGE_URL: String,onLikeClick: (Int) -> Unit,onComm
             .padding(horizontal = 12.dp, vertical = 6.dp)
             .fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
-        elevation = CardDefaults.cardElevation(3.dp)
+        elevation = CardDefaults.cardElevation(3.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White
+        )
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
 
@@ -167,6 +178,195 @@ fun PostItem(post: Post,BASE_IMAGE_URL: String,onLikeClick: (Int) -> Unit,onComm
         }
     }
 }
+@Composable
+fun PostImages(
+    images: List<String>,
+    BASE_IMAGE_URL: String
+) {
+    if (images.isEmpty()) return
+
+    val urls = images.map { "$BASE_IMAGE_URL$it" }
+    var previewImage by remember { mutableStateOf<String?>(null) }
+
+    when (urls.size) {
+        1 -> SingleImage(urls[0]) { previewImage = it }
+        2 -> TwoImages(urls) { previewImage = it }
+        3 -> ThreeImages(urls) { previewImage = it }
+        else -> FourPlusImages(urls) { previewImage = it }
+    }
+
+    previewImage?.let {
+        FullScreenImage(
+            imageUrl = it,
+            onDismiss = { previewImage = null }
+        )
+    }
+}
+
+@Composable
+fun SingleImage(
+    url: String,
+    onClick: (String) -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(220.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .clipToBounds()
+            .clickable { onClick(url) }
+    ) {
+        NetworkImage(
+            url = url,
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
+
+
+
+@Composable
+fun TwoImages(
+    urls: List<String>,
+    onClick: (String) -> Unit
+) {
+    Row {
+        urls.take(2).forEach { url ->
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(180.dp)
+                    .padding(end = 4.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onClick(url) }
+                        .clipToBounds()
+                ) {
+                    NetworkImage(
+                        url = url,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
+        }
+    }
+}
+
+
+@Composable
+fun ThreeImages(
+    urls: List<String>,
+    onClick: (String) -> Unit
+) {
+    Column {
+        Row {
+            urls.take(2).forEach { url ->
+                NetworkImage(
+                    url = url,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(140.dp)
+                        .padding(end = 4.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onClick(url) }
+                )
+            }
+        }
+
+        Spacer(Modifier.height(4.dp))
+
+        NetworkImage(
+            url = urls[2],
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(180.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .clickable { onClick(urls[2]) }
+        )
+    }
+}
+
+@Composable
+fun FourPlusImages(
+    urls: List<String>,
+    onClick: (String) -> Unit
+) {
+    Column {
+        Row {
+            ImageCell(urls[0], onClick)
+            ImageCell(urls[1], onClick)
+        }
+
+        Spacer(Modifier.height(4.dp))
+
+        Row {
+            ImageCell(urls[2], onClick)
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(140.dp)
+                    .padding(start = 4.dp)
+                    .clip(RoundedCornerShape(12.dp))   // ✅ ONE CLIP ONLY
+                    .clickable { onClick(urls[3]) }
+            ) {
+                NetworkImage(
+                    url = urls[3],
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.55f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "+${urls.size - 3}",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.headlineMedium
+                    )
+                }
+            }
+
+        }
+    }
+}
+
+@Composable
+private fun RowScope.ImageCell(
+    url: String,
+    onClick: (String) -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .weight(1f)
+            .height(140.dp)
+            .padding(end = 4.dp)              // ✅ padding OUTSIDE
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color.LightGray)
+                .clickable { onClick(url) }
+                .clipToBounds()               // 🔥 MOST IMPORTANT
+        ) {
+            NetworkImage(
+                url = url,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
+    }
+}
+
+
+
+
 
 
 @Composable
@@ -211,52 +411,49 @@ fun PostHeader(
         Column {
             Text(text = user.name, fontWeight = FontWeight.SemiBold)
             Text(
-                text = createdAt.take(10),
+                text = formatPostDateCmp(createdAt),
                 style = MaterialTheme.typography.labelSmall,
                 color = Color.Gray
             )
+
         }
     }
 }
 
 
+@OptIn(ExperimentalTime::class)
+fun formatPostDateCmp(apiDate: String): String {
+    return try {
+        val postDate = LocalDate.parse(apiDate.take(10))
 
-
-@Composable
-fun PostImages(
-    images: List<String>?,
-    BASE_IMAGE_URL: String
-) {
-    if (images.isNullOrEmpty()) return   // ✅ visibility hata di
-
-    var previewImage by remember { mutableStateOf<String?>(null) }
-
-    LazyRow {
-        items(images) { image ->
-
-            val fullUrl = "$BASE_IMAGE_URL$image"
-
-            NetworkImage(
-                url = fullUrl,
-                modifier = Modifier
-                    .padding(end = 8.dp)
-                    .size(160.dp)
-                    .clip(RoundedCornerShape(12.dp)) // 👈 side radius
-                    .clickable {
-                        previewImage = fullUrl       // 👈 fullscreen open
-                    }
-            )
-        }
-    }
-
-    // Fullscreen overlay
-    previewImage?.let {
-        FullScreenImage(
-            imageUrl = it,
-            onDismiss = { previewImage = null }
+        val now = Instant.fromEpochMilliseconds(
+            getTimeMillis()
         )
+
+
+        val today = now
+            .toLocalDateTime(TimeZone.currentSystemDefault())
+            .date
+
+        val yesterday = today.minus(1, DateTimeUnit.DAY)
+
+        when {
+            postDate == today -> "Today"
+            postDate == yesterday -> "Yesterday"
+            else -> {
+                val day = postDate.dayOfMonth.toString().padStart(2, '0')
+                val month = postDate.monthNumber.toString().padStart(2, '0')
+                val year = postDate.year
+                "$day-$month-$year"
+            }
+        }
+    } catch (e: Exception) {
+        apiDate.take(10)
     }
 }
+
+
+
 
 @Composable
 fun FullScreenImage(
