@@ -8,9 +8,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -28,8 +30,10 @@ import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -51,6 +55,7 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import coil3.compose.AsyncImage
+import com.developer.ev2z.response.Comment
 import com.developer.ev2z.response.Post
 import com.developer.ev2z.response.Users
 
@@ -58,7 +63,8 @@ import com.developer.ev2z.response.Users
 fun CommunityScreen(
     posts: List<Post>,
     onCreatePostClick: () -> Unit,
-    onLikeClick: (Int) -> Unit
+    onLikeClick: (Int) -> Unit,
+    onCommentClick: (Int) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier
@@ -75,7 +81,8 @@ fun CommunityScreen(
             PostItem(
                 post = post,
                 BASE_IMAGE_URL = BASE_IMAGE_URL,
-                onLikeClick = onLikeClick   // ✅ pass-through
+                onLikeClick = onLikeClick,
+                onCommentClick = onCommentClick
             )
         }
     }
@@ -122,7 +129,7 @@ fun CreatePostCard(onClick: () -> Unit) {
 
 
 @Composable
-fun PostItem(post: Post,BASE_IMAGE_URL: String,onLikeClick: (Int) -> Unit) {
+fun PostItem(post: Post,BASE_IMAGE_URL: String,onLikeClick: (Int) -> Unit,onCommentClick: (Int) -> Unit) {
     Card(
         modifier = Modifier
             .padding(horizontal = 12.dp, vertical = 6.dp)
@@ -154,7 +161,8 @@ fun PostItem(post: Post,BASE_IMAGE_URL: String,onLikeClick: (Int) -> Unit) {
 
             PostFooter(
                 post = post,
-                onLikeClick = onLikeClick
+                onLikeClick = onLikeClick,
+                onCommentClick = onCommentClick
             )
         }
     }
@@ -296,7 +304,8 @@ fun FullScreenImage(
 @Composable
 fun PostFooter(
     post: Post,
-    onLikeClick: (Int) -> Unit
+    onLikeClick: (Int) -> Unit,
+    onCommentClick: (Int) -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -328,8 +337,179 @@ fun PostFooter(
 
         Text(
             text = "💬 ${post.comments_count} Comments",
-            color = Color.Gray
+            color = Color.Gray,
+            modifier = Modifier.clickable {
+                onCommentClick(post.id)
+            }
         )
+    }
+}
+
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CommentBottomSheet(
+    postId: Int,
+    viewModel: CommunityViewModel,
+    onDismiss: () -> Unit
+) {
+
+    val state = viewModel.state
+    var input by remember { mutableStateOf("") }
+
+    LaunchedEffect(postId) {
+        viewModel.load(postId)
+    }
+
+//    ModalBottomSheet(onDismissRequest = onDismiss) {
+//        Column(Modifier.fillMaxHeight(0.9f)) {
+//
+//            LazyColumn(
+//                modifier = Modifier.weight(1f)
+//            ) {
+//                items(state.comments) { comment ->
+//                    CommentItem(
+//                        comment = comment,
+//                        isReply = comment.parent_id != null,
+//                        onLike = {
+//                            viewModel.like(comment.id, postId)
+//                        },
+//                        onReply = {
+//                            viewModel.setReply(comment)
+//                        }
+//                    )
+//                }
+//            }
+//
+//            // 🔽 Reply Indicator
+//            state.replyTo?.let {
+//                Text(
+//                    "Replying to ${it.user.name}",
+//                    color = Color.Gray,
+//                    modifier = Modifier.padding(8.dp)
+//                )
+//            }
+//
+//            // 🔽 Input
+//            Row(
+//                Modifier.padding(8.dp),
+//                verticalAlignment = Alignment.CenterVertically
+//            ) {
+//                OutlinedTextField(
+//                    value = input,
+//                    onValueChange = { input = it },
+//                    modifier = Modifier.weight(1f),
+//                    placeholder = { Text("Add a comment…") }
+//                )
+//
+//                TextButton(
+//                    enabled = input.isNotBlank(),
+//                    onClick = {
+//                        viewModel.sendComment(postId, input)
+//                        input = ""
+//                    }
+//                ) {
+//                    Text("Post")
+//                }
+//            }
+//        }
+//    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxHeight(0.9f)
+                .imePadding()          // 👈 🔥 KEY LINE
+        ) {
+
+            LazyColumn(
+                modifier = Modifier.weight(1f)
+            ) {
+                items(state.comments) { comment ->
+                    CommentItem(
+                        comment = comment,
+                        isReply = comment.parent_id != null,
+                        onLike = {
+                            viewModel.like(comment.id, postId)
+                        },
+                        onReply = {
+                            viewModel.setReply(comment)
+                        }
+                    )
+                }
+            }
+
+            // Reply indicator
+            state.replyTo?.let {
+                Text(
+                    "Replying to ${it.user.name}",
+                    color = Color.Gray,
+                    modifier = Modifier.padding(8.dp)
+                )
+            }
+
+            // 👇 INPUT ALWAYS AT BOTTOM
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = input,
+                    onValueChange = { input = it },
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("Add a comment…") }
+                )
+
+                TextButton(
+                    enabled = input.isNotBlank(),
+                    onClick = {
+                        viewModel.sendComment(postId, input)
+                        input = ""
+                    }
+                ) {
+                    Text("Post")
+                }
+            }
+        }
+    }
+}
+
+
+
+@Composable
+fun CommentItem(
+    comment: Comment,
+    isReply: Boolean,
+    onLike: () -> Unit,
+    onReply: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .padding(
+                start = if (isReply) 32.dp else 16.dp,
+                end = 16.dp,
+                top = 8.dp
+            )
+    ) {
+        Text(comment.user.name, fontWeight = FontWeight.Bold)
+        Text(comment.comment)
+
+        Row {
+            Text(
+                "❤️ ${comment.likes_count}",
+                modifier = Modifier.clickable { onLike() }
+            )
+            Spacer(Modifier.width(16.dp))
+            Text(
+                "Reply",
+                modifier = Modifier.clickable { onReply() },
+                color = Color.Blue
+            )
+        }
     }
 }
 
@@ -342,6 +522,8 @@ class CommunityScreenWrapper : Screen {
         val viewModel = CommunityViewModelProvider.viewModel
         val state = viewModel.state
         val navigator = LocalNavigator.currentOrThrow
+        var openCommentsPostId by remember { mutableStateOf<Int?>(null) }
+
 
 
         // 👇 refresh-aware API call
@@ -380,10 +562,20 @@ class CommunityScreenWrapper : Screen {
                     },
                     onLikeClick = { postId ->
                         viewModel.toggleLike(postId)
+                    },
+                    onCommentClick = { postId ->
+                        openCommentsPostId = postId
                     }
                 )
             }
 
+        }
+        openCommentsPostId?.let { postId ->
+            CommentBottomSheet(
+                postId = postId,
+                viewModel = viewModel,
+                onDismiss = { openCommentsPostId = null }
+            )
         }
     }
 }

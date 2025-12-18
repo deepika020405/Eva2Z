@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import com.developer.ev2z.repository.CommunityRepository
+import com.developer.ev2z.response.Comment
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -15,7 +16,9 @@ import com.developer.ev2z.response.Post
 data class CommunityUiState(
     val loading: Boolean = false,
     val posts: List<Post> = emptyList(),
-    val error: String? = null
+    val error: String? = null,
+    val comments: List<Comment> = emptyList(),
+    val replyTo: Comment? = null
 )
 
 class CommunityViewModel(
@@ -128,4 +131,44 @@ class CommunityViewModel(
             }
         }
     }
+
+    fun load(postId: Int) {
+        scope.launch {
+            _state = _state.copy(loading = true)
+
+            val list = repository.getComments(postId)
+
+            _state = _state.copy(
+                loading = false,
+                comments = list
+            )
+        }
+    }
+
+    fun sendComment(postId: Int, text: String) {
+        scope.launch {
+            repository.addComment(postId, text, _state.replyTo?.id)
+
+            _state = _state.copy(replyTo = null)
+
+            load(postId)
+            refreshPosts()
+        }
+    }
+
+    fun like(commentId: Int, postId: Int) {
+        scope.launch {
+            repository.likeComment(commentId)
+            load(postId)
+        }
+    }
+
+    fun setReply(comment: Comment) {
+        _state = _state.copy(replyTo = comment)
+    }
+
+    fun clearReply() {
+        _state = _state.copy(replyTo = null)
+    }
+
 }

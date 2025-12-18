@@ -27,4 +27,19 @@ class CommunityRepository(
     suspend fun toggleLike(postId: Int): Boolean {
         return apiService.togglePostLike(postId)
     }
+
+
+
+        suspend fun getComments(postId: Int) =
+            apiService.getPostComments(postId).comments
+
+        suspend fun addComment(
+            postId: Int,
+            text: String,
+            parentId: Int?
+        ) = apiService.postComment(postId, text, parentId)
+
+        suspend fun likeComment(commentId: Int) =
+            apiService.likeComment(commentId)
+
 }

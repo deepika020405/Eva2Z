@@ -3,6 +3,7 @@ package com.developer.ev2z.network
 import com.developer.ev2z.data.local.model.DeviceResponse
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
 import com.developer.ev2z.request.CartAddRequest
+import com.developer.ev2z.request.CommentRequest
 import com.developer.ev2z.request.CreateOrderRequest
 import com.developer.ev2z.request.DeviceAnalyticsRequest
 import com.developer.ev2z.request.LoginRequest
@@ -725,5 +726,43 @@ class ApiService {
             println("❌ Like API Error: ${e.message}")
             throw e
         }
+    }
+
+    // GET COMMENTS
+    suspend fun getPostComments(postId: Int): CommentResponse {
+        val token = AppTokenProvider.getToken()
+
+        return client.get("${baseUrl}posts/$postId/comments") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }.body()
+    }
+
+    // POST COMMENT / REPLY
+    suspend fun postComment(
+        postId: Int,
+        comment: String,
+        parentId: Int? = null
+    ): JsonObject {
+        val token = AppTokenProvider.getToken()
+
+        return client.post("${baseUrl}posts/$postId/comments") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(
+                CommentRequest(
+                    comment = comment,
+                    parent_id = parentId
+                )
+            )
+        }.body()
+    }
+
+    // LIKE COMMENT
+    suspend fun likeComment(commentId: Int): JsonObject {
+        val token = AppTokenProvider.getToken()
+
+        return client.post("${baseUrl}comments/$commentId/like") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }.body()
     }
 }
