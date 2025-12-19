@@ -18,11 +18,13 @@ data class Comment(
     val created_at: String,
     val likes_count: Int = 0,
     val is_liked: Boolean = false,
+    val liked: Boolean = false,
     val user: CommentUser
 )
 
 @Serializable
 data class CommentUser(
     val id: Int,
-    val name: String
+    val name: String,
+    val photo: String? = null
 )

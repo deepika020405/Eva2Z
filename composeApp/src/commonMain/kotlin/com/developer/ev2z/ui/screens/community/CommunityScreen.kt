@@ -633,6 +633,9 @@ fun CommentBottomSheet(
                         },
                         onReply = {
                             viewModel.setReply(comment)
+                        },
+                        onRemoveReplyTag = {
+                            viewModel.clearReply()
                         }
                     )
                 }
@@ -681,31 +684,83 @@ fun CommentBottomSheet(
 fun CommentItem(
     comment: Comment,
     isReply: Boolean,
+    replyToName: String? = null,
     onLike: () -> Unit,
-    onReply: () -> Unit
+    onReply: () -> Unit,
+    onRemoveReplyTag: () -> Unit
 ) {
-    Column(
+    Row(
         modifier = Modifier
             .padding(
                 start = if (isReply) 32.dp else 16.dp,
                 end = 16.dp,
-                top = 8.dp
+                top = 10.dp
             )
     ) {
-        Text(comment.user.name, fontWeight = FontWeight.Bold)
-        Text(comment.comment)
 
-        Row {
+        // 👤 USER PHOTO
+        AsyncImage(
+            model = comment.user.photo?.let {
+                "https://gps.eva2z.in/storage/$it"
+            },
+            contentDescription = null,
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(Color.LightGray),
+            contentScale = ContentScale.Crop
+        )
+
+        Spacer(Modifier.width(10.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+
+            // 👤 NAME
             Text(
-                "❤️ ${comment.likes_count}",
-                modifier = Modifier.clickable { onLike() }
+                text = comment.user.name,
+                fontWeight = FontWeight.SemiBold
             )
-            Spacer(Modifier.width(16.dp))
-            Text(
-                "Reply",
-                modifier = Modifier.clickable { onReply() },
-                color = Color.Blue
-            )
+
+            // 🔁 REPLY TO TAG INSIDE COMMENT
+            if (replyToName != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "@$replyToName",
+                        color = Color(0xFF0066FF),
+                        fontWeight = FontWeight.Medium
+                    )
+
+                    Spacer(Modifier.width(6.dp))
+
+                    Text(
+                        text = "✕",
+                        color = Color.Gray,
+                        modifier = Modifier.clickable {
+                            onRemoveReplyTag()
+                        }
+                    )
+                }
+            }
+
+            Text(comment.comment)
+
+            Spacer(Modifier.height(4.dp))
+
+            Row {
+                Text(
+                    text = if (comment.liked) "❤️ ${comment.likes_count}"
+                    else "🤍 ${comment.likes_count}",
+                    modifier = Modifier.clickable { onLike() }
+                )
+
+                Spacer(Modifier.width(16.dp))
+
+                Text(
+                    "Reply",
+                    color = Color.Blue,
+                    modifier = Modifier.clickable { onReply() }
+                )
+            }
         }
     }
 }
