@@ -86,6 +86,7 @@ class DeviceReportViewModel(
                 if (response.success) {
                     _myDevices.value = response.devices
                     _totalDevices.value = response.total_devices
+                    println(response.toString())
 
                     if (response.devices.isNotEmpty()) {
                         _selectedDevice.value = response.devices.first()

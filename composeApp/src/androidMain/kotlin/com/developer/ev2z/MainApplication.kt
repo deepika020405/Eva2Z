@@ -1,6 +1,7 @@
 package com.developer.ev2z
 
 import android.app.Application
+import com.developer.ev2z.upi.appContext
 
 class MainApplication : Application() {
     override fun onCreate() {
@@ -8,6 +9,7 @@ class MainApplication : Application() {
 
         // ✅ App context initialize
         initAppContext(this)
+        appContext = this
 
         // ✅ PhonePe SDK initialize
 //        initPhonePe()

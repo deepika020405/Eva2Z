@@ -48,9 +48,9 @@ data class DeviceItem(
 )
 
 fun statusColor(status: String) = when (status) {
-    "Running", "moving" -> Color(0xFF6DBD6D)
+    "on", "moving" -> Color(0xFF6DBD6D)
     "Idle", "idle" -> Color(0xFFE8A93A)
-    "Stopped", "parked", "offline" -> Color(0xFFE35E5E)
+    "off", "parked", "offline" -> Color(0xFFE35E5E)
     else -> Color.Gray
 }
 
@@ -332,7 +332,7 @@ fun DeviceSelectorPanelWithData(
                             Modifier
                                 .size(10.dp)
                                 .background(
-                                    statusColor(device.status ?: "Stopped"),
+                                    statusColor(device.engine_status ?: "Stopped"),
                                     RoundedCornerShape(50)
                                 )
                         )
@@ -350,7 +350,7 @@ fun DeviceSelectorPanelWithData(
                         }
 
                         Text(
-                            device.status ?: "Unknown",
+                            device.engine_status ?: "Unknown",
                             color = statusColor(device.status ?: "Stopped"),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Medium

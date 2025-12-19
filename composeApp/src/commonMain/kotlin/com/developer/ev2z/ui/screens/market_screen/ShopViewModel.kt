@@ -512,6 +512,24 @@ class ShopViewModel(
         }
     }
 
+    fun confirmPayment(txnId: String) {
+        println("✅ Payment confirmed for txnId = $txnId")
+
+        // backend verify / success API call yahin jayega
+        _paymentState.value = PaymentState.Success(txnId)
+
+        // cart refresh / clear if needed
+        refreshCart()
+    }
+
+    fun paymentFailed(reason: String) {
+        println("❌ Payment failed: $reason")
+        _paymentState.value = PaymentState.Failed(reason)
+    }
+
+    fun markPaymentPending(txnId: String) {
+        _paymentState.value = PaymentState.Processing
+    }
 
 
     // ✅ Handle payment result - bas SUCCESS ya FAILED
