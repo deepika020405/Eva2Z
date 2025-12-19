@@ -64,6 +64,13 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
+        <!-- Add inside <application> tag -->
+        <activity
+            android:name="com.developer.ev2z.phonepe.PaymentHandlerActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

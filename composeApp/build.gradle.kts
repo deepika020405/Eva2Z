@@ -64,9 +64,7 @@ kotlin {
 
             // ML Kit Barcode Scanning for Android
             implementation(libs.barcode.scanning)
-//            implementation("com.phonepe.intent.sdk:android-sdk:2.1.0")
-            // In your androidMain dependencies
-            implementation("phonepe.intentsdk.android.release:IntentSDK:2.4.1")
+            implementation("phonepe.intentsdk.android.release:IntentSDK:5.3.0")
 
 
 

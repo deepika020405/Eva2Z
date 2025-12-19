@@ -19,6 +19,8 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import com.developer.ev2z.util.encodeUrl
+import com.developer.ev2z.phonepe.openPhonePeSdk
+import com.developer.ev2z.phonepe.PaymentResult
 
 
 data class ShopUiState(
@@ -515,6 +517,57 @@ class ShopViewModel(
                 loadBillingAddresses()
             } else {
                 println("❌ Failed to delete billing address")
+            }
+        }
+    }
+
+    // Add to ShopViewModel.kt
+
+    fun initiatePhonePePayment() {
+        val s = _state.value
+        val token = tokenProvider()
+        val amount = (s.finalAmount ?: s.totalPrice ?: "0").toDouble()
+        val billingId = s.selectedAddress?.id
+
+        if (billingId == null) {
+            _paymentState.value = PaymentState.Failed("Please select delivery address")
+            return
+        }
+
+        _paymentState.value = PaymentState.Processing
+
+        scope.launch {
+            try {
+                // ✅ Create order on backend
+                val resp = repo.createPhonePeOrder(
+                    token = token,
+                    amount = amount,
+                    billingId = billingId
+                )
+
+                val orderToken = resp["orderToken"]?.jsonPrimitive?.content
+                    ?: throw Exception("orderToken missing")
+
+                val phonepeOrderId = resp["phonepeOrderId"]?.jsonPrimitive?.content
+                    ?: throw Exception("orderId missing")
+
+                println("✅ Order Created: token=$orderToken, orderId=$phonepeOrderId")
+
+                // ✅ Launch PhonePe via expect/actual
+                openPhonePeSdk(orderToken) { result ->
+                    if (result.success) {
+                        println("✅ Payment Success: ${result.transactionId}")
+                        _paymentState.value = PaymentState.Success(result.transactionId)
+                        refreshCart()
+                    } else {
+                        println("❌ Payment Failed: ${result.message}")
+                        _paymentState.value = PaymentState.Failed(result.message)
+                    }
+                }
+
+            } catch (e: Exception) {
+                println("❌ Order creation failed: ${e.message}")
+                _paymentState.value = PaymentState.Failed(e.message ?: "Order creation failed")
             }
         }
     }
