@@ -301,6 +301,13 @@ class HistoryPlaybackViewModel(
         }
     }
 
+    fun selectDateRange(start: String, end: String) {
+        _startDate.value = start
+        _endDate.value = end
+        _routePoints.value = emptyList()
+        _currentPlaybackIndex.value = 0
+    }
+
     override fun onCleared() {
         super.onCleared()
         playbackJob?.cancel()

@@ -5,10 +5,10 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -63,14 +63,12 @@ fun HistoryPlaybackScreen(
         viewModel.loadDevices()
     }
 
-    // AUTO-FETCH when device selected
     LaunchedEffect(selectedDevice) {
         if (selectedDevice != null) {
             viewModel.fetchHistory()
         }
     }
 
-    // ✅ FIX PROBLEM 3: Refetch when date changes
     LaunchedEffect(startDate, endDate) {
         if (selectedDevice != null && startDate.isNotEmpty() && endDate.isNotEmpty()) {
             viewModel.fetchHistory()
@@ -78,7 +76,6 @@ fun HistoryPlaybackScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // MAP BACKGROUND
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -109,7 +106,6 @@ fun HistoryPlaybackScreen(
             }
         }
 
-        // TOP BAR
         TopDeviceBoxWithData(
             deviceCount = devices.size,
             selectedDevice = selectedDevice?.device_name,
@@ -117,7 +113,6 @@ fun HistoryPlaybackScreen(
             onDropdownClick = { viewModel.toggleDeviceDropdown() }
         )
 
-        // BOTTOM SHEET
         HistoryPlaybackBottomSheet(
             hasData = routePoints.isNotEmpty(),
             selectedDevice = selectedDevice,
@@ -126,56 +121,145 @@ fun HistoryPlaybackScreen(
             totalDistance = totalDistance,
             averageSpeed = averageSpeed,
             isPlaying = isPlaying,
-            onPreviousDate = {
-                viewModel.navigateToPreviousDate()
-            },
-            onNextDate = {
-                viewModel.navigateToNextDate()
-            },
+            onPreviousDate = { viewModel.navigateToPreviousDate() },
+            onNextDate = { viewModel.navigateToNextDate() },
             onDateClick = { showDatePicker = true },
             onPlayClick = { viewModel.togglePlayback() }
         )
 
-        // DEVICE DROPDOWN
+        // ✅ DROPDOWN (HOME SCREEN STYLE - NOT DIALOG)
         if (showDeviceDropdown) {
-            DeviceSelectorPanel(
-                devices = devices,
-                onDeviceSelected = { device ->
-                    viewModel.selectDevice(device)
-                },
-                onDismiss = { viewModel.toggleDeviceDropdown() }
-            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0x55000000))
+                    .zIndex(999f)
+                    .clickable { viewModel.toggleDeviceDropdown() },
+                contentAlignment = Alignment.TopCenter
+            ) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth(0.92f)
+                        .padding(top = 140.dp)
+                        .heightIn(max = 500.dp)
+                        .clickable(enabled = false) {},
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Select device", fontSize = 14.sp, color = Color.Gray)
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Close",
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .clickable { viewModel.toggleDeviceDropdown() }
+                            )
+                        }
+
+                        HorizontalDivider()
+
+                        if (devices.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(32.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("No devices found", color = Color.Gray)
+                            }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.weight(1f, fill = false)
+                            ) {
+                                items(devices) { device ->
+                                    // ✅ HOME SCREEN STYLE STATUS COLOR
+                                    val engine_statusColor = when (device.engine_status?.lowercase()) {
+                                        "moving", "running" -> Color(0xFF86b071)
+                                        "idle", "ideal" -> Color(0xFFfcd158)
+                                        "parked" -> Color(0xFFfa7575)
+                                        "offline" -> Color(0xFFe8e8e8)
+                                        else -> Color(0xFFe8e8e8)
+                                    }
+
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                viewModel.selectDevice(device)
+                                            }
+                                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        // ✅ STATUS DOT
+                                        Box(
+                                            modifier = Modifier
+                                                .size(8.dp)
+                                                .background(engine_statusColor, CircleShape)
+                                        )
+
+                                        Spacer(Modifier.width(12.dp))
+
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(device.device_name, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                            Text("Device ID: ${device.device_id}", fontSize = 11.sp, color = Color.Gray)
+                                        }
+
+                                        // ✅ STATUS TEXT
+                                        Text(
+                                            text = when (device.engine_status?.lowercase()) {
+                                                "moving" -> "Running"
+                                                "idle" -> "Ideal"
+                                                "parked" -> "Parked"
+                                                "offline" -> "Offline"
+                                                else -> device.status ?: "Unknown"
+                                            },
+                                            fontSize = 12.sp,
+                                            color = engine_statusColor,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
-        // DATE PICKER
         if (showDatePicker) {
             DateRangePickerDialog(
-                title = "Select Date",
-                selectedDate = startDate,
+                startDate = startDate,
+                endDate = endDate,
                 minDate = viewModel.minSelectableDate,
                 maxDate = viewModel.maxSelectableDate,
-                onDateSelected = {
-                    viewModel.selectStartDate(it)
-                    viewModel.selectEndDate(it)
+                onDatesSelected = { start, end ->
+                    viewModel.selectDateRange(start, end)
                 },
                 onDismiss = { showDatePicker = false }
             )
         }
 
-        // NO DATA DIALOG
         if (showNoDataDialog) {
             AlertDialog(
                 onDismissRequest = { viewModel.dismissNoDataDialog() },
                 icon = { Icon(Icons.Default.Info, null, tint = Color(0xFF7CB342)) },
                 title = { Text("No History Found") },
-                text = { Text("No route data available for the selected date. Please try a different date.") },
+                text = { Text("No route data available for the selected date range. Please try a different date range.") },
                 confirmButton = {
                     TextButton(onClick = { viewModel.dismissNoDataDialog() }) { Text("OK") }
                 }
             )
         }
 
-        // LOADING OVERLAY
         if (uiState is HistoryPlaybackUiState.Loading) {
             Box(
                 modifier = Modifier
@@ -305,7 +389,6 @@ fun BoxScope.HistoryPlaybackBottomSheet(
                     )
                 }
 
-                // ✅ FIX PROBLEM 1: Show "Please Select Device" - NOT CLICKABLE
                 if (selectedDevice == null) {
                     Text(
                         text = "Please Select Device",
@@ -418,141 +501,147 @@ fun BoxScope.HistoryPlaybackBottomSheet(
     }
 }
 
-@Composable
-fun DeviceSelectorPanel(
-    devices: List<Device>,
-    onDeviceSelected: (Device) -> Unit,
-    onDismiss: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0x55000000))
-            .zIndex(999f)
-            .clickable { onDismiss() },
-        contentAlignment = Alignment.TopCenter
-    ) {
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth(0.92f)
-                .padding(top = 140.dp)
-                .clickable(enabled = false) {},
-            shape = RoundedCornerShape(18.dp),
-            color = Color.White,
-            shadowElevation = 8.dp
-        ) {
-            Column(
-                Modifier
-                    .padding(18.dp)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                Text("Select Device", fontSize = 16.sp, color = Color.Gray)
-                Spacer(Modifier.height(16.dp))
-
-                if (devices.isEmpty()) {
-                    Text("No devices found", color = Color.Gray)
-                } else {
-                    devices.forEach { device ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    // ✅ FIX PROBLEM 2: Call both device selection AND dismiss
-                                    onDeviceSelected(device)
-                                    onDismiss()
-                                }
-                                .padding(vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                Modifier
-                                    .size(10.dp)
-                                    .background(
-                                        when (device.status) {
-                                            "moving" -> Color(0xFF4CAF50)
-                                            "idle" -> Color(0xFFFFC107)
-                                            else -> Color(0xFFF44336)
-                                        },
-                                        CircleShape
-                                    )
-                            )
-                            Spacer(Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(device.device_name, fontSize = 16.sp)
-                                Text("ID: ${device.device_id}", fontSize = 12.sp, color = Color.Gray, maxLines = 1)
-                            }
-                            Text(
-                                device.status ?: "Unknown",
-                                color = when (device.status) {
-                                    "moving" -> Color(0xFF4CAF50)
-                                    "idle" -> Color(0xFFFFC107)
-                                    else -> Color(0xFFF44336)
-                                },
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 fun formatDateRange(startDate: String, endDate: String): String {
     return try {
         val start = LocalDate.parse(startDate)
-        val dayOfWeek = when (start.dayOfWeek) {
-            DayOfWeek.MONDAY -> "Mon"
-            DayOfWeek.TUESDAY -> "Tue"
-            DayOfWeek.WEDNESDAY -> "Wed"
-            DayOfWeek.THURSDAY -> "Thu"
-            DayOfWeek.FRIDAY -> "Fri"
-            DayOfWeek.SATURDAY -> "Sat"
-            DayOfWeek.SUNDAY -> "Sun"
-            else -> ""
+        val end = LocalDate.parse(endDate)
+
+        if (startDate == endDate) {
+            val dayOfWeek = when (start.dayOfWeek) {
+                DayOfWeek.MONDAY -> "Mon"
+                DayOfWeek.TUESDAY -> "Tue"
+                DayOfWeek.WEDNESDAY -> "Wed"
+                DayOfWeek.THURSDAY -> "Thu"
+                DayOfWeek.FRIDAY -> "Fri"
+                DayOfWeek.SATURDAY -> "Sat"
+                DayOfWeek.SUNDAY -> "Sun"
+                else -> ""
+            }
+            val monthName = when (start.month) {
+                Month.JANUARY -> "Jan"; Month.FEBRUARY -> "Feb"; Month.MARCH -> "Mar"
+                Month.APRIL -> "Apr"; Month.MAY -> "May"; Month.JUNE -> "Jun"
+                Month.JULY -> "Jul"; Month.AUGUST -> "Aug"; Month.SEPTEMBER -> "Sep"
+                Month.OCTOBER -> "Oct"; Month.NOVEMBER -> "Nov"; Month.DECEMBER -> "Dec"
+                else -> ""
+            }
+            "$dayOfWeek, ${start.dayOfMonth} $monthName ${start.year}"
+        } else {
+            val startMonth = when (start.month) {
+                Month.JANUARY -> "Jan"; Month.FEBRUARY -> "Feb"; Month.MARCH -> "Mar"
+                Month.APRIL -> "Apr"; Month.MAY -> "May"; Month.JUNE -> "Jun"
+                Month.JULY -> "Jul"; Month.AUGUST -> "Aug"; Month.SEPTEMBER -> "Sep"
+                Month.OCTOBER -> "Oct"; Month.NOVEMBER -> "Nov"; Month.DECEMBER -> "Dec"
+                else -> ""
+            }
+            val endMonth = when (end.month) {
+                Month.JANUARY -> "Jan"; Month.FEBRUARY -> "Feb"; Month.MARCH -> "Mar"
+                Month.APRIL -> "Apr"; Month.MAY -> "May"; Month.JUNE -> "Jun"
+                Month.JULY -> "Jul"; Month.AUGUST -> "Aug"; Month.SEPTEMBER -> "Sep"
+                Month.OCTOBER -> "Oct"; Month.NOVEMBER -> "Nov"; Month.DECEMBER -> "Dec"
+                else -> ""
+            }
+            "${start.dayOfMonth} $startMonth - ${end.dayOfMonth} $endMonth ${end.year}"
         }
-        val monthName = when (start.month) {
-            Month.JANUARY -> "Jan"
-            Month.FEBRUARY -> "Feb"
-            Month.MARCH -> "Mar"
-            Month.APRIL -> "Apr"
-            Month.MAY -> "May"
-            Month.JUNE -> "Jun"
-            Month.JULY -> "Jul"
-            Month.AUGUST -> "Aug"
-            Month.SEPTEMBER -> "Sep"
-            Month.OCTOBER -> "Oct"
-            Month.NOVEMBER -> "Nov"
-            Month.DECEMBER -> "Dec"
-            else -> ""
-        }
-        "$dayOfWeek, ${start.dayOfMonth} $monthName ${start.year}"
     } catch (e: Exception) {
-        startDate
+        "$startDate - $endDate"
     }
 }
+
+//@OptIn(ExperimentalMaterial3Api::class)
+//@Composable
+//fun DateRangePickerDialog(
+//    startDate: String,
+//    endDate: String,
+//    minDate: LocalDate,
+//    maxDate: LocalDate,
+//    onDatesSelected: (String, String) -> Unit,
+//    onDismiss: () -> Unit
+//) {
+//    var firstSelectedDate by remember { mutableStateOf<LocalDate?>(null) }
+//    var secondSelectedDate by remember { mutableStateOf<LocalDate?>(null) }
+//
+//    val initialSelectedDateMillis = try {
+//        val date = LocalDate.parse(startDate)
+//        date.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()
+//    } catch (e: Exception) {
+//        null
+//    }
+//
+//    val datePickerState = rememberDatePickerState(
+//        initialSelectedDateMillis = initialSelectedDateMillis,
+//        selectableDates = object : SelectableDates {
+//            override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+//                val instant = Instant.fromEpochMilliseconds(utcTimeMillis)
+//                val date = instant.toLocalDateTime(TimeZone.UTC).date
+//                return date in minDate..maxDate
+//            }
+//        }
+//    )
+//
+//    DatePickerDialog(
+//        onDismissRequest = onDismiss,
+//        confirmButton = {
+//            TextButton(onClick = {
+//                val selectedMillis = datePickerState.selectedDateMillis
+//                if (selectedMillis != null) {
+//                    val instant = Instant.fromEpochMilliseconds(selectedMillis)
+//                    val selectedDate = instant.toLocalDateTime(TimeZone.UTC).date
+//
+//                    when {
+//                        firstSelectedDate == null -> {
+//                            firstSelectedDate = selectedDate
+//                        }
+//                        secondSelectedDate == null -> {
+//                            secondSelectedDate = selectedDate
+//                            val start = minOf(firstSelectedDate!!, secondSelectedDate!!)
+//                            val end = maxOf(firstSelectedDate!!, secondSelectedDate!!)
+//                            onDatesSelected(start.toString(), end.toString())
+//                            onDismiss()
+//                        }
+//                        else -> {
+//                            firstSelectedDate = selectedDate
+//                            secondSelectedDate = null
+//                        }
+//                    }
+//                } else if (firstSelectedDate != null && secondSelectedDate == null) {
+//                    onDatesSelected(firstSelectedDate.toString(), firstSelectedDate.toString())
+//                    onDismiss()
+//                }
+//            }) { Text("OK") }
+//        },
+//        dismissButton = {
+//            TextButton(onClick = onDismiss) { Text("Cancel") }
+//        }
+//    ) {
+//        DatePicker(
+//            state = datePickerState,
+//            title = {
+//                Text(
+//                    text = if (firstSelectedDate != null && secondSelectedDate == null) {
+//                        "Select end date or tap OK"
+//                    } else {
+//                        "Select start date"
+//                    },
+//                    modifier = Modifier.padding(16.dp)
+//                )
+//            }
+//        )
+//    }
+//}
+
+// ✅ COMPLETE REWRITE WITH DateRangePicker
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DateRangePickerDialog(
-    title: String,
-    selectedDate: String,
+    startDate: String,
+    endDate: String,
     minDate: LocalDate,
     maxDate: LocalDate,
-    onDateSelected: (String) -> Unit,
+    onDatesSelected: (String, String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    // ✅ FIXED: Set initial selected date in calendar
-    val initialSelectedDateMillis = try {
-        val date = LocalDate.parse(selectedDate)
-        date.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()
-    } catch (e: Exception) {
-        null
-    }
-
-    val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = initialSelectedDateMillis,
+    val dateRangePickerState = rememberDateRangePickerState(
         selectableDates = object : SelectableDates {
             override fun isSelectableDate(utcTimeMillis: Long): Boolean {
                 val instant = Instant.fromEpochMilliseconds(utcTimeMillis)
@@ -566,24 +655,110 @@ fun DateRangePickerDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
             TextButton(onClick = {
-                datePickerState.selectedDateMillis?.let { millis ->
-                    val instant = Instant.fromEpochMilliseconds(millis)
-                    val date = instant.toLocalDateTime(TimeZone.UTC).date
-                    onDateSelected(date.toString())
+                val startMillis = dateRangePickerState.selectedStartDateMillis
+                val endMillis = dateRangePickerState.selectedEndDateMillis
+
+                when {
+                    // ✅ BOTH DATES SELECTED (RANGE)
+                    startMillis != null && endMillis != null -> {
+                        val start = Instant.fromEpochMilliseconds(startMillis)
+                            .toLocalDateTime(TimeZone.UTC).date
+                        val end = Instant.fromEpochMilliseconds(endMillis)
+                            .toLocalDateTime(TimeZone.UTC).date
+
+                        onDatesSelected(
+                            minOf(start, end).toString(),
+                            maxOf(start, end).toString()
+                        )
+                        onDismiss()
+                    }
+                    // ✅ ONLY START DATE (SINGLE DATE)
+                    startMillis != null -> {
+                        val date = Instant.fromEpochMilliseconds(startMillis)
+                            .toLocalDateTime(TimeZone.UTC).date
+                        onDatesSelected(date.toString(), date.toString())
+                        onDismiss()
+                    }
                 }
-                onDismiss()
-            }) { Text("OK") }
+            }) {
+                Text("OK")
+            }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }
-        }
+        },
+        colors = DatePickerDefaults.colors(
+            selectedDayContainerColor = Color(0xFF7CB342),      // Primary Green
+            selectedDayContentColor = Color.White,
+            todayContentColor = Color(0xFF7CB342),
+            todayDateBorderColor = Color(0xFF7CB342),
+            dayInSelectionRangeContainerColor = Color(0xFFD9ECCF), // ✅ Light Green
+            dayInSelectionRangeContentColor = Color.Black
+        )
     ) {
-        DatePicker(
-            state = datePickerState,
-            title = { Text(title, modifier = Modifier.padding(16.dp)) }
+        DateRangePicker(
+            state = dateRangePickerState,
+            title = {
+                Text(
+                    text = "Select date",
+                    modifier = Modifier.padding(16.dp)
+                )
+            },
+            headline = {
+                val start = dateRangePickerState.selectedStartDateMillis
+                val end = dateRangePickerState.selectedEndDateMillis
+
+                val text = when {
+                    start != null && end != null -> {
+                        val startDate = Instant.fromEpochMilliseconds(start)
+                            .toLocalDateTime(TimeZone.UTC).date
+                        val endDate = Instant.fromEpochMilliseconds(end)
+                            .toLocalDateTime(TimeZone.UTC).date
+                        formatShortDate(startDate) + " - " + formatShortDate(endDate)
+                    }
+                    start != null -> {
+                        val date = Instant.fromEpochMilliseconds(start)
+                            .toLocalDateTime(TimeZone.UTC).date
+                        formatShortDate(date)
+                    }
+                    else -> ""
+                }
+
+                if (text.isNotEmpty()) {
+                    Text(
+                        text = text,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        style = MaterialTheme.typography.headlineLarge
+                    )
+                }
+            }
         )
     }
 }
+
+fun formatShortDate(date: LocalDate): String {
+    val dayOfWeek = when (date.dayOfWeek) {
+        DayOfWeek.MONDAY -> "Mon"
+        DayOfWeek.TUESDAY -> "Tue"
+        DayOfWeek.WEDNESDAY -> "Wed"
+        DayOfWeek.THURSDAY -> "Thu"
+        DayOfWeek.FRIDAY -> "Fri"
+        DayOfWeek.SATURDAY -> "Sat"
+        DayOfWeek.SUNDAY -> "Sun"
+        else -> ""
+    }
+    val monthName = when (date.month) {
+        Month.JANUARY -> "Jan"; Month.FEBRUARY -> "Feb"; Month.MARCH -> "Mar"
+        Month.APRIL -> "Apr"; Month.MAY -> "May"; Month.JUNE -> "Jun"
+        Month.JULY -> "Jul"; Month.AUGUST -> "Aug"; Month.SEPTEMBER -> "Sep"
+        Month.OCTOBER -> "Oct"; Month.NOVEMBER -> "Nov"; Month.DECEMBER -> "Dec"
+        else -> ""
+    }
+    return "$dayOfWeek, $monthName ${date.dayOfMonth}"
+}
+
+
+
 
 @Composable
 expect fun HistoryMapView(
