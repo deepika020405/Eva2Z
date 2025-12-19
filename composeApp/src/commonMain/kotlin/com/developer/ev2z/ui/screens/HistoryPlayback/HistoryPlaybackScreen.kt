@@ -127,7 +127,7 @@ fun HistoryPlaybackScreen(
             onPlayClick = { viewModel.togglePlayback() }
         )
 
-        // ✅ DROPDOWN (HOME SCREEN STYLE - NOT DIALOG)
+        // ✅ DROPDOWN (HOME SCREEN STYLE - FIXED)
         if (showDeviceDropdown) {
             Box(
                 modifier = Modifier
@@ -181,13 +181,26 @@ fun HistoryPlaybackScreen(
                                 modifier = Modifier.weight(1f, fill = false)
                             ) {
                                 items(devices) { device ->
-                                    // ✅ HOME SCREEN STYLE STATUS COLOR
-                                    val engine_statusColor = when (device.engine_status?.lowercase()) {
-                                        "moving", "running" -> Color(0xFF86b071)
-                                        "idle", "ideal" -> Color(0xFFfcd158)
-                                        "parked" -> Color(0xFFfa7575)
-                                        "offline" -> Color(0xFFe8e8e8)
-                                        else -> Color(0xFFe8e8e8)
+                                    // ✅ FIXED: Using engine_status correctly with proper color mapping
+                                    val statusColor = when (device.engine_status.lowercase()) {
+                                        "moving", "running" -> Color(0xFF86b071)  // Green
+                                        "idle", "ideal" -> Color(0xFFfcd158)      // Yellow
+                                        "parked" -> Color(0xFFfa7575)             // Red
+                                        "offline" -> Color(0xFFe8e8e8)            // Gray
+                                        else -> Color(0xFFe8e8e8)                 // Default Gray
+                                    }
+
+                                    // ✅ FIXED: Display text mapping
+                                    val statusText = when (device.engine_status.lowercase()) {
+                                        "moving" -> "Running"
+                                        "running" -> "Running"
+                                        "idle" -> "Idle"
+                                        "ideal" -> "Idle"
+                                        "parked" -> "Parked"
+                                        "offline" -> "Offline"
+                                        else -> device.engine_status.replaceFirstChar {
+                                            if (it.isLowerCase()) it.titlecase() else it.toString()
+                                        }
                                     }
 
                                     Row(
@@ -203,27 +216,29 @@ fun HistoryPlaybackScreen(
                                         Box(
                                             modifier = Modifier
                                                 .size(8.dp)
-                                                .background(engine_statusColor, CircleShape)
+                                                .background(statusColor, CircleShape)
                                         )
 
                                         Spacer(Modifier.width(12.dp))
 
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text(device.device_name, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                                            Text("Device ID: ${device.device_id}", fontSize = 11.sp, color = Color.Gray)
+                                            Text(
+                                                device.device_name,
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                            Text(
+                                                "Device ID: ${device.device_id}",
+                                                fontSize = 11.sp,
+                                                color = Color.Gray
+                                            )
                                         }
 
                                         // ✅ STATUS TEXT
                                         Text(
-                                            text = when (device.engine_status?.lowercase()) {
-                                                "moving" -> "Running"
-                                                "idle" -> "Ideal"
-                                                "parked" -> "Parked"
-                                                "offline" -> "Offline"
-                                                else -> device.status ?: "Unknown"
-                                            },
+                                            text = statusText,
                                             fontSize = 12.sp,
-                                            color = engine_statusColor,
+                                            color = statusColor,
                                             fontWeight = FontWeight.Medium
                                         )
                                     }
@@ -547,90 +562,6 @@ fun formatDateRange(startDate: String, endDate: String): String {
     }
 }
 
-//@OptIn(ExperimentalMaterial3Api::class)
-//@Composable
-//fun DateRangePickerDialog(
-//    startDate: String,
-//    endDate: String,
-//    minDate: LocalDate,
-//    maxDate: LocalDate,
-//    onDatesSelected: (String, String) -> Unit,
-//    onDismiss: () -> Unit
-//) {
-//    var firstSelectedDate by remember { mutableStateOf<LocalDate?>(null) }
-//    var secondSelectedDate by remember { mutableStateOf<LocalDate?>(null) }
-//
-//    val initialSelectedDateMillis = try {
-//        val date = LocalDate.parse(startDate)
-//        date.atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()
-//    } catch (e: Exception) {
-//        null
-//    }
-//
-//    val datePickerState = rememberDatePickerState(
-//        initialSelectedDateMillis = initialSelectedDateMillis,
-//        selectableDates = object : SelectableDates {
-//            override fun isSelectableDate(utcTimeMillis: Long): Boolean {
-//                val instant = Instant.fromEpochMilliseconds(utcTimeMillis)
-//                val date = instant.toLocalDateTime(TimeZone.UTC).date
-//                return date in minDate..maxDate
-//            }
-//        }
-//    )
-//
-//    DatePickerDialog(
-//        onDismissRequest = onDismiss,
-//        confirmButton = {
-//            TextButton(onClick = {
-//                val selectedMillis = datePickerState.selectedDateMillis
-//                if (selectedMillis != null) {
-//                    val instant = Instant.fromEpochMilliseconds(selectedMillis)
-//                    val selectedDate = instant.toLocalDateTime(TimeZone.UTC).date
-//
-//                    when {
-//                        firstSelectedDate == null -> {
-//                            firstSelectedDate = selectedDate
-//                        }
-//                        secondSelectedDate == null -> {
-//                            secondSelectedDate = selectedDate
-//                            val start = minOf(firstSelectedDate!!, secondSelectedDate!!)
-//                            val end = maxOf(firstSelectedDate!!, secondSelectedDate!!)
-//                            onDatesSelected(start.toString(), end.toString())
-//                            onDismiss()
-//                        }
-//                        else -> {
-//                            firstSelectedDate = selectedDate
-//                            secondSelectedDate = null
-//                        }
-//                    }
-//                } else if (firstSelectedDate != null && secondSelectedDate == null) {
-//                    onDatesSelected(firstSelectedDate.toString(), firstSelectedDate.toString())
-//                    onDismiss()
-//                }
-//            }) { Text("OK") }
-//        },
-//        dismissButton = {
-//            TextButton(onClick = onDismiss) { Text("Cancel") }
-//        }
-//    ) {
-//        DatePicker(
-//            state = datePickerState,
-//            title = {
-//                Text(
-//                    text = if (firstSelectedDate != null && secondSelectedDate == null) {
-//                        "Select end date or tap OK"
-//                    } else {
-//                        "Select start date"
-//                    },
-//                    modifier = Modifier.padding(16.dp)
-//                )
-//            }
-//        )
-//    }
-//}
-
-// ✅ COMPLETE REWRITE WITH DateRangePicker
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DateRangePickerDialog(
@@ -659,7 +590,6 @@ fun DateRangePickerDialog(
                 val endMillis = dateRangePickerState.selectedEndDateMillis
 
                 when {
-                    // ✅ BOTH DATES SELECTED (RANGE)
                     startMillis != null && endMillis != null -> {
                         val start = Instant.fromEpochMilliseconds(startMillis)
                             .toLocalDateTime(TimeZone.UTC).date
@@ -672,7 +602,6 @@ fun DateRangePickerDialog(
                         )
                         onDismiss()
                     }
-                    // ✅ ONLY START DATE (SINGLE DATE)
                     startMillis != null -> {
                         val date = Instant.fromEpochMilliseconds(startMillis)
                             .toLocalDateTime(TimeZone.UTC).date
@@ -688,11 +617,11 @@ fun DateRangePickerDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         },
         colors = DatePickerDefaults.colors(
-            selectedDayContainerColor = Color(0xFF7CB342),      // Primary Green
+            selectedDayContainerColor = Color(0xFF6DBD6D),
             selectedDayContentColor = Color.White,
             todayContentColor = Color(0xFF7CB342),
             todayDateBorderColor = Color(0xFF7CB342),
-            dayInSelectionRangeContainerColor = Color(0xFFD9ECCF), // ✅ Light Green
+            dayInSelectionRangeContainerColor = Color(0xD9ECCF),
             dayInSelectionRangeContentColor = Color.Black
         )
     ) {
@@ -756,9 +685,6 @@ fun formatShortDate(date: LocalDate): String {
     }
     return "$dayOfWeek, $monthName ${date.dayOfMonth}"
 }
-
-
-
 
 @Composable
 expect fun HistoryMapView(
