@@ -2,32 +2,36 @@
 package com.developer.ev2z.upi
 
 import com.developer.ev2z.data.local.model.UpiApp
+import platform.Foundation.NSCharacterSet
 import platform.Foundation.NSURL
+import platform.Foundation.URLQueryAllowedCharacterSet
+import platform.Foundation.stringByAddingPercentEncodingWithAllowedCharacters
 import platform.UIKit.UIApplication
-import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
 
-@OptIn(ExperimentalTime::class)
 actual fun launchUpiPayment(
+    activity: Any,   // 👈 added to match expect
     app: UpiApp,
     amount: String,
     txnId: String,
     onResult: (Boolean) -> Unit
 ) {
-    val cleanTxnId = "EV2Z${Clock.System.now().toEpochMilliseconds()}"
 
-    val url =
-        "${app.scheme}?" +
-                "pa=9990758825@ptyes" +
+
+
+    val urlString =
+        "upi://pay" +
+                "?pa=9990758825@ptyes" +
                 "&pn=EV2Z" +
-                "&tr=$cleanTxnId" +
+                "&tr=$txnId" +
                 "&am=$amount" +
                 "&cu=INR"
 
-    UIApplication.sharedApplication.openURL(
-        NSURL.URLWithString(url)!!
-    )
+    val url = NSURL.URLWithString(urlString)
 
-    // iOS → no callback possible
-    onResult(true)
+    if (url != null && UIApplication.sharedApplication.canOpenURL(url)) {
+        UIApplication.sharedApplication.openURL(url)
+        onResult(true)
+    } else {
+        onResult(false)
+    }
 }

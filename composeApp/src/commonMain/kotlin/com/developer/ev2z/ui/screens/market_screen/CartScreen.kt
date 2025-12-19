@@ -53,13 +53,13 @@ import coil3.compose.AsyncImage
 import com.developer.ev2z.getPlatformContext
 import com.developer.ev2z.response.CartItemDto
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.runtime.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.animation.core.animateIntOffsetAsState
 import androidx.compose.foundation.layout.offset
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import com.developer.ev2z.data.local.model.UpiApp
@@ -718,6 +718,8 @@ fun CheckoutBottomBar(viewModel: ShopViewModel) {
 
     val state by viewModel.state.collectAsState()
     val paymentState by viewModel.paymentState.collectAsState()
+    val context = getPlatformContext()!! // returns Activity on Android
+
 
     var showUpiSheet by remember { mutableStateOf(false) } // 👈 OUTSIDE
 
@@ -771,20 +773,16 @@ fun CheckoutBottomBar(viewModel: ShopViewModel) {
 
                 viewModel.createOrder { txnId ->
 
+
                     launchUpiPayment(
+                        activity = context,
                         app = app,
                         amount = state.finalAmount ?: state.totalPrice ?: "0",
                         txnId = txnId
-                    ) { opened ->
-
-                        if (opened) {
-                            // ✅ ONLY mark pending
-                            viewModel.markPaymentPending(txnId)
-                        } else {
-                            // ❌ UPI app not found / intent failed
-                            viewModel.paymentFailed("No UPI app found")
-                        }
+                    ) {
+                        viewModel.markPaymentPending(txnId)
                     }
+
                 }
             },
             onDismiss = { showUpiSheet = false }
