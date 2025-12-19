@@ -25,6 +25,7 @@ sealed class HistoryPlaybackUiState {
     data class Error(val message: String) : HistoryPlaybackUiState()
 }
 
+@OptIn(kotlin.time.ExperimentalTime::class)
 class HistoryPlaybackViewModel(
     private val apiService: ApiService,
     private val storageManager: StorageManager

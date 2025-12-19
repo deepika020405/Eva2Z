@@ -31,7 +31,7 @@ import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
 import kotlinx.datetime.*
 import org.jetbrains.compose.resources.painterResource
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, kotlin.time.ExperimentalTime::class)
 @Composable
 fun HistoryPlaybackScreen(
     apiService: ApiService,
@@ -617,11 +617,11 @@ fun DateRangePickerDialog(
             TextButton(onClick = onDismiss) { Text("Cancel") }
         },
         colors = DatePickerDefaults.colors(
-            selectedDayContainerColor = Color(0xFF6DBD6D),
+            selectedDayContainerColor = Color(0xFF7CB342),
             selectedDayContentColor = Color.White,
             todayContentColor = Color(0xFF7CB342),
             todayDateBorderColor = Color(0xFF7CB342),
-            dayInSelectionRangeContainerColor = Color(0xD9ECCF),
+            dayInSelectionRangeContainerColor = Color(0xFFD9ECCF),
             dayInSelectionRangeContentColor = Color.Black
         )
     ) {

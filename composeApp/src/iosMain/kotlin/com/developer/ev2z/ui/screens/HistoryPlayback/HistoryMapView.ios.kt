@@ -35,9 +35,17 @@ actual fun HistoryMapView(
 
             if (coordinates.isNotEmpty()) {
                 memScoped {
-                    val coordsPointer = allocArrayOf(coordinates.toTypedArray())
+                    // ✅ FIXED: Properly allocate coordinate array for iOS
+                    val coordArray = allocArray<CValue<CLLocationCoordinate2D>>(coordinates.size)
+                    coordinates.forEachIndexed { index, coord ->
+                        coordArray[index] = cValue {
+                            latitude = coord.useContents { latitude }
+                            longitude = coord.useContents { longitude }
+                        }
+                    }
+
                     val polyline = MKPolyline.polylineWithCoordinates(
-                        coords = coordsPointer,
+                        coords = coordArray.reinterpret(),
                         count = coordinates.size.toULong()
                     )
                     mapView.addOverlay(polyline)
