@@ -30,6 +30,7 @@ import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
 import kotlinx.datetime.*
 import org.jetbrains.compose.resources.painterResource
+import kotlin.time.ExperimentalTime
 
 @OptIn(ExperimentalMaterial3Api::class, kotlin.time.ExperimentalTime::class)
 @Composable
@@ -562,7 +563,7 @@ fun formatDateRange(startDate: String, endDate: String): String {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalTime::class)
 @Composable
 fun DateRangePickerDialog(
     startDate: String,

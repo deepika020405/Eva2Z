@@ -1,4 +1,3 @@
-// composeApp/src/iosMain/kotlin/com/developer/ev2z/ui/screens/HistoryPlayback/HistoryMapView.ios.kt
 package com.developer.ev2z.ui.screens.HistoryPlayback
 
 import androidx.compose.runtime.Composable
@@ -6,6 +5,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.interop.UIKitView
 import com.developer.ev2z.response.RoutePoint
 import kotlinx.cinterop.*
+import platform.CoreLocation.CLLocationCoordinate2D
 import platform.CoreLocation.CLLocationCoordinate2DMake
 import platform.MapKit.*
 import platform.UIKit.UIEdgeInsetsMake
@@ -35,17 +35,15 @@ actual fun HistoryMapView(
 
             if (coordinates.isNotEmpty()) {
                 memScoped {
-                    // ✅ FIXED: Properly allocate coordinate array for iOS
-                    val coordArray = allocArray<CValue<CLLocationCoordinate2D>>(coordinates.size)
+                    // ✅ FIXED: Properly allocate and populate coordinate array
+                    val coordArray = allocArray<CLLocationCoordinate2D>(coordinates.size)
                     coordinates.forEachIndexed { index, coord ->
-                        coordArray[index] = cValue {
-                            latitude = coord.useContents { latitude }
-                            longitude = coord.useContents { longitude }
-                        }
+                        coordArray[index].latitude = coord.useContents { latitude }
+                        coordArray[index].longitude = coord.useContents { longitude }
                     }
 
                     val polyline = MKPolyline.polylineWithCoordinates(
-                        coords = coordArray.reinterpret(),
+                        coords = coordArray,
                         count = coordinates.size.toULong()
                     )
                     mapView.addOverlay(polyline)
