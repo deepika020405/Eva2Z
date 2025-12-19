@@ -27,19 +27,45 @@ class ApiService {
     private val client = KtorClient.client
     private val baseUrl = KtorClient.BASE_URL
 
-    // ---------------- LOGIN ----------------
+    // ===============================================
+    // AUTHENTICATION APIs
+    // ===============================================
 
-    suspend fun login(request: LoginRequest): LoginResponse {
-        println("🌐 API: Sending login request")
+    // ---------------- LOGIN - FIXED ----------------
+    suspend fun login(phone: String, password: String): JsonObject {
+        println("🌐 API: Sending login request for phone=$phone")
 
         return try {
-            val response = client.post("${baseUrl}login") {
-                contentType(ContentType.Application.Json)
-                setBody(request)
+            val response = client.submitForm(
+                url = "${baseUrl}login",
+                formParameters = Parameters.build {
+                    append("phone", phone)
+                    append("password", password)
+                }
+            ) {
+                header(HttpHeaders.Accept, ContentType.Application.Json.toString())
             }
 
             println("✔️ API Login status: ${response.status}")
             response.body()
+
+        } catch (e: ResponseException) {
+            val status = e.response.status
+            val text = try {
+                e.response.bodyAsText()
+            } catch (_: Exception) {
+                """{"message":"Network error"}"""
+            }
+
+            println("❌ API Login Error: HTTP $status")
+            println("   response body: $text")
+
+            // ✅ Parse and return error JSON (don't throw here)
+            val json = Json { ignoreUnknownKeys = true }
+            val errorObj = json.parseToJsonElement(text).jsonObject
+
+            // ✅ Return error JSON as-is
+            return errorObj
 
         } catch (e: Exception) {
             println("❌ API Login Error: ${e.message}")
@@ -47,8 +73,269 @@ class ApiService {
         }
     }
 
-    // ---------------- LATEST LOCATIONS ----------------
+    // ---------------- REGISTER USER ----------------
+    suspend fun registerUser(
+        name: String,
+        phone: String,
+        email: String
+    ): JsonObject {
+        println("🌐 API: Registering user (sending OTP) phone=$phone")
 
+        return try {
+            val response = client.submitForm(
+                url = "${baseUrl}register",
+                formParameters = Parameters.build {
+                    append("name", name)
+                    append("phone", phone)
+                    append("email", email)
+                }
+            ) {
+                header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+            }
+
+            println("✔️ Register User Status: ${response.status}")
+            response.body()
+
+        } catch (e: ResponseException) {
+            val status = e.response.status
+            val text = try {
+                e.response.bodyAsText()
+            } catch (_: Exception) {
+                """{"message":"Network error"}"""
+            }
+
+            println("❌ Register User Error: HTTP $status")
+            println("   response body: $text")
+
+            // ✅ Parse and return error JSON (don't throw here)
+            val json = Json { ignoreUnknownKeys = true }
+            val errorObj = json.parseToJsonElement(text).jsonObject
+
+            // ✅ Return error JSON as-is
+            return errorObj
+
+        } catch (e: Exception) {
+            println("❌ Register User Error: ${e.message}")
+            throw e
+        }
+    }
+
+    // ---------------- VERIFY OTP (after signup) ----------------
+    suspend fun verifyOtp(phone: String, otp: String): JsonObject {
+        println("🌐 API: Verifying OTP for phone=$phone")
+
+        return try {
+            val response = client.post("${baseUrl}verify-otp") {
+                contentType(ContentType.Application.Json)
+                setBody(mapOf(
+                    "phone" to phone,
+                    "otp" to otp
+                ))
+            }
+
+            println("✔️ Verify OTP Status: ${response.status}")
+            response.body()
+
+        } catch (e: ResponseException) {
+            val status = e.response.status
+            val text = try { e.response.bodyAsText() } catch (_: Exception) { "unable-to-read-body" }
+            println("❌ Verify OTP Error: HTTP $status")
+            println("   response body: $text")
+            throw e
+        } catch (e: Exception) {
+            println("❌ Verify OTP Error: ${e.message}")
+            throw e
+        }
+    }
+
+    // ---------------- RESEND OTP (after signup) ----------------
+    suspend fun resendOtp(phone: String): JsonObject {
+        println("🌐 API: Resending OTP for phone=$phone")
+
+        return try {
+            val response = client.post("${baseUrl}resend-otp") {
+                contentType(ContentType.Application.Json)
+                setBody(mapOf("phone" to phone))
+            }
+
+            println("✔️ Resend OTP Status: ${response.status}")
+            response.body()
+
+        } catch (e: ResponseException) {
+            val status = e.response.status
+            val text = try { e.response.bodyAsText() } catch (_: Exception) { "unable-to-read-body" }
+            println("❌ Resend OTP Error: HTTP $status")
+            println("   response body: $text")
+            throw e
+        } catch (e: Exception) {
+            println("❌ Resend OTP Error: ${e.message}")
+            throw e
+        }
+    }
+
+    // ---------------- SAVE PASSWORD (for registration after OTP) ----------------
+    suspend fun savePassword(
+        phone: String,
+        password: String
+    ): JsonObject {
+        println("🌐 API: Saving password for phone=$phone")
+
+        return try {
+            val response = client.post("${baseUrl}save-password") {
+                contentType(ContentType.Application.Json)
+                setBody(mapOf(
+                    "phone" to phone,
+                    "password" to password
+                ))
+            }
+
+            println("✔️ Save Password Status: ${response.status}")
+            response.body()
+
+        } catch (e: ResponseException) {
+            val status = e.response.status
+            val text = try { e.response.bodyAsText() } catch (_: Exception) { "unable-to-read-body" }
+            println("❌ Save Password Error: HTTP $status")
+            println("   response body: $text")
+            throw e
+        } catch (e: Exception) {
+            println("❌ Save Password Error: ${e.message}")
+            throw e
+        }
+    }
+
+    // ---------------- FORGOT PASSWORD (send OTP) ----------------
+    suspend fun forgotPassword(phone: String): JsonObject {
+        println("🌐 API: Forgot password request for phone=$phone")
+
+        return try {
+            val response = client.submitForm(
+                url = "${baseUrl}forgot-password",
+                formParameters = Parameters.build {
+                    append("phone", phone)
+                }
+            ) {
+                header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+            }
+
+            println("✔️ Forgot Password Status: ${response.status}")
+            response.body()
+
+        } catch (e: ResponseException) {
+            val status = e.response.status
+            val text = try {
+                e.response.bodyAsText()
+            } catch (_: Exception) {
+                """{"message":"Network error"}"""
+            }
+
+            println("❌ Forgot Password Error: HTTP $status")
+            println("   response body: $text")
+
+            // ✅ Parse and return error JSON (don't throw here)
+            val json = Json { ignoreUnknownKeys = true }
+            val errorObj = json.parseToJsonElement(text).jsonObject
+
+            // ✅ Return error JSON as-is
+            return errorObj
+
+        } catch (e: Exception) {
+            println("❌ Forgot Password Error: ${e.message}")
+            throw e
+        }
+    }
+
+    // ---------------- VERIFY FORGOT PASSWORD OTP ----------------
+    suspend fun verifyForgotOtp(phone: String, otp: String): JsonObject {
+        println("🌐 API: Verifying forgot password OTP for phone=$phone")
+
+        return try {
+            val response = client.post("${baseUrl}forgot-password-verify-otp") {
+                contentType(ContentType.Application.Json)
+                setBody(mapOf(
+                    "phone" to phone,
+                    "otp" to otp
+                ))
+            }
+
+            println("✔️ Verify Forgot OTP Status: ${response.status}")
+            response.body()
+
+        } catch (e: ResponseException) {
+            val status = e.response.status
+            val text = try { e.response.bodyAsText() } catch (_: Exception) { "unable-to-read-body" }
+            println("❌ Verify Forgot OTP Error: HTTP $status")
+            println("   response body: $text")
+            throw e
+        } catch (e: Exception) {
+            println("❌ Verify Forgot OTP Error: ${e.message}")
+            throw e
+        }
+    }
+
+    // ---------------- RESEND FORGOT PASSWORD OTP ----------------
+    suspend fun resendForgotOtp(phone: String): JsonObject {
+        println("🌐 API: Resending forgot password OTP for phone=$phone")
+
+        return try {
+            val response = client.post("${baseUrl}resend-otp") {
+                contentType(ContentType.Application.Json)
+                setBody(mapOf("phone" to phone))
+            }
+
+            println("✔️ Resend Forgot OTP Status: ${response.status}")
+            response.body()
+
+        } catch (e: ResponseException) {
+            val status = e.response.status
+            val text = try { e.response.bodyAsText() } catch (_: Exception) { "unable-to-read-body" }
+            println("❌ Resend Forgot OTP Error: HTTP $status")
+            println("   response body: $text")
+            throw e
+        } catch (e: Exception) {
+            println("❌ Resend Forgot OTP Error: ${e.message}")
+            throw e
+        }
+    }
+
+    // ---------------- RESET PASSWORD ----------------
+    suspend fun resetPassword(
+        phone: String,
+        password: String,
+        confirmPassword: String
+    ): JsonObject {
+        println("🌐 API: Resetting password for phone=$phone")
+
+        return try {
+            val response = client.post("${baseUrl}reset-password") {
+                contentType(ContentType.Application.Json)
+                setBody(mapOf(
+                    "phone" to phone,
+                    "password" to password,
+                    "confirm_password" to confirmPassword
+                ))
+            }
+
+            println("✔️ Reset Password Status: ${response.status}")
+            response.body()
+
+        } catch (e: ResponseException) {
+            val status = e.response.status
+            val text = try { e.response.bodyAsText() } catch (_: Exception) { "unable-to-read-body" }
+            println("❌ Reset Password Error: HTTP $status")
+            println("   response body: $text")
+            throw e
+        } catch (e: Exception) {
+            println("❌ Reset Password Error: ${e.message}")
+            throw e
+        }
+    }
+
+    // ===============================================
+    // DEVICE APIs (existing code)
+    // ===============================================
+
+    // ---------------- LATEST LOCATIONS ----------------
     suspend fun getDevicesLatestLocations(token: String): DeviceResponse {
         println("🌐 API: Fetching latest locations")
 
@@ -67,7 +354,6 @@ class ApiService {
     }
 
     // ---------------- ADD DEVICE ----------------
-
     suspend fun addDevice(token: String, body: JsonObject): JsonObject {
         println("🌐 API: Adding device")
 
@@ -88,7 +374,6 @@ class ApiService {
     }
 
     // ---------------- UPDATE DEVICE ----------------
-
     suspend fun updateDevice(token: String, body: JsonObject): JsonObject {
         println("🌐 API: Updating device")
 
@@ -109,7 +394,6 @@ class ApiService {
     }
 
     // ---------------- MY DEVICES ----------------
-
     suspend fun getMyDevices(token: String): MyDevicesResponse {
         println("🌐 API: Fetching my devices")
 
@@ -128,7 +412,6 @@ class ApiService {
     }
 
     // ---------------- LIVE LOCATION ----------------
-
     suspend fun getDeviceLiveLocation(
         token: String,
         deviceId: String
@@ -149,7 +432,6 @@ class ApiService {
     }
 
     // ---------------- TOTAL MILAGES ----------------
-
     suspend fun getTotalMilages(token: String, terminalId: String): TotalMilagesResponse {
         println("🌐 API: Fetching total milages")
 
@@ -174,7 +456,6 @@ class ApiService {
     }
 
     // ---------------- MOBILIZE (CUT / RESTORE) ----------------
-
     suspend fun sendMobilizeCommand(
         token: String,
         terminalId: String,
@@ -205,7 +486,6 @@ class ApiService {
     }
 
     // ---------------- ANALYTICS ----------------
-
     suspend fun getDeviceAnalytics(
         token: String,
         deviceId: String,
@@ -231,7 +511,6 @@ class ApiService {
     }
 
     // ---------------- PROFILE PICTURE ----------------
-
     suspend fun getProfilePicture(token: String): JsonObject {
         return client.get("${baseUrl}profile-picture") {
             header(HttpHeaders.Authorization, token)
@@ -239,7 +518,6 @@ class ApiService {
     }
 
     // ---------------- UPDATE PROFILE (MULTIPART) ----------------
-
     suspend fun updateProfile(
         token: String,
         name: String,
@@ -279,8 +557,58 @@ class ApiService {
         }
     }
 
-    // ---------------- DELETE DEVICE ----------------
+    // ---------------- CHANGE PASSWORD ----------------
+    suspend fun changePassword(
+        token: String,
+        currentPassword: String,
+        newPassword: String,
+        confirmNewPassword: String
+    ): JsonObject {
+        println("🌐 API: Change Password Request")
 
+        return try {
+            val response = client.submitForm(
+                url = "${baseUrl}change-password",
+                formParameters = Parameters.build {
+                    append("current_password", currentPassword)
+                    append("new_password", newPassword)
+                    append("confirm_new_password", confirmNewPassword)
+                }
+            ) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+            }
+
+            println("✔️ Change Password Status: ${response.status}")
+            val responseBody: JsonObject = response.body()
+
+            println("📝 Response: $responseBody")
+            responseBody
+
+        } catch (e: ResponseException) {
+            val status = e.response.status
+            val text = try {
+                e.response.bodyAsText()
+            } catch (_: Exception) {
+                """{"error":"Network error"}"""
+            }
+
+            println("❌ Change Password Error: HTTP $status")
+            println("   response body: $text")
+
+            // ✅ Parse and return error JSON (don't throw here)
+            val json = Json { ignoreUnknownKeys = true }
+            val errorObj = json.parseToJsonElement(text).jsonObject
+
+            return errorObj
+
+        } catch (e: Exception) {
+            println("❌ Change Password Error: ${e.message}")
+            throw e
+        }
+    }
+
+    // ---------------- DELETE DEVICE ----------------
     suspend fun deleteDevice(deviceId: String, token: String): JsonObject {
 
         println("🌐 API: Deleting device: $deviceId")
@@ -300,7 +628,6 @@ class ApiService {
     }
 
     // ---------------- MOBILIZE (2nd API) ----------------
-
     suspend fun mobilizeDevice(
         token: String,
         terminalId: String,
@@ -330,8 +657,40 @@ class ApiService {
         }
     }
 
+    // ---------------- GEO FENCING ----------------
 
-    // imports you may need
+
+    // ---------------- HISTORY PLAYBACK ----------------
+    suspend fun getRouteHistory(
+        token: String,
+        startDate: String,
+        endDate: String,
+        terminalId: String
+    ): RouteHistoryResponse {
+        println("🌐 API: Fetching route history")
+
+        return try {
+            val response = client.post("${baseUrl}route-history") {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(mapOf(
+                    "start_date" to startDate,
+                    "end_date" to endDate,
+                    "terminal_id" to terminalId
+                ))
+            }
+
+            println("✔️ Route History Status: ${response.status}")
+            response.body()
+
+        } catch (e: Exception) {
+            println("❌ Route History Error: ${e.message}")
+            throw e
+        }
+    }
+    // ===============================================
+    // SHOP / PRODUCT APIs (existing code)
+    // ===============================================
 
     // ---------------- GET PRODUCTS ----------------
     suspend fun getProducts(token: String): List<ProductDto> {
@@ -343,14 +702,12 @@ class ApiService {
             println("✔️ getProducts: received ${res.size} items")
             res
         } catch (e: ResponseException) {
-            // Ktor HTTP error with response available
             val status = e.response.status
             val text = try { e.response.bodyAsText() } catch (_: Exception) { "unable-to-read-body" }
             println("❌ getProducts - HTTP error: $status")
             println("   response body: $text")
             emptyList()
         } catch (e: Exception) {
-            // network / serialization / other errors
             println("❌ getProducts - error: ${e.message}")
             e.printStackTrace()
             emptyList()
@@ -371,7 +728,6 @@ class ApiService {
             val text = try { e.response.bodyAsText() } catch (_: Exception) { "unable-to-read-body" }
             println("❌ getWishlist - HTTP error: $status")
             println("   response body: $text")
-            // Return a safe fallback
             WishlistResponse(success = false, wishlist = emptyList())
         } catch (e: Exception) {
             println("❌ getWishlist - error: ${e.message}")
@@ -438,12 +794,11 @@ class ApiService {
         } catch (e: Exception) {
             println("❌ getCart error: ${e.message}")
             e.printStackTrace()
-            // safe fallback
             CartResponse(success = false, cart = emptyList(), totalPrice = "0.00")
         }
     }
 
-
+    // ---------------- ADD TO CART ----------------
     suspend fun addToCart(
         token: String,
         add: String,
@@ -455,7 +810,6 @@ class ApiService {
 
         val url = "${baseUrl}cart"
 
-        // ---- PRINT REQUEST BEFORE SENDING ----
         val bodyToSend = CartAddRequest(
             action = add,
             product_id = productId,
@@ -467,25 +821,20 @@ class ApiService {
         println("🌐 POST URL = $url")
         println("📦 REQUEST BODY = ${kotlinx.serialization.json.Json.encodeToString(CartAddRequest.serializer(), bodyToSend)}")
 
-        // ---- DO REQUEST ----
         val response = client.post(url) {
             header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
-
             setBody(bodyToSend)
         }
 
-        // ---- PRINT RAW RESPONSE ----
         val raw = response.bodyAsText()
         println("📝 RAW RESPONSE = $raw")
         println("📡 RESPONSE STATUS = ${response.status}")
 
-        // ---- TRY PARSE ----
         return try {
             response.body<CartActionResponse>()
         } catch (e: Exception) {
             println("❌ Parsing Error: ${e.message}")
-
             CartActionResponse(
                 success = false,
                 action = null,
@@ -494,8 +843,7 @@ class ApiService {
         }
     }
 
-
-
+    // ---------------- UPDATE CART QUANTITY ----------------
     suspend fun updateCartQuantity(
         token: String,
         productId: Int,
@@ -519,7 +867,7 @@ class ApiService {
         }.body()
     }
 
-
+    // ---------------- GET GPS BILLING ----------------
     suspend fun getGpsBilling(token: String): BillingListResponse {
         val url = "${baseUrl}get-gps-billing"
 
@@ -548,7 +896,7 @@ class ApiService {
         }
     }
 
-
+    // ---------------- SAVE GPS BILLING ----------------
     suspend fun saveGpsBilling(
         token: String,
         body: JsonObject
@@ -574,8 +922,7 @@ class ApiService {
         }
     }
 
-
-
+    // ---------------- APPLY PROMO ----------------
     suspend fun applyPromo(
         token: String,
         amount: String,
@@ -615,16 +962,14 @@ class ApiService {
         }
     }
 
-
-
-
+    // ---------------- CREATE PHONEPE ORDER ----------------
     suspend fun createPhonePeOrder(token: String, req: CreateOrderRequest): JsonObject {
         val url = "${baseUrl}phonepe/create-orders"
 
         val response = client.post(url) {
             header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
-            setBody(req)   // ⭐ DTO passed safely
+            setBody(req)
         }
 
         return response.body()
@@ -766,3 +1111,4 @@ class ApiService {
         }.body()
     }
 }
+

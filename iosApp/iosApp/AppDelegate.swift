@@ -1,8 +1,20 @@
 import UIKit
 import ComposeApp   // ⚠️ ye tumhare shared module ka naam hota hai
 
-class AppDelegate: UIResponder, UIApplicationDelegate {
 
+
+// REMOVE @UIApplicationMain
+class AppDelegate: NSObject, UIApplicationDelegate {
+
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil
+    ) -> Bool {
+        print("✅ App Delegate initialized")
+        return true
+    }
+
+    // PhonePe callback handler
     func application(
         _ application: UIApplication,
         open url: URL,
@@ -27,6 +39,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             txnId: txnId,
             reason: status
         )
+//
+//         // 🔥 KMP bridge call
+//         PaymentBus.shared.onResult(
+//             success: success,
+//             txnId: txnId,
+//             reason: status
+//         )
 
         return true
     }

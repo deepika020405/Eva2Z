@@ -1,4 +1,3 @@
-// composeApp/src/commonMain/kotlin/com/developer/ev2z/App.kt
 package com.developer.ev2z
 
 import androidx.compose.foundation.background
@@ -17,7 +16,8 @@ import com.developer.ev2z.data.local.UserPrefs
 import com.developer.ev2z.data.local.createStorageManager
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.repository.AuthRepository
-import com.developer.ev2z.ui.screens.AuthPagerScreen
+import com.developer.ev2z.ui.screens.Auth.AuthPagerScreen
+import com.developer.ev2z.ui.screens.ChangePassword.UpdatePasswordViewModel
 import com.developer.ev2z.ui.screens.homeScreen.HomeViewModel
 import com.developer.ev2z.viewmodel.AuthViewModel
 import com.developer.ev2z.navigation.HomeNavGraph
@@ -27,10 +27,13 @@ import com.developer.ev2z.ui.screens.AddDevice.AddDeviceViewModel
 import com.developer.ev2z.ui.screens.AddDevice.AddDeviceResult
 import com.developer.ev2z.ui.screens.AddDevice.BottomSheet
 import com.developer.ev2z.ui.screens.AddDeviceSuccess.AddDeviceSuccessScreen
+import com.developer.ev2z.ui.screens.ChangePassword.ChangePasswordScreen
 import com.developer.ev2z.ui.screens.device_Report.DeviceReportScreen
 import com.developer.ev2z.ui.screens.device_Report.DeviceReportViewModel
 import com.developer.ev2z.ui.screens.device_Report.PlatformAddressProvider
 import com.developer.ev2z.util.AppTokenProvider
+import com.developer.ev2z.ui.screens.AuthFlows.ForgetPasswordFlow
+import com.developer.ev2z.ui.screens.AuthFlows.RegistrationFlow
 import kotlinx.coroutines.delay
 
 @Composable
@@ -44,6 +47,10 @@ fun App() {
     val authViewModel = remember { AuthViewModel(authRepository, storage) }
     val homeViewModel = remember { HomeViewModel(homeRepository) }
     val addDeviceViewModel = remember { AddDeviceViewModel() }
+
+    // ✅ NEW: UpdatePasswordViewModel
+    val updatePasswordViewModel = remember { UpdatePasswordViewModel(apiService, storage) }
+
     val platformContext = getPlatformContext()
     val addressProvider = remember { PlatformAddressProvider(platformContext) }
 
@@ -62,6 +69,16 @@ fun App() {
     var showDeviceReport by remember { mutableStateOf(false) }
     var showAddDeviceSuccess by remember { mutableStateOf(false) }
 
+    // Authentication flow states
+    var showForgetPassword by remember { mutableStateOf(false) }
+    var showRegistration by remember { mutableStateOf(false) }
+    var registrationName by remember { mutableStateOf("") }
+    var registrationPhone by remember { mutableStateOf("") }
+    var registrationEmail by remember { mutableStateOf("") }
+
+    // ✅ NEW: Change Password state
+    var showChangePassword by remember { mutableStateOf(false) }
+
     // Success screen data
     var successDeviceName by remember { mutableStateOf("") }
     var successDeviceId by remember { mutableStateOf("") }
@@ -70,6 +87,7 @@ fun App() {
 
     val loginSuccess by authViewModel.loginSuccess.collectAsState()
     val addDeviceResult by addDeviceViewModel.addDeviceResult.collectAsState()
+    var forgetPasswordPhone by remember { mutableStateOf("") }
 
     // Initial load
     LaunchedEffect(Unit) {
@@ -121,6 +139,57 @@ fun App() {
         when {
             isLoading -> {
                 SplashScreen()
+            }
+
+            // UPDATE showChangePassword rendering
+            showChangePassword -> {
+                println("📱 Rendering: Change Password Screen")
+                ChangePasswordScreen(
+                    apiService = apiService,
+                    storageManager = storage,
+                    onBackPressed = {
+                        println("🔙 Back from Change Password")
+                        showChangePassword = false
+                    }
+                )
+            }
+
+            // Forget Password Flow
+            showForgetPassword -> {
+                println("📱 Rendering: Forget Password Flow")
+                ForgetPasswordFlow(
+                    authViewModel = authViewModel,
+                    preFilledPhone = forgetPasswordPhone,
+                    onBack = {
+                        println("🔙 Back to Auth from Forget Password")
+                        showForgetPassword = false
+                        forgetPasswordPhone = ""
+                    },
+                    onSuccess = {
+                        println("✅ Password reset successful")
+                        showForgetPassword = false
+                        forgetPasswordPhone = ""
+                    }
+                )
+            }
+
+            // Registration Flow
+            showRegistration -> {
+                println("📱 Rendering: Registration Flow")
+                RegistrationFlow(
+                    authViewModel = authViewModel,
+                    name = registrationName,
+                    phone = registrationPhone,
+                    email = registrationEmail,
+                    onBack = {
+                        println("🔙 Back to Auth from Registration")
+                        showRegistration = false
+                    },
+                    onSuccess = {
+                        println("✅ Registration successful")
+                        showRegistration = false
+                    }
+                )
             }
 
             showAddDeviceSuccess -> {
@@ -190,6 +259,10 @@ fun App() {
                         println("➕ Navigate to Device Report triggered")
                         showDeviceReport = true
                     },
+                    onNavigateToChangePassword = { // ✅ NEW
+                        println("🔑 Navigate to Change Password triggered")
+                        showChangePassword = true
+                    },
                     onLogout = {
                         println("🚪 Logging out...")
                         userPrefs.clear()
@@ -207,8 +280,22 @@ fun App() {
                     onLoginSuccess = {
                         println("🎉 onLoginSuccess triggered")
                         authViewModel.resetLoginSuccess()
-                        authViewModel.setError("")
+                        authViewModel.clearError()
                         authViewModel.setLoginSuccess(true)
+                    },
+                    onForgetPasswordClick = { phone ->
+                        println("🔑 Forget Password clicked with phone: $phone")
+                        forgetPasswordPhone = phone
+                        showForgetPassword = true
+                    },
+                    onSignupOTPClick = { name, phone, email ->
+                        println("📧 Signup OTP clicked: $name, $phone, $email")
+                        registrationName = name
+                        registrationPhone = phone
+                        registrationEmail = email
+                        val fullPhone = "+91$phone"
+                        authViewModel.signUp(name, fullPhone, "", email)
+                        showRegistration = true
                     }
                 )
             }

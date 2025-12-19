@@ -54,5 +54,11 @@
     <string>UIInterfaceOrientationLandscapeLeft</string>
     <string>UIInterfaceOrientationLandscapeRight</string>
 </array>
+
+<key>NSUserTrackingUsageDescription</key>
+<string>We need to read SMS to auto-fill OTP</string>
+
+<key>NSContactsUsageDescription</key>
+<string>To autofill OTP from SMS</string>
 </dict>
 </plist>

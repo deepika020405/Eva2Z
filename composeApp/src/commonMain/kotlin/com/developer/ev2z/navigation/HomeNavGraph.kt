@@ -1,4 +1,4 @@
-// HomeNavGraph.kt - UPDATED WITH PRIVACY/TERMS SCREENS
+// HomeNavGraph.kt - FINAL FIXED VERSION
 package com.developer.ev2z.navigation
 
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -14,7 +14,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.navigator.tab.*
@@ -22,6 +21,8 @@ import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.repository.ProductRepository
 import com.developer.ev2z.ui.screens.EditProfile.EditProfileScreen
+import com.developer.ev2z.ui.screens.GeoFencing.GeoFencingScreen
+import com.developer.ev2z.ui.screens.HistoryPlayback.HistoryPlaybackScreen
 import com.developer.ev2z.ui.screens.Profile.ProfileScreen
 import com.developer.ev2z.ui.screens.homeScreen.HomeScreen
 import com.developer.ev2z.ui.screens.homeScreen.HomeViewModel
@@ -33,7 +34,7 @@ import com.developer.ev2z.ui.screens.community.CommunityScreenWrapper
 import com.developer.ev2z.ui.screens.market_screen.ShopViewModel
 import kotlinx.coroutines.launch
 
-// ------------------ TABS -------------------
+// ------------------ TABS (same as before) -------------------
 
 class HomeTab(
     private val viewModel: HomeViewModel,
@@ -77,7 +78,6 @@ object CommunityTab : Tab {
         // ✅ Navigator so future screens (create post, comments) work
         Navigator(CommunityScreenWrapper())
     }
-
     override val options: TabOptions
         @Composable get() = TabOptions(
             index = 1u,
@@ -92,6 +92,7 @@ class OrdersTab : Tab {
         // ✅ WRAP with Navigator so LocalNavigator works
         Navigator(ShopScreenWrapper())
 //        Navigator(screen = ShopScreenWrapper(shopViewModel))
+
     }
 
     override val options: TabOptions
@@ -109,6 +110,7 @@ class ShopScreenWrapper : Screen {
         ShopScreenHost()
     }
 }
+
 class ProfileTab(
     private val apiService: ApiService,
     private val storageManager: StorageManager,
@@ -116,6 +118,9 @@ class ProfileTab(
     private val onNavigateToManageDevice: () -> Unit,
     private val onNavigateToPrivacyPolicy: () -> Unit,
     private val onNavigateToTermsConditions: () -> Unit,
+    private val onNavigateToChangePassword: () -> Unit,
+    private val onNavigateToGeoFencing: () -> Unit,
+    private val onNavigateToHistoryPlayback: () -> Unit,
     private val onLogout: () -> Unit
 ) : Tab {
     @Composable
@@ -127,6 +132,9 @@ class ProfileTab(
             onManageDevice = onNavigateToManageDevice,
             onPrivacyPolicy = onNavigateToPrivacyPolicy,
             onTermsConditions = onNavigateToTermsConditions,
+            onChangePassword = onNavigateToChangePassword,
+            onGeoFencing = onNavigateToGeoFencing,
+            onHistoryPlayback = onNavigateToHistoryPlayback,
             onLogout = onLogout
         )
     }
@@ -150,6 +158,7 @@ fun HomeNavGraph(
     token: String,
     onNavigateToAddDevice: () -> Unit,
     onNavigateToDeviceReport: () -> Unit,
+    onNavigateToChangePassword: () -> Unit = {}, // ✅ RECEIVE FROM APP
     onLogout: () -> Unit = {}
 ) {
     SetupStatusBar()
@@ -158,6 +167,8 @@ fun HomeNavGraph(
     var showManageDevice by remember { mutableStateOf(false) }
     var showPrivacyPolicy by remember { mutableStateOf(false) }
     var showTermsConditions by remember { mutableStateOf(false) }
+    var showGeoFencing by remember { mutableStateOf(false) }
+    var showHistoryPlayback by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         HomeNavGraphContent(
@@ -171,6 +182,9 @@ fun HomeNavGraph(
             onNavigateToManageDevice = { showManageDevice = true },
             onNavigateToPrivacyPolicy = { showPrivacyPolicy = true },
             onNavigateToTermsConditions = { showTermsConditions = true },
+            onNavigateToChangePassword = onNavigateToChangePassword,
+            onNavigateToGeoFencing = { showGeoFencing = true },
+            onNavigateToHistoryPlayback = { showHistoryPlayback = true },
             onLogout = onLogout
         )
 
@@ -189,9 +203,7 @@ fun HomeNavGraph(
                 apiService = apiService,
                 storageManager = storageManager,
                 onBackClick = { showManageDevice = false },
-                onProfileClick = {
-                    showManageDevice = false
-                },
+                onProfileClick = { showManageDevice = false },
                 onAddDeviceClick = {
                     showManageDevice = false
                     onNavigateToAddDevice()
@@ -214,10 +226,27 @@ fun HomeNavGraph(
                 onBackPressed = { showTermsConditions = false }
             )
         }
+
+        // GeoFencing Screen
+        if (showGeoFencing) {
+            GeoFencingScreen(
+                apiService = apiService,
+                storageManager = storageManager,
+                onBackPressed = { showGeoFencing = false }
+            )
+        }
+
+// History Playback Screen
+        if (showHistoryPlayback) {
+            HistoryPlaybackScreen(
+                apiService = apiService,
+                storageManager = storageManager,
+                onBackPressed = { showHistoryPlayback = false }
+            )
+        }
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeNavGraphContent(
     viewModel: HomeViewModel,
@@ -230,17 +259,15 @@ fun HomeNavGraphContent(
     onNavigateToManageDevice: () -> Unit,
     onNavigateToPrivacyPolicy: () -> Unit,
     onNavigateToTermsConditions: () -> Unit,
+    onNavigateToChangePassword: () -> Unit = {},
+    onNavigateToGeoFencing: () -> Unit = {},
+    onNavigateToHistoryPlayback: () -> Unit = {},
     onLogout: () -> Unit
 ) {
-    // === Create Shop repository + viewmodel here (or inject via DI) ===
     val productRepository = remember { ProductRepository(apiService) }
-
-    // Token provider lambda — adapt to your StorageManager API if the method differs
     val tokenProvider: () -> String = remember {
-        { storageManager.getString("token","") } // <-- replace getToken() with actual method if different
+        { storageManager.getString("token","") }
     }
-
-    // Create ShopViewModel (remember so it's not recreated every recomposition)
     val shopViewModel = remember {
         ShopViewModel(repo = productRepository, tokenProvider = tokenProvider)
     }
@@ -254,11 +281,15 @@ fun HomeNavGraphContent(
             onNavigateToManageDevice,
             onNavigateToPrivacyPolicy,
             onNavigateToTermsConditions,
+            onNavigateToChangePassword,
+            onNavigateToGeoFencing,
+            onNavigateToHistoryPlayback,
             onLogout
         )
     }
     val ordersTab = remember { OrdersTab() }
     val tabs = listOf(homeTab, CommunityTab, ordersTab, profileTab)
+
     val pagerState = rememberPagerState(pageCount = { tabs.size })
     val coroutineScope = rememberCoroutineScope()
 
@@ -306,7 +337,6 @@ fun CustomBottomNavBar(
             NavigationBarItem(
                 selected = selected,
                 onClick = { onTabSelected(index) },
-
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = green,
                     selectedTextColor = green,
@@ -314,14 +344,12 @@ fun CustomBottomNavBar(
                     unselectedIconColor = Color.Gray,
                     unselectedTextColor = Color.Gray
                 ),
-
                 icon = {
                     Icon(
                         painter = tab.options.icon!!,
                         contentDescription = tab.options.title
                     )
                 },
-
                 label = {
                     Text(
                         text = tab.options.title,
