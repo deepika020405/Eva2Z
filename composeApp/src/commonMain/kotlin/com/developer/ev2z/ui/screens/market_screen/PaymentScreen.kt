@@ -31,12 +31,28 @@ fun PaymentScreenContent() {
     val paymentState by viewModel.paymentState.collectAsState()
     val navigator = LocalNavigator.currentOrThrow
 
-    // ✅ Handle payment success
+    // ✅ Handle payment success/failed
     LaunchedEffect(paymentState) {
-        when (paymentState) {
+        when (val ps = paymentState) {
             is PaymentState.Success -> {
-                // Navigate to success screen or go back
-                navigator.pop()
+                println("✅ Navigating to success screen")
+                navigator.replace(
+                    PaymentResultScreen(
+                        isSuccess = true,
+                        transactionId = ps.txnId,
+                        amount = state.finalAmount ?: state.totalPrice
+                    )
+                )
+            }
+            is PaymentState.Failed -> {
+                println("❌ Navigating to failed screen")
+                navigator.replace(
+                    PaymentResultScreen(
+                        isSuccess = false,
+                        reason = ps.reason,
+                        amount = state.finalAmount ?: state.totalPrice
+                    )
+                )
             }
             else -> {}
         }
