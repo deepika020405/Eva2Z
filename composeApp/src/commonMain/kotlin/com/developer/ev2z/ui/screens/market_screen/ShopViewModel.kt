@@ -1,12 +1,10 @@
+// commonMain/ui/screens/market_screen/ShopViewModel.kt
 package com.developer.ev2z.ui.screens.market_screen
-
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.developer.ev2z.phonepe.PaymentBus
 import com.developer.ev2z.phonepe.PaymentState
 import com.developer.ev2z.repository.ProductRepository
-import com.developer.ev2z.request.CreateOrderRequest
 import com.developer.ev2z.response.CartItemDto
 import com.developer.ev2z.response.ProductDto
 import com.developer.ev2z.response.WishlistProductWrapper
@@ -18,35 +16,25 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import com.developer.ev2z.util.encodeUrl
 import com.developer.ev2z.phonepe.openPhonePeSdk
-import com.developer.ev2z.phonepe.PaymentResult
-
 
 data class ShopUiState(
     val loading: Boolean = false,
     val products: List<ProductDto> = emptyList(),
     val wishlist: List<WishlistProductWrapper> = emptyList(),
-    val cart: List<CartItemDto> = emptyList(),       // new
-    val cartCount: Int = 0,                          // new (sum of quantities)
+    val cart: List<CartItemDto> = emptyList(),
+    val cartCount: Int = 0,
     val totalPrice: String? = null,
-    val addresses: List<BillingAddress> = emptyList(),   // ⭐ NEW
-    val selectedAddress: BillingAddress? = null,         // ⭐ NEW
+    val addresses: List<BillingAddress> = emptyList(),
+    val selectedAddress: BillingAddress? = null,
     val error: String? = null,
     val promoApplied: Boolean = false,
     val appliedPromoCode: String? = null,
     val originalAmount: String? = null,
     val finalAmount: String? = null,
     val discountApplied: Double? = null,
-    val promoError: String? = null,
-    val orderLoading: Boolean = false,
-    val orderToken: String? = null,
-    val merchantOrderId: String? = null,
-    val phonePeOrderId: String? = null,
-    val orderError: String? = null
+    val promoError: String? = null
 )
-
-
 
 data class BillingAddress(
     val id: Int,
@@ -59,17 +47,6 @@ data class BillingAddress(
     val pincode: String
 )
 
-data class CartState(
-    val loading: Boolean = false,
-    val cart: List<CartItemDto> = emptyList(),
-    val cartCount: Int = 0,
-    val totalPrice: String? = "0",
-
-    val addresses: List<BillingAddress> = emptyList(),
-    val selectedAddress: BillingAddress? = null
-)
-
-
 class ShopViewModel(
     private val repo: ProductRepository,
     private val tokenProvider: () -> String
@@ -79,9 +56,7 @@ class ShopViewModel(
     private val _state = MutableStateFlow(ShopUiState())
     val state: StateFlow<ShopUiState> = _state
 
-    private val _paymentState =
-        MutableStateFlow<PaymentState>(PaymentState.Idle)
-
+    private val _paymentState = MutableStateFlow<PaymentState>(PaymentState.Idle)
     val paymentState: StateFlow<PaymentState> = _paymentState
 
     fun loadData() {
@@ -93,8 +68,6 @@ class ShopViewModel(
                 val products = repo.getProducts(token)
                 val wishlist = repo.getWishlist(token)
                 val cartResp = repo.getCart(token)
-
-                // compute cart count as sum of quantities
                 val count = cartResp.cart.sumOf { it.quantity }
 
                 _state.value = ShopUiState(
@@ -117,16 +90,11 @@ class ShopViewModel(
 
     fun toggleWishlist(productId: Int) {
         val token = tokenProvider()
-
         scope.launch {
             val isWishlisted = _state.value.wishlist.any { it.product_id == productId }
-
             if (isWishlisted) repo.removeWishlist(token, productId)
             else repo.addWishlist(token, productId)
-
-            // Refresh wishlist
             val wishlist = repo.getWishlist(token)
-
             _state.value = _state.value.copy(wishlist = wishlist)
         }
     }
@@ -134,7 +102,6 @@ class ShopViewModel(
     fun isFavorite(productId: Int): Boolean {
         return _state.value.wishlist.any { it.product_id == productId }
     }
-
 
     fun refreshCart() {
         val token = tokenProvider()
@@ -148,31 +115,22 @@ class ShopViewModel(
                     totalPrice = cartResp.totalPrice
                 )
             } catch (e: Exception) {
-                // ignore or set error
+                println("❌ refreshCart error: ${e.message}")
             }
         }
     }
 
-
-    fun addToCart(add: String,productId: Int, quantity: Int = 1,plan_type: String,device_type: String) {
+    fun addToCart(add: String, productId: Int, quantity: Int = 1, plan_type: String, device_type: String) {
         val token = tokenProvider()
-
         scope.launch {
             try {
-                val ok = repo.addToCart(token, add,productId, quantity,plan_type,device_type)
-
-                if (ok) {
-//                    refreshCart() // update cart count UI
-                } else {
-                    println("❌ Failed to add to cart")
-                }
-
+                val ok = repo.addToCart(token, add, productId, quantity, plan_type, device_type)
+                if (!ok) println("❌ Failed to add to cart")
             } catch (e: Exception) {
                 println("❌ addToCart error: ${e.message}")
             }
         }
     }
-
 
     fun loadCart() {
         val token = tokenProvider()
@@ -199,28 +157,17 @@ class ShopViewModel(
         }
     }
 
-
-
-    fun updateQuantity(
-        productId: Int,
-        newQty: Int,
-        plan_type: String?,
-        device_type: String?
-    ) {
+    fun updateQuantity(productId: Int, newQty: Int, plan_type: String?, device_type: String?) {
         val token = tokenProvider()
 
         scope.launch {
-
-            // ⭐ SAME LOGIC APPLY AS ADD TO CART
             val finalPlan = if (productId == 10 || productId == 11) {
                 when (plan_type?.lowercase()) {
                     "with_recharge" -> "with_recharge"
                     "without_recharge" -> "without_recharge"
                     else -> ""
                 }
-            } else {
-                ""   // ⭐ OTHER PRODUCTS MUST NOT SEND PLAN TYPE
-            }
+            } else ""
 
             val finalDevice = when (device_type?.lowercase()) {
                 "android" -> "android"
@@ -237,11 +184,8 @@ class ShopViewModel(
                     device_type = finalDevice
                 )
 
-                if (ok) {
-                    refreshCart()
-                } else {
-                    println("❌ Failed to update quantity (Server Reject)")
-                }
+                if (ok) refreshCart()
+                else println("❌ Failed to update quantity")
 
             } catch (e: Exception) {
                 println("❌ updateQuantity error: ${e.message}")
@@ -249,12 +193,10 @@ class ShopViewModel(
         }
     }
 
-
     fun loadBillingAddresses() {
         val token = tokenProvider()
 
         scope.launch {
-
             try {
                 _state.value = _state.value.copy(loading = true)
 
@@ -264,7 +206,6 @@ class ShopViewModel(
                 println("📦 Raw Billing Count = ${list.size}")
 
                 val mapped = list.sortedByDescending { it.id }.map {
-                    println("➡ Address Loaded: ${it.fname} ${it.address}")
                     BillingAddress(
                         id = it.id,
                         fullName = it.fname ?: "",
@@ -276,8 +217,6 @@ class ShopViewModel(
                         pincode = it.pincode ?: ""
                     )
                 }
-
-                println("🎯 Final Address List Mapped: ${mapped.size}")
 
                 _state.value = _state.value.copy(
                     addresses = mapped,
@@ -297,7 +236,6 @@ class ShopViewModel(
         _state.value = _state.value.copy(selectedAddress = address)
     }
 
-
     fun addNewAddress(
         fname: String,
         phone: String,
@@ -311,14 +249,13 @@ class ShopViewModel(
         val token = tokenProvider()
 
         scope.launch {
-
             val ok = repo.addBillingAddress(
                 token, fname, phone, email, address, city, state, pincode
             )
 
             if (ok) {
                 println("✔ Address Added Successfully")
-                loadBillingAddresses()   // refresh list
+                loadBillingAddresses()
                 onDone()
             } else {
                 println("❌ Failed to Add Address")
@@ -326,13 +263,11 @@ class ShopViewModel(
         }
     }
 
-
     fun applyPromo(code: String) {
         val token = tokenProvider()
         val amount = _state.value.totalPrice ?: "0"
         val upper = code.trim().uppercase()
 
-        // ❌ Invalid format?
         if (!upper.startsWith("WELCOME") && !upper.startsWith("REFER")) {
             _state.value = _state.value.copy(
                 promoApplied = false,
@@ -353,7 +288,6 @@ class ShopViewModel(
                     return@launch
                 }
 
-                // ⭐ SUCCESS
                 _state.value = _state.value.copy(
                     promoApplied = true,
                     appliedPromoCode = resp.appliedCode,
@@ -376,105 +310,19 @@ class ShopViewModel(
     fun clearPromoError() {
         _state.value = _state.value.copy(promoError = null)
     }
-    
-
-
-
-    fun createOrder(
-        onReady: (orderToken: String) -> Unit
-    ) {
-        val s = _state.value
-        val token = tokenProvider()
-        val amount = (s.finalAmount ?: s.totalPrice ?: "0").toDouble()
-        val billingId = s.selectedAddress?.id
-
-        if (billingId == null) {
-            _paymentState.value =
-                PaymentState.Failed("Please select delivery address")
-            return
-        }
-
-        _paymentState.value = PaymentState.Processing
-
-        scope.launch {
-            try {
-                val resp = repo.createPhonePeOrder(
-                    token = token,
-                    amount = amount,
-                    billingId = billingId
-                )
-
-                val orderToken = resp["orderToken"]?.jsonPrimitive?.content
-                    ?: throw Exception("orderToken missing")
-
-                println("✅ ORDER TOKEN = $orderToken")
-
-                // 🔥 ONLY PASS TOKEN
-                onReady(orderToken)
-
-            } catch (e: Exception) {
-                _paymentState.value =
-                    PaymentState.Failed(e.message ?: "Order creation failed")
-            }
-        }
-    }
-
-    fun confirmPayment(txnId: String) {
-        println("✅ Payment confirmed for txnId = $txnId")
-
-        // backend verify / success API call yahin jayega
-        _paymentState.value = PaymentState.Success(txnId)
-
-        // cart refresh / clear if needed
-        refreshCart()
-    }
-
-    fun paymentFailed(reason: String) {
-        println("❌ Payment failed: $reason")
-        _paymentState.value = PaymentState.Failed(reason)
-    }
-
-    fun markPaymentPending(txnId: String) {
-        _paymentState.value = PaymentState.Processing
-    }
-
-
-    // ✅ Handle payment result - bas SUCCESS ya FAILED
-    fun onPaymentResult(success: Boolean, txnId: String?, reason: String?) {
-        println("📊 Payment Result: success=$success, txn=$txnId, reason=$reason")
-
-        _paymentState.value = if (success) {
-            println("✅ Payment successful!")
-            // Backend already cleared cart when order was created
-            PaymentState.Success(txnId ?: "")
-        } else {
-            println("❌ Payment failed: $reason")
-            PaymentState.Failed(reason ?: "Payment failed")
-        }
-    }
-
-
-
-
-
 
     fun removeFromCart(item: CartItemDto) {
         val token = tokenProvider()
 
         scope.launch {
-
-            // ⭐ PLAN TYPE — ONLY FOR RECHARGE PRODUCTS
             val finalPlan = if (item.product_id == 10 || item.product_id == 11) {
                 when (item.plan_type?.lowercase()) {
                     "with_recharge" -> "with_recharge"
                     "without_recharge" -> "without_recharge"
                     else -> ""
                 }
-            } else {
-                ""   // 🚫 others MUST NOT send plan_type
-            }
+            } else ""
 
-            // ⭐ DEVICE TYPE — SAME AS UPDATE QUANTITY
             val finalDevice = when (item.device_type?.lowercase()) {
                 "android" -> "android"
                 "ios" -> "ios"
@@ -484,27 +332,21 @@ class ShopViewModel(
             try {
                 val ok = repo.addToCart(
                     token = token,
-                    add = "remove",          // 🔥 THIS IS THE KEY
+                    add = "remove",
                     productId = item.product_id,
-                    quantity = 0,            // ignored by backend for remove
+                    quantity = 0,
                     plan_type = finalPlan,
                     device_type = finalDevice
                 )
 
-                if (ok) {
-                    refreshCart()
-                } else {
-                    println("❌ Failed to remove item (Server Reject)")
-                }
+                if (ok) refreshCart()
+                else println("❌ Failed to remove item")
 
             } catch (e: Exception) {
                 println("❌ removeFromCart error = ${e.message}")
             }
         }
     }
-
-
-    // ShopViewModel.kt
 
     fun deleteBillingAddress(billingId: Int) {
         val token = tokenProvider()
@@ -521,58 +363,7 @@ class ShopViewModel(
         }
     }
 
-    // Add to ShopViewModel.kt
-
-//    fun initiatePhonePePayment() {
-//        val s = _state.value
-//        val token = tokenProvider()
-//        val amount = (s.finalAmount ?: s.totalPrice ?: "0").toDouble()
-//        val billingId = s.selectedAddress?.id
-//
-//        if (billingId == null) {
-//            _paymentState.value = PaymentState.Failed("Please select delivery address")
-//            return
-//        }
-//
-//        _paymentState.value = PaymentState.Processing
-//
-//        scope.launch {
-//            try {
-//                // ✅ Create order on backend
-//                val resp = repo.createPhonePeOrder(
-//                    token = token,
-//                    amount = amount,
-//                    billingId = billingId
-//                )
-//
-//                val orderToken = resp["orderToken"]?.jsonPrimitive?.content
-//                    ?: throw Exception("orderToken missing")
-//
-//                val phonepeOrderId = resp["phonepeOrderId"]?.jsonPrimitive?.content
-//                    ?: throw Exception("orderId missing")
-//
-//                println("✅ Order Created: token=$orderToken, orderId=$phonepeOrderId")
-//
-//                // ✅ Launch PhonePe via expect/actual
-//                openPhonePeSdk(orderToken) { result ->
-//                    if (result.success) {
-//                        println("✅ Payment Success: ${result.transactionId}")
-//                        _paymentState.value = PaymentState.Success(result.transactionId)
-//                        refreshCart()
-//                    } else {
-//                        println("❌ Payment Failed: ${result.message}")
-//                        _paymentState.value = PaymentState.Failed(result.message)
-//                    }
-//                }
-//
-//            } catch (e: Exception) {
-//                println("❌ Order creation failed: ${e.message}")
-//                _paymentState.value = PaymentState.Failed(e.message ?: "Order creation failed")
-//            }
-//        }
-//    }
-    // commonMain/ui/screens/market_screen/ShopViewModel.kt
-
+    // ✅ FIXED: Payment initiation with proper state management
     fun initiatePhonePePayment() {
         val s = _state.value
         val token = tokenProvider()
@@ -584,11 +375,13 @@ class ShopViewModel(
             return
         }
 
+        println("🚀 Starting payment initiation...")
         _paymentState.value = PaymentState.Processing
 
         scope.launch {
             try {
-                // ✅ Create order on backend
+                // ✅ 1. Create order on backend
+                println("📝 Creating order on backend...")
                 val resp = repo.createPhonePeOrder(
                     token = token,
                     amount = amount,
@@ -601,21 +394,12 @@ class ShopViewModel(
                 val phonepeOrderId = resp["phonepeOrderId"]?.jsonPrimitive?.content
                     ?: throw Exception("orderId missing")
 
-                println("✅ Order Created: token=$orderToken, orderId=$phonepeOrderId")
+                println("✅ Order Created: token=${orderToken.take(50)}..., orderId=$phonepeOrderId")
 
-                // ✅ Launch PhonePe via expect/actual
+                // ✅ 2. Launch PhonePe SDK
+                println("📱 Launching PhonePe SDK...")
                 openPhonePeSdk(orderToken) { result ->
-                    if (result.success) {
-                        println("✅ Payment Success: ${result.transactionId}")
-                        _paymentState.value = PaymentState.Success(result.transactionId)
-
-                        // ✅ Clear cart immediately on success
-                        clearCart()
-
-                    } else {
-                        println("❌ Payment Failed: ${result.message}")
-                        _paymentState.value = PaymentState.Failed(result.message)
-                    }
+                    handlePaymentResult(result)
                 }
 
             } catch (e: Exception) {
@@ -625,7 +409,30 @@ class ShopViewModel(
         }
     }
 
-    // ✅ Add this function to clear cart
+    // ✅ FIXED: Payment result handler
+    private fun handlePaymentResult(result: com.developer.ev2z.phonepe.PaymentResult) {
+        println("📊 Payment Result Received:")
+        println("  - Success: ${result.success}")
+        println("  - TxnId: ${result.transactionId}")
+        println("  - Message: ${result.message}")
+
+        if (result.success) {
+            // ⭐ IMPORTANT: User completed payment flow
+            // Backend will verify via webhook
+            println("✅ Payment flow completed successfully")
+            _paymentState.value = PaymentState.Success(result.transactionId)
+
+            // ✅ Clear cart ONLY after successful payment
+            clearCart()
+
+        } else {
+            // ❌ Payment failed or cancelled
+            println("❌ Payment failed: ${result.message}")
+            _paymentState.value = PaymentState.Failed(result.message ?: "Payment failed")
+        }
+    }
+
+    // ✅ Clear cart after successful payment
     private fun clearCart() {
         scope.launch {
             try {
@@ -643,5 +450,11 @@ class ShopViewModel(
                 println("❌ Cart clear error: ${e.message}")
             }
         }
+    }
+
+    // ✅ Reset payment state (for retry)
+    fun resetPaymentState() {
+        println("🔄 Resetting payment state to Idle")
+        _paymentState.value = PaymentState.Idle
     }
 }

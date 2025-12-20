@@ -9,29 +9,32 @@ actual fun openPhonePeSdk(
     paymentUrl: String,
     onResult: (PaymentResult) -> Unit
 ) {
-    // ✅ Register callback
+    println("🚀 iOS PhonePe launcher called")
+    println("🔗 Payment URL/Token: ${paymentUrl.take(50)}...")
+
+    // ✅ Register callback FIRST
     PaymentBus.register { success, txnId, reason ->
-        println("📞 iOS Callback: success=$success txnId=$txnId")
+        println("📞 iOS Payment Callback: success=$success, txnId=$txnId, reason=$reason")
         onResult(PaymentResult(success, txnId, reason))
     }
 
     try {
-        // ✅ Build PhonePe payment URL
+        // ✅ Build PhonePe payment URL with token parameter
         val phonePeWebUrl = "https://mercury.phonepe.com/transact/pg?token=$paymentUrl"
 
-        println("🚀 Opening In-App PhonePe WebView")
-        println("🔗 URL: $phonePeWebUrl")
+        println("📲 Posting notification with URL")
 
-        // ✅ CORRECT: Cast String to NSString, then to NSObject
+        // ✅ Cast to NSString then NSObject
         NSNotificationCenter.defaultCenter.postNotificationName(
             aName = "OpenPaymentWebView",
             `object` = phonePeWebUrl as NSString as NSObject
         )
 
-        println("✅ Payment WebView notification posted")
+        println("✅ Payment notification posted successfully")
 
     } catch (e: Exception) {
-        println("❌ Error: ${e.message}")
+        println("❌ iOS Payment Error: ${e.message}")
+        e.printStackTrace()
         onResult(PaymentResult(false, null, "Failed to open payment: ${e.message}"))
     }
 }

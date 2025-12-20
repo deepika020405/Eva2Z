@@ -1,3 +1,4 @@
+// commonMain/ui/screens/market_screen/PaymentScreen.kt
 package com.developer.ev2z.ui.screens.market_screen
 
 import androidx.compose.foundation.background
@@ -31,11 +32,11 @@ fun PaymentScreenContent() {
     val paymentState by viewModel.paymentState.collectAsState()
     val navigator = LocalNavigator.currentOrThrow
 
-    // ✅ Handle payment success/failed
+    // ✅ Handle payment state changes
     LaunchedEffect(paymentState) {
         when (val ps = paymentState) {
             is PaymentState.Success -> {
-                println("✅ Navigating to success screen")
+                println("✅ Payment Success - Navigating to success screen")
                 navigator.replace(
                     PaymentResultScreen(
                         isSuccess = true,
@@ -45,7 +46,7 @@ fun PaymentScreenContent() {
                 )
             }
             is PaymentState.Failed -> {
-                println("❌ Navigating to failed screen")
+                println("❌ Payment Failed - Navigating to failed screen")
                 navigator.replace(
                     PaymentResultScreen(
                         isSuccess = false,
@@ -78,7 +79,11 @@ fun PaymentScreenContent() {
             Text(
                 "✕",
                 fontSize = 24.sp,
-                modifier = Modifier.clickable { navigator.pop() }
+                modifier = Modifier.clickable {
+                    // ✅ Reset payment state before going back
+                    viewModel.resetPaymentState()
+                    navigator.pop()
+                }
             )
         }
 
@@ -121,6 +126,9 @@ fun PaymentScreenContent() {
             name = "PhonePe",
             description = "UPI, Cards, Wallets & More",
             onClick = {
+                println("📱 PhonePe button clicked")
+                // ✅ Reset state before initiating new payment
+                viewModel.resetPaymentState()
                 viewModel.initiatePhonePePayment()
             },
             enabled = paymentState !is PaymentState.Processing
@@ -153,18 +161,36 @@ fun PaymentScreenContent() {
             }
         }
 
-        // Error Display
+        // Error Display (only for immediate errors, not payment failures)
         if (paymentState is PaymentState.Failed) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(Color(0xFFFFEBEE)),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text(
-                    "❌ ${(paymentState as PaymentState.Failed).reason}",
-                    modifier = Modifier.padding(16.dp),
-                    color = Color.Red
-                )
+                Column(
+                    modifier = Modifier.padding(16.dp)
+                ) {
+                    Text(
+                        "❌ ${(paymentState as PaymentState.Failed).reason}",
+                        color = Color.Red,
+                        fontSize = 14.sp
+                    )
+
+                    Spacer(Modifier.height(12.dp))
+
+                    // ✅ Retry button for immediate errors
+                    Button(
+                        onClick = {
+                            println("🔄 Retry button clicked")
+                            viewModel.resetPaymentState()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(Color(0xFF1B9F4A))
+                    ) {
+                        Text("Try Again")
+                    }
+                }
             }
         }
     }

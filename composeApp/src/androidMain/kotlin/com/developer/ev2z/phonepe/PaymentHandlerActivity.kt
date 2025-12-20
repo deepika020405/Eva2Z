@@ -14,20 +14,24 @@ import com.phonepe.intent.sdk.api.models.PhonePeEnvironment
 class PaymentHandlerActivity : ComponentActivity() {
 
     private lateinit var launcher: ActivityResultLauncher<Intent>
+    private var hasProcessedResult = false // ⭐ Prevent duplicate callbacks
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         Log.d("PhonePe", "🏗️ PaymentHandlerActivity created")
 
-        // ✅ 1. Register launcher FIRST (mandatory before SDK call)
+        // ✅ 1. Register launcher FIRST
         launcher = registerForActivityResult(
             ActivityResultContracts.StartActivityForResult()
         ) { result ->
-            handlePaymentResult(result.resultCode, result.data)
+            if (!hasProcessedResult) {
+                hasProcessedResult = true
+                handlePaymentResult(result.resultCode, result.data)
+            }
         }
 
-        // ✅ 2. Initialize PhonePe SDK (EXACT SAME AS YOUR OLD CODE)
+        // ✅ 2. Initialize PhonePe SDK
         val initResult = PhonePeKt.init(
             this,
             "M22VRDGEOVBYAUAT",
@@ -60,7 +64,7 @@ class PaymentHandlerActivity : ComponentActivity() {
         Log.d("PhonePe", "🔑 Token: ${orderToken.take(50)}...")
         Log.d("PhonePe", "🆔 Order ID: $orderId")
 
-        // ✅ 4. Start PhonePe checkout (EXACT SAME AS YOUR OLD CODE)
+        // ✅ 4. Start PhonePe checkout
         try {
             PhonePeKt.startCheckoutPage(
                 this,           // context
@@ -81,7 +85,7 @@ class PaymentHandlerActivity : ComponentActivity() {
     private fun handlePaymentResult(resultCode: Int, data: Intent?) {
         Log.d("PhonePe", "📱 Result Code: $resultCode")
 
-        // ✅ Check for SDK error codes (EXACT SAME AS YOUR OLD CODE)
+        // ✅ Check for SDK error codes
         val sdkErrorCode = data?.getStringExtra("key_error_code")
         val sdkErrorResult = data?.getStringExtra("key_error_result")
 
@@ -92,14 +96,16 @@ class PaymentHandlerActivity : ComponentActivity() {
             return
         }
 
-        // ✅ Handle result codes (EXACT SAME AS YOUR OLD CODE)
+        // ✅ Handle result codes
         when (resultCode) {
             Activity.RESULT_OK -> {
-                Log.i("PhonePe", "✅ Payment SUCCESS")
+                Log.i("PhonePe", "✅ Payment SUCCESS (User completed flow)")
+                // ⭐ IMPORTANT: This means user completed payment FLOW
+                // NOT that payment is verified by backend
                 PaymentBus.notify(true, null, null)
             }
             Activity.RESULT_CANCELED -> {
-                Log.w("PhonePe", "⚠️ Payment CANCELLED")
+                Log.w("PhonePe", "⚠️ Payment CANCELLED by user")
                 PaymentBus.notify(false, null, "Payment cancelled by user")
             }
             else -> {
@@ -109,5 +115,10 @@ class PaymentHandlerActivity : ComponentActivity() {
         }
 
         finish()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        Log.d("PhonePe", "🗑️ PaymentHandlerActivity destroyed")
     }
 }

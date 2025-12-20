@@ -9,6 +9,8 @@ actual fun openPhonePeSdk(
     paymentUrl: String, // orderToken
     onResult: (PaymentResult) -> Unit
 ) {
+    Log.d("PhonePe", "🚀 Android PhonePe launcher called")
+
     val activity = ActivityProvider.getActivity() ?: run {
         Log.e("PhonePe", "❌ Activity not found")
         onResult(PaymentResult(false, null, "Activity not available"))
@@ -19,13 +21,12 @@ actual fun openPhonePeSdk(
         val orderToken = paymentUrl
         val orderId = "OMO${System.currentTimeMillis()}"
 
-        Log.d("PhonePe", "🚀 Launching Payment Handler")
         Log.d("PhonePe", "🔑 Order Token: ${orderToken.take(50)}...")
         Log.d("PhonePe", "🆔 Order ID: $orderId")
 
-        // ✅ Register callback
+        // ✅ Register callback FIRST
         PaymentBus.register { success, txnId, reason ->
-            Log.d("PhonePe", "📞 Callback: success=$success")
+            Log.d("PhonePe", "📞 Android Callback: success=$success, txnId=$txnId")
             onResult(PaymentResult(success, txnId, reason))
         }
 
@@ -40,7 +41,7 @@ actual fun openPhonePeSdk(
         Log.d("PhonePe", "✅ Payment handler launched")
 
     } catch (e: Exception) {
-        Log.e("PhonePe", "❌ Error: ${e.message}", e)
+        Log.e("PhonePe", "❌ Android Payment Error: ${e.message}", e)
         onResult(PaymentResult(false, null, e.message))
     }
 }
