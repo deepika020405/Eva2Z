@@ -1,12 +1,6 @@
 package com.developer.ev2z.phonepe
 
-//expect fun openPhonePeSdk(
-//    orderToken: String,
-//    merchantId: String,
-//    onResult: (PaymentResult) -> Unit
-//)
-
-
+// ✅ Simple expect function - NO CLASS NEEDED
 expect fun openPhonePeSdk(
     paymentUrl: String,
     onResult: (PaymentResult) -> Unit

@@ -1,52 +1,35 @@
+// iosApp/AppDelegate.swift
 import UIKit
-import ComposeApp   // ⚠️ ye tumhare shared module ka naam hota hai
+import ComposeApp
+import PhonePePayment
 
-
-
-// REMOVE @UIApplicationMain
 class AppDelegate: NSObject, UIApplicationDelegate {
 
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil
     ) -> Bool {
-        print("✅ App Delegate initialized")
+        print("✅ AppDelegate initialized")
         return true
     }
 
-    // PhonePe callback handler
+    // ✅ Handle deep link callback
     func application(
-        _ application: UIApplication,
+        _ app: UIApplication,
         open url: URL,
         options: [UIApplication.OpenURLOptionsKey : Any] = [:]
     ) -> Bool {
+        print("📲 AppDelegate: Deep link opened: \(url.absoluteString)")
 
-        print("📲 PhonePe Callback URL = \(url)")
+        // ✅ Let PhonePe SDK handle it first
+        let handled = PPPayment.checkDeeplink(url)
+        if handled {
+            print("✅ PhonePe SDK handled deep link")
+            return true
+        }
 
-        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-
-        let status = components?.queryItems?
-            .first(where: { $0.name == "status" })?.value
-
-        let txnId = components?.queryItems?
-            .first(where: { $0.name == "transactionId" })?.value
-
-        let success = status == "SUCCESS"
-
-        // 🔥 KMP bridge call
-        PaymentBus.shared.onResult(
-            success: success,
-            txnId: txnId,
-            reason: status
-        )
-//
-//         // 🔥 KMP bridge call
-//         PaymentBus.shared.onResult(
-//             success: success,
-//             txnId: txnId,
-//             reason: status
-//         )
-
+        // ✅ Otherwise, pass to PaymentBridge
+        PaymentBridge.shared.handleDeepLink(url)
         return true
     }
 }

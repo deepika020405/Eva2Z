@@ -641,6 +641,18 @@ fun AddAddressUI(
             Text("Save Address", color = Color.White)
         }
 
+        // Replace the UPI bottom sheet button with:
+
+//        Button(
+//            onClick = {
+//                // ✅ Navigate to payment method selector
+//                navigator.push(PaymentScreen())
+//            },
+//            shape = RoundedCornerShape(30.dp)
+//        ) {
+//            Text("Proceed to Payment")
+//        }
+
         Spacer(Modifier.height(10.dp))
 
         TextButton(onClick = onCancel) {
@@ -712,16 +724,15 @@ fun SummaryRow(label: String, value: String, isBold: Boolean = false) {
     }
 }
 
-
 @Composable
 fun CheckoutBottomBar(viewModel: ShopViewModel) {
-
     val state by viewModel.state.collectAsState()
     val paymentState by viewModel.paymentState.collectAsState()
     val context = getPlatformContext()!! // returns Activity on Android
 
 
     var showUpiSheet by remember { mutableStateOf(false) } // 👈 OUTSIDE
+    val navigator = LocalNavigator.currentOrThrow  // ✅ ADD THIS
 
     Box(
         Modifier
@@ -737,7 +748,6 @@ fun CheckoutBottomBar(viewModel: ShopViewModel) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-
             Column {
                 Text("Total Amount", color = Color.Gray)
                 Text(
@@ -753,8 +763,11 @@ fun CheckoutBottomBar(viewModel: ShopViewModel) {
                     strokeWidth = 3.dp
                 )
             } else {
+                // ✅ CORRECT: Navigate to PaymentScreen
                 Button(
-                    onClick = { showUpiSheet = true },
+                    onClick = {
+                        navigator.push(PaymentScreen())
+                    },
                     shape = RoundedCornerShape(30.dp)
                 ) {
                     Text("Checkout")
@@ -762,6 +775,7 @@ fun CheckoutBottomBar(viewModel: ShopViewModel) {
             }
         }
     }
+
 
     if (showUpiSheet) {
         UpiBottomSheet(
@@ -788,7 +802,88 @@ fun CheckoutBottomBar(viewModel: ShopViewModel) {
             onDismiss = { showUpiSheet = false }
         )
     }
+
 }
+
+
+//@Composable
+//fun CheckoutBottomBar(viewModel: ShopViewModel) {
+//
+//    val state by viewModel.state.collectAsState()
+//    val paymentState by viewModel.paymentState.collectAsState()
+//
+//    var showUpiSheet by remember { mutableStateOf(false) } // 👈 OUTSIDE
+//
+//    Box(
+//        Modifier
+//            .fillMaxWidth()
+//            .padding(16.dp)
+//    ) {
+//        Row(
+//            Modifier
+//                .fillMaxWidth()
+//                .clip(RoundedCornerShape(30.dp))
+//                .background(Color.White)
+//                .padding(16.dp),
+//            horizontalArrangement = Arrangement.SpaceBetween,
+//            verticalAlignment = Alignment.CenterVertically
+//        ) {
+//
+//            Column {
+//                Text("Total Amount", color = Color.Gray)
+//                Text(
+//                    "₹${state.finalAmount ?: state.totalPrice ?: "0"}",
+//                    fontSize = 20.sp,
+//                    fontWeight = FontWeight.Bold
+//                )
+//            }
+//
+//            if (paymentState is PaymentState.Processing) {
+//                CircularProgressIndicator(
+//                    modifier = Modifier.size(36.dp),
+//                    strokeWidth = 3.dp
+//                )
+//            } else {
+//                Button(
+//                    onClick = { showUpiSheet = true },
+//                    shape = RoundedCornerShape(30.dp)
+//                ) {
+//                    Text("Checkout")
+//                }
+//            }
+//        }
+//    }
+//
+//    if (showUpiSheet) {
+//        UpiBottomSheet(
+//            amount = state.finalAmount ?: state.totalPrice ?: "0",
+//            onAppClick = { app ->
+//
+//                // ✅ Close sheet immediately
+//                showUpiSheet = false
+//
+//                viewModel.createOrder { txnId ->
+//
+//                    launchUpiPayment(
+//                        app = app,
+//                        amount = state.finalAmount ?: state.totalPrice ?: "0",
+//                        txnId = txnId
+//                    ) { opened ->
+//
+//                        if (opened) {
+//                            // ✅ ONLY mark pending
+//                            viewModel.markPaymentPending(txnId)
+//                        } else {
+//                            // ❌ UPI app not found / intent failed
+//                            viewModel.paymentFailed("No UPI app found")
+//                        }
+//                    }
+//                }
+//            },
+//            onDismiss = { showUpiSheet = false }
+//        )
+//    }
+//}
 
 
 
