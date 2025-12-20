@@ -1,12 +1,9 @@
+// iosMain/com/developer/ev2z/phonepe/PhonePeLauncher.ios.kt
 package com.developer.ev2z.phonepe
 
-import kotlinx.cinterop.ExperimentalForeignApi
 import platform.Foundation.NSNotificationCenter
 import platform.Foundation.NSNotification
-import platform.Foundation.NSString
-import platform.darwin.NSObject
 
-@OptIn(ExperimentalForeignApi::class)
 actual fun openPhonePeSdk(
     paymentUrl: String,
     onResult: (PaymentResult) -> Unit
@@ -24,10 +21,10 @@ actual fun openPhonePeSdk(
         println("🚀 Opening In-App PhonePe WebView")
         println("🔗 URL: $phonePeWebUrl")
 
-        // ✅ Post notification to Swift layer (CORRECTED)
+        // ✅ Post notification to Swift layer
         NSNotificationCenter.defaultCenter.postNotificationName(
-            aName = "OpenPaymentWebView",
-            anObject = phonePeWebUrl as NSObject  // ✅ Direct cast to NSObject
+            "OpenPaymentWebView",
+            `object` = platform.Foundation.NSString.create(string = phonePeWebUrl)
         )
 
         println("✅ Payment WebView notification posted")
