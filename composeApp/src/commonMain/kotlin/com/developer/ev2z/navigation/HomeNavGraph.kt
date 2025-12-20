@@ -16,12 +16,13 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.Navigator
+import cafe.adriel.voyager.navigator.currentOrThrow
 import cafe.adriel.voyager.navigator.tab.*
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.repository.ProductRepository
 import com.developer.ev2z.ui.screens.EditProfile.EditProfileScreen
-import com.developer.ev2z.ui.screens.GeoFencing.GeoFencingScreen
+import com.developer.ev2z.ui.screens.GeoFencing.GeoFencingScreenWrapper
 import com.developer.ev2z.ui.screens.HistoryPlayback.HistoryPlaybackScreen
 import com.developer.ev2z.ui.screens.Profile.ProfileScreen
 import com.developer.ev2z.ui.screens.homeScreen.HomeScreen
@@ -228,8 +229,9 @@ fun HomeNavGraph(
         }
 
         // GeoFencing Screen
+        // GeoFencing Screen
         if (showGeoFencing) {
-            GeoFencingScreen(
+            GeoFencingScreenWrapper(
                 apiService = apiService,
                 storageManager = storageManager,
                 onBackPressed = { showGeoFencing = false }
