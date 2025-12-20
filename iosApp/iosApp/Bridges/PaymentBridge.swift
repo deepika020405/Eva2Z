@@ -11,10 +11,7 @@ import ComposeApp
 
     private override init() {
         super.init()
-        setupObserver()
-    }
 
-    private func setupObserver() {
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(handleOpenPaymentNotification(_:)),
@@ -26,29 +23,28 @@ import ComposeApp
     @objc private func handleOpenPaymentNotification(_ notification: Notification) {
         guard let urlString = notification.object as? String else {
             print("❌ Invalid notification payload")
-            PaymentBus.shared.notify(success: false, txnId: nil, reason: "Invalid payment URL")
             return
         }
 
-        // ✅ Extract token from URL
         guard let url = URL(string: urlString),
               let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let token = components.queryItems?.first(where: { $0.name == "token" })?.value else {
-            print("❌ Failed to extract token")
+            print("❌ Failed to extract token from URL")
             PaymentBus.shared.notify(success: false, txnId: nil, reason: "Invalid payment URL")
             return
         }
 
-        print("📬 Token received: \(token.prefix(50))...")
+        print("📬 Received payment request with token: \(token.prefix(50))...")
         openPaymentWithSDK(token: token)
     }
 
     private func openPaymentWithSDK(token: String) {
         print("🚀 Initializing PhonePe SDK")
 
-        // ✅ Initialize SDK
+        // ✅ CHANGE: Use .sandbox instead of .production
         ppPayment = PPPayment(
-            environment: .production,
+            // environment: .sandbox,  // ✅ THIS IS THE ONLY CHANGE
+            environment: .production,  // ✅ THIS IS THE ONLY CHANGE
             flowId: "ABCDEFGHIJK12",
             merchantId: "M22VRDGEOVBYAUAT"
         )
@@ -62,49 +58,43 @@ import ComposeApp
 
         guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let rootViewController = windowScene.windows.first?.rootViewController else {
-            print("❌ No root view controller")
+            print("❌ Failed to get root view controller")
             PaymentBus.shared.notify(success: false, txnId: nil, reason: "UI not available")
             return
         }
 
-        // ✅ Start PhonePe checkout
         ppPayment?.startCheckoutFlow(
             merchantId: "M22VRDGEOVBYAUAT",
             orderId: orderId,
             token: token,
             appSchema: "eva2zgps",
             on: rootViewController
-        ) { [weak self] transactionRequest, resultState in
-            self?.handlePaymentResult(transactionRequest: transactionRequest, resultState: resultState)
+        ) { [weak self] _, resultState in
+            self?.handlePaymentResult(resultState: resultState)
         }
 
         print("✅ PhonePe SDK checkout started")
     }
 
-    private func handlePaymentResult(transactionRequest: DPSTransactionRequest?, resultState: PPResultState) {
+    private func handlePaymentResult(resultState: PPResultState) {
         print("📱 Payment Result State: \(resultState)")
-
-        // ✅ Extract transaction ID if available
-        let txnId = transactionRequest?.transactionId
 
         switch resultState {
         case .success:
-            print("✅ Payment Success - txnId: \(txnId ?? "nil")")
-            // ⭐ IMPORTANT: Don't mark success immediately
-            // Backend will verify via webhook
-            PaymentBus.shared.notify(success: true, txnId: txnId, reason: nil)
+            print("✅ Payment Success")
+            PaymentBus.shared.notify(success: true, txnId: nil, reason: nil)
 
         case .failure(let error):
             print("❌ Payment Failed: \(error.localizedDescription)")
             PaymentBus.shared.notify(success: false, txnId: nil, reason: error.localizedDescription)
 
         case .interrupted(let error):
-            print("🚫 Payment Interrupted/Cancelled: \(error.localizedDescription)")
-            PaymentBus.shared.notify(success: false, txnId: nil, reason: "Payment cancelled by user")
+            print("🚫 Payment Cancelled: \(error.localizedDescription)")
+            PaymentBus.shared.notify(success: false, txnId: nil, reason: "Payment cancelled")
 
         @unknown default:
-            print("❓ Unknown payment state")
-            PaymentBus.shared.notify(success: false, txnId: nil, reason: "Unknown payment state")
+            print("❓ Unknown state")
+            PaymentBus.shared.notify(success: false, txnId: nil, reason: "Unknown error")
         }
     }
 
