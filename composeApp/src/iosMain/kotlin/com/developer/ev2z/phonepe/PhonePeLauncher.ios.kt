@@ -22,10 +22,10 @@ actual fun openPhonePeSdk(
         println("🚀 Opening In-App PhonePe WebView")
         println("🔗 URL: $phonePeWebUrl")
 
-        // ✅ Post notification to Swift layer
+        // ✅ CORRECT: Cast String to NSString, then to NSObject
         NSNotificationCenter.defaultCenter.postNotificationName(
             aName = "OpenPaymentWebView",
-            anObject = NSString.create(string = phonePeWebUrl) as NSObject
+            `object` = phonePeWebUrl as NSString as NSObject
         )
 
         println("✅ Payment WebView notification posted")

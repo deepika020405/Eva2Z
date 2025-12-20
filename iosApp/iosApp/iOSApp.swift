@@ -5,6 +5,9 @@ import ComposeApp
 @main
 struct iOSApp: App {
 
+    // ✅ Register AppDelegate
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+
     init() {
         // ✅ Initialize PaymentBridge on app launch
         _ = PaymentBridge.shared

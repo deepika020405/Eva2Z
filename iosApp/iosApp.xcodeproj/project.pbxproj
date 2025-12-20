@@ -6,12 +6,19 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		4FDAB54F04AE0440A6EEEEDC /* Pods_iosApp.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1F8417AE17D4F9C8B54DACA7 /* Pods_iosApp.framework */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
+		1F8417AE17D4F9C8B54DACA7 /* Pods_iosApp.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_iosApp.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		4DAC992457B2C2BC921AA76D /* Pods-iosApp.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-iosApp.debug.xcconfig"; path = "Target Support Files/Pods-iosApp/Pods-iosApp.debug.xcconfig"; sourceTree = "<group>"; };
+		B427065B07D4FD0B60ACA239 /* Pods-iosApp.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-iosApp.release.xcconfig"; path = "Target Support Files/Pods-iosApp/Pods-iosApp.release.xcconfig"; sourceTree = "<group>"; };
 		F7AB645343BC4036AAD6FF29 /* Eva2z_Connect-Multiplatform.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Eva2z_Connect-Multiplatform.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		2C45D110652E882FE831364D /* Exceptions for "iosApp" folder in "iosApp" target */ = {
+		2C45D110652E882FE831364D /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -24,13 +31,15 @@
 		82A88AC3F1A01D9A60340262 /* iosApp */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				2C45D110652E882FE831364D /* Exceptions for "iosApp" folder in "iosApp" target */,
+				2C45D110652E882FE831364D /* PBXFileSystemSynchronizedBuildFileExceptionSet */,
 			);
 			path = iosApp;
 			sourceTree = "<group>";
 		};
 		C8C4B23C2B2773CBFC557DC5 /* Configuration */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = Configuration;
 			sourceTree = "<group>";
 		};
@@ -41,6 +50,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4FDAB54F04AE0440A6EEEEDC /* Pods_iosApp.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -55,12 +65,32 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		158FE44B0359AD8E29C00D2C /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				1F8417AE17D4F9C8B54DACA7 /* Pods_iosApp.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		64EE927E58ABE4A4DB41C793 /* Pods */ = {
+			isa = PBXGroup;
+			children = (
+				4DAC992457B2C2BC921AA76D /* Pods-iosApp.debug.xcconfig */,
+				B427065B07D4FD0B60ACA239 /* Pods-iosApp.release.xcconfig */,
+			);
+			name = Pods;
+			path = Pods;
+			sourceTree = "<group>";
+		};
 		691B3245971E84495B381CA8 = {
 			isa = PBXGroup;
 			children = (
 				C8C4B23C2B2773CBFC557DC5 /* Configuration */,
 				82A88AC3F1A01D9A60340262 /* iosApp */,
 				0B6AF90C62C0257462761392 /* Products */,
+				64EE927E58ABE4A4DB41C793 /* Pods */,
+				158FE44B0359AD8E29C00D2C /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -71,10 +101,12 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = A6714B73A5B3DD079BD29C43 /* Build configuration list for PBXNativeTarget "iosApp" */;
 			buildPhases = (
+				05879231AFE0AC2F4FFAF4BF /* [CP] Check Pods Manifest.lock */,
 				E9B49B62183F4F5A6ED6CC9A /* Compile Kotlin Framework */,
 				62C4FCAE64D99A6981B42C60 /* Sources */,
 				8B5110EB66333616EC79CBEC /* Frameworks */,
 				9A73D7DBCF758C37279CE7A0 /* Resources */,
+				C413E646FC4FA126C877D410 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -84,8 +116,6 @@
 				82A88AC3F1A01D9A60340262 /* iosApp */,
 			);
 			name = iosApp;
-			packageProductDependencies = (
-			);
 			productName = iosApp;
 			productReference = F7AB645343BC4036AAD6FF29 /* Eva2z_Connect-Multiplatform.app */;
 			productType = "com.apple.product-type.application";
@@ -135,6 +165,45 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		05879231AFE0AC2F4FFAF4BF /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-iosApp-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
+		C413E646FC4FA126C877D410 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-iosApp/Pods-iosApp-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-iosApp/Pods-iosApp-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-iosApp/Pods-iosApp-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
 		E9B49B62183F4F5A6ED6CC9A /* Compile Kotlin Framework */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -227,6 +296,7 @@
 		};
 		3D85C639999F48FE7BAC537B /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = B427065B07D4FD0B60ACA239 /* Pods-iosApp.release.xcconfig */;
 			buildSettings = {
 				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -237,6 +307,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\"";
 				DEVELOPMENT_TEAM = "${TEAM_ID}";
 				ENABLE_PREVIEWS = YES;
+				FRAMEWORK_SEARCH_PATHS = "$(inherited) \"${PODS_ROOT}/PhonePePayment\" \"${PODS_XCFRAMEWORKS_BUILD_DIR}/PhonePePayment\" \"$(SRCROOT)/../composeApp/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)\"";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = iosApp/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -256,6 +327,7 @@
 		};
 		514D90B104D5547C695800DE /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 4DAC992457B2C2BC921AA76D /* Pods-iosApp.debug.xcconfig */;
 			buildSettings = {
 				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -266,6 +338,7 @@
 				DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\"";
 				DEVELOPMENT_TEAM = "${TEAM_ID}";
 				ENABLE_PREVIEWS = YES;
+				FRAMEWORK_SEARCH_PATHS = "$(inherited) \"${PODS_ROOT}/PhonePePayment\" \"${PODS_XCFRAMEWORKS_BUILD_DIR}/PhonePePayment\" \"$(SRCROOT)/../composeApp/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)\"";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = iosApp/Info.plist;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

@@ -38,12 +38,21 @@
     <string>Photo library access is required to scan barcodes from images</string>
 
     <!-- ✅ PhonePe URL Query Scheme -->
+    <!-- PhonePe SDK URL Schemes -->
     <key>LSApplicationQueriesSchemes</key>
     <array>
         <string>phonepe</string>
+        <string>ppemerchantsdkv1</string>
+        <string>ppemerchantsdkv2</string>
+        <string>ppemerchantsdkv3</string>
+        <string>paytmmp</string>
+        <string>gpay</string>
+        <string>credpay</string>
+        <string>amazonpay</string>
+        <string>bhim</string>
     </array>
 
-    <!-- ✅ Deep Link for YOUR APP (callback after payment) -->
+    <!-- Your App's Deep Link (for callback) -->
     <key>CFBundleURLTypes</key>
     <array>
         <dict>
