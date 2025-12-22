@@ -2,96 +2,35 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleDevelopmentRegion</key>
-    <string>$(DEVELOPMENT_LANGUAGE)</string>
-    
-    <key>CFBundleExecutable</key>
-    <string>$(EXECUTABLE_NAME)</string>
-    
-    <key>CFBundleIdentifier</key>
-    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-    
-    <key>CFBundleInfoDictionaryVersion</key>
-    <string>6.0</string>
-    
-    <key>CFBundleName</key>
-    <string>$(PRODUCT_NAME)</string>
-    
-    <key>CFBundlePackageType</key>
-    <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
-    
-    <key>CFBundleShortVersionString</key>
-    <string>1.0</string>
-    
-    <key>CFBundleVersion</key>
-    <string>1</string>
-    
-    <key>CADisableMinimumFrameDurationOnPhone</key>
-    <true/>
-
-    <!-- Camera Permission -->
-    <key>NSCameraUsageDescription</key>
-    <string>Camera access is required to scan device barcodes and SIM QR codes</string>
-
-    <!-- Photo Library Permission -->
-    <key>NSPhotoLibraryUsageDescription</key>
-    <string>Photo library access is required to scan barcodes from images</string>
-
-    <!-- ✅ PhonePe URL Query Scheme -->
-    <!-- PhonePe SDK URL Schemes -->
-    <key>LSApplicationQueriesSchemes</key>
-    <array>
-        <string>phonepe</string>
-        <string>ppemerchantsdkv1</string>
-        <string>ppemerchantsdkv2</string>
-        <string>ppemerchantsdkv3</string>
-        <string>paytmmp</string>
-        <string>gpay</string>
-        <string>credpay</string>
-        <string>amazonpay</string>
-        <string>bhim</string>
-    </array>
-
-    <!-- Your App's Deep Link (for callback) -->
-    <key>CFBundleURLTypes</key>
-    <array>
-        <dict>
-            <key>CFBundleTypeRole</key>
-            <string>Editor</string>
-            <key>CFBundleURLSchemes</key>
-            <array>
-                <string>eva2zgps</string>
-            </array>
-        </dict>
-    </array>
-
-    <key>UILaunchScreen</key>
-    <dict/>
-    
-    <key>UIRequiredDeviceCapabilities</key>
-    <array>
-        <string>armv7</string>
-    </array>
-    
-    <key>UISupportedInterfaceOrientations</key>
-    <array>
-        <string>UIInterfaceOrientationPortrait</string>
-        <string>UIInterfaceOrientationLandscapeLeft</string>
-        <string>UIInterfaceOrientationLandscapeRight</string>
-    </array>
-    
-    <key>UISupportedInterfaceOrientations~ipad</key>
-    <array>
-        <string>UIInterfaceOrientationPortrait</string>
-        <string>UIInterfaceOrientationPortraitUpsideDown</string>
-        <string>UIInterfaceOrientationLandscapeLeft</string>
-        <string>UIInterfaceOrientationLandscapeRight</string>
-    </array>
-
-    <key>NSUserTrackingUsageDescription</key>
-    <string>We need to read SMS to auto-fill OTP</string>
-
-    <key>NSContactsUsageDescription</key>
-    <string>To autofill OTP from SMS</string>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>eva2zgps</string>
+			</array>
+		</dict>
+	</array>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>phonepe</string>
+		<string>ppemerchantsdkv1</string>
+		<string>ppemerchantsdkv2</string>
+		<string>ppemerchantsdkv3</string>
+		<string>ppemerchantsdkv4</string>
+		<string>ppemerchantsdkv5</string>
+		<string>paytmmp</string>
+		<string>gpay</string>
+		<string>credpay</string>
+		<string>amazonpay</string>
+		<string>bhim</string>
+		<string>supermoney</string>
+	</array>
+	<key>UILaunchScreen</key>
+	<dict/>
 </dict>
 </plist>

@@ -41,8 +41,10 @@ import ComposeApp
     private func openPaymentWithSDK(token: String) {
         print("🚀 Initializing PhonePe SDK")
 
+        // ✅ CHANGE: Use .sandbox instead of .production
         ppPayment = PPPayment(
-            environment: .production,
+            // environment: .sandbox,  // ✅ THIS IS THE ONLY CHANGE
+            environment: .production,  // ✅ THIS IS THE ONLY CHANGE
             flowId: "ABCDEFGHIJK12",
             merchantId: "M22VRDGEOVBYAUAT"
         )
@@ -61,27 +63,22 @@ import ComposeApp
             return
         }
 
-        // ✅ CORRECT PhonePe SDK signature - expects 2 parameters
         ppPayment?.startCheckoutFlow(
             merchantId: "M22VRDGEOVBYAUAT",
             orderId: orderId,
             token: token,
             appSchema: "eva2zgps",
             on: rootViewController
-        ) { [weak self] transactionRequest, resultState in
-            // ✅ Callback receives both transactionRequest AND resultState
-            self?.handlePaymentResult(transactionRequest: transactionRequest, resultState: resultState)
+        ) { [weak self] _, resultState in
+            self?.handlePaymentResult(resultState: resultState)
         }
 
         print("✅ PhonePe SDK checkout started")
     }
 
-    // ✅ Handle payment result with BOTH parameters
-    private func handlePaymentResult(transactionRequest: DPSTransactionRequest?, resultState: PPResultState) {
+    private func handlePaymentResult(resultState: PPResultState) {
         print("📱 Payment Result State: \(resultState)")
-        print("📱 Transaction Request: \(String(describing: transactionRequest))")
 
-        // ✅ Access correct enum cases from SDK
         switch resultState {
         case .success:
             print("✅ Payment Success")
@@ -92,8 +89,8 @@ import ComposeApp
             PaymentBus.shared.notify(success: false, txnId: nil, reason: error.localizedDescription)
 
         case .interrupted(let error):
-            print("🚫 Payment Interrupted/Cancelled: \(error.localizedDescription)")
-            PaymentBus.shared.notify(success: false, txnId: nil, reason: error.localizedDescription)
+            print("🚫 Payment Cancelled: \(error.localizedDescription)")
+            PaymentBus.shared.notify(success: false, txnId: nil, reason: "Payment cancelled")
 
         @unknown default:
             print("❓ Unknown state")

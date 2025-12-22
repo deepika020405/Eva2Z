@@ -45,12 +45,15 @@ fun PaymentResultContent(
     reason: String?
 ) {
     val navigator = LocalNavigator.currentOrThrow
+    val viewModel = ShopViewModelProvider.viewModel
 
-    // ✅ Auto-navigate back after 3 seconds on success
+    // ✅ Auto-navigate back after 3 seconds ONLY on success
     LaunchedEffect(isSuccess) {
         if (isSuccess) {
             delay(3000)
-            // ✅ Pop back to CartScreen
+            // ✅ Reset payment state
+            viewModel.resetPaymentState()
+            // ✅ Pop to root (shop screen)
             navigator.popUntilRoot()
         }
     }
@@ -171,7 +174,8 @@ fun PaymentResultContent(
                 if (isSuccess) {
                     Button(
                         onClick = {
-                            // ✅ Go back to shop (root screen)
+                            // ✅ Reset payment state before navigating
+                            viewModel.resetPaymentState()
                             navigator.popUntilRoot()
                         },
                         modifier = Modifier.fillMaxWidth(),
@@ -187,7 +191,11 @@ fun PaymentResultContent(
                     ) {
                         Button(
                             onClick = {
-                                navigator.pop() // Go back to payment screen
+                                println("🔄 Retry Payment clicked")
+                                // ✅ CRITICAL: Reset payment state before retry
+                                viewModel.resetPaymentState()
+                                // ✅ Pop back to PaymentScreen (removes result screen)
+                                navigator.pop()
                             },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
@@ -200,6 +208,8 @@ fun PaymentResultContent(
 
                         TextButton(
                             onClick = {
+                                // ✅ Reset payment state
+                                viewModel.resetPaymentState()
                                 // ✅ Go back to shop
                                 navigator.popUntilRoot()
                             }

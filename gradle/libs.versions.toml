@@ -16,6 +16,7 @@ cameraCamera2 = "1.5.2"
 coilCompose = "3.3.0"
 composeMultiplatform = "1.9.3"
 componentsMap = "1.7.0"
+intentsdk = "5.3.0"
 junit = "4.13.2"
 kotlin = "2.2.20"
 kotlinxDatetime = "0.7.1"
@@ -47,6 +48,7 @@ androidx-navigation-compose = { module = "androidx.navigation:navigation-compose
 barcode-scanning = { module = "com.google.mlkit:barcode-scanning", version.ref = "barcodeScanning" }
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coilCompose" }
 coil-network-ktor3 = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coilCompose" }
+intentsdk = { module = "phonepe.intentsdk.android.release:IntentSDK", version.ref = "intentsdk" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlin-testJunit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
 junit = { module = "junit:junit", version.ref = "junit" }
