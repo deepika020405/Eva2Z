@@ -259,16 +259,30 @@ fun App() {
                         println("➕ Navigate to Device Report triggered")
                         showDeviceReport = true
                     },
-                    onNavigateToChangePassword = { // ✅ NEW
+                    onNavigateToChangePassword = {
                         println("🔑 Navigate to Change Password triggered")
                         showChangePassword = true
                     },
                     onLogout = {
                         println("🚪 Logging out...")
+
+                        // ✅ Clear all user data
                         userPrefs.clear()
+                        storage.clear()
+
+                        // ✅ Reset all states
                         isLoggedIn = false
                         authToken = ""
+                        username = ""
+
+                        // ✅ Reset ViewModel states
                         authViewModel.resetLoginSuccess()
+                        authViewModel.clearError()
+
+                        // ✅ Clear AppTokenProvider
+                        AppTokenProvider.getToken = { "" }
+
+                        println("✅ Logout complete - redirecting to login")
                     }
                 )
             }

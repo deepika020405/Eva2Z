@@ -52,127 +52,127 @@ fun GeneralSettingsScreen(
             )
         }
     ) { padding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .background(Color(0xFFF5F5F5))
-        ) {
-            item {
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Notifications Section
-                Text(
-                    text = "Preferences",
-                    fontSize = 14.sp,
-                    color = Color.Gray,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 8.dp)
-                )
-
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 8.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Column {
-                        SettingSwitchItem(
-                            icon = Icons.Default.Notifications,
-                            title = "Notifications",
-                            subtitle = "Enable push notifications",
-                            checked = notificationsEnabled,
-                            onCheckedChange = { notificationsEnabled = it }
-                        )
-
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            color = Color(0xFFE0E0E0)
-                        )
-
-                        SettingSwitchItem(
-                            icon = Icons.Default.DarkMode,
-                            title = "Dark Mode",
-                            subtitle = "Switch to dark theme",
-                            checked = darkModeEnabled,
-                            onCheckedChange = { darkModeEnabled = it }
-                        )
-
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            color = Color(0xFFE0E0E0)
-                        )
-
-                        SettingSwitchItem(
-                            icon = Icons.Default.LocationOn,
-                            title = "Location Services",
-                            subtitle = "Allow location access",
-                            checked = locationEnabled,
-                            onCheckedChange = { locationEnabled = it }
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // App Settings Section
-                Text(
-                    text = "App Settings",
-                    fontSize = 14.sp,
-                    color = Color.Gray,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 8.dp)
-                )
-
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 8.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Column {
-                        SettingNavigationItem(
-                            icon = Icons.Default.Language,
-                            title = "Language",
-                            subtitle = "English",
-                            onClick = { /* TODO: Language selection */ }
-                        )
-
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            color = Color(0xFFE0E0E0)
-                        )
-
-                        SettingNavigationItem(
-                            icon = Icons.Default.Storage,
-                            title = "Storage",
-                            subtitle = "Manage app storage",
-                            onClick = { /* TODO: Storage management */ }
-                        )
-
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            color = Color(0xFFE0E0E0)
-                        )
-
-                        SettingNavigationItem(
-                            icon = Icons.Default.Update,
-                            title = "App Version",
-                            subtitle = "v1.0.0",
-                            onClick = { /* TODO: Check for updates */ }
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(100.dp))
-            }
-        }
+//        LazyColumn(
+//            modifier = Modifier
+//                .fillMaxSize()
+//                .padding(padding)
+//                .background(Color(0xFFF5F5F5))
+//        ) {
+//            item {
+//                Spacer(modifier = Modifier.height(16.dp))
+//
+//                // Notifications Section
+//                Text(
+//                    text = "Preferences",
+//                    fontSize = 14.sp,
+//                    color = Color.Gray,
+//                    modifier = Modifier
+//                        .fillMaxWidth()
+//                        .padding(horizontal = 24.dp, vertical = 8.dp)
+//                )
+//
+//                Card(
+//                    modifier = Modifier
+//                        .fillMaxWidth()
+//                        .padding(horizontal = 24.dp, vertical = 8.dp),
+//                    shape = RoundedCornerShape(16.dp),
+//                    colors = CardDefaults.cardColors(containerColor = Color.White),
+//                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+//                ) {
+//                    Column {
+//                        SettingSwitchItem(
+//                            icon = Icons.Default.Notifications,
+//                            title = "Notifications",
+//                            subtitle = "Enable push notifications",
+//                            checked = notificationsEnabled,
+//                            onCheckedChange = { notificationsEnabled = it }
+//                        )
+//
+//                        HorizontalDivider(
+//                            modifier = Modifier.padding(horizontal = 16.dp),
+//                            color = Color(0xFFE0E0E0)
+//                        )
+//
+//                        SettingSwitchItem(
+//                            icon = Icons.Default.DarkMode,
+//                            title = "Dark Mode",
+//                            subtitle = "Switch to dark theme",
+//                            checked = darkModeEnabled,
+//                            onCheckedChange = { darkModeEnabled = it }
+//                        )
+//
+//                        HorizontalDivider(
+//                            modifier = Modifier.padding(horizontal = 16.dp),
+//                            color = Color(0xFFE0E0E0)
+//                        )
+//
+//                        SettingSwitchItem(
+//                            icon = Icons.Default.LocationOn,
+//                            title = "Location Services",
+//                            subtitle = "Allow location access",
+//                            checked = locationEnabled,
+//                            onCheckedChange = { locationEnabled = it }
+//                        )
+//                    }
+//                }
+//
+//                Spacer(modifier = Modifier.height(16.dp))
+//
+//                // App Settings Section
+//                Text(
+//                    text = "App Settings",
+//                    fontSize = 14.sp,
+//                    color = Color.Gray,
+//                    modifier = Modifier
+//                        .fillMaxWidth()
+//                        .padding(horizontal = 24.dp, vertical = 8.dp)
+//                )
+//
+//                Card(
+//                    modifier = Modifier
+//                        .fillMaxWidth()
+//                        .padding(horizontal = 24.dp, vertical = 8.dp),
+//                    shape = RoundedCornerShape(16.dp),
+//                    colors = CardDefaults.cardColors(containerColor = Color.White),
+//                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+//                ) {
+//                    Column {
+//                        SettingNavigationItem(
+//                            icon = Icons.Default.Language,
+//                            title = "Language",
+//                            subtitle = "English",
+//                            onClick = { /* TODO: Language selection */ }
+//                        )
+//
+//                        HorizontalDivider(
+//                            modifier = Modifier.padding(horizontal = 16.dp),
+//                            color = Color(0xFFE0E0E0)
+//                        )
+//
+//                        SettingNavigationItem(
+//                            icon = Icons.Default.Storage,
+//                            title = "Storage",
+//                            subtitle = "Manage app storage",
+//                            onClick = { /* TODO: Storage management */ }
+//                        )
+//
+//                        HorizontalDivider(
+//                            modifier = Modifier.padding(horizontal = 16.dp),
+//                            color = Color(0xFFE0E0E0)
+//                        )
+//
+//                        SettingNavigationItem(
+//                            icon = Icons.Default.Update,
+//                            title = "App Version",
+//                            subtitle = "v1.0.0",
+//                            onClick = { /* TODO: Check for updates */ }
+//                        )
+//                    }
+//                }
+//
+//                Spacer(modifier = Modifier.height(100.dp))
+//            }
+//        }
     }
 }
 

@@ -265,7 +265,14 @@ fun HomeNavGraph(
 
         if (showAccountActivity) {
             AccountActivityScreen(
-                onBackPressed = { showAccountActivity = false }
+                apiService = apiService,
+                storageManager = storageManager,
+                onBackPressed = { showAccountActivity = false },
+                onAccountDeleted = {
+                    // Account deleted successfully - trigger logout
+                    showAccountActivity = false
+                    onLogout()
+                }
             )
         }
 
