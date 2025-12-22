@@ -542,3 +542,144 @@ fun AboutMenuItem(
         )
     }
 }
+
+
+
+
+git commit -m "feat: Device management, account deletion, and data refresh fixes
+
+🎯 Major Features:
+- Edit Device Name functionality with validation
+- Account deletion with auto-logout
+- Fixed image picker in Add Device screen
+- Fixed iOS QR/barcode scanning
+- Real-time data refresh after updates
+
+📱 Edit Device Name:
+- Created EditDeviceNameScreen.kt with form UI
+- Created EditDeviceNameViewModel.kt with update logic
+- Only device name is editable (ID & SIM disabled)
+- Auto-capitalize device names
+- Name validation (min 3 characters)
+- Success/error state handling
+- API: updateDevice() endpoint integration
+
+🔄 Data Refresh Fixes:
+- Added refreshTrigger parameter to ManageDeviceScreen
+- Added refreshTrigger parameter to ProfileScreen
+- Auto-refresh device list after name update
+- Auto-refresh profile after edit
+- LaunchedEffect triggers on data changes
+- No more stale data display
+
+🗑️ Account Deletion:
+- Fixed API response parsing (status vs success)
+- Added AccountActivityViewModel logout() function
+- Implemented proper state management
+- Added LaunchedEffect for auto-logout trigger
+- Success message display (1 second delay)
+- Dialog state handling during operation
+- Storage cleanup on deletion
+- Proper callback flow to App.kt
+
+🔧 Image Picker Fixes:
+- Fixed gallery button in Add Device screen
+- Proper button sizing (48dp clickable area)
+- Visual feedback with background
+- Border styling for better UX
+
+📱 iOS Barcode Scanning Fixes:
+- Enhanced barcode data extraction logic
+- Better regex for SIM number parsing: simNo[\''\\s]*[:=][\''\\s]*([0-9]+)
+- Support for multiple QR formats (XML, plain numbers)
+- Length validation (Device ID: 15-16, SIM: 19-20 digits)
+- Improved gallery image processing
+- Detailed logging for debugging
+- Background thread camera initialization
+
+🎨 UI/UX Improvements:
+- Edit icon in device list items
+- Disabled field styling (gray background)
+- Real-time validation messages
+- Loading states with spinners
+- Success/error feedback dialogs
+- Confirmation dialogs for destructive actions
+- Smooth transitions between screens
+
+📊 Files Changed:
+NEW:
+- EditDeviceNameScreen.kt (156 lines)
+- EditDeviceNameViewModel.kt (67 lines)
+
+UPDATED:
+- ManageDeviceScreen.kt (+refreshTrigger, +onEditDeviceClick)
+- ProfileScreen.kt (+refreshTrigger, auto-reload)
+- HomeNavGraph.kt (+refresh state management)
+- AccountActivityScreen.kt (auto-logout fix)
+- AccountActivityViewModel.kt (logout function, API key fix)
+- AddDeviceScreenCommon.kt (gallery button fix)
+- AddDeviceScreen.ios.kt (barcode scanning improvements)
+- ApiService.kt (updateDevice endpoint)
+
+✅ Testing Status:
+- Android: Edit device working ✅
+- Android: Account deletion with auto-logout ✅
+- Android: Gallery picker working ✅
+- Android: Data refresh working ✅
+- iOS: QR/Barcode scanning improved ✅
+- iOS: Gallery processing enhanced ✅
+- iOS: Background camera initialization ✅
+
+🔄 API Endpoints Used:
+- PATCH /update-device (Edit device name)
+- DELETE /account (Delete account)
+- GET /my-devices (Refresh device list)
+- GET /profile-picture (Refresh profile data)
+
+🐛 Bugs Fixed:
+1. Stale data in ManageDeviceScreen after edit
+2. Stale data in ProfileScreen after edit
+3. Gallery button not responding in Add Device
+4. iOS barcode data extraction issues
+5. Account deletion not triggering logout
+6. API response key mismatch (status vs success)
+7. Missing logout() function in ViewModel
+
+📝 Technical Details:
+- Refresh triggers using State<Int>
+- LaunchedEffect for reactive updates
+- Auto-capitalize device names
+- Cross-platform barcode scanning
+- Proper state management with StateFlow
+- Coroutine-based API calls
+- Material 3 UI components
+- Form validation with error messages
+- Background thread operations (iOS camera)
+
+🚀 Performance Improvements:
+- Efficient recomposition with refreshTrigger
+- Background thread camera initialization (iOS)
+- Minimal re-renders with LaunchedEffect
+- Proper cleanup on navigation
+
+🔐 Security & Best Practices:
+- Token validation before API calls
+- Storage cleanup on account deletion
+- Error handling with user feedback
+- Input validation (name, device ID, SIM)
+- Proper null safety
+- Exception handling with stack traces
+
+📱 Cross-Platform Support:
+- Android: CameraX + ML Kit barcode scanning
+- iOS: AVFoundation + Vision framework
+- Shared UI components (CommonMain)
+- Platform-specific camera implementations
+- Unified image picker interface
+
+🎯 Next Steps:
+- Test on real iPhone with PhonePe app
+- Add device type icons in navigation
+- Implement change password validation
+- Add device history tracking
+- Optimize image compression
