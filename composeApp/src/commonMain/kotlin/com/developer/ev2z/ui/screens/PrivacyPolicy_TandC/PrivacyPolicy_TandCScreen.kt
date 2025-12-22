@@ -14,7 +14,9 @@ import androidx.compose.ui.unit.sp
 
 enum class WebViewType {
     PRIVACY_POLICY,
-    TERMS_CONDITIONS
+    TERMS_CONDITIONS,
+    REFUND_POLICY,
+    SHIPPING_POLICY
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -26,11 +28,15 @@ fun PrivacyPolicy_TandCScreen(
     val url = when (type) {
         WebViewType.PRIVACY_POLICY -> "https://www.eva2z.com/privacy-policy"
         WebViewType.TERMS_CONDITIONS -> "https://eva2z.com/term-condition/"
+        WebViewType.REFUND_POLICY -> "https://www.eva2z.com/refund-cancellation-policy"
+        WebViewType.SHIPPING_POLICY -> "https://www.eva2z.com/shipping-installation-policy"
     }
 
     val title = when (type) {
         WebViewType.PRIVACY_POLICY -> "Privacy Policy"
         WebViewType.TERMS_CONDITIONS -> "Terms & Conditions"
+        WebViewType.REFUND_POLICY -> "Refund & Cancellation Policy"
+        WebViewType.SHIPPING_POLICY -> "Shipping & Installation Policy"
     }
 
     Scaffold(

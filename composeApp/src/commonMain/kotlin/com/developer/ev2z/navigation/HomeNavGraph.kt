@@ -118,6 +118,8 @@ class ProfileTab(
     private val onNavigateToManageDevice: () -> Unit,
     private val onNavigateToPrivacyPolicy: () -> Unit,
     private val onNavigateToTermsConditions: () -> Unit,
+    private val onNavigateToRefundPolicy: () -> Unit,
+    private val onNavigateToShippingPolicy: () -> Unit,
     private val onNavigateToChangePassword: () -> Unit,
     private val onNavigateToGeoFencing: () -> Unit,
     private val onNavigateToHistoryPlayback: () -> Unit,
@@ -132,6 +134,8 @@ class ProfileTab(
             onManageDevice = onNavigateToManageDevice,
             onPrivacyPolicy = onNavigateToPrivacyPolicy,
             onTermsConditions = onNavigateToTermsConditions,
+            onRefundPolicy = onNavigateToRefundPolicy,
+            onShippingPolicy = onNavigateToShippingPolicy,
             onChangePassword = onNavigateToChangePassword,
             onGeoFencing = onNavigateToGeoFencing,
             onHistoryPlayback = onNavigateToHistoryPlayback,
@@ -167,6 +171,8 @@ fun HomeNavGraph(
     var showManageDevice by remember { mutableStateOf(false) }
     var showPrivacyPolicy by remember { mutableStateOf(false) }
     var showTermsConditions by remember { mutableStateOf(false) }
+    var showRefundPolicy by remember { mutableStateOf(false) }
+    var showShippingPolicy by remember { mutableStateOf(false) }
     var showGeoFencing by remember { mutableStateOf(false) }
     var showHistoryPlayback by remember { mutableStateOf(false) }
 
@@ -182,6 +188,8 @@ fun HomeNavGraph(
             onNavigateToManageDevice = { showManageDevice = true },
             onNavigateToPrivacyPolicy = { showPrivacyPolicy = true },
             onNavigateToTermsConditions = { showTermsConditions = true },
+            onNavigateToRefundPolicy = { showRefundPolicy = true },
+            onNavigateToShippingPolicy = { showShippingPolicy = true },
             onNavigateToChangePassword = onNavigateToChangePassword,
             onNavigateToGeoFencing = { showGeoFencing = true },
             onNavigateToHistoryPlayback = { showHistoryPlayback = true },
@@ -227,6 +235,22 @@ fun HomeNavGraph(
             )
         }
 
+        // Refund & Cancellation Policy Screen
+        if (showRefundPolicy) {
+            PrivacyPolicy_TandCScreen(
+                type = WebViewType.REFUND_POLICY,
+                onBackPressed = { showRefundPolicy = false }
+            )
+        }
+
+        // Shipping & Installation Policy Screen
+        if (showShippingPolicy) {
+            PrivacyPolicy_TandCScreen(
+                type = WebViewType.SHIPPING_POLICY,
+                onBackPressed = { showShippingPolicy = false }
+            )
+        }
+
         // GeoFencing Screen
         if (showGeoFencing) {
             GeoFencingScreen(
@@ -259,6 +283,8 @@ fun HomeNavGraphContent(
     onNavigateToManageDevice: () -> Unit,
     onNavigateToPrivacyPolicy: () -> Unit,
     onNavigateToTermsConditions: () -> Unit,
+    onNavigateToRefundPolicy: () -> Unit,
+    onNavigateToShippingPolicy: () -> Unit,
     onNavigateToChangePassword: () -> Unit = {},
     onNavigateToGeoFencing: () -> Unit = {},
     onNavigateToHistoryPlayback: () -> Unit = {},
@@ -281,6 +307,8 @@ fun HomeNavGraphContent(
             onNavigateToManageDevice,
             onNavigateToPrivacyPolicy,
             onNavigateToTermsConditions,
+            onNavigateToRefundPolicy,
+            onNavigateToShippingPolicy,
             onNavigateToChangePassword,
             onNavigateToGeoFencing,
             onNavigateToHistoryPlayback,

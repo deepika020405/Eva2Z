@@ -35,6 +35,8 @@ fun ProfileScreen(
     onManageDevice: () -> Unit = {},
     onPrivacyPolicy: () -> Unit = {},
     onTermsConditions: () -> Unit = {},
+    onRefundPolicy: () -> Unit = {},
+    onShippingPolicy: () -> Unit = {},
     onChangePassword: () -> Unit = {},
     onGeoFencing: () -> Unit = {},
     onHistoryPlayback: () -> Unit = {},
@@ -68,6 +70,8 @@ fun ProfileScreen(
         onFeedback = { viewModel.openFeedback() },
         onPrivacyPolicy = onPrivacyPolicy,
         onTermsConditions = onTermsConditions,
+        onRefundPolicy = onRefundPolicy,
+        onShippingPolicy = onShippingPolicy,
         onContactUs = { viewModel.openWhatsApp() },
         onLogout = { viewModel.logout() },
         onDismissError = { viewModel.clearError() }
@@ -93,7 +97,7 @@ fun ProfileScreenContent(
     onGeneralSettings: () -> Unit = {},
     onAccountActivity: () -> Unit = {},
     onReferAndEarn: () -> Unit = {},
-    onChangePassword: () -> Unit = {}, // ✅ RECEIVE CALLBACK
+    onChangePassword: () -> Unit = {},
     onManageDevice: () -> Unit = {},
     onAddFence: () -> Unit = {},
     onHistoryPlayback: () -> Unit = {},
@@ -101,6 +105,8 @@ fun ProfileScreenContent(
     onFeedback: () -> Unit = {},
     onPrivacyPolicy: () -> Unit = {},
     onTermsConditions: () -> Unit = {},
+    onRefundPolicy: () -> Unit = {},
+    onShippingPolicy: () -> Unit = {},
     onContactUs: () -> Unit = {},
     onLogout: () -> Unit = {},
     onDismissError: () -> Unit = {}
@@ -203,6 +209,8 @@ fun ProfileScreenContent(
                         onFeedback = onFeedback,
                         onPrivacyPolicy = onPrivacyPolicy,
                         onTermsConditions = onTermsConditions,
+                        onRefundPolicy = onRefundPolicy,
+                        onShippingPolicy = onShippingPolicy,
                         onContactUs = onContactUs
                     )
                 }
@@ -441,6 +449,8 @@ fun AboutSection(
     onFeedback: () -> Unit,
     onPrivacyPolicy: () -> Unit,
     onTermsConditions: () -> Unit,
+    onRefundPolicy: () -> Unit,
+    onShippingPolicy: () -> Unit,
     onContactUs: () -> Unit
 ) {
     Card(
@@ -468,6 +478,16 @@ fun AboutSection(
                 color = Color(0xFFE0E0E0)
             )
             AboutMenuItem("Terms & Conditions", Icons.Rounded.Description, onTermsConditions)
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = Color(0xFFE0E0E0)
+            )
+            AboutMenuItem("Refund & Cancellation Policy", Icons.Rounded.Receipt, onRefundPolicy)
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = Color(0xFFE0E0E0)
+            )
+            AboutMenuItem("Shipping & Installation Policy", Icons.Rounded.LocalShipping, onShippingPolicy)
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp),
                 color = Color(0xFFE0E0E0)
