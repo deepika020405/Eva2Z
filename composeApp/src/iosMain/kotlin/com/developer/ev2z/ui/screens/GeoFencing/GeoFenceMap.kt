@@ -14,7 +14,6 @@ import platform.MapKit.addOverlay
 import platform.MapKit.removeOverlays
 import platform.MapKit.overlays
 import platform.UIKit.UIEdgeInsetsMake
-import kotlin.collections.forEachIndexed
 
 @OptIn(ExperimentalForeignApi::class)
 @Composable
@@ -35,24 +34,28 @@ actual fun GeoFenceMap(
 
             polygon?.let { poly ->
                 memScoped {
+                    val size = poly.points.size
 
-                    val coords =
-                        allocArray<CLLocationCoordinate2D>(poly.points.size)
+                    // Allocate native memory for coordinates
+                    val coords = allocArray<DoubleVar>(size * 2)
 
+                    // Fill with lat/lng pairs
                     poly.points.forEachIndexed { index, point ->
-                        coords[index] =
-                            CLLocationCoordinate2DMake(point.lat, point.lng)
+                        coords[index * 2] = point.lat
+                        coords[index * 2 + 1] = point.lng
                     }
 
-                    val polygonOverlay =
-                        MKPolygon.polygonWithCoordinates(
-                            coords,
-                            poly.points.size.toULong()
-                        )
+                    // Reinterpret as CLLocationCoordinate2D array
+                    val coordsPtr = coords.reinterpret<CLLocationCoordinate2D>()
+
+                    val polygonOverlay = MKPolygon.polygonWithCoordinates(
+                        coordsPtr,
+                        size.toULong()
+                    )
 
                     mapView.addOverlay(polygonOverlay)
 
-                    // 🟢 FIT MAP TO POLYGON
+                    // Fit map to polygon
                     mapView.setVisibleMapRect(
                         polygonOverlay.boundingMapRect,
                         edgePadding = UIEdgeInsetsMake(40.0, 40.0, 40.0, 40.0),

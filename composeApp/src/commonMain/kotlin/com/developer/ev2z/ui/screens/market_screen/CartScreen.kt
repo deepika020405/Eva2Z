@@ -777,31 +777,31 @@ fun CheckoutBottomBar(viewModel: ShopViewModel) {
     }
 
 
-    if (showUpiSheet) {
-        UpiBottomSheet(
-            amount = state.finalAmount ?: state.totalPrice ?: "0",
-            onAppClick = { app ->
-
-                // ✅ Close sheet immediately
-                showUpiSheet = false
-
-                viewModel.createOrder { txnId ->
-
-
-                    launchUpiPayment(
-                        activity = context,
-                        app = app,
-                        amount = state.finalAmount ?: state.totalPrice ?: "0",
-                        txnId = txnId
-                    ) {
-                        viewModel.markPaymentPending(txnId)
-                    }
-
-                }
-            },
-            onDismiss = { showUpiSheet = false }
-        )
-    }
+//    if (showUpiSheet) {
+//        UpiBottomSheet(
+//            amount = state.finalAmount ?: state.totalPrice ?: "0",
+//            onAppClick = { app ->
+//
+//                // ✅ Close sheet immediately
+//                showUpiSheet = false
+//
+//                viewModel.createOrder { txnId ->
+//
+//
+//                    launchUpiPayment(
+//                        activity = context,
+//                        app = app,
+//                        amount = state.finalAmount ?: state.totalPrice ?: "0",
+//                        txnId = txnId
+//                    ) {
+//                        viewModel.markPaymentPending(txnId)
+//                    }
+//
+//                }
+//            },
+//            onDismiss = { showUpiSheet = false }
+//        )
+//    }
 
 }
 
