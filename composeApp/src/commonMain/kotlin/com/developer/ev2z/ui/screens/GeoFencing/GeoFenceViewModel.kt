@@ -42,6 +42,12 @@ sealed class SaveGeoFenceState {
     data class Error(val msg: String) : SaveGeoFenceState()
 }
 
+sealed class DeleteGeoFenceState {
+    object Idle : DeleteGeoFenceState()
+    object Loading : DeleteGeoFenceState()
+    object Success : DeleteGeoFenceState()
+    data class Error(val msg: String) : DeleteGeoFenceState()
+}
 class GeoFenceViewModel(
     private val repository: GeoFenceRepository
 ) : ViewModel() {
@@ -74,6 +80,11 @@ class GeoFenceViewModel(
         MutableStateFlow<SaveGeoFenceState>(SaveGeoFenceState.Idle)
 
     val saveState: StateFlow<SaveGeoFenceState> = _saveState
+
+    private val _deleteState =
+        MutableStateFlow<DeleteGeoFenceState>(DeleteGeoFenceState.Idle)
+    val deleteState: StateFlow<DeleteGeoFenceState> = _deleteState
+
     fun loadGeoFences() {
         viewModelScope.launch {
             _uiState.value = GeoFenceUiState.Loading
@@ -195,6 +206,24 @@ class GeoFenceViewModel(
             }
         }
     }
+
+        fun deleteGeoFence(item: GeoFenceDto) {
+            viewModelScope.launch {
+                _deleteState.value = DeleteGeoFenceState.Loading
+
+                repository.deleteGeoFence(
+                    geoFence = item,
+                    token = token
+                ).onSuccess {
+                    _deleteState.value = DeleteGeoFenceState.Success
+                    loadGeoFences() // 🔄 refresh list
+                }.onFailure {
+                    _deleteState.value =
+                        DeleteGeoFenceState.Error(it.message ?: "Delete failed")
+                }
+            }
+        }
+
 
 
 }

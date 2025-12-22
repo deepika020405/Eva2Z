@@ -68,6 +68,25 @@ class GeoFenceRepository(
             Result.failure(e)
         }
 
+    suspend fun deleteGeoFence(
+        geoFence: GeoFenceDto,
+        token: String
+    ): Result<Unit> {
+        return try {
+            apiService.deleteGeoFence(
+                token = token,
+                geoFenceId = geoFence.id,
+                deviceId = geoFence.device_id,
+                name = geoFence.name,
+                latitude = geoFence.latitude,
+                longitude = geoFence.longitude,
+                radius = geoFence.radius
+            )
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 
 }
 

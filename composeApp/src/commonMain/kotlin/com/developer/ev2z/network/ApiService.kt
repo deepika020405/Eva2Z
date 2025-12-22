@@ -6,7 +6,6 @@ import com.developer.ev2z.request.CartAddRequest
 import com.developer.ev2z.request.CommentRequest
 import com.developer.ev2z.request.CreateOrderRequest
 import com.developer.ev2z.request.DeviceAnalyticsRequest
-import com.developer.ev2z.request.LoginRequest
 import com.developer.ev2z.response.*
 import com.developer.ev2z.util.AppTokenProvider
 import io.ktor.client.call.*
@@ -1148,6 +1147,36 @@ class ApiService {
         ) {
             header(HttpHeaders.Authorization, "Bearer $token")
             header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+        }.body()
+    }
+
+
+
+    suspend fun deleteGeoFence(
+        token: String,
+        geoFenceId: Int,
+        deviceId: String,
+        name: String,
+        latitude: String,
+        longitude: String,
+        radius: String
+    ): JsonObject {
+
+        return client.delete("${baseUrl}geofences/$geoFenceId") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+
+            setBody(
+                FormDataContent(
+                    Parameters.build {
+                        append("device_id", deviceId)
+                        append("name", name)
+                        append("latitude", latitude.toString())
+                        append("longitude", longitude.toString())
+                        append("radius", radius.toString())
+                    }
+                )
+            )
         }.body()
     }
 

@@ -40,6 +40,7 @@ fun GeoFencingScreen(
     val viewModel: GeoFenceViewModel = rememberGeoFenceViewModel()
     val state by viewModel.uiState.collectAsState()
 
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -70,8 +71,12 @@ fun GeoFencingScreen(
                 GeoFenceUiState.Empty ->
                     EmptyGeoFenceView(onAddGeoFence)
 
-                is GeoFenceUiState.Success ->
-                    GeoFenceList((state as GeoFenceUiState.Success).list)
+                is GeoFenceUiState.Success -> {
+                    GeoFenceList(
+                        list = (state as GeoFenceUiState.Success).list,
+                        onDelete = { viewModel.deleteGeoFence(it) }
+                    )
+                }
 
                 is GeoFenceUiState.Error ->
                     Text(
@@ -122,21 +127,23 @@ fun EmptyGeoFenceView(
 
 
 @Composable
-fun GeoFenceList(list: List<GeoFenceDto>) {
+fun GeoFenceList(list: List<GeoFenceDto>, onDelete: (GeoFenceDto) -> Unit) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         items(list) { item ->
-            GeoFenceCard(item)
+            GeoFenceCard(item,onDelete)
         }
     }
 }
 
 
 @Composable
-fun GeoFenceCard(item: GeoFenceDto) {
+fun GeoFenceCard(item: GeoFenceDto, onDelete: (GeoFenceDto) -> Unit) {
+    var showDeleteDialog by remember { mutableStateOf(false) }
+
     Card(
         shape = RoundedCornerShape(16.dp),
         modifier = Modifier.fillMaxWidth()
@@ -153,7 +160,12 @@ fun GeoFenceCard(item: GeoFenceDto) {
                 Icon(
                     imageVector = Icons.Default.Delete,
                     contentDescription = "Delete",
-                    tint = Color.Red
+                    tint = Color.Red,
+                    modifier = Modifier
+                        .size(22.dp)
+                        .clickable {
+                            showDeleteDialog = true   // 👈 open dialog
+                        }
                 )
             }
 
@@ -183,6 +195,35 @@ fun GeoFenceCard(item: GeoFenceDto) {
                 }
             }
         }
+    }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = {
+                Text("Delete GeoFence")
+            },
+            text = {
+                Text("Are you sure you want to delete \"${item.name}\"?")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteDialog = false
+                        onDelete(item)   // 🔥 ACTUAL DELETE CALL
+                    }
+                ) {
+                    Text("Delete", color = Color.Red)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showDeleteDialog = false }
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 
