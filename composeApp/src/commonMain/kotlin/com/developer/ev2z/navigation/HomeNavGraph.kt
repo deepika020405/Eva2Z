@@ -1,4 +1,3 @@
-// HomeNavGraph.kt - FINAL FIXED VERSION
 package com.developer.ev2z.navigation
 
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -27,6 +26,7 @@ import com.developer.ev2z.ui.screens.Profile.ProfileScreen
 import com.developer.ev2z.ui.screens.homeScreen.HomeScreen
 import com.developer.ev2z.ui.screens.homeScreen.HomeViewModel
 import com.developer.ev2z.ui.screens.ManageDevices.ManageDeviceScreen
+import com.developer.ev2z.ui.screens.ManageDevices.EditDeviceNameScreen
 import com.developer.ev2z.ui.screens.market_screen.ShopScreenHost
 import com.developer.ev2z.ui.screens.PrivacyPolicy_TandC.PrivacyPolicy_TandCScreen
 import com.developer.ev2z.ui.screens.PrivacyPolicy_TandC.WebViewType
@@ -98,6 +98,7 @@ class ShopScreenWrapper : Screen {
 class ProfileTab(
     private val apiService: ApiService,
     private val storageManager: StorageManager,
+    private val refreshTrigger: Int, // ✅ Add refresh trigger
     private val onNavigateToEditProfile: () -> Unit,
     private val onNavigateToManageDevice: () -> Unit,
     private val onNavigateToPrivacyPolicy: () -> Unit,
@@ -117,6 +118,7 @@ class ProfileTab(
         ProfileScreen(
             apiService = apiService,
             storageManager = storageManager,
+            refreshTrigger = refreshTrigger, // ✅ Pass refresh trigger
             onEditProfile = onNavigateToEditProfile,
             onManageDevice = onNavigateToManageDevice,
             onPrivacyPolicy = onNavigateToPrivacyPolicy,
@@ -157,8 +159,10 @@ fun HomeNavGraph(
 ) {
     SetupStatusBar()
 
+    // ✅ Screen visibility states
     var showEditProfile by remember { mutableStateOf(false) }
     var showManageDevice by remember { mutableStateOf(false) }
+    var showEditDeviceName by remember { mutableStateOf(false) }
     var showPrivacyPolicy by remember { mutableStateOf(false) }
     var showTermsConditions by remember { mutableStateOf(false) }
     var showRefundPolicy by remember { mutableStateOf(false) }
@@ -169,12 +173,22 @@ fun HomeNavGraph(
     var showAccountActivity by remember { mutableStateOf(false) }
     var showReferAndEarn by remember { mutableStateOf(false) }
 
+    // ✅ Edit device state
+    var editDeviceId by remember { mutableStateOf("") }
+    var editDeviceName by remember { mutableStateOf("") }
+    var editSimNumber by remember { mutableStateOf("") }
+
+    // ✅ Refresh triggers
+    var manageDeviceRefresh by remember { mutableStateOf(0) }
+    var profileRefresh by remember { mutableStateOf(0) }
+
     Box(modifier = Modifier.fillMaxSize()) {
         HomeNavGraphContent(
             viewModel = viewModel,
             apiService = apiService,
             storageManager = storageManager,
             token = token,
+            profileRefreshTrigger = profileRefresh, // ✅ Pass refresh trigger
             onNavigateToAddDevice = onNavigateToAddDevice,
             onNavigateToDeviceReport = onNavigateToDeviceReport,
             onNavigateToEditProfile = { showEditProfile = true },
@@ -192,27 +206,56 @@ fun HomeNavGraph(
             onLogout = onLogout
         )
 
+        // ✅ Edit Profile Screen
         if (showEditProfile) {
             EditProfileScreen(
                 apiService = apiService,
                 storageManager = storageManager,
-                onBackPressed = { showEditProfile = false }
+                onBackPressed = {
+                    showEditProfile = false
+                    profileRefresh++ // ✅ Trigger profile refresh
+                }
             )
         }
 
+        // ✅ Manage Device Screen
         if (showManageDevice) {
             ManageDeviceScreen(
                 apiService = apiService,
                 storageManager = storageManager,
+                refreshTrigger = manageDeviceRefresh, // ✅ Pass refresh trigger
                 onBackClick = { showManageDevice = false },
                 onProfileClick = { showManageDevice = false },
                 onAddDeviceClick = {
                     showManageDevice = false
                     onNavigateToAddDevice()
+                },
+                onEditDeviceClick = { deviceId, deviceName, simNumber ->
+                    editDeviceId = deviceId
+                    editDeviceName = deviceName
+                    editSimNumber = simNumber
+                    showEditDeviceName = true
                 }
             )
         }
 
+        // ✅ Edit Device Name Screen
+        if (showEditDeviceName) {
+            EditDeviceNameScreen(
+                apiService = apiService,
+                storageManager = storageManager,
+                deviceId = editDeviceId,
+                deviceName = editDeviceName,
+                simNumber = editSimNumber,
+                onBackPressed = { showEditDeviceName = false },
+                onUpdateSuccess = {
+                    showEditDeviceName = false
+                    manageDeviceRefresh++ // ✅ Trigger device list refresh
+                }
+            )
+        }
+
+        // ✅ Privacy Policy
         if (showPrivacyPolicy) {
             PrivacyPolicy_TandCScreen(
                 type = WebViewType.PRIVACY_POLICY,
@@ -220,6 +263,7 @@ fun HomeNavGraph(
             )
         }
 
+        // ✅ Terms & Conditions
         if (showTermsConditions) {
             PrivacyPolicy_TandCScreen(
                 type = WebViewType.TERMS_CONDITIONS,
@@ -227,6 +271,7 @@ fun HomeNavGraph(
             )
         }
 
+        // ✅ Refund Policy
         if (showRefundPolicy) {
             PrivacyPolicy_TandCScreen(
                 type = WebViewType.REFUND_POLICY,
@@ -234,6 +279,7 @@ fun HomeNavGraph(
             )
         }
 
+        // ✅ Shipping Policy
         if (showShippingPolicy) {
             PrivacyPolicy_TandCScreen(
                 type = WebViewType.SHIPPING_POLICY,
@@ -241,6 +287,7 @@ fun HomeNavGraph(
             )
         }
 
+        // ✅ Geo Fencing
         if (showGeoFencing) {
             GeoFencingScreen(
                 apiService = apiService,
@@ -249,6 +296,7 @@ fun HomeNavGraph(
             )
         }
 
+        // ✅ History Playback
         if (showHistoryPlayback) {
             HistoryPlaybackScreen(
                 apiService = apiService,
@@ -257,25 +305,27 @@ fun HomeNavGraph(
             )
         }
 
+        // ✅ General Settings
         if (showGeneralSettings) {
             GeneralSettingsScreen(
                 onBackPressed = { showGeneralSettings = false }
             )
         }
 
+        // ✅ Account Activity
         if (showAccountActivity) {
             AccountActivityScreen(
                 apiService = apiService,
                 storageManager = storageManager,
                 onBackPressed = { showAccountActivity = false },
                 onAccountDeleted = {
-                    // Account deleted successfully - trigger logout
                     showAccountActivity = false
                     onLogout()
                 }
             )
         }
 
+        // ✅ Refer And Earn
         if (showReferAndEarn) {
             ReferAndEarnScreen(
                 onBackPressed = { showReferAndEarn = false }
@@ -290,6 +340,7 @@ fun HomeNavGraphContent(
     apiService: ApiService,
     storageManager: StorageManager,
     token: String,
+    profileRefreshTrigger: Int = 0, // ✅ Add refresh trigger
     onNavigateToAddDevice: () -> Unit,
     onNavigateToDeviceReport: () -> Unit,
     onNavigateToEditProfile: () -> Unit,
@@ -315,10 +366,13 @@ fun HomeNavGraphContent(
     }
 
     val homeTab = remember { HomeTab(viewModel, token, onNavigateToAddDevice, onNavigateToDeviceReport) }
-    val profileTab = remember {
+
+    // ✅ Update ProfileTab with refresh trigger
+    val profileTab = remember(profileRefreshTrigger) {
         ProfileTab(
             apiService,
             storageManager,
+            profileRefreshTrigger, // ✅ Pass refresh trigger
             onNavigateToEditProfile,
             onNavigateToManageDevice,
             onNavigateToPrivacyPolicy,
@@ -334,6 +388,7 @@ fun HomeNavGraphContent(
             onLogout
         )
     }
+
     val ordersTab = remember { OrdersTab() }
     val tabs = listOf(homeTab, CommunityTab, ordersTab, profileTab)
 

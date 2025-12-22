@@ -124,15 +124,14 @@ fun AddDeviceCommon(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(top = 24.dp, end = 24.dp)
+                .size(48.dp) // ✅ Add proper size
+                .background(Color.White, shape = RoundedCornerShape(8.dp)) // ✅ Add background
         ) {
             Icon(
                 imageVector = Icons.Outlined.Image,
                 contentDescription = "Gallery",
                 tint = Color.Black,
-                modifier = Modifier
-                    .size(36.dp)
-                    .background(color = Color.White)
-                    .border(width = 2.dp, color = Color.Gray)
+                modifier = Modifier.size(24.dp) // ✅ Icon size
             )
         }
 

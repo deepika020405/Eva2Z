@@ -1,4 +1,3 @@
-// ProfileScreen.kt - COMPLETE FIXED VERSION
 package com.developer.ev2z.ui.screens.Profile
 
 import androidx.compose.foundation.background
@@ -31,6 +30,7 @@ import com.developer.ev2z.network.ApiService
 fun ProfileScreen(
     apiService: ApiService,
     storageManager: StorageManager,
+    refreshTrigger: Int = 0, // ✅ Keep this parameter
     onEditProfile: () -> Unit = {},
     onManageDevice: () -> Unit = {},
     onPrivacyPolicy: () -> Unit = {},
@@ -49,9 +49,14 @@ fun ProfileScreen(
     val state by viewModel.state.collectAsState()
     var showImageZoom by remember { mutableStateOf(false) }
 
-    // Handle logout navigation
-    LaunchedEffect(state.logoutSuccess) {
+    // ✅ FIX: Reload data when refreshTrigger changes
+    LaunchedEffect(refreshTrigger) {
         viewModel.loadUserData()
+        viewModel.fetchProfilePicture()
+    }
+
+    // ✅ FIX: Separate logout handler
+    LaunchedEffect(state.logoutSuccess) {
         if (state.logoutSuccess) {
             onLogout()
         }

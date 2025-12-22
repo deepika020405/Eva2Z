@@ -12,6 +12,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit // ✅ Add this import
 import androidx.compose.material.icons.sharp.Wifi
 import androidx.compose.material.icons.sharp.Cable
 import androidx.compose.material3.*
@@ -25,7 +26,7 @@ import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.data.local.UserPrefs
 import com.developer.ev2z.response.Device
 
-// Theme colors - adjust these to match your app's theme
+// Theme colors
 private val card_bg = Color(0xFFF5F5F5)
 private val onPrimaryLight = Color.White
 private val primaryContainerLight = Color(0xFF4CAF50)
@@ -39,7 +40,9 @@ fun ManageDeviceScreen(
     storageManager: StorageManager,
     onBackClick: () -> Unit = {},
     onProfileClick: () -> Unit = {},
-    onAddDeviceClick: () -> Unit = {}
+    onAddDeviceClick: () -> Unit = {},
+    onEditDeviceClick: (deviceId: String, deviceName: String, simNumber: String) -> Unit = { _, _, _ -> },
+    refreshTrigger: Int = 0 // ✅ Add this parameter
 ) {
     val viewModel = remember { ManageDeviceViewModel(apiService) }
     val uiState by viewModel.uiState.collectAsState()
@@ -47,19 +50,11 @@ fun ManageDeviceScreen(
     val userPrefs = remember { UserPrefs(storageManager) }
     var token by remember { mutableStateOf("") }
 
-    // Load token and devices
-    LaunchedEffect(Unit) {
+    // ✅ Reload devices when refreshTrigger changes
+    LaunchedEffect(refreshTrigger) {
         token = userPrefs.getToken() ?: ""
         if (token.isNotEmpty()) {
             viewModel.loadDevices(token)
-        }
-    }
-
-    // Show success message
-    LaunchedEffect(uiState.successMessage) {
-        uiState.successMessage?.let { message ->
-            println("✅ Success: $message")
-            // You can show a Snackbar here if needed
         }
     }
 
@@ -153,6 +148,14 @@ fun ManageDeviceScreen(
                             },
                             onTurnOn = {
                                 viewModel.mobilizeDevice(token, device.device_id, "restore")
+                            },
+                            onEdit = {
+                                // ✅ Call the callback with device details
+                                onEditDeviceClick(
+                                    device.device_id,
+                                    device.device_name,
+                                    device.sim_no ?: ""
+                                )
                             }
                         )
                     }
@@ -244,7 +247,8 @@ private fun DeviceListItem(
     device: Device,
     onDelete: () -> Unit,
     onTurnOff: () -> Unit,
-    onTurnOn: () -> Unit
+    onTurnOn: () -> Unit,
+    onEdit: () -> Unit
 ) {
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showTurnOffDialog by remember { mutableStateOf(false) }
@@ -274,7 +278,7 @@ private fun DeviceListItem(
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Device Name and Delete Button
+        // Device Name and Action Buttons
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -291,12 +295,24 @@ private fun DeviceListItem(
                 )
             }
 
-            IconButton(onClick = { showDeleteDialog = true }) {
-                Icon(
-                    imageVector = Icons.Outlined.Delete,
-                    contentDescription = "Remove Device",
-                    tint = Color.Red
-                )
+            Row {
+                // ✅ Edit Button
+                IconButton(onClick = onEdit) {
+                    Icon(
+                        imageVector = Icons.Outlined.Edit,
+                        contentDescription = "Edit Device",
+                        tint = primaryContainerLight
+                    )
+                }
+
+                // Delete Button
+                IconButton(onClick = { showDeleteDialog = true }) {
+                    Icon(
+                        imageVector = Icons.Outlined.Delete,
+                        contentDescription = "Remove Device",
+                        tint = Color.Red
+                    )
+                }
             }
         }
 
