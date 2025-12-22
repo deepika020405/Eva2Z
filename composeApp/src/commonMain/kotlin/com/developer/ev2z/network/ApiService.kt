@@ -1180,5 +1180,33 @@ class ApiService {
         }.body()
     }
 
+
+    // ApiService.kt
+
+    suspend fun updateGeoFence(
+        geoFenceId: Int,
+        token: String,
+        deviceId: String,
+        name: String,
+        latitude: String,
+        longitude: String,
+        radius: Int
+    ): JsonObject {
+
+        return client.submitForm(
+            url = "${baseUrl}geofences-update/$geoFenceId",
+            formParameters = Parameters.build {
+                append("device_id", deviceId)
+                append("name", name)
+                append("latitude", latitude.toString())
+                append("longitude", longitude.toString())
+                append("radius", radius.toString())
+            }
+        ) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+        }.body()
+    }
+
 }
 

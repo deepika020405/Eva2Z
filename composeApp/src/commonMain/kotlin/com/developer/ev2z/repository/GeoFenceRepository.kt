@@ -3,6 +3,7 @@ package com.developer.ev2z.repository
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.response.Device
 import com.developer.ev2z.response.GeoFenceDto
+import com.developer.ev2z.util.AppTokenProvider
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -81,6 +82,30 @@ class GeoFenceRepository(
                 latitude = geoFence.latitude,
                 longitude = geoFence.longitude,
                 radius = geoFence.radius
+            )
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+
+    suspend fun updateGeoFence(
+        geoFence: GeoFenceDto,
+        name: String,
+        radius: Int,
+        lat: String,
+        lng: String
+    ): Result<Unit> {
+        return try {
+            apiService.updateGeoFence(
+                geoFenceId = geoFence.id,
+                token = AppTokenProvider.getToken(),
+                deviceId = geoFence.device_id,
+                name = name,
+                latitude = lat,
+                longitude = lng,
+                radius = radius
             )
             Result.success(Unit)
         } catch (e: Exception) {

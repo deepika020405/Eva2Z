@@ -48,6 +48,14 @@ sealed class DeleteGeoFenceState {
     object Success : DeleteGeoFenceState()
     data class Error(val msg: String) : DeleteGeoFenceState()
 }
+
+sealed class EditGeoFenceState {
+    object Idle : EditGeoFenceState()
+    object Loading : EditGeoFenceState()
+    object Success : EditGeoFenceState()
+    data class Error(val msg: String) : EditGeoFenceState()
+}
+
 class GeoFenceViewModel(
     private val repository: GeoFenceRepository
 ) : ViewModel() {
@@ -84,6 +92,10 @@ class GeoFenceViewModel(
     private val _deleteState =
         MutableStateFlow<DeleteGeoFenceState>(DeleteGeoFenceState.Idle)
     val deleteState: StateFlow<DeleteGeoFenceState> = _deleteState
+
+    private val _editState =
+        MutableStateFlow<EditGeoFenceState>(EditGeoFenceState.Idle)
+    val editState: StateFlow<EditGeoFenceState> = _editState
 
     fun loadGeoFences() {
         viewModelScope.launch {
@@ -225,5 +237,41 @@ class GeoFenceViewModel(
         }
 
 
+
+    fun updateGeoFence(
+        geoFence: GeoFenceDto,
+        name: String,
+        radius: Int
+    ) {
+        viewModelScope.launch {
+            _saveState.value = SaveGeoFenceState.Loading
+
+            repository.updateGeoFence(
+                geoFence = geoFence,
+                name = name,
+                radius = radius,
+                lat = geoFence.latitude,
+                lng = geoFence.longitude
+            ).onSuccess {
+                _saveState.value = SaveGeoFenceState.Success
+                loadGeoFences()
+            }.onFailure {
+                _saveState.value =
+                    SaveGeoFenceState.Error(it.message ?: "Update failed")
+            }
+        }
+    }
+
+    fun setEditLocation(lat: String, lng: String) {
+        _polygon.value = createCirclePolygon(
+            centerLat = lat.toDouble(),
+            centerLng = lng.toDouble(),
+            radiusMeters = 1500.0
+        )
+    }
+
+    fun resetSaveState() {
+        _saveState.value = SaveGeoFenceState.Idle
+    }
 
 }

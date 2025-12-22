@@ -35,7 +35,8 @@ import com.developer.ev2z.response.GeoFenceDto
 @Composable
 fun GeoFencingScreen(
     onAddGeoFence: () -> Unit,
-    onBackPressed: () -> Unit
+    onBackPressed: () -> Unit,
+    onEditGeoFence: (GeoFenceDto) -> Unit
 ) {
     val viewModel: GeoFenceViewModel = rememberGeoFenceViewModel()
     val state by viewModel.uiState.collectAsState()
@@ -74,7 +75,8 @@ fun GeoFencingScreen(
                 is GeoFenceUiState.Success -> {
                     GeoFenceList(
                         list = (state as GeoFenceUiState.Success).list,
-                        onDelete = { viewModel.deleteGeoFence(it) }
+                        onDelete = { viewModel.deleteGeoFence(it) },
+                        onEdit = { onEditGeoFence(it) } // ✅
                     )
                 }
 
@@ -127,21 +129,21 @@ fun EmptyGeoFenceView(
 
 
 @Composable
-fun GeoFenceList(list: List<GeoFenceDto>, onDelete: (GeoFenceDto) -> Unit) {
+fun GeoFenceList(list: List<GeoFenceDto>, onDelete: (GeoFenceDto) -> Unit, onEdit: (GeoFenceDto) -> Unit) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         items(list) { item ->
-            GeoFenceCard(item,onDelete)
+            GeoFenceCard(item,onDelete,onEdit)
         }
     }
 }
 
 
 @Composable
-fun GeoFenceCard(item: GeoFenceDto, onDelete: (GeoFenceDto) -> Unit) {
+fun GeoFenceCard(item: GeoFenceDto, onDelete: (GeoFenceDto) -> Unit,onEdit: (GeoFenceDto) -> Unit) {
     var showDeleteDialog by remember { mutableStateOf(false) }
 
     Card(
@@ -170,6 +172,11 @@ fun GeoFenceCard(item: GeoFenceDto, onDelete: (GeoFenceDto) -> Unit) {
             }
 
             Spacer(Modifier.height(6.dp))
+//            Text(
+//                text = "Device Name: ${item.name}",
+//                color = Color.Gray,
+//                fontSize = 12.sp
+//            )
 
             Text(
                 text = "Device ID: ${item.device_id}",
@@ -187,10 +194,11 @@ fun GeoFenceCard(item: GeoFenceDto, onDelete: (GeoFenceDto) -> Unit) {
             Spacer(Modifier.height(12.dp))
 
             Row(horizontalArrangement = Arrangement.SpaceBetween) {
-                TextButton(onClick = { /* Disable */ }) {
-                    Text("Disable", color = Color.Red)
-                }
-                TextButton(onClick = { /* Edit */ }) {
+//                TextButton(onClick = { /* Disable */ }) {
+//                    Text("Disable", color = Color.Red)
+//                }
+                TextButton(onClick = { println("CLICKED")
+                    onEdit(item) }) {
                     Text("Edit")
                 }
             }
@@ -230,33 +238,61 @@ fun GeoFenceCard(item: GeoFenceDto, onDelete: (GeoFenceDto) -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddGeoFenceScreen(
-    onBack: () -> Unit,
-    onSave: () -> Unit
+fun AddEditGeoFenceScreen(
+    editingGeoFence: GeoFenceDto?,   // 👈 NULL = Add, NOT NULL = Edit
+    onBack: () -> Unit
 ) {
     val viewModel: GeoFenceViewModel = rememberGeoFenceViewModel()
 
     val deviceState by viewModel.deviceState.collectAsState()
-
-    var geoFenceName by remember { mutableStateOf("") }
-    var selectedDevice by remember { mutableStateOf<Device?>(null) }
-    var showDeviceSheet by remember { mutableStateOf(false) }
-    var radius by remember { mutableStateOf("") }
-    var selectedLocation by remember { mutableStateOf<LocationResult?>(null) }
-    var showLocationPicker by remember { mutableStateOf(false) }
     val polygon by viewModel.polygon.collectAsState()
     val saveState by viewModel.saveState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
 
+    var geoFenceName by remember {
+        mutableStateOf(editingGeoFence?.name ?: "")
+    }
 
+    var radius by remember {
+        mutableStateOf(editingGeoFence?.radius?.toString() ?: "")
+    }
+
+    var selectedDevice by remember {
+        mutableStateOf<Device?>(null)
+    }
+
+    var selectedLocation by remember {
+        mutableStateOf<LocationResult?>(null)
+    }
+
+    var showDeviceSheet by remember { mutableStateOf(false) }
+    var showLocationPicker by remember { mutableStateOf(false) }
+
+
+    // 🔁 PREFILL FOR EDIT
+    LaunchedEffect(editingGeoFence) {
+        editingGeoFence?.let { geo ->
+            selectedLocation = LocationResult(
+                name = geo.name,
+                lat = geo.latitude.toDouble(),
+                lng = geo.longitude.toDouble()
+            )
+
+            viewModel.setEditLocation(
+                lat = geo.latitude,
+                lng = geo.longitude
+            )
+
+        }
+    }
 
     Scaffold(
-        snackbarHost = {
-            SnackbarHost(hostState = snackbarHostState)
-        },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Add GeoFence") },
+                title = {
+                    Text(if (editingGeoFence == null) "Add GeoFence" else "Edit GeoFence")
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, null)
@@ -274,68 +310,59 @@ fun AddGeoFenceScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
 
-
             item { GeoFenceMapPreview(polygon) }
 
             item {
                 OutlinedTextField(
                     value = geoFenceName,
                     onValueChange = { geoFenceName = it },
-                    placeholder = { Text("Add Geofence Name") },
+                    placeholder = { Text("GeoFence Name") },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
 
-            // 🔽 DEVICE FIELD
+            // DEVICE
             item {
                 OutlinedTextField(
                     value = selectedDevice?.device_name ?: "",
-                    onValueChange = {},
                     enabled = false,
+                    onValueChange = {},
                     placeholder = { Text("Select Device") },
                     trailingIcon = {
-                        TextButton(
-                            onClick = {
-                                showDeviceSheet = true
-                                viewModel.loadDevices() // 🔥 API CALL
-                            }
-                        ) {
-                            Text("+ Add Device", color = Color(0xFF4CAF50))
+                        TextButton(onClick = {
+                            showDeviceSheet = true
+                            viewModel.loadDevices()
+                        }) {
+                            Text("Select", color = Color(0xFF4CAF50))
                         }
                     },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
 
+            // LOCATION
             item {
                 OutlinedTextField(
                     value = selectedLocation?.name ?: "",
-                    onValueChange = {},
                     enabled = false,
+                    onValueChange = {},
                     placeholder = { Text("Select Location") },
                     trailingIcon = {
                         TextButton(onClick = { showLocationPicker = true }) {
-                            Text("+ Add Location", color = Color(0xFF4CAF50))
+                            Text("Select", color = Color(0xFF4CAF50))
                         }
                     },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
 
+            // RADIUS
             item {
                 OutlinedTextField(
                     value = radius,
                     onValueChange = { radius = it },
-                    placeholder = { Text("Enter Radius") },
+                    placeholder = { Text("Radius (meters)") },
                     modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            item {
-                Text(
-                    text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor",
-                    fontSize = 12.sp,
-                    color = Color.Gray
                 )
             }
 
@@ -344,15 +371,24 @@ fun AddGeoFenceScreen(
                     onClick = {
                         if (
                             geoFenceName.isNotBlank() &&
-                            selectedDevice != null &&
-                            selectedLocation != null &&
-                            radius.isNotBlank()
+                            radius.isNotBlank() &&
+                            selectedLocation != null
                         ) {
-                            viewModel.saveGeoFence(
-                                name = geoFenceName,
-                                device = selectedDevice!!,
-                                radiusMeters = radius.toInt()
-                            )
+                            if (editingGeoFence == null) {
+                                // ➕ ADD
+                                viewModel.saveGeoFence(
+                                    name = geoFenceName,
+                                    device = selectedDevice!!,
+                                    radiusMeters = radius.toInt()
+                                )
+                            } else {
+                                // ✏️ UPDATE
+                                viewModel.updateGeoFence(
+                                    geoFence = editingGeoFence,
+                                    name = geoFenceName,
+                                    radius = radius.toInt()
+                                )
+                            }
                         }
                     },
                     modifier = Modifier
@@ -360,21 +396,16 @@ fun AddGeoFenceScreen(
                         .height(52.dp),
                     shape = RoundedCornerShape(26.dp)
                 ) {
-                    when (saveState) {
-                        SaveGeoFenceState.Loading ->
-                            CircularProgressIndicator(
-                                color = Color.White,
-                                strokeWidth = 2.dp
-                            )
-                        else ->
-                            Text("+ Save", color = Color.White)
-                    }
+                    Text(
+                        if (editingGeoFence == null) "Save" else "Update",
+                        color = Color.White
+                    )
                 }
             }
         }
     }
 
-    // 🔽 DEVICE LIST BOTTOM SHEET
+    // DEVICE SHEET
     if (showDeviceSheet) {
         DevicePickerBottomSheet(
             deviceState = deviceState,
@@ -387,40 +418,26 @@ fun AddGeoFenceScreen(
         )
     }
 
+    // LOCATION DIALOG
     if (showLocationPicker) {
         LocationPickerDialog(
             onDismiss = { showLocationPicker = false },
             onLocationSelected = {
                 selectedLocation = it
+                viewModel.selectLocation(it)
                 showLocationPicker = false
             }
         )
     }
 
+    // CLOSE ON SUCCESS
     LaunchedEffect(saveState) {
-        when (saveState) {
-
-            SaveGeoFenceState.Success -> {
-                snackbarHostState.showSnackbar(
-                    message = "GeoFence saved successfully",
-                    duration = SnackbarDuration.Short
-                )
-                onBack() // 👈 screen close
-            }
-
-            is SaveGeoFenceState.Error -> {
-                snackbarHostState.showSnackbar(
-                    message = (saveState as SaveGeoFenceState.Error).msg,
-                    duration = SnackbarDuration.Short
-                )
-            }
-
-            else -> Unit
+        if (saveState is SaveGeoFenceState.Success) {
+            viewModel.resetSaveState()   // ✅ VERY IMPORTANT
+            onBack()
         }
     }
-
 }
-
 
 @Composable
 fun GeoFenceMapPreview(
@@ -643,5 +660,7 @@ fun LocationRow(
         Divider()
     }
 }
+
+
 
 
