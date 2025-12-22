@@ -1,6 +1,7 @@
 package com.developer.ev2z.repository
 
 import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.response.Device
 import com.developer.ev2z.response.GeoFenceDto
 
 class GeoFenceRepository(
@@ -19,4 +20,18 @@ class GeoFenceRepository(
             Result.failure(e)
         }
     }
+
+    suspend fun fetchMyDevices(token: String): Result<List<Device>> =
+        try {
+            val res = apiService.getMyDevices(token)
+
+            if (res.success) {
+                Result.success(res.devices) // ✅ CORRECT
+            } else {
+                Result.failure(Exception("Failed to load devices"))
+            }
+
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
 }
