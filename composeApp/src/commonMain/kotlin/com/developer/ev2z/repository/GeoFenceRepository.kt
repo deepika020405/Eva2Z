@@ -3,6 +3,8 @@ package com.developer.ev2z.repository
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.response.Device
 import com.developer.ev2z.response.GeoFenceDto
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.jsonPrimitive
 
 class GeoFenceRepository(
     private val apiService: ApiService
@@ -34,4 +36,39 @@ class GeoFenceRepository(
         } catch (e: Exception) {
             Result.failure(e)
         }
+
+    // ✅ SAVE GEOFENCE
+    suspend fun saveGeoFence(
+        token: String,
+        deviceId: String,
+        name: String,
+        latitude: Double,
+        longitude: Double,
+        radius: Int
+    ): Result<Unit> =
+        try {
+            val res = apiService.saveGeoFence(
+                token = token,
+                deviceId = deviceId,
+                name = name,
+                latitude = latitude,
+                longitude = longitude,
+                radius = radius
+            )
+
+            if (res["success"]?.jsonPrimitive?.boolean == true) {
+                Result.success(Unit)
+            } else {
+                Result.failure(
+                    Exception(res["message"]?.jsonPrimitive?.content ?: "Save failed")
+                )
+            }
+
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+
+
 }
+
+

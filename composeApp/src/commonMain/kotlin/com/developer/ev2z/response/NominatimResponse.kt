@@ -13,5 +13,5 @@ data class NominatimResponse(
 @Serializable
 data class GeoJson(
     val type: String,
-    val coordinates: List<List<List<Double>>>
+    val coordinates: List<Double> // ALWAYS Point
 )

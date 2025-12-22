@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -203,9 +204,15 @@ fun AddGeoFenceScreen(
     var selectedLocation by remember { mutableStateOf<LocationResult?>(null) }
     var showLocationPicker by remember { mutableStateOf(false) }
     val polygon by viewModel.polygon.collectAsState()
+    val saveState by viewModel.saveState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+
 
 
     Scaffold(
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState)
+        },
         topBar = {
             TopAppBar(
                 title = { Text("Add GeoFence") },
@@ -293,16 +300,34 @@ fun AddGeoFenceScreen(
 
             item {
                 Button(
-                    onClick = onSave,
+                    onClick = {
+                        if (
+                            geoFenceName.isNotBlank() &&
+                            selectedDevice != null &&
+                            selectedLocation != null &&
+                            radius.isNotBlank()
+                        ) {
+                            viewModel.saveGeoFence(
+                                name = geoFenceName,
+                                device = selectedDevice!!,
+                                radiusMeters = radius.toInt()
+                            )
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
-                    shape = RoundedCornerShape(26.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF4CAF50)
-                    )
+                    shape = RoundedCornerShape(26.dp)
                 ) {
-                    Text("+ Save", color = Color.White)
+                    when (saveState) {
+                        SaveGeoFenceState.Loading ->
+                            CircularProgressIndicator(
+                                color = Color.White,
+                                strokeWidth = 2.dp
+                            )
+                        else ->
+                            Text("+ Save", color = Color.White)
+                    }
                 }
             }
         }
@@ -329,6 +354,28 @@ fun AddGeoFenceScreen(
                 showLocationPicker = false
             }
         )
+    }
+
+    LaunchedEffect(saveState) {
+        when (saveState) {
+
+            SaveGeoFenceState.Success -> {
+                snackbarHostState.showSnackbar(
+                    message = "GeoFence saved successfully",
+                    duration = SnackbarDuration.Short
+                )
+                onBack() // 👈 screen close
+            }
+
+            is SaveGeoFenceState.Error -> {
+                snackbarHostState.showSnackbar(
+                    message = (saveState as SaveGeoFenceState.Error).msg,
+                    duration = SnackbarDuration.Short
+                )
+            }
+
+            else -> Unit
+        }
     }
 
 }

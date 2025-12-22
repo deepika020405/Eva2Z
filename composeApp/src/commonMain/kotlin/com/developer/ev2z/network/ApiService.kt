@@ -1122,6 +1122,34 @@ class ApiService {
     }
 
 
+    // ---------------- SAVE GEOFENCE ----------------
+    suspend fun saveGeoFence(
+        token: String,
+        deviceId: String,
+        name: String,
+        latitude: Double,
+        longitude: Double,
+        radius: Int
+    ): JsonObject {
+
+        val url = "${baseUrl}geofences"
+
+        println("🌐 API: Saving GeoFence")
+
+        return client.submitForm(
+            url = url,
+            formParameters = Parameters.build {
+                append("device_id", deviceId)
+                append("name", name)
+                append("latitude", latitude.toString())
+                append("longitude", longitude.toString())
+                append("radius", radius.toString())
+            }
+        ) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+        }.body()
+    }
 
 }
 

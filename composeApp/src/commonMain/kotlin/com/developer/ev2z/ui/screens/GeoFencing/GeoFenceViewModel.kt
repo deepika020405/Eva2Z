@@ -35,6 +35,13 @@ sealed class DeviceUiState {
     data class Error(val msg: String) : DeviceUiState()
 }
 
+sealed class SaveGeoFenceState {
+    object Idle : SaveGeoFenceState()
+    object Loading : SaveGeoFenceState()
+    object Success : SaveGeoFenceState()
+    data class Error(val msg: String) : SaveGeoFenceState()
+}
+
 class GeoFenceViewModel(
     private val repository: GeoFenceRepository
 ) : ViewModel() {
@@ -62,6 +69,11 @@ class GeoFenceViewModel(
         MutableStateFlow<GeoFencePolygon?>(null)
 
     val polygon: StateFlow<GeoFencePolygon?> = _polygon
+
+    private val _saveState =
+        MutableStateFlow<SaveGeoFenceState>(SaveGeoFenceState.Idle)
+
+    val saveState: StateFlow<SaveGeoFenceState> = _saveState
     fun loadGeoFences() {
         viewModelScope.launch {
             _uiState.value = GeoFenceUiState.Loading
@@ -112,11 +124,6 @@ class GeoFenceViewModel(
         }
     }
 
-//    fun selectLocation(location: LocationResult, polygon: GeoFencePolygon?) {
-//        _selected.value = location
-//        _polygon.value = polygon
-//    }
-
     fun selectLocation(location: LocationResult) {
         _selected.value = location
         _polygon.value = createCirclePolygon(
@@ -159,6 +166,34 @@ class GeoFenceViewModel(
         }
 
         return GeoFencePolygon(polygonPoints)
+    }
+
+
+    fun saveGeoFence(
+        name: String,
+        device: Device,
+        radiusMeters: Int
+    ) {
+        val location = selected.value ?: return
+
+        viewModelScope.launch {
+            _saveState.value = SaveGeoFenceState.Loading
+
+            repository.saveGeoFence(
+                token = token,
+                deviceId = device.device_id,
+                name = name,
+                latitude = location.lat,
+                longitude = location.lng,
+                radius = radiusMeters
+            ).onSuccess {
+                _saveState.value = SaveGeoFenceState.Success
+                loadGeoFences() // refresh list
+            }.onFailure {
+                _saveState.value =
+                    SaveGeoFenceState.Error(it.message ?: "Failed to save geofence")
+            }
+        }
     }
 
 
