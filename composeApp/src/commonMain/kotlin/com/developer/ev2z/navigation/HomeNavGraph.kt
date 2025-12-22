@@ -32,9 +32,12 @@ import com.developer.ev2z.ui.screens.PrivacyPolicy_TandC.PrivacyPolicy_TandCScre
 import com.developer.ev2z.ui.screens.PrivacyPolicy_TandC.WebViewType
 import com.developer.ev2z.ui.screens.community.CommunityScreenWrapper
 import com.developer.ev2z.ui.screens.market_screen.ShopViewModel
+import com.developer.ev2z.ui.screens.GeneralSettings.GeneralSettingsScreen
+import com.developer.ev2z.ui.screens.AccountActivity.AccountActivityScreen
+import com.developer.ev2z.ui.screens.ReferAndEarn.ReferAndEarnScreen
 import kotlinx.coroutines.launch
 
-// ------------------ TABS (same as before) -------------------
+// ------------------ TABS -------------------
 
 class HomeTab(
     private val viewModel: HomeViewModel,
@@ -58,24 +61,9 @@ class HomeTab(
         )
 }
 
-//object WalletTab : Tab {
-//    @Composable
-//    override fun Content() = WalletScreen()
-//
-//    override val options: TabOptions
-//        @Composable get() = TabOptions(
-//            index = 1u,
-//            title = "Community",
-//            icon = rememberVectorPainter(Icons.Default.GridView)
-//        )
-//}
-
-
 object CommunityTab : Tab {
-
     @Composable
     override fun Content() {
-        // ✅ Navigator so future screens (create post, comments) work
         Navigator(CommunityScreenWrapper())
     }
     override val options: TabOptions
@@ -89,10 +77,7 @@ object CommunityTab : Tab {
 class OrdersTab : Tab {
     @Composable
     override fun Content() {
-        // ✅ WRAP with Navigator so LocalNavigator works
         Navigator(ShopScreenWrapper())
-//        Navigator(screen = ShopScreenWrapper(shopViewModel))
-
     }
 
     override val options: TabOptions
@@ -103,7 +88,6 @@ class OrdersTab : Tab {
         )
 }
 
-// ✅ NEW: Wrapper Screen for Shop
 class ShopScreenWrapper : Screen {
     @Composable
     override fun Content() {
@@ -123,6 +107,9 @@ class ProfileTab(
     private val onNavigateToChangePassword: () -> Unit,
     private val onNavigateToGeoFencing: () -> Unit,
     private val onNavigateToHistoryPlayback: () -> Unit,
+    private val onNavigateToGeneralSettings: () -> Unit,
+    private val onNavigateToAccountActivity: () -> Unit,
+    private val onNavigateToReferAndEarn: () -> Unit,
     private val onLogout: () -> Unit
 ) : Tab {
     @Composable
@@ -139,6 +126,9 @@ class ProfileTab(
             onChangePassword = onNavigateToChangePassword,
             onGeoFencing = onNavigateToGeoFencing,
             onHistoryPlayback = onNavigateToHistoryPlayback,
+            onGeneralSettings = onNavigateToGeneralSettings,
+            onAccountActivity = onNavigateToAccountActivity,
+            onReferAndEarn = onNavigateToReferAndEarn,
             onLogout = onLogout
         )
     }
@@ -162,7 +152,7 @@ fun HomeNavGraph(
     token: String,
     onNavigateToAddDevice: () -> Unit,
     onNavigateToDeviceReport: () -> Unit,
-    onNavigateToChangePassword: () -> Unit = {}, // ✅ RECEIVE FROM APP
+    onNavigateToChangePassword: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     SetupStatusBar()
@@ -175,6 +165,9 @@ fun HomeNavGraph(
     var showShippingPolicy by remember { mutableStateOf(false) }
     var showGeoFencing by remember { mutableStateOf(false) }
     var showHistoryPlayback by remember { mutableStateOf(false) }
+    var showGeneralSettings by remember { mutableStateOf(false) }
+    var showAccountActivity by remember { mutableStateOf(false) }
+    var showReferAndEarn by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         HomeNavGraphContent(
@@ -193,10 +186,12 @@ fun HomeNavGraph(
             onNavigateToChangePassword = onNavigateToChangePassword,
             onNavigateToGeoFencing = { showGeoFencing = true },
             onNavigateToHistoryPlayback = { showHistoryPlayback = true },
+            onNavigateToGeneralSettings = { showGeneralSettings = true },
+            onNavigateToAccountActivity = { showAccountActivity = true },
+            onNavigateToReferAndEarn = { showReferAndEarn = true },
             onLogout = onLogout
         )
 
-        // Edit Profile Screen
         if (showEditProfile) {
             EditProfileScreen(
                 apiService = apiService,
@@ -205,7 +200,6 @@ fun HomeNavGraph(
             )
         }
 
-        // Manage Device Screen
         if (showManageDevice) {
             ManageDeviceScreen(
                 apiService = apiService,
@@ -219,7 +213,6 @@ fun HomeNavGraph(
             )
         }
 
-        // Privacy Policy Screen
         if (showPrivacyPolicy) {
             PrivacyPolicy_TandCScreen(
                 type = WebViewType.PRIVACY_POLICY,
@@ -227,7 +220,6 @@ fun HomeNavGraph(
             )
         }
 
-        // Terms & Conditions Screen
         if (showTermsConditions) {
             PrivacyPolicy_TandCScreen(
                 type = WebViewType.TERMS_CONDITIONS,
@@ -235,7 +227,6 @@ fun HomeNavGraph(
             )
         }
 
-        // Refund & Cancellation Policy Screen
         if (showRefundPolicy) {
             PrivacyPolicy_TandCScreen(
                 type = WebViewType.REFUND_POLICY,
@@ -243,7 +234,6 @@ fun HomeNavGraph(
             )
         }
 
-        // Shipping & Installation Policy Screen
         if (showShippingPolicy) {
             PrivacyPolicy_TandCScreen(
                 type = WebViewType.SHIPPING_POLICY,
@@ -251,7 +241,6 @@ fun HomeNavGraph(
             )
         }
 
-        // GeoFencing Screen
         if (showGeoFencing) {
             GeoFencingScreen(
                 apiService = apiService,
@@ -260,12 +249,29 @@ fun HomeNavGraph(
             )
         }
 
-// History Playback Screen
         if (showHistoryPlayback) {
             HistoryPlaybackScreen(
                 apiService = apiService,
                 storageManager = storageManager,
                 onBackPressed = { showHistoryPlayback = false }
+            )
+        }
+
+        if (showGeneralSettings) {
+            GeneralSettingsScreen(
+                onBackPressed = { showGeneralSettings = false }
+            )
+        }
+
+        if (showAccountActivity) {
+            AccountActivityScreen(
+                onBackPressed = { showAccountActivity = false }
+            )
+        }
+
+        if (showReferAndEarn) {
+            ReferAndEarnScreen(
+                onBackPressed = { showReferAndEarn = false }
             )
         }
     }
@@ -288,6 +294,9 @@ fun HomeNavGraphContent(
     onNavigateToChangePassword: () -> Unit = {},
     onNavigateToGeoFencing: () -> Unit = {},
     onNavigateToHistoryPlayback: () -> Unit = {},
+    onNavigateToGeneralSettings: () -> Unit = {},
+    onNavigateToAccountActivity: () -> Unit = {},
+    onNavigateToReferAndEarn: () -> Unit = {},
     onLogout: () -> Unit
 ) {
     val productRepository = remember { ProductRepository(apiService) }
@@ -312,6 +321,9 @@ fun HomeNavGraphContent(
             onNavigateToChangePassword,
             onNavigateToGeoFencing,
             onNavigateToHistoryPlayback,
+            onNavigateToGeneralSettings,
+            onNavigateToAccountActivity,
+            onNavigateToReferAndEarn,
             onLogout
         )
     }

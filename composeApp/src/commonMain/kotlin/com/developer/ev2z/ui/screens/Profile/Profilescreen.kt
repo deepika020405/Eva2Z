@@ -40,6 +40,9 @@ fun ProfileScreen(
     onChangePassword: () -> Unit = {},
     onGeoFencing: () -> Unit = {},
     onHistoryPlayback: () -> Unit = {},
+    onGeneralSettings: () -> Unit = {},
+    onAccountActivity: () -> Unit = {},
+    onReferAndEarn: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     val viewModel = remember { ProfileViewModel(apiService, storageManager) }
@@ -59,9 +62,9 @@ fun ProfileScreen(
         onRefresh = { viewModel.fetchProfilePicture() },
         onProfileImageClick = { showImageZoom = true },
         onEditProfile = onEditProfile,
-        onGeneralSettings = { /* Navigate to SettingActivity */ },
-        onAccountActivity = { /* Navigate to account activity */ },
-        onReferAndEarn = { /* Navigate to ReferAndEarnActivity */ },
+        onGeneralSettings = onGeneralSettings,
+        onAccountActivity = onAccountActivity,
+        onReferAndEarn = onReferAndEarn,
         onChangePassword = onChangePassword,
         onManageDevice = onManageDevice,
         onAddFence = onGeoFencing,
