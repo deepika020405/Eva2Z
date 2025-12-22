@@ -2,6 +2,8 @@ package com.developer.ev2z.ui.screens.GeoFencing
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.developer.ev2z.data.local.model.GeoFencePolygon
+import com.developer.ev2z.data.local.model.LatLng
 import com.developer.ev2z.network.NominatimApi
 import com.developer.ev2z.repository.GeoFenceRepository
 import com.developer.ev2z.response.Device
@@ -12,6 +14,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlin.math.PI
+import kotlin.math.asin
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
 
 
 sealed class GeoFenceUiState {
@@ -51,6 +58,10 @@ class GeoFenceViewModel(
     }
     private var searchJob: Job? = null
     val _isSearching = MutableStateFlow(false)
+    private val _polygon =
+        MutableStateFlow<GeoFencePolygon?>(null)
+
+    val polygon: StateFlow<GeoFencePolygon?> = _polygon
     fun loadGeoFences() {
         viewModelScope.launch {
             _uiState.value = GeoFenceUiState.Loading
@@ -101,8 +112,54 @@ class GeoFenceViewModel(
         }
     }
 
+//    fun selectLocation(location: LocationResult, polygon: GeoFencePolygon?) {
+//        _selected.value = location
+//        _polygon.value = polygon
+//    }
+
     fun selectLocation(location: LocationResult) {
         _selected.value = location
+        _polygon.value = createCirclePolygon(
+            centerLat = location.lat,
+            centerLng = location.lng,
+            radiusMeters = 1500.0
+        )
     }
+
+    private fun createCirclePolygon(
+        centerLat: Double,
+        centerLng: Double,
+        radiusMeters: Double = 1000.0,
+        points: Int = 32
+    ): GeoFencePolygon {
+
+        val earthRadius = 6371000.0
+
+        val latRad = centerLat * PI / 180
+        val lngRad = centerLng * PI / 180
+
+        val polygonPoints: List<LatLng> = (0 until points).map { i ->
+
+            val angle = 2 * PI * i / points
+
+            val lat = asin(
+                sin(latRad) * cos(radiusMeters / earthRadius) +
+                        cos(latRad) * sin(radiusMeters / earthRadius) * cos(angle)
+            )
+
+            val lng = lngRad + atan2(
+                sin(angle) * sin(radiusMeters / earthRadius) * cos(latRad),
+                cos(radiusMeters / earthRadius) - sin(latRad) * sin(lat)
+            )
+
+            LatLng(
+                lat = lat * 180 / PI,
+                lng = lng * 180 / PI
+            )
+        }
+
+        return GeoFencePolygon(polygonPoints)
+    }
+
 
 }

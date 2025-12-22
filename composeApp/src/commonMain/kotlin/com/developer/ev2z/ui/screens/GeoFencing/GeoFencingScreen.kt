@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.developer.ev2z.data.local.model.GeoFencePolygon
 import com.developer.ev2z.response.Device
 import com.developer.ev2z.response.GeoFenceDto
 
@@ -201,6 +202,8 @@ fun AddGeoFenceScreen(
     var radius by remember { mutableStateOf("") }
     var selectedLocation by remember { mutableStateOf<LocationResult?>(null) }
     var showLocationPicker by remember { mutableStateOf(false) }
+    val polygon by viewModel.polygon.collectAsState()
+
 
     Scaffold(
         topBar = {
@@ -223,7 +226,8 @@ fun AddGeoFenceScreen(
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
 
-            item { GeoFenceMapPreview() }
+
+            item { GeoFenceMapPreview(polygon) }
 
             item {
                 OutlinedTextField(
@@ -331,20 +335,16 @@ fun AddGeoFenceScreen(
 
 
 @Composable
-fun GeoFenceMapPreview() {
+fun GeoFenceMapPreview(
+    polygon: GeoFencePolygon?
+) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(220.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFFE0E0E0)),
-        contentAlignment = Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Map Preview", fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(6.dp))
-            Text("Polygon / Radius will appear here", fontSize = 12.sp)
-        }
+        GeoFenceMap(polygon)
     }
 }
 
@@ -555,3 +555,5 @@ fun LocationRow(
         Divider()
     }
 }
+
+

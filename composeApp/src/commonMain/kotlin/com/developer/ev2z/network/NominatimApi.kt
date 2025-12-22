@@ -1,6 +1,7 @@
 package com.developer.ev2z.network
 
 
+import com.developer.ev2z.data.local.mapper.toPolygon
 import com.developer.ev2z.response.NominatimResponse
 import com.developer.ev2z.ui.screens.GeoFencing.LocationResult
 import io.ktor.client.*
@@ -20,6 +21,7 @@ object NominatimApi {
             client.get("https://nominatim.openstreetmap.org/search") {
                 parameter("q", query)
                 parameter("format", "json")
+                parameter("polygon_geojson", "1") // ⭐ IMPORTANT
                 parameter("limit", "5")
 
                 // ⚠️ REQUIRED by Nominatim
@@ -27,10 +29,11 @@ object NominatimApi {
             }.body()
 
         return response.map {
+            val polygon = it.geojson?.toPolygon()
             LocationResult(
                 name = it.display_name,
                 lat = it.lat.toDouble(),
-                lng = it.lon.toDouble()
+                lng = it.lon.toDouble(),
             )
         }
     }
