@@ -30,7 +30,7 @@ import com.developer.ev2z.network.ApiService
 fun ProfileScreen(
     apiService: ApiService,
     storageManager: StorageManager,
-    refreshTrigger: Int = 0, // ✅ Keep this parameter
+    refreshTrigger: Int = 0,
     onEditProfile: () -> Unit = {},
     onManageDevice: () -> Unit = {},
     onPrivacyPolicy: () -> Unit = {},
@@ -43,6 +43,7 @@ fun ProfileScreen(
     onGeneralSettings: () -> Unit = {},
     onAccountActivity: () -> Unit = {},
     onReferAndEarn: () -> Unit = {},
+    onAboutApp: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     val viewModel = remember { ProfileViewModel(apiService, storageManager) }
@@ -81,6 +82,7 @@ fun ProfileScreen(
         onRefundPolicy = onRefundPolicy,
         onShippingPolicy = onShippingPolicy,
         onContactUs = { viewModel.openWhatsApp() },
+        onAboutApp = onAboutApp,
         onLogout = { viewModel.logout() },
         onDismissError = { viewModel.clearError() }
     )
@@ -116,6 +118,7 @@ fun ProfileScreenContent(
     onRefundPolicy: () -> Unit = {},
     onShippingPolicy: () -> Unit = {},
     onContactUs: () -> Unit = {},
+    onAboutApp: () -> Unit = {},
     onLogout: () -> Unit = {},
     onDismissError: () -> Unit = {}
 ) {
@@ -202,7 +205,7 @@ fun ProfileScreenContent(
 
                 item {
                     Text(
-                        text = "About A2Z",
+                        text = "About EVA2Z",
                         fontSize = 14.sp,
                         color = Color.Gray,
                         modifier = Modifier
@@ -219,7 +222,8 @@ fun ProfileScreenContent(
                         onTermsConditions = onTermsConditions,
                         onRefundPolicy = onRefundPolicy,
                         onShippingPolicy = onShippingPolicy,
-                        onContactUs = onContactUs
+                        onContactUs = onContactUs,
+                        onAboutApp = onAboutApp
                     )
                 }
 
@@ -459,7 +463,8 @@ fun AboutSection(
     onTermsConditions: () -> Unit,
     onRefundPolicy: () -> Unit,
     onShippingPolicy: () -> Unit,
-    onContactUs: () -> Unit
+    onContactUs: () -> Unit,
+    onAboutApp: () -> Unit  // ✅ ADD THIS
 ) {
     Card(
         modifier = Modifier
@@ -470,11 +475,28 @@ fun AboutSection(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column {
-            AboutMenuItem("Rate EVA2Z On Play Store", Icons.Rounded.Star, onRateApp)
+            // ✅ PLATFORM-SPECIFIC RATE APP TEXT
+            AboutMenuItem(
+                title = getPlatformRateAppText(), // ✅ Platform-specific
+                icon = Icons.Rounded.Star,
+                onClick = onRateApp
+            )
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp),
                 color = Color(0xFFE0E0E0)
             )
+
+            // ✅ ADD ABOUT APP
+            AboutMenuItem(
+                title = "About App",
+                icon = Icons.Rounded.Info,
+                onClick = onAboutApp
+            )
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = Color(0xFFE0E0E0)
+            )
+
             AboutMenuItem("Feedback", Icons.Rounded.Feedback, onFeedback)
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp),
@@ -504,6 +526,9 @@ fun AboutSection(
         }
     }
 }
+
+// ✅ ADD EXPECT FUNCTION
+expect fun getPlatformRateAppText(): String
 
 @Composable
 fun AboutMenuItem(

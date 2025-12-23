@@ -35,6 +35,7 @@ import com.developer.ev2z.ui.screens.community.CommunityScreenWrapper
 import com.developer.ev2z.ui.screens.market_screen.ShopViewModel
 import com.developer.ev2z.ui.screens.GeneralSettings.GeneralSettingsScreen
 import com.developer.ev2z.ui.screens.AccountActivity.AccountActivityScreen
+import com.developer.ev2z.ui.screens.Profile.AboutAppScreen
 import com.developer.ev2z.ui.screens.ReferAndEarn.ReferAndEarnScreen
 import kotlinx.coroutines.launch
 
@@ -112,6 +113,7 @@ class ProfileTab(
     private val onNavigateToGeneralSettings: () -> Unit,
     private val onNavigateToAccountActivity: () -> Unit,
     private val onNavigateToReferAndEarn: () -> Unit,
+    private val onNavigateToAboutApp: () -> Unit = {},
     private val onLogout: () -> Unit
 ) : Tab {
     @Composable
@@ -132,6 +134,7 @@ class ProfileTab(
             onGeneralSettings = onNavigateToGeneralSettings,
             onAccountActivity = onNavigateToAccountActivity,
             onReferAndEarn = onNavigateToReferAndEarn,
+            onAboutApp = onNavigateToAboutApp,
             onLogout = onLogout
         )
     }
@@ -156,6 +159,7 @@ fun HomeNavGraph(
     onNavigateToAddDevice: () -> Unit,
     onNavigateToDeviceReport: () -> Unit,
     onNavigateToChangePassword: () -> Unit = {},
+    onNavigateToAboutApp: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     SetupStatusBar()
@@ -173,6 +177,7 @@ fun HomeNavGraph(
     var showGeneralSettings by remember { mutableStateOf(false) }
     var showAccountActivity by remember { mutableStateOf(false) }
     var showReferAndEarn by remember { mutableStateOf(false) }
+    var showAboutApp by remember { mutableStateOf(false) }
 
     // ✅ Edit device state
     var editDeviceId by remember { mutableStateOf("") }
@@ -204,6 +209,7 @@ fun HomeNavGraph(
             onNavigateToGeneralSettings = { showGeneralSettings = true },
             onNavigateToAccountActivity = { showAccountActivity = true },
             onNavigateToReferAndEarn = { showReferAndEarn = true },
+            onNavigateToAboutApp = { showAboutApp = true },
             onLogout = onLogout
         )
 
@@ -333,6 +339,12 @@ fun HomeNavGraph(
                 onBackPressed = { showReferAndEarn = false }
             )
         }
+
+        if (showAboutApp) {
+            AboutAppScreen(
+                onBackClick = { showAboutApp = false }
+            )
+        }
     }
 }
 
@@ -357,6 +369,7 @@ fun HomeNavGraphContent(
     onNavigateToGeneralSettings: () -> Unit = {},
     onNavigateToAccountActivity: () -> Unit = {},
     onNavigateToReferAndEarn: () -> Unit = {},
+    onNavigateToAboutApp: () -> Unit = {},
     onLogout: () -> Unit
 ) {
     val productRepository = remember { ProductRepository(apiService) }
@@ -387,6 +400,7 @@ fun HomeNavGraphContent(
             onNavigateToGeneralSettings,
             onNavigateToAccountActivity,
             onNavigateToReferAndEarn,
+            onNavigateToAboutApp,
             onLogout
         )
     }
