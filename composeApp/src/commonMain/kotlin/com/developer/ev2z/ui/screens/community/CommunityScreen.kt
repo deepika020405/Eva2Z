@@ -18,9 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -28,7 +26,6 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -52,7 +49,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
@@ -371,7 +367,7 @@ private fun RowScope.ImageCell(
 
 @Composable
 fun PostHeader(
-    user: Users,
+    user: Users?,
     createdAt: String,
     BASE_IMAGE_URL: String
 ) {
@@ -385,7 +381,7 @@ fun PostHeader(
                 .background(Color(0xFFE0E0E0)),
             contentAlignment = Alignment.Center
         ) {
-            if (!user.photo.isNullOrEmpty()) {
+            if (!user?.photo.isNullOrEmpty()) {
 //
                 AsyncImage(
                     model = "$BASE_IMAGE_URL/storage/${user.photo}",
@@ -397,7 +393,7 @@ fun PostHeader(
                 )
             } else {
                 Text(
-                    text = user.name.firstOrNull()?.uppercase() ?: "U",
+                    text = user?.name?.firstOrNull()?.uppercase() ?: "U",
                     fontWeight = FontWeight.Bold,
                     color = Color.Gray
                 )
@@ -409,7 +405,7 @@ fun PostHeader(
         Spacer(Modifier.width(10.dp))
 
         Column {
-            Text(text = user.name, fontWeight = FontWeight.SemiBold)
+            Text(text = user?.name ?: "N/A", fontWeight = FontWeight.SemiBold)
             Text(
                 text = formatPostDateCmp(createdAt),
                 style = MaterialTheme.typography.labelSmall,

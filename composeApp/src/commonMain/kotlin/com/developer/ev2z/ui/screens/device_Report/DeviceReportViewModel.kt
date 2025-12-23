@@ -103,23 +103,51 @@ class DeviceReportViewModel(
         }
     }
 
+//    fun fetchDeviceLiveLocation(token: String, deviceId: String) {
+//        viewModelScope.launch {
+//            try {
+//                val response = repository.getDeviceLiveLocation(token, deviceId)
+//                if (response.success) {
+//                    _liveLocation.value = response
+//                    _uiState.value = DeviceReportUiState.Success
+//
+//                    // jaise hi live location aaye, address nikaal lo
+//                    response.data?.latestLocation?.let {
+//                        getAddressFromLatLng(it.latitude.toDouble(), it.longitude.toDouble())
+//                    }
+//                } else {
+//                    _uiState.value = DeviceReportUiState.Error("Failed to fetch live location")
+//                }
+//            } catch (e: Exception) {
+//                _uiState.value = DeviceReportUiState.Error(e.message ?: "Unknown error occurred")
+//            }
+//        }
+//    }
+
     fun fetchDeviceLiveLocation(token: String, deviceId: String) {
         viewModelScope.launch {
             try {
                 val response = repository.getDeviceLiveLocation(token, deviceId)
+
                 if (response.success) {
                     _liveLocation.value = response
-                    _uiState.value = DeviceReportUiState.Success
 
-                    // jaise hi live location aaye, address nikaal lo
                     response.data?.latestLocation?.let {
-                        getAddressFromLatLng(it.latitude.toDouble(), it.longitude.toDouble())
+                        getAddressFromLatLng(
+                            it.latitude.toDouble(),
+                            it.longitude.toDouble()
+                        )
                     }
                 } else {
-                    _uiState.value = DeviceReportUiState.Error("Failed to fetch live location")
+                    // 👇 IMPORTANT: no full screen error
+                    _liveLocation.value = null
                 }
+
+                _uiState.value = DeviceReportUiState.Success
             } catch (e: Exception) {
-                _uiState.value = DeviceReportUiState.Error(e.message ?: "Unknown error occurred")
+                // 👇 silent fail
+                _liveLocation.value = null
+                _uiState.value = DeviceReportUiState.Success
             }
         }
     }
