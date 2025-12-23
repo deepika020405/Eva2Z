@@ -27,7 +27,6 @@ import com.google.mlkit.vision.common.InputImage
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-// ✅ Use common BottomSheet
 @Composable
 actual fun BottomSheet(
     onNavigate: (String) -> Unit,
@@ -40,7 +39,6 @@ actual fun BottomSheet(
     )
 }
 
-// ✅ Use common Camera UI
 @Composable
 actual fun AddDevice(
     onNavigate: (String) -> Unit,
@@ -52,9 +50,7 @@ actual fun AddDevice(
 
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        hasCameraPermission = isGranted
-    }
+    ) { hasCameraPermission = it }
 
     val galleryLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
@@ -90,7 +86,6 @@ actual fun AddDevice(
     )
 }
 
-// ✅ Use common details
 @Composable
 actual fun AddDeviceDeteails(
     onNavigate: (String) -> Unit,
@@ -99,7 +94,6 @@ actual fun AddDeviceDeteails(
     AddDeviceDetailsCommon(onNavigate, viewModel)
 }
 
-// ✅ Platform-specific camera
 @SuppressLint("MissingPermission")
 @Composable
 actual fun OpenCamera(
@@ -177,16 +171,39 @@ actual fun ProcessBarcodeData(
         1 -> {
             if (format != Barcode.FORMAT_QR_CODE) {
                 val deviceId = data.replace(Regex("[^0-9]"), "")
-                if (deviceId.isNotEmpty()) onBarcodeDetected(deviceId)
+                if (deviceId.length >= 15) {
+                    onBarcodeDetected(deviceId)
+                    println("✅ Android: Device ID: $deviceId")
+                }
             }
         }
         2 -> {
             if (format == Barcode.FORMAT_QR_CODE) {
-                val simNoRegex = Regex("""simNo="([^"]+)"""")
-                val match = simNoRegex.find(data)
-                val simNumber = match?.groups?.get(1)?.value ?: data
-                val cleanSim = simNumber.removeSuffix("U")
-                if (cleanSim.isNotEmpty()) onBarcodeDetected(cleanSim + "U")
+                println("📱 Android QR: '$data'")
+
+                val patterns = listOf(
+                    Regex("""SIM\s*NO[.:\s]+([0-9]{19,20}U?)""", RegexOption.IGNORE_CASE),
+                    Regex("""simNo["\s]*[:=]["'\s]*([0-9]{19,20}U?)""", RegexOption.IGNORE_CASE),
+                    Regex("""([0-9]{19,20}U)"""),
+                    Regex("""([0-9]{19,20})""")
+                )
+
+                var simNumber: String? = null
+                for (pattern in patterns) {
+                    pattern.find(data)?.let {
+                        simNumber = it.groupValues[1]
+                        println("✅ Android: Pattern matched")
+                        return@let
+                    }
+                }
+
+                simNumber?.let { sim ->
+                    val cleanSim = sim.take(20).removeSuffix("U")
+                    if (cleanSim.length >= 19) {
+                        onBarcodeDetected("${cleanSim}U")
+                        println("✅ Android: SIM: ${cleanSim}U")
+                    }
+                } ?: println("❌ Android: No SIM found")
             }
         }
     }
@@ -208,35 +225,18 @@ actual fun FillDeviceDetails(
         val scanner = BarcodeScanning.getClient()
 
         scanner.process(image).addOnSuccessListener { barcodes ->
+            println("📱 Android Gallery: Found ${barcodes.size} barcodes")
             barcodes.forEach { barcode ->
-                barcode.rawValue?.let { rawValue ->
-                    when (scanStep) {
-                        1 -> {
-                            if (barcode.format != Barcode.FORMAT_QR_CODE) {
-                                val deviceId = rawValue.replace(Regex("[^0-9]"), "")
-                                if (deviceId.isNotEmpty()) {
-                                    onResult(deviceId)
-                                    return@addOnSuccessListener
-                                }
-                            }
-                        }
-                        2 -> {
-                            if (barcode.format == Barcode.FORMAT_QR_CODE) {
-                                val simNORegex = Regex("""simNo="([^"]+)"""")
-                                val match = simNORegex.find(rawValue)
-                                val simNumber = match?.groups?.get(1)?.value ?: rawValue
-                                val cleanSim = simNumber.removeSuffix("U")
-                                if (cleanSim.isNotEmpty()) {
-                                    onResult(cleanSim + "U")
-                                    return@addOnSuccessListener
-                                }
-                            }
-                        }
-                    }
+                barcode.rawValue?.let { data ->
+                    println("📱 Android Gallery Data: '$data'")
+                    ProcessBarcodeData(data, barcode.format, scanStep, onResult)
                 }
             }
+        }.addOnFailureListener { e ->
+            println("❌ Android Gallery Error: ${e.message}")
         }
     } catch (e: Exception) {
+        println("❌ Android Exception: ${e.message}")
         e.printStackTrace()
     }
 }

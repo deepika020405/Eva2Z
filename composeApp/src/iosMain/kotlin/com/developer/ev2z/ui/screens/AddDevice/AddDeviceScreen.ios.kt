@@ -17,16 +17,14 @@ import kotlinx.cinterop.*
 import platform.AVFoundation.*
 import platform.CoreGraphics.CGRectMake
 import platform.CoreMedia.CMSampleBufferGetImageBuffer
+import platform.CoreVideo.kCVPixelBufferPixelFormatTypeKey
+import platform.CoreVideo.kCVPixelFormatType_32BGRA
 import platform.Foundation.NSError
 import platform.PhotosUI.*
 import platform.UIKit.UIImage
 import platform.UIKit.UIView
 import platform.Vision.*
-import platform.darwin.NSObject
-import platform.darwin.dispatch_async
-import platform.darwin.dispatch_get_global_queue
-import platform.darwin.dispatch_get_main_queue
-import platform.darwin.DISPATCH_QUEUE_PRIORITY_DEFAULT
+import platform.darwin.*
 
 @Composable
 actual fun BottomSheet(
@@ -164,9 +162,8 @@ actual fun OpenCamera(
         factory = {
             val container = UIView()
 
-            // ✅ Setup camera on BACKGROUND thread
             dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT.toLong(), 0u)) {
-                captureSession.sessionPreset = AVCaptureSessionPresetHigh
+                captureSession.sessionPreset = AVCaptureSessionPreset1920x1080
 
                 AVCaptureDevice.defaultDeviceWithMediaType(AVMediaTypeVideo)?.let { device ->
                     memScoped {
@@ -180,21 +177,20 @@ actual fun OpenCamera(
 
                     val output = AVCaptureVideoDataOutput()
                     output.setSampleBufferDelegate(delegate, dispatch_get_main_queue())
+                    output.alwaysDiscardsLateVideoFrames = true
 
                     if (captureSession.canAddOutput(output)) {
                         captureSession.addOutput(output)
                     }
                 }
 
-                // ✅ Start session on BACKGROUND thread
                 if (!isSessionStarted) {
                     captureSession.startRunning()
                     isSessionStarted = true
-                    println("✅ iOS: Camera session started on background thread")
+                    println("✅ iOS: Camera started")
                 }
             }
 
-            // ✅ Setup preview layer on MAIN thread
             dispatch_async(dispatch_get_main_queue()) {
                 previewLayer.frame = CGRectMake(
                     0.0, 0.0,
@@ -209,7 +205,6 @@ actual fun OpenCamera(
         },
         modifier = Modifier.fillMaxSize(),
         update = { view ->
-            // Update preview layer frame if needed
             previewLayer.frame = CGRectMake(
                 0.0, 0.0,
                 view.bounds.useContents { size.width },
@@ -220,8 +215,6 @@ actual fun OpenCamera(
 
     DisposableEffect(Unit) {
         onDispose {
-            println("🛑 iOS: Stopping camera session")
-            // ✅ Stop on background thread
             dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT.toLong(), 0u)) {
                 if (captureSession.running) {
                     captureSession.stopRunning()
@@ -258,52 +251,6 @@ private fun processCameraFrame(
     }
 }
 
-//@OptIn(ExperimentalForeignApi::class)
-//private fun processImageForBarcode(
-//    image: UIImage,
-//    scanStep: Int,
-//    viewModel: AddDeviceViewModel
-//) {
-//    image.CGImage?.let { cgImage ->
-//        val request = VNDetectBarcodesRequest { vnRequest, _ ->
-//            val results = vnRequest?.results as? List<*>
-//            results?.forEach { result ->
-//                val observation = result as? VNBarcodeObservation
-//                observation?.payloadStringValue?.let { data ->
-//                    val isQR = observation.symbology == VNBarcodeSymbologyQR
-//                    when (scanStep) {
-//                        1 -> {
-//                            if (!isQR) {
-//                                val deviceId = data.replace(Regex("[^0-9]"), "")
-//                                if (deviceId.isNotEmpty()) {
-//                                    viewModel.setDeviceId(deviceId)
-//                                }
-//                            }
-//                        }
-//                        2 -> {
-//                            if (isQR) {
-//                                val simNoRegex = Regex("""simNo="([^"]+)"""")
-//                                val match = simNoRegex.find(data)
-//                                val simNumber = match?.groups?.get(1)?.value ?: data
-//                                val cleanSim = simNumber.removeSuffix("U")
-//                                if (cleanSim.isNotEmpty()) {
-//                                    viewModel.setSimNumber(cleanSim + "U")
-//                                }
-//                            }
-//                        }
-//                    }
-//                }
-//            }
-//        }
-//
-//        memScoped {
-//            val errorPtr = alloc<ObjCObjectVar<NSError?>>()
-//            val handler = VNImageRequestHandler(cgImage, mapOf<Any?, Any>())
-//            handler.performRequests(listOf(request), errorPtr.ptr)
-//        }
-//    }
-//}
-
 @OptIn(ExperimentalForeignApi::class)
 private fun processImageForBarcode(
     image: UIImage,
@@ -321,29 +268,10 @@ private fun processImageForBarcode(
                     val isQR = observation.symbology == VNBarcodeSymbologyQR
                     println("📱 iOS Gallery Data: '$data', isQR: $isQR")
 
-                    when (scanStep) {
-                        1 -> {
-                            if (!isQR) {
-                                val deviceId = data.replace(Regex("[^0-9]"), "")
-                                if (deviceId.length >= 15) {
-                                    viewModel.setDeviceId(deviceId)
-                                    println("✅ iOS Gallery: Device ID set: $deviceId")
-                                }
-                            }
-                        }
-                        2 -> {
-                            if (isQR) {
-                                val simNoRegex = Regex("""simNo["\s]*[:=]["'\s]*([0-9]+)""", RegexOption.IGNORE_CASE)
-                                val match = simNoRegex.find(data)
-                                val simNumber = match?.groupValues?.get(1) ?: data.replace(Regex("[^0-9]"), "")
-                                val cleanSim = simNumber.take(20).removeSuffix("U")
-
-                                if (cleanSim.length >= 19) {
-                                    val finalSim = "${cleanSim}U"
-                                    viewModel.setSimNumber(finalSim)
-                                    println("✅ iOS Gallery: SIM set: $finalSim")
-                                }
-                            }
+                    extractBarcodeData(data, isQR, scanStep) { extractedData ->
+                        when (scanStep) {
+                            1 -> viewModel.setDeviceId(extractedData)
+                            2 -> viewModel.setSimNumber(extractedData)
                         }
                     }
                 }
@@ -358,118 +286,56 @@ private fun processImageForBarcode(
     }
 }
 
-// Fix extractBarcodeData function
 private fun extractBarcodeData(
     data: String,
     isQR: Boolean,
     scanStep: Int,
     onBarcodeDetected: (String) -> Unit
 ) {
-    println("📱 iOS Barcode Data: '$data', isQR: $isQR, step: $scanStep")
+    println("📱 iOS Barcode: '$data', isQR: $isQR, step: $scanStep")
 
     when (scanStep) {
         1 -> {
-            // Step 1: Extract Device ID from barcode (NOT QR)
             if (!isQR) {
                 val deviceId = data.replace(Regex("[^0-9]"), "")
-                println("📱 iOS Device ID extracted: '$deviceId'")
-                if (deviceId.length >= 15) { // ✅ Minimum 15 digits
+                if (deviceId.length >= 15) {
                     onBarcodeDetected(deviceId)
-                    println("✅ iOS: Device ID accepted: $deviceId")
-                } else {
-                    println("⚠️ iOS: Device ID too short: ${deviceId.length} digits")
+                    println("✅ iOS: Device ID: $deviceId")
                 }
-            } else {
-                println("⚠️ iOS: Step 1 expects barcode, got QR")
             }
         }
         2 -> {
-            // Step 2: Extract SIM number from QR code
             if (isQR) {
-                // Try to extract from XML-style format first
-                val simNoRegex = Regex("""simNo["\s]*[:=]["'\s]*([0-9]+)""", RegexOption.IGNORE_CASE)
-                val match = simNoRegex.find(data)
+                val patterns = listOf(
+                    Regex("""SIM\s*NO[.:\s]+([0-9]{19,20}U?)""", RegexOption.IGNORE_CASE),
+                    Regex("""simNo["\s]*[:=]["'\s]*([0-9]{19,20}U?)""", RegexOption.IGNORE_CASE),
+                    Regex("""([0-9]{19,20}U)"""),
+                    Regex("""([0-9]{19,20})""")
+                )
 
-                val simNumber = if (match != null) {
-                    match.groupValues[1]
-                } else {
-                    // If no match, try to extract any long number (19-20 digits)
-                    val numbers = data.replace(Regex("[^0-9]"), "")
-                    if (numbers.length >= 19) numbers else null
+                var simNumber: String? = null
+                for (pattern in patterns) {
+                    pattern.find(data)?.let {
+                        simNumber = it.groupValues[1]
+                        println("✅ iOS: Pattern matched: ${pattern.pattern}")
+                        return@let
+                    }
                 }
 
-                println("📱 iOS SIM Number extracted: '$simNumber'")
-
                 simNumber?.let { sim ->
-                    val cleanSim = sim.take(20).removeSuffix("U") // ✅ Max 20 digits
-                    if (cleanSim.length >= 19) { // ✅ Minimum 19 digits
-                        val finalSim = if (!cleanSim.endsWith("U")) "${cleanSim}U" else cleanSim
-                        onBarcodeDetected(finalSim)
-                        println("✅ iOS: SIM Number accepted: $finalSim")
-                    } else {
-                        println("⚠️ iOS: SIM too short: ${cleanSim.length} digits")
+                    val cleanSim = sim.take(20).removeSuffix("U")
+                    if (cleanSim.length >= 19) {
+                        onBarcodeDetected("${cleanSim}U")
+                        println("✅ iOS: SIM: ${cleanSim}U")
                     }
-                } ?: println("❌ iOS: No SIM number found in QR data")
-            } else {
-                println("⚠️ iOS: Step 2 expects QR, got barcode")
+                } ?: println("❌ iOS: No SIM found")
             }
         }
     }
 }
 
-//private fun extractBarcodeData(
-//    data: String,
-//    isQR: Boolean,
-//    scanStep: Int,
-//    onBarcodeDetected: (String) -> Unit
-//) {
-//    when (scanStep) {
-//        1 -> {
-//            if (!isQR) {
-//                val deviceId = data.replace(Regex("[^0-9]"), "")
-//                if (deviceId.isNotEmpty()) {
-//                    onBarcodeDetected(deviceId)
-//                }
-//            }
-//        }
-//        2 -> {
-//            if (isQR) {
-//                val simNoRegex = Regex("""simNo="([^"]+)"""")
-//                val match = simNoRegex.find(data)
-//                val simNumber = match?.groups?.get(1)?.value ?: data
-//                val cleanSim = simNumber.removeSuffix("U")
-//                if (cleanSim.isNotEmpty()) {
-//                    onBarcodeDetected(cleanSim + "U")
-//                }
-//            }
-//        }
-//    }
-//}
-
-actual fun ScanBarcode(
-    scanner: Any,
-    imageProxy: Any,
-    scanStep: Int,
-    onBarcodeDetected: (String) -> Unit
-) {
-    // Not used in iOS implementation
+actual fun ScanBarcode(scanner: Any, imageProxy: Any, scanStep: Int, onBarcodeDetected: (String) -> Unit) {}
+actual fun ProcessBarcodeData(data: String, format: Int, scanStep: Int, onBarcodeDetected: (String) -> Unit) {
+    extractBarcodeData(data, format == 256, scanStep, onBarcodeDetected)
 }
-
-actual fun ProcessBarcodeData(
-    data: String,
-    format: Int,
-    scanStep: Int,
-    onBarcodeDetected: (String) -> Unit
-) {
-    val isQR = (format == 256)
-    extractBarcodeData(data, isQR, scanStep, onBarcodeDetected)
-}
-
-actual fun FillDeviceDetails(
-    imageUri: Any,
-    context: Any,
-    scanStep: Int,
-    onResult: (String) -> Unit
-) {
-    // Not used in iOS implementation
-}
+actual fun FillDeviceDetails(imageUri: Any, context: Any, scanStep: Int, onResult: (String) -> Unit) {}

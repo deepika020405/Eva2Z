@@ -3,6 +3,7 @@ package com.developer.ev2z.ui.screens.HistoryPlayback
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import com.developer.ev2z.response.RoutePoint
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -36,12 +37,20 @@ actual fun HistoryMapView(
         position = CameraPosition.fromLatLngZoom(currentPoint, 15f)
     }
 
+    // ✅ FIX: Remember marker state
+    val markerState = remember(currentPoint) {
+        MarkerState(position = currentPoint)
+    }
+
     LaunchedEffect(currentIndex) {
         if (currentIndex in latLngList.indices) {
+            val newPosition = latLngList[currentIndex]
             cameraPositionState.animate(
-                CameraUpdateFactory.newLatLngZoom(latLngList[currentIndex], 15f),
+                CameraUpdateFactory.newLatLngZoom(newPosition, 15f),
                 durationMs = 500
             )
+            // ✅ Update marker position
+            markerState.position = newPosition
         }
     }
 
@@ -57,8 +66,9 @@ actual fun HistoryMapView(
             width = 10f
         )
 
+        // ✅ FIX: Use remembered state
         Marker(
-            state = MarkerState(position = currentPoint),
+            state = markerState,
             title = "Point ${currentIndex + 1}",
             snippet = routePoints.getOrNull(currentIndex)?.createdAt ?: ""
         )
