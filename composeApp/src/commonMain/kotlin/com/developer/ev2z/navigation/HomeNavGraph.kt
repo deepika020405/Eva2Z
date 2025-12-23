@@ -1,4 +1,3 @@
-// HomeNavGraph.kt - FINAL FIXED VERSION
 package com.developer.ev2z.navigation
 
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -28,14 +27,18 @@ import com.developer.ev2z.ui.screens.Profile.ProfileScreen
 import com.developer.ev2z.ui.screens.homeScreen.HomeScreen
 import com.developer.ev2z.ui.screens.homeScreen.HomeViewModel
 import com.developer.ev2z.ui.screens.ManageDevices.ManageDeviceScreen
+import com.developer.ev2z.ui.screens.ManageDevices.EditDeviceNameScreen
 import com.developer.ev2z.ui.screens.market_screen.ShopScreenHost
 import com.developer.ev2z.ui.screens.PrivacyPolicy_TandC.PrivacyPolicy_TandCScreen
 import com.developer.ev2z.ui.screens.PrivacyPolicy_TandC.WebViewType
 import com.developer.ev2z.ui.screens.community.CommunityScreenWrapper
 import com.developer.ev2z.ui.screens.market_screen.ShopViewModel
+import com.developer.ev2z.ui.screens.GeneralSettings.GeneralSettingsScreen
+import com.developer.ev2z.ui.screens.AccountActivity.AccountActivityScreen
+import com.developer.ev2z.ui.screens.ReferAndEarn.ReferAndEarnScreen
 import kotlinx.coroutines.launch
 
-// ------------------ TABS (same as before) -------------------
+// ------------------ TABS -------------------
 
 class HomeTab(
     private val viewModel: HomeViewModel,
@@ -59,24 +62,9 @@ class HomeTab(
         )
 }
 
-//object WalletTab : Tab {
-//    @Composable
-//    override fun Content() = WalletScreen()
-//
-//    override val options: TabOptions
-//        @Composable get() = TabOptions(
-//            index = 1u,
-//            title = "Community",
-//            icon = rememberVectorPainter(Icons.Default.GridView)
-//        )
-//}
-
-
 object CommunityTab : Tab {
-
     @Composable
     override fun Content() {
-        // ✅ Navigator so future screens (create post, comments) work
         Navigator(CommunityScreenWrapper())
     }
     override val options: TabOptions
@@ -90,10 +78,7 @@ object CommunityTab : Tab {
 class OrdersTab : Tab {
     @Composable
     override fun Content() {
-        // ✅ WRAP with Navigator so LocalNavigator works
         Navigator(ShopScreenWrapper())
-//        Navigator(screen = ShopScreenWrapper(shopViewModel))
-
     }
 
     override val options: TabOptions
@@ -104,7 +89,6 @@ class OrdersTab : Tab {
         )
 }
 
-// ✅ NEW: Wrapper Screen for Shop
 class ShopScreenWrapper : Screen {
     @Composable
     override fun Content() {
@@ -115,13 +99,19 @@ class ShopScreenWrapper : Screen {
 class ProfileTab(
     private val apiService: ApiService,
     private val storageManager: StorageManager,
+    private val refreshTrigger: Int, // ✅ Add refresh trigger
     private val onNavigateToEditProfile: () -> Unit,
     private val onNavigateToManageDevice: () -> Unit,
     private val onNavigateToPrivacyPolicy: () -> Unit,
     private val onNavigateToTermsConditions: () -> Unit,
+    private val onNavigateToRefundPolicy: () -> Unit,
+    private val onNavigateToShippingPolicy: () -> Unit,
     private val onNavigateToChangePassword: () -> Unit,
     private val onNavigateToGeoFencing: () -> Unit,
     private val onNavigateToHistoryPlayback: () -> Unit,
+    private val onNavigateToGeneralSettings: () -> Unit,
+    private val onNavigateToAccountActivity: () -> Unit,
+    private val onNavigateToReferAndEarn: () -> Unit,
     private val onLogout: () -> Unit
 ) : Tab {
     @Composable
@@ -129,13 +119,19 @@ class ProfileTab(
         ProfileScreen(
             apiService = apiService,
             storageManager = storageManager,
+            refreshTrigger = refreshTrigger, // ✅ Pass refresh trigger
             onEditProfile = onNavigateToEditProfile,
             onManageDevice = onNavigateToManageDevice,
             onPrivacyPolicy = onNavigateToPrivacyPolicy,
             onTermsConditions = onNavigateToTermsConditions,
+            onRefundPolicy = onNavigateToRefundPolicy,
+            onShippingPolicy = onNavigateToShippingPolicy,
             onChangePassword = onNavigateToChangePassword,
             onGeoFencing = onNavigateToGeoFencing,
             onHistoryPlayback = onNavigateToHistoryPlayback,
+            onGeneralSettings = onNavigateToGeneralSettings,
+            onAccountActivity = onNavigateToAccountActivity,
+            onReferAndEarn = onNavigateToReferAndEarn,
             onLogout = onLogout
         )
     }
@@ -159,17 +155,33 @@ fun HomeNavGraph(
     token: String,
     onNavigateToAddDevice: () -> Unit,
     onNavigateToDeviceReport: () -> Unit,
-    onNavigateToChangePassword: () -> Unit = {}, // ✅ RECEIVE FROM APP
+    onNavigateToChangePassword: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     SetupStatusBar()
 
+    // ✅ Screen visibility states
     var showEditProfile by remember { mutableStateOf(false) }
     var showManageDevice by remember { mutableStateOf(false) }
+    var showEditDeviceName by remember { mutableStateOf(false) }
     var showPrivacyPolicy by remember { mutableStateOf(false) }
     var showTermsConditions by remember { mutableStateOf(false) }
+    var showRefundPolicy by remember { mutableStateOf(false) }
+    var showShippingPolicy by remember { mutableStateOf(false) }
     var showGeoFencing by remember { mutableStateOf(false) }
     var showHistoryPlayback by remember { mutableStateOf(false) }
+    var showGeneralSettings by remember { mutableStateOf(false) }
+    var showAccountActivity by remember { mutableStateOf(false) }
+    var showReferAndEarn by remember { mutableStateOf(false) }
+
+    // ✅ Edit device state
+    var editDeviceId by remember { mutableStateOf("") }
+    var editDeviceName by remember { mutableStateOf("") }
+    var editSimNumber by remember { mutableStateOf("") }
+
+    // ✅ Refresh triggers
+    var manageDeviceRefresh by remember { mutableStateOf(0) }
+    var profileRefresh by remember { mutableStateOf(0) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         HomeNavGraphContent(
@@ -177,42 +189,74 @@ fun HomeNavGraph(
             apiService = apiService,
             storageManager = storageManager,
             token = token,
+            profileRefreshTrigger = profileRefresh, // ✅ Pass refresh trigger
             onNavigateToAddDevice = onNavigateToAddDevice,
             onNavigateToDeviceReport = onNavigateToDeviceReport,
             onNavigateToEditProfile = { showEditProfile = true },
             onNavigateToManageDevice = { showManageDevice = true },
             onNavigateToPrivacyPolicy = { showPrivacyPolicy = true },
             onNavigateToTermsConditions = { showTermsConditions = true },
+            onNavigateToRefundPolicy = { showRefundPolicy = true },
+            onNavigateToShippingPolicy = { showShippingPolicy = true },
             onNavigateToChangePassword = onNavigateToChangePassword,
             onNavigateToGeoFencing = { showGeoFencing = true },
             onNavigateToHistoryPlayback = { showHistoryPlayback = true },
+            onNavigateToGeneralSettings = { showGeneralSettings = true },
+            onNavigateToAccountActivity = { showAccountActivity = true },
+            onNavigateToReferAndEarn = { showReferAndEarn = true },
             onLogout = onLogout
         )
 
-        // Edit Profile Screen
+        // ✅ Edit Profile Screen
         if (showEditProfile) {
             EditProfileScreen(
                 apiService = apiService,
                 storageManager = storageManager,
-                onBackPressed = { showEditProfile = false }
+                onBackPressed = {
+                    showEditProfile = false
+                    profileRefresh++ // ✅ Trigger profile refresh
+                }
             )
         }
 
-        // Manage Device Screen
+        // ✅ Manage Device Screen
         if (showManageDevice) {
             ManageDeviceScreen(
                 apiService = apiService,
                 storageManager = storageManager,
+                refreshTrigger = manageDeviceRefresh, // ✅ Pass refresh trigger
                 onBackClick = { showManageDevice = false },
                 onProfileClick = { showManageDevice = false },
                 onAddDeviceClick = {
                     showManageDevice = false
                     onNavigateToAddDevice()
+                },
+                onEditDeviceClick = { deviceId, deviceName, simNumber ->
+                    editDeviceId = deviceId
+                    editDeviceName = deviceName
+                    editSimNumber = simNumber
+                    showEditDeviceName = true
                 }
             )
         }
 
-        // Privacy Policy Screen
+        // ✅ Edit Device Name Screen
+        if (showEditDeviceName) {
+            EditDeviceNameScreen(
+                apiService = apiService,
+                storageManager = storageManager,
+                deviceId = editDeviceId,
+                deviceName = editDeviceName,
+                simNumber = editSimNumber,
+                onBackPressed = { showEditDeviceName = false },
+                onUpdateSuccess = {
+                    showEditDeviceName = false
+                    manageDeviceRefresh++ // ✅ Trigger device list refresh
+                }
+            )
+        }
+
+        // ✅ Privacy Policy
         if (showPrivacyPolicy) {
             PrivacyPolicy_TandCScreen(
                 type = WebViewType.PRIVACY_POLICY,
@@ -220,7 +264,7 @@ fun HomeNavGraph(
             )
         }
 
-        // Terms & Conditions Screen
+        // ✅ Terms & Conditions
         if (showTermsConditions) {
             PrivacyPolicy_TandCScreen(
                 type = WebViewType.TERMS_CONDITIONS,
@@ -228,8 +272,24 @@ fun HomeNavGraph(
             )
         }
 
-        // GeoFencing Screen
-        // GeoFencing Screen
+
+        // ✅ Refund Policy
+        if (showRefundPolicy) {
+            PrivacyPolicy_TandCScreen(
+                type = WebViewType.REFUND_POLICY,
+                onBackPressed = { showRefundPolicy = false }
+            )
+        }
+
+        // ✅ Shipping Policy
+        if (showShippingPolicy) {
+            PrivacyPolicy_TandCScreen(
+                type = WebViewType.SHIPPING_POLICY,
+                onBackPressed = { showShippingPolicy = false }
+            )
+        }
+
+        // ✅ Geo Fencing
         if (showGeoFencing) {
             GeoFencingScreenWrapper(
                 apiService = apiService,
@@ -238,12 +298,39 @@ fun HomeNavGraph(
             )
         }
 
-// History Playback Screen
+        // ✅ History Playback
         if (showHistoryPlayback) {
             HistoryPlaybackScreen(
                 apiService = apiService,
                 storageManager = storageManager,
                 onBackPressed = { showHistoryPlayback = false }
+            )
+        }
+
+        // ✅ General Settings
+        if (showGeneralSettings) {
+            GeneralSettingsScreen(
+                onBackPressed = { showGeneralSettings = false }
+            )
+        }
+
+        // ✅ Account Activity
+        if (showAccountActivity) {
+            AccountActivityScreen(
+                apiService = apiService,
+                storageManager = storageManager,
+                onBackPressed = { showAccountActivity = false },
+                onAccountDeleted = {
+                    showAccountActivity = false
+                    onLogout()
+                }
+            )
+        }
+
+        // ✅ Refer And Earn
+        if (showReferAndEarn) {
+            ReferAndEarnScreen(
+                onBackPressed = { showReferAndEarn = false }
             )
         }
     }
@@ -255,15 +342,21 @@ fun HomeNavGraphContent(
     apiService: ApiService,
     storageManager: StorageManager,
     token: String,
+    profileRefreshTrigger: Int = 0, // ✅ Add refresh trigger
     onNavigateToAddDevice: () -> Unit,
     onNavigateToDeviceReport: () -> Unit,
     onNavigateToEditProfile: () -> Unit,
     onNavigateToManageDevice: () -> Unit,
     onNavigateToPrivacyPolicy: () -> Unit,
     onNavigateToTermsConditions: () -> Unit,
+    onNavigateToRefundPolicy: () -> Unit,
+    onNavigateToShippingPolicy: () -> Unit,
     onNavigateToChangePassword: () -> Unit = {},
     onNavigateToGeoFencing: () -> Unit = {},
     onNavigateToHistoryPlayback: () -> Unit = {},
+    onNavigateToGeneralSettings: () -> Unit = {},
+    onNavigateToAccountActivity: () -> Unit = {},
+    onNavigateToReferAndEarn: () -> Unit = {},
     onLogout: () -> Unit
 ) {
     val productRepository = remember { ProductRepository(apiService) }
@@ -275,20 +368,29 @@ fun HomeNavGraphContent(
     }
 
     val homeTab = remember { HomeTab(viewModel, token, onNavigateToAddDevice, onNavigateToDeviceReport) }
-    val profileTab = remember {
+
+    // ✅ Update ProfileTab with refresh trigger
+    val profileTab = remember(profileRefreshTrigger) {
         ProfileTab(
             apiService,
             storageManager,
+            profileRefreshTrigger, // ✅ Pass refresh trigger
             onNavigateToEditProfile,
             onNavigateToManageDevice,
             onNavigateToPrivacyPolicy,
             onNavigateToTermsConditions,
+            onNavigateToRefundPolicy,
+            onNavigateToShippingPolicy,
             onNavigateToChangePassword,
             onNavigateToGeoFencing,
             onNavigateToHistoryPlayback,
+            onNavigateToGeneralSettings,
+            onNavigateToAccountActivity,
+            onNavigateToReferAndEarn,
             onLogout
         )
     }
+
     val ordersTab = remember { OrdersTab() }
     val tabs = listOf(homeTab, CommunityTab, ordersTab, profileTab)
 

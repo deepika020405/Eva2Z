@@ -687,6 +687,50 @@ class ApiService {
             throw e
         }
     }
+
+    // ---------------- DELETE ACCOUNT ----------------
+    suspend fun deleteAccount(
+        token: String,
+        body: JsonObject
+    ): JsonObject {
+        println("🌐 API: Delete Account Request")
+
+        return try {
+            val response = client.delete("${baseUrl}user/delete") {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(body)
+            }
+
+            println("✔️ Delete Account Status: ${response.status}")
+            val responseBody: JsonObject = response.body()
+
+            println("📝 Response: $responseBody")
+            responseBody
+
+        } catch (e: ResponseException) {
+            val status = e.response.status
+            val text = try {
+                e.response.bodyAsText()
+            } catch (_: Exception) {
+                """{"success":false,"message":"Network error"}"""
+            }
+
+            println("❌ Delete Account Error: HTTP $status")
+            println("   response body: $text")
+
+            // ✅ Parse and return error JSON
+            val json = Json { ignoreUnknownKeys = true }
+            val errorObj = json.parseToJsonElement(text).jsonObject
+
+            return errorObj
+
+        } catch (e: Exception) {
+            println("❌ Delete Account Error: ${e.message}")
+            throw e
+        }
+    }
+
     // ===============================================
     // SHOP / PRODUCT APIs (existing code)
     // ===============================================

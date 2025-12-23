@@ -1,4 +1,3 @@
-// ProfileScreen.kt - COMPLETE FIXED VERSION
 package com.developer.ev2z.ui.screens.Profile
 
 import androidx.compose.foundation.background
@@ -31,22 +30,33 @@ import com.developer.ev2z.network.ApiService
 fun ProfileScreen(
     apiService: ApiService,
     storageManager: StorageManager,
+    refreshTrigger: Int = 0, // ✅ Keep this parameter
     onEditProfile: () -> Unit = {},
     onManageDevice: () -> Unit = {},
     onPrivacyPolicy: () -> Unit = {},
     onTermsConditions: () -> Unit = {},
+    onRefundPolicy: () -> Unit = {},
+    onShippingPolicy: () -> Unit = {},
     onChangePassword: () -> Unit = {},
     onGeoFencing: () -> Unit = {},
     onHistoryPlayback: () -> Unit = {},
+    onGeneralSettings: () -> Unit = {},
+    onAccountActivity: () -> Unit = {},
+    onReferAndEarn: () -> Unit = {},
     onLogout: () -> Unit = {}
 ) {
     val viewModel = remember { ProfileViewModel(apiService, storageManager) }
     val state by viewModel.state.collectAsState()
     var showImageZoom by remember { mutableStateOf(false) }
 
-    // Handle logout navigation
-    LaunchedEffect(state.logoutSuccess) {
+    // ✅ FIX: Reload data when refreshTrigger changes
+    LaunchedEffect(refreshTrigger) {
         viewModel.loadUserData()
+        viewModel.fetchProfilePicture()
+    }
+
+    // ✅ FIX: Separate logout handler
+    LaunchedEffect(state.logoutSuccess) {
         if (state.logoutSuccess) {
             onLogout()
         }
@@ -57,9 +67,9 @@ fun ProfileScreen(
         onRefresh = { viewModel.fetchProfilePicture() },
         onProfileImageClick = { showImageZoom = true },
         onEditProfile = onEditProfile,
-        onGeneralSettings = { /* Navigate to SettingActivity */ },
-        onAccountActivity = { /* Navigate to account activity */ },
-        onReferAndEarn = { /* Navigate to ReferAndEarnActivity */ },
+        onGeneralSettings = onGeneralSettings,
+        onAccountActivity = onAccountActivity,
+        onReferAndEarn = onReferAndEarn,
         onChangePassword = onChangePassword,
         onManageDevice = onManageDevice,
         onAddFence = onGeoFencing,
@@ -68,6 +78,8 @@ fun ProfileScreen(
         onFeedback = { viewModel.openFeedback() },
         onPrivacyPolicy = onPrivacyPolicy,
         onTermsConditions = onTermsConditions,
+        onRefundPolicy = onRefundPolicy,
+        onShippingPolicy = onShippingPolicy,
         onContactUs = { viewModel.openWhatsApp() },
         onLogout = { viewModel.logout() },
         onDismissError = { viewModel.clearError() }
@@ -93,7 +105,7 @@ fun ProfileScreenContent(
     onGeneralSettings: () -> Unit = {},
     onAccountActivity: () -> Unit = {},
     onReferAndEarn: () -> Unit = {},
-    onChangePassword: () -> Unit = {}, // ✅ RECEIVE CALLBACK
+    onChangePassword: () -> Unit = {},
     onManageDevice: () -> Unit = {},
     onAddFence: () -> Unit = {},
     onHistoryPlayback: () -> Unit = {},
@@ -101,6 +113,8 @@ fun ProfileScreenContent(
     onFeedback: () -> Unit = {},
     onPrivacyPolicy: () -> Unit = {},
     onTermsConditions: () -> Unit = {},
+    onRefundPolicy: () -> Unit = {},
+    onShippingPolicy: () -> Unit = {},
     onContactUs: () -> Unit = {},
     onLogout: () -> Unit = {},
     onDismissError: () -> Unit = {}
@@ -203,6 +217,8 @@ fun ProfileScreenContent(
                         onFeedback = onFeedback,
                         onPrivacyPolicy = onPrivacyPolicy,
                         onTermsConditions = onTermsConditions,
+                        onRefundPolicy = onRefundPolicy,
+                        onShippingPolicy = onShippingPolicy,
                         onContactUs = onContactUs
                     )
                 }
@@ -441,6 +457,8 @@ fun AboutSection(
     onFeedback: () -> Unit,
     onPrivacyPolicy: () -> Unit,
     onTermsConditions: () -> Unit,
+    onRefundPolicy: () -> Unit,
+    onShippingPolicy: () -> Unit,
     onContactUs: () -> Unit
 ) {
     Card(
@@ -468,6 +486,16 @@ fun AboutSection(
                 color = Color(0xFFE0E0E0)
             )
             AboutMenuItem("Terms & Conditions", Icons.Rounded.Description, onTermsConditions)
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = Color(0xFFE0E0E0)
+            )
+            AboutMenuItem("Refund & Cancellation Policy", Icons.Rounded.Receipt, onRefundPolicy)
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = Color(0xFFE0E0E0)
+            )
+            AboutMenuItem("Shipping & Installation Policy", Icons.Rounded.LocalShipping, onShippingPolicy)
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp),
                 color = Color(0xFFE0E0E0)
