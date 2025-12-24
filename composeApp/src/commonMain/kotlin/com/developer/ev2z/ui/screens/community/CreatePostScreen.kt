@@ -190,7 +190,7 @@ fun ImagePickerOptionDialog(
             )
 
             ListItem(
-                headlineContent = { Text("Camera") },
+                headlineContent = { Text("Single Upload") },
                 modifier = Modifier.clickable {
                     onCameraClick()
                     onDismiss()
@@ -198,7 +198,7 @@ fun ImagePickerOptionDialog(
             )
 
             ListItem(
-                headlineContent = { Text("Gallery (up to 5)") },
+                headlineContent = { Text("Multiple Upload") },
                 modifier = Modifier.clickable {
                     onGalleryClick()
                     onDismiss()

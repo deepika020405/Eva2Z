@@ -554,59 +554,6 @@ fun CommentBottomSheet(
         viewModel.load(postId)
     }
 
-//    ModalBottomSheet(onDismissRequest = onDismiss) {
-//        Column(Modifier.fillMaxHeight(0.9f)) {
-//
-//            LazyColumn(
-//                modifier = Modifier.weight(1f)
-//            ) {
-//                items(state.comments) { comment ->
-//                    CommentItem(
-//                        comment = comment,
-//                        isReply = comment.parent_id != null,
-//                        onLike = {
-//                            viewModel.like(comment.id, postId)
-//                        },
-//                        onReply = {
-//                            viewModel.setReply(comment)
-//                        }
-//                    )
-//                }
-//            }
-//
-//            // 🔽 Reply Indicator
-//            state.replyTo?.let {
-//                Text(
-//                    "Replying to ${it.user.name}",
-//                    color = Color.Gray,
-//                    modifier = Modifier.padding(8.dp)
-//                )
-//            }
-//
-//            // 🔽 Input
-//            Row(
-//                Modifier.padding(8.dp),
-//                verticalAlignment = Alignment.CenterVertically
-//            ) {
-//                OutlinedTextField(
-//                    value = input,
-//                    onValueChange = { input = it },
-//                    modifier = Modifier.weight(1f),
-//                    placeholder = { Text("Add a comment…") }
-//                )
-//
-//                TextButton(
-//                    enabled = input.isNotBlank(),
-//                    onClick = {
-//                        viewModel.sendComment(postId, input)
-//                        input = ""
-//                    }
-//                ) {
-//                    Text("Post")
-//                }
-//            }
-//        }
-//    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss
