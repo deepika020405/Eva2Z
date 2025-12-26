@@ -11,8 +11,7 @@ plugins {
     alias(libs.plugins.composeCompiler)
     kotlin("plugin.serialization") version "2.1.0"
     alias(libs.plugins.googleServices)
-    // ❌ REMOVED: Crashlytics plugin (causing Play Protect issues)
-    // alias(libs.plugins.firebaseCrashlytics)
+     alias(libs.plugins.firebaseCrashlytics)
 }
 
 repositories {
@@ -62,8 +61,7 @@ kotlin {
             // ✅ FIREBASE BOM - Only Analytics (minimal)
             implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
             implementation(libs.firebase.analytics)
-            // ❌ REMOVED: Crashlytics (causing build issues)
-            // implementation(libs.firebase.crashlytics)
+             implementation(libs.firebase.crashlytics)
 
             // ✅ PLAY INTEGRITY API
             implementation(libs.integrity)
@@ -111,7 +109,7 @@ android {
         applicationId = "com.developer.ev2z"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 68
+        versionCode = 69
         versionName = "4.9.4"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
