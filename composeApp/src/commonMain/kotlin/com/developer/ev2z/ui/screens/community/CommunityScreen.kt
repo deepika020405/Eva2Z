@@ -9,11 +9,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -28,6 +31,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +39,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,8 +50,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
@@ -57,6 +65,7 @@ import com.developer.ev2z.response.Comment
 import com.developer.ev2z.response.Post
 import com.developer.ev2z.response.Users
 import io.ktor.util.date.getTimeMillis
+import kotlinx.coroutines.delay
 import kotlinx.datetime.*
 import kotlin.time.ExperimentalTime
 
@@ -539,6 +548,156 @@ fun PostFooter(
 }
 
 
+//@OptIn(ExperimentalMaterial3Api::class)
+//@Composable
+//fun CommentBottomSheet(
+//    postId: Int,
+//    viewModel: CommunityViewModel,
+//    onDismiss: () -> Unit
+//) {
+//
+//    val state = viewModel.state
+//    var input by remember { mutableStateOf("") }
+//
+//    LaunchedEffect(postId) {
+//        viewModel.load(postId)
+//    }
+//
+//
+////    ModalBottomSheet(
+////        onDismissRequest = onDismiss
+////    ) {
+////        Column(
+////            modifier = Modifier
+////                .fillMaxHeight(0.95f)
+////                .imePadding()          // 👈 🔥 KEY LINE
+////        ) {
+////
+////            // 🔹 TOP BAR
+////            Text(
+////                "Comments",
+////                fontWeight = FontWeight.Bold,
+////                modifier = Modifier
+////                    .align(Alignment.CenterHorizontally)
+////                    .padding(vertical = 12.dp)
+////            )
+////
+////            Divider()
+////
+////            LazyColumn(
+////                modifier = Modifier.weight(1f)
+////            ) {
+////                items(state.comments) { comment ->
+////                    CommentItem(
+////                        comment = comment,
+////                        isReply = comment.parent_id != null,
+////                        onLike = {
+////                            viewModel.like(comment.id, postId)
+////                        },
+////                        onReply = {
+////                            viewModel.setReply(comment)
+////                        },
+////                        onRemoveReplyTag = {
+////                            viewModel.clearReply()
+////                        }
+////                    )
+////                }
+////            }
+////
+////            // Reply indicator
+////            state.replyTo?.let {
+////                Text(
+////                    "Replying to ${it.user.name}",
+////                    color = Color.Gray,
+////                    modifier = Modifier.padding(8.dp)
+////                )
+////            }
+////
+////            // 👇 INPUT ALWAYS AT BOTTOM
+////            Row(
+////                Modifier
+////                    .fillMaxWidth()
+////                    .padding(8.dp),
+////                verticalAlignment = Alignment.CenterVertically
+////            ) {
+////                OutlinedTextField(
+////                    value = input,
+////                    onValueChange = { input = it },
+////                    modifier = Modifier.weight(1f),
+////                    placeholder = { Text("Add a comment…") }
+////                )
+////
+////                TextButton(
+////                    enabled = input.isNotBlank(),
+////                    onClick = {
+////                        viewModel.sendComment(postId, input)
+////                        input = ""
+////                    }
+////                ) {
+////                    Text("Post")
+////                }
+////            }
+////        }
+//
+//    ModalBottomSheet(
+//        onDismissRequest = onDismiss
+//    ) {
+//        Column(
+//            modifier = Modifier
+//                .fillMaxHeight(0.95f)
+//                .imePadding() // 🔥 keyboard safe
+//        ) {
+//
+//            // 🔹 TOP BAR
+//            Text(
+//                "Comments",
+//                fontWeight = FontWeight.Bold,
+//                modifier = Modifier
+//                    .align(Alignment.CenterHorizontally)
+//                    .padding(vertical = 12.dp)
+//            )
+//
+//            Divider()
+//
+//            // 🔹 COMMENTS LIST
+//            LazyColumn(
+//                modifier = Modifier
+//                    .weight(1f)
+//                    .fillMaxWidth()
+//            ) {
+//                items(state.comments) { comment ->
+//                    CommentItem(
+//                        comment = comment,
+//                        isReply = comment.parent_id != null,
+//                        onLike = {
+//                            viewModel.like(comment.id, postId)
+//                        },
+//                        onReply = {
+//                            viewModel.setReply(comment)
+//                        },
+//                        onRemoveReplyTag = {
+//                            viewModel.clearReply()
+//                        }
+//                    )
+//                }
+//            }
+//
+//            // 🔹 INPUT FIXED AT BOTTOM
+//            CommentInputBar(
+//                replyTo = state.replyTo,
+//                input = input,
+//                onInputChange = { input = it },
+//                onSend = {
+//                    viewModel.sendComment(postId, input)
+//                    input = ""
+//                }
+//            )
+//        }
+//    }
+//
+//
+//}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CommentBottomSheet(
@@ -546,26 +705,42 @@ fun CommentBottomSheet(
     viewModel: CommunityViewModel,
     onDismiss: () -> Unit
 ) {
-
     val state = viewModel.state
     var input by remember { mutableStateOf("") }
+
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true
+    )
 
     LaunchedEffect(postId) {
         viewModel.load(postId)
     }
 
-
     ModalBottomSheet(
+        sheetState = sheetState,
         onDismissRequest = onDismiss
     ) {
         Column(
             modifier = Modifier
-                .fillMaxHeight(0.9f)
-                .imePadding()          // 👈 🔥 KEY LINE
+                .fillMaxHeight()
         ) {
 
+            // 🔹 HEADER
+            Text(
+                text = "Comments",
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .padding(vertical = 12.dp)
+            )
+
+            Divider()
+
+            // 🔹 COMMENTS LIST
             LazyColumn(
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
             ) {
                 items(state.comments) { comment ->
                     CommentItem(
@@ -584,38 +759,73 @@ fun CommentBottomSheet(
                 }
             }
 
-            // Reply indicator
-            state.replyTo?.let {
-                Text(
-                    "Replying to ${it.user.name}",
-                    color = Color.Gray,
-                    modifier = Modifier.padding(8.dp)
-                )
-            }
-
-            // 👇 INPUT ALWAYS AT BOTTOM
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    value = input,
-                    onValueChange = { input = it },
-                    modifier = Modifier.weight(1f),
-                    placeholder = { Text("Add a comment…") }
-                )
-
-                TextButton(
-                    enabled = input.isNotBlank(),
-                    onClick = {
-                        viewModel.sendComment(postId, input)
-                        input = ""
-                    }
-                ) {
-                    Text("Post")
+            // 🔥 INPUT BAR — handles keyboard safely
+            CommentInputBar(
+                replyTo = state.replyTo,
+                input = input,
+                onInputChange = { input = it },
+                onSend = {
+                    viewModel.sendComment(postId, input)
+                    input = ""
                 }
+            )
+        }
+    }
+
+}
+
+
+@Composable
+fun CommentInputBar(
+    replyTo: Comment?,
+    input: String,
+    onInputChange: (String) -> Unit,
+    onSend: () -> Unit
+) {
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(replyTo) {
+        if (replyTo != null) {
+            delay(150) // 🔥 let sheet settle
+            focusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .imePadding()
+    ) {
+
+        replyTo?.let {
+            Text(
+                text = "Replying to ${it.user.name}",
+                color = Color.Gray,
+                modifier = Modifier.padding(start = 12.dp, bottom = 4.dp)
+            )
+        }
+
+        Row(
+            modifier = Modifier.padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = input,
+                onValueChange = onInputChange,
+                modifier = Modifier
+                    .weight(1f)
+                    .focusRequester(focusRequester),
+                placeholder = { Text("Add a comment…") }
+            )
+
+            TextButton(
+                enabled = input.isNotBlank(),
+                onClick = onSend
+            ) {
+                Text("Post")
             }
         }
     }
@@ -774,6 +984,8 @@ class CommunityScreenWrapper : Screen {
         }
     }
 }
+
+
 
 
 
