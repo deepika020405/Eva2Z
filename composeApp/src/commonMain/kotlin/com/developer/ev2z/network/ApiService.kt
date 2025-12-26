@@ -1252,5 +1252,56 @@ class ApiService {
         }.body()
     }
 
+
+    // ---------------- STORIES ----------------
+    suspend fun getStories(): StoryResponse {
+        val token = AppTokenProvider.getToken()
+
+        println("🌐 API: Fetching stories")
+
+        return client.get("${baseUrl}stories") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }.body()
+    }
+
+
+    // ---------------- ADD STORY ----------------
+    suspend fun addStory(
+        body: String,
+        media: List<ByteArray>
+    ): JsonObject {
+
+        val token = AppTokenProvider.getToken()
+        val url = "${baseUrl}stories"
+
+        println("🌐 API: Add Story")
+
+        return client.submitFormWithBinaryData(
+            url = url,
+            formData = formData {
+
+                // ✅ text body
+                append("body", body)
+
+                // ✅ images (media[])
+                media.forEachIndexed { index, bytes ->
+                    append(
+                        key = "media[]",
+                        value = bytes,
+                        headers = Headers.build {
+                            append(HttpHeaders.ContentType, "image/png")
+                            append(
+                                HttpHeaders.ContentDisposition,
+                                "filename=story_$index.png"
+                            )
+                        }
+                    )
+                }
+            }
+        ) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }.body()
+    }
+
 }
 

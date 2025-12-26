@@ -6,6 +6,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -52,6 +54,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -63,6 +66,7 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import coil3.compose.AsyncImage
 import com.developer.ev2z.response.Comment
 import com.developer.ev2z.response.Post
+import com.developer.ev2z.response.Story
 import com.developer.ev2z.response.Users
 import io.ktor.util.date.getTimeMillis
 import kotlinx.coroutines.delay
@@ -72,9 +76,13 @@ import kotlin.time.ExperimentalTime
 @Composable
 fun CommunityScreen(
     posts: List<Post>,
+    stories: List<Story>,
+    authUserId: Int,
     onCreatePostClick: () -> Unit,
     onLikeClick: (Int) -> Unit,
-    onCommentClick: (Int) -> Unit
+    onCommentClick: (Int) -> Unit,
+    onAddStory: () -> Unit,
+    onStoryClick: (Story) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier
@@ -82,6 +90,16 @@ fun CommunityScreen(
             .background(Color(0xFFf2f5f0))
     ) {
          val BASE_IMAGE_URL = "https://gps.eva2z.in"
+
+        item {
+            StoriesRow(
+                stories = stories,
+                authUserId = authUserId,
+                onAddStory = onAddStory,
+                onStoryClick = onStoryClick
+            )
+
+        }
 
         item {
             CreatePostCard(onClick = onCreatePostClick)
@@ -918,6 +936,130 @@ fun CommentItem(
     }
 }
 
+@Composable
+fun StoriesRow(
+    stories: List<Story>,
+    authUserId: Int,
+    onAddStory: () -> Unit,
+    onStoryClick: (Story) -> Unit
+) {
+    LazyRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp)
+    ) {
+
+        // 🔹 YOUR STORY (FIRST)
+        item {
+            AddStoryItem(onClick = onAddStory)
+        }
+
+        // 🔹 OTHER STORIES
+        items(stories) { story ->
+            StoryItem(
+                story = story,
+                isMine = story.user.id == authUserId,
+                onClick = { onStoryClick(story) }
+            )
+        }
+    }
+}
+
+
+@Composable
+fun AddStoryItem(onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .padding(end = 12.dp)
+            .clickable { onClick() },
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+
+        Box {
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(Color.LightGray)
+            )
+
+            Box(
+                modifier = Modifier
+                    .size(22.dp)
+                    .align(Alignment.BottomEnd)
+                    .clip(CircleShape)
+                    .background(Color(0xFF0066FF)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+
+        Spacer(Modifier.height(4.dp))
+        Text("Your story", style = MaterialTheme.typography.labelSmall)
+    }
+}
+
+
+@Composable
+fun StoryItem(
+    story: Story,
+    isMine: Boolean,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .padding(end = 12.dp)
+            .clickable { onClick() },
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+
+        Box(
+            modifier = Modifier
+                .size(68.dp)
+                .clip(CircleShape)
+                .background(
+                    Brush.linearGradient(
+                        listOf(Color.Magenta, Color.Red, Color.Yellow)
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+
+            AsyncImage(
+                model = "https://gps.eva2z.in/storage/${story.user.photo}",
+                contentDescription = null,
+                modifier = Modifier
+                    .size(60.dp)
+                    .clip(CircleShape)
+                    .background(Color.LightGray),
+                contentScale = ContentScale.Crop
+            )
+        }
+
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = story.user.name,
+            maxLines = 1,
+            style = MaterialTheme.typography.labelSmall
+        )
+    }
+}
+
+
+
+
+
+
+
+
+
 class CommunityScreenWrapper : Screen {
 
     @Composable
@@ -960,18 +1102,25 @@ class CommunityScreenWrapper : Screen {
             else -> {
                 CommunityScreen(
                     posts = state.posts,
+                    stories = state.stories,
+                    authUserId = state.authUserId,
                     onCreatePostClick = {
-                        navigator.push(
-                            CreatePostScreen()
-                        )
+                        navigator.push(CreatePostScreen())
                     },
                     onLikeClick = { postId ->
                         viewModel.toggleLike(postId)
                     },
                     onCommentClick = { postId ->
                         openCommentsPostId = postId
+                    },
+                    onAddStory = {
+                        navigator.push(CreateStoryScreen())
+                    },
+                    onStoryClick = { story ->
+                        // TODO: open StoryViewerScreen(story)
                     }
                 )
+
             }
 
         }
@@ -984,9 +1133,5 @@ class CommunityScreenWrapper : Screen {
         }
     }
 }
-
-
-
-
 
 

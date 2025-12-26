@@ -12,14 +12,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import com.developer.ev2z.response.Post
+import com.developer.ev2z.response.Story
 
 data class CommunityUiState(
     val loading: Boolean = false,
     val posts: List<Post> = emptyList(),
+    val stories: List<Story> = emptyList(),
+    val authUserId: Int = 0,
     val error: String? = null,
     val comments: List<Comment> = emptyList(),
     val replyTo: Comment? = null
 )
+
 
 class CommunityViewModel(
     private val repository: CommunityRepository
@@ -38,26 +42,52 @@ class CommunityViewModel(
     // ❌ init me loadPosts mat karo
     // init { loadPosts() }
 
-    fun loadPosts() {
-        if (_state.loading) return   // 👈 safety: double call avoid
+//    fun loadPosts() {
+//        if (_state.loading) return   // 👈 safety: double call avoid
+//
+//        _state = _state.copy(loading = true, error = null)
+//
+//        scope.launch {
+//            try {
+//                val posts = repository.fetchPosts()
+//                _state = CommunityUiState(
+//                    loading = false,
+//                    posts = posts
+//                )
+//            } catch (e: Exception) {
+//                _state = CommunityUiState(
+//                    loading = false,
+//                    error = e.message ?: "Something went wrong"
+//                )
+//            }
+//        }
+//    }
 
-        _state = _state.copy(loading = true, error = null)
+    fun loadPosts() {
+        if (_state.loading) return
+
+        _state = _state.copy(loading = true)
 
         scope.launch {
             try {
                 val posts = repository.fetchPosts()
-                _state = CommunityUiState(
+                val storiesRes = repository.fetchStories()
+
+                _state = _state.copy(
                     loading = false,
-                    posts = posts
+                    posts = posts,
+                    stories = storiesRes.stories,
+                    authUserId = storiesRes.auth_user_id
                 )
             } catch (e: Exception) {
-                _state = CommunityUiState(
+                _state = _state.copy(
                     loading = false,
-                    error = e.message ?: "Something went wrong"
+                    error = e.message
                 )
             }
         }
     }
+
 
     // 🔥 Call this when ANY change happens
     fun refreshPosts() {
@@ -170,5 +200,38 @@ class CommunityViewModel(
     fun clearReply() {
         _state = _state.copy(replyTo = null)
     }
+
+
+    fun loadStories() {
+        scope.launch {
+            try {
+                val res = repository.fetchStories()
+                _state = _state.copy(
+                    stories = res.stories,
+                    authUserId = res.auth_user_id
+                )
+            } catch (e: Exception) {
+                // ignore or log
+            }
+        }
+    }
+
+    fun createStory(
+        body: String,
+        media: List<ByteArray>
+    ) {
+        scope.launch {
+            try {
+                repository.addStory(body, media)
+
+                // 🔄 refresh stories after upload
+                loadStories()
+
+            } catch (e: Exception) {
+                println("❌ Create Story Error: ${e.message}")
+            }
+        }
+    }
+
 
 }
