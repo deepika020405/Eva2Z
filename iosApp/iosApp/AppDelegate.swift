@@ -1,7 +1,7 @@
-// iosApp/AppDelegate.swift
 import UIKit
 import ComposeApp
 import PhonePePayment
+import FirebaseCore  // ✅ ADD THIS
 
 class AppDelegate: NSObject, UIApplicationDelegate {
 
@@ -9,11 +9,15 @@ class AppDelegate: NSObject, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil
     ) -> Bool {
+
+        // ✅ INITIALIZE FIREBASE
+        FirebaseApp.configure()
+        print("✅ Firebase initialized")
+
         print("✅ AppDelegate initialized")
         return true
     }
 
-    // ✅ Handle deep link callback
     func application(
         _ app: UIApplication,
         open url: URL,
@@ -21,14 +25,12 @@ class AppDelegate: NSObject, UIApplicationDelegate {
     ) -> Bool {
         print("📲 AppDelegate: Deep link opened: \(url.absoluteString)")
 
-        // ✅ Let PhonePe SDK handle it first
         let handled = PPPayment.checkDeeplink(url)
         if handled {
             print("✅ PhonePe SDK handled deep link")
             return true
         }
 
-        // ✅ Otherwise, pass to PaymentBridge
         PaymentBridge.shared.handleDeepLink(url)
         return true
     }

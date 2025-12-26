@@ -14,17 +14,22 @@
         <key>CFBundleInfoDictionaryVersion</key>
         <string>6.0</string>
 
+        <!-- ✅ HOME SCREEN PE YE NAAM DIKHEGA -->
+        <key>CFBundleDisplayName</key>
+        <string>EVA2Z Connect</string>
+
         <key>CFBundleName</key>
         <string>$(PRODUCT_NAME)</string>
 
         <key>CFBundlePackageType</key>
         <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 
+        <!-- ✅ VERSION UPDATED - Android ke saath match -->
         <key>CFBundleShortVersionString</key>
-        <string>1.0</string>
+        <string>4.9.1</string>
 
         <key>CFBundleVersion</key>
-        <string>1</string>
+        <string>65</string>
 
         <key>CADisableMinimumFrameDurationOnPhone</key>
         <true/>
@@ -35,21 +40,21 @@
         <key>NSPhotoLibraryUsageDescription</key>
         <string>Photo library access is required to scan barcodes from images</string>
 
-        <!-- ✅ PhonePe URL Query Schemes - ADD THESE 2 -->
+        <!-- ✅ PhonePe URL Query Schemes -->
         <key>LSApplicationQueriesSchemes</key>
         <array>
             <string>phonepe</string>
             <string>ppemerchantsdkv1</string>
             <string>ppemerchantsdkv2</string>
             <string>ppemerchantsdkv3</string>
-            <string>ppemerchantsdkv4</string>  <!-- ✅ ADD THIS -->
-            <string>ppemerchantsdkv5</string>  <!-- ✅ ADD THIS -->
+            <string>ppemerchantsdkv4</string>
+            <string>ppemerchantsdkv5</string>
             <string>paytmmp</string>
             <string>gpay</string>
             <string>credpay</string>
             <string>amazonpay</string>
             <string>bhim</string>
-            <string>supermoney</string>  <!-- ✅ ADD THIS -->
+            <string>supermoney</string>
         </array>
 
         <key>CFBundleURLTypes</key>
