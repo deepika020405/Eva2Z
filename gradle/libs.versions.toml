@@ -1,6 +1,7 @@
 [versions]
 accompanistPager = "0.36.0"
 agp = "8.13.2"
+googleServices = "4.4.4"
 android-compileSdk = "36"
 android-minSdk = "29"
 android-targetSdk = "36"
@@ -16,6 +17,7 @@ cameraCamera2 = "1.5.2"
 coilCompose = "3.3.0"
 composeMultiplatform = "1.9.3"
 componentsMap = "1.7.0"
+integrity = "1.6.0"
 intentsdk = "5.3.0"
 junit = "4.13.2"
 kotlin = "2.2.20"
@@ -48,6 +50,9 @@ androidx-navigation-compose = { module = "androidx.navigation:navigation-compose
 barcode-scanning = { module = "com.google.mlkit:barcode-scanning", version.ref = "barcodeScanning" }
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coilCompose" }
 coil-network-ktor3 = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coilCompose" }
+firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
+firebase-crashlytics = { module = "com.google.firebase:firebase-crashlytics" }
+integrity = { module = "com.google.android.play:integrity", version.ref = "integrity" }
 intentsdk = { module = "phonepe.intentsdk.android.release:IntentSDK", version.ref = "intentsdk" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
 kotlin-testJunit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.ref = "kotlin" }
@@ -89,3 +94,4 @@ composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "composeMul
 composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
 kotlinxSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+googleServices = { id = "com.google.gms.google-services", version.ref = "googleServices" }
