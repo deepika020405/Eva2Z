@@ -11,6 +11,8 @@ plugins {
     alias(libs.plugins.composeCompiler)
     kotlin("plugin.serialization") version "2.1.0"
     alias(libs.plugins.googleServices)
+    // ❌ REMOVED: Crashlytics plugin (causing Play Protect issues)
+    // alias(libs.plugins.firebaseCrashlytics)
 }
 
 repositories {
@@ -57,10 +59,11 @@ kotlin {
             implementation(libs.play.services.auth)
             implementation(libs.play.services.auth.api.phone)
 
-            // ✅ FIREBASE BOM (Bill of Materials) - ensures compatible versions
-            implementation(platform("com.google.firebase:firebase-bom:34.7.0"))
+            // ✅ FIREBASE BOM - Only Analytics (minimal)
+            implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
             implementation(libs.firebase.analytics)
-            implementation(libs.firebase.crashlytics)
+            // ❌ REMOVED: Crashlytics (causing build issues)
+            // implementation(libs.firebase.crashlytics)
 
             // ✅ PLAY INTEGRITY API
             implementation(libs.integrity)
@@ -95,13 +98,10 @@ kotlin {
     }
 }
 
-// ✅ LOAD KEYSTORE PROPERTIES FROM FILE
+// ✅ LOAD KEYSTORE PROPERTIES
 val keystorePropertiesFile = rootProject.file("keystore.properties")
 val keystoreProperties = Properties()
-
-if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
-}
+keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 
 android {
     namespace = "com.developer.ev2z"
@@ -111,12 +111,11 @@ android {
         applicationId = "com.developer.ev2z"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 65
-        versionName = "4.9.1"
+        versionCode = 68
+        versionName = "4.9.4"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    // ✅ SIGNING CONFIGS
     signingConfigs {
         getByName("debug") {
             storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
@@ -126,18 +125,10 @@ android {
         }
 
         create("release") {
-            if (keystorePropertiesFile.exists()) {
-                storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
-                storePassword = keystoreProperties["storePassword"] as String
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
-            } else {
-                println("⚠️ WARNING: keystore.properties not found! Using debug keystore for release.")
-                storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
-                storePassword = "android"
-                keyAlias = "androiddebugkey"
-                keyPassword = "android"
-            }
+            storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
+            storePassword = keystoreProperties["storePassword"] as String
+            keyAlias = keystoreProperties["keyAlias"] as String
+            keyPassword = keystoreProperties["keyPassword"] as String
         }
     }
 
@@ -151,9 +142,6 @@ android {
         getByName("release") {
             isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("release")
-
-            // ✅ ProGuard rules for Firebase (if using minify)
-            // proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         getByName("debug") {
             signingConfig = signingConfigs.getByName("debug")
