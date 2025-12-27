@@ -208,16 +208,16 @@ fun SignupScreen(
                     )
                 )
 
-//                // 🔥 EVENT 2: Generate Lead (marketing / Meta)
-//                Analytics.logEvent(
-//                    name = "generate_lead",
-//                    params = mapOf(
-//                        "source" to "signup_screen",
-//                        "phone_masked" to maskPhone(phoneNumber),
-//                        "email_domain" to email.substringAfter("@", ""),
-//                        "country_code" to "IN"
-//                    )
-//                )
+                // 🔥 EVENT 2: Generate Lead (marketing / Meta)
+                Analytics.logEvent(
+                    name = "generate_lead",
+                    params = mapOf(
+                        "source" to "signup_screen",
+                        "phone_masked" to maskPhone(phoneNumber),
+                        "email_domain" to email.substringAfter("@", ""),
+                        "country_code" to "IN"
+                    )
+                )
 
                 // ✅ First check if phone is already registered
                 viewModel.checkPhoneRegistered(fullPhone) { isRegistered, message ->
