@@ -4,6 +4,7 @@ package com.developer.ev2z.repository
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.response.Post
 import com.developer.ev2z.response.StoryResponse
+import com.developer.ev2z.response.StoryViewersResponse
 import kotlinx.serialization.json.JsonObject
 
 class CommunityRepository(
@@ -55,6 +56,17 @@ class CommunityRepository(
         media: List<ByteArray>
     ): JsonObject {
         return apiService.addStory(body, media)
+    }
+
+
+    // ---------------- STORY VIEW ----------------
+    suspend fun viewStory(storyId: Int) {
+        apiService.viewStory(storyId)
+    }
+
+    // ---------------- STORY VIEWERS ----------------
+    suspend fun getStoryViewers(storyId: Int): StoryViewersResponse {
+        return apiService.getStoryViewers(storyId)
     }
 
 }

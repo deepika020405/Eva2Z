@@ -1117,8 +1117,11 @@ class CommunityScreenWrapper : Screen {
                         navigator.push(CreateStoryScreen())
                     },
                     onStoryClick = { story ->
-                        // TODO: open StoryViewerScreen(story)
+                        val index = state.stories.indexOfFirst { it.id == story.id }
+                        viewModel.startStory(index)
+                        navigator.push(StoryViewerScreen())
                     }
+
                 )
 
             }

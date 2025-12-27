@@ -25,3 +25,16 @@ data class Story(
 data class AddStoryResponse(
     val story: Story
 )
+@Serializable
+data class StoryViewersResponse(
+    val story_id: Int,
+    val total_views: Int,
+    val viewers: List<StoryViewer>
+)
+@Serializable
+data class StoryViewer(
+    val id: Int,
+    val user: Users,
+    val created_at: String
+)
+

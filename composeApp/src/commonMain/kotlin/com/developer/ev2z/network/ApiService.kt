@@ -1303,5 +1303,24 @@ class ApiService {
         }.body()
     }
 
+
+    // ---------------- STORY VIEW ----------------
+    suspend fun viewStory(storyId: Int): JsonObject {
+        val token = AppTokenProvider.getToken()
+
+        return client.post("${baseUrl}stories/$storyId/view") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }.body()
+    }
+
+    // ---------------- STORY VIEWERS ----------------
+    suspend fun getStoryViewers(storyId: Int): StoryViewersResponse {
+        val token = AppTokenProvider.getToken()
+
+        return client.get("${baseUrl}stories/$storyId/viewers") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }.body()
+    }
+
 }
 

@@ -13,6 +13,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import com.developer.ev2z.response.Post
 import com.developer.ev2z.response.Story
+import com.developer.ev2z.response.StoryViewer
 
 data class CommunityUiState(
     val loading: Boolean = false,
@@ -21,7 +22,11 @@ data class CommunityUiState(
     val authUserId: Int = 0,
     val error: String? = null,
     val comments: List<Comment> = emptyList(),
-    val replyTo: Comment? = null
+    val replyTo: Comment? = null,
+    val storyIndex: Int = 0,
+    val storyProgress: Float = 0f,
+    val storyPaused: Boolean = false,
+    val storyViewers: List<StoryViewer> = emptyList()
 )
 
 
@@ -38,6 +43,8 @@ class CommunityViewModel(
     private var refreshKey by mutableStateOf(0)
 
     fun observeRefreshKey(): Int = refreshKey
+    private val viewedStoryIds = mutableSetOf<Int>()
+
 
     // ❌ init me loadPosts mat karo
     // init { loadPosts() }
@@ -233,5 +240,75 @@ class CommunityViewModel(
         }
     }
 
+
+    fun startStory(index: Int) {
+        val story = _state.stories.getOrNull(index) ?: return
+
+        _state = _state.copy(
+            storyIndex = index,
+            storyProgress = 0f,
+            storyPaused = false
+        )
+
+        // ✅ VIEW API only once
+        if (!viewedStoryIds.contains(story.id)) {
+            viewedStoryIds.add(story.id)
+            scope.launch {
+                repository.viewStory(story.id)
+            }
+        }
+
+        runStoryTimer()
+    }
+
+    private fun runStoryTimer() {
+        scope.launch {
+            while (_state.storyProgress < 1f) {
+                if (!_state.storyPaused) {
+                    kotlinx.coroutines.delay(150) // ~15 sec
+                    _state = _state.copy(
+                        storyProgress = _state.storyProgress + 0.01f
+                    )
+                } else {
+                    kotlinx.coroutines.delay(50)
+                }
+            }
+
+            nextStory()
+        }
+    }
+
+    fun pauseStory() {
+        _state = _state.copy(storyPaused = true)
+    }
+
+    fun resumeStory() {
+        _state = _state.copy(storyPaused = false)
+    }
+
+    fun nextStory() {
+        val next = _state.storyIndex + 1
+        if (next < _state.stories.size) {
+            startStory(next)
+        }
+    }
+
+    fun prevStory() {
+        val prev = _state.storyIndex - 1
+        if (prev >= 0) {
+            startStory(prev)
+        }
+    }
+
+    fun loadStoryViewers(storyId: Int) {
+        scope.launch {
+            val res = repository.getStoryViewers(storyId)
+            _state = _state.copy(storyViewers = res.viewers)
+        }
+    }
+
+    fun clearStoryViewers() {
+        _state = _state.copy(storyViewers = emptyList())
+    }
 
 }
