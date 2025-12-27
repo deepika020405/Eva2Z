@@ -732,6 +732,42 @@ class ApiService {
         }
     }
 
+
+    // ---------------- REFER & EARN ----------------
+    suspend fun getReferralCode(token: String): ReferralCodeResponse {
+        println("🌐 API: Fetching referral code")
+
+        return try {
+            val response = client.get("${baseUrl}invite-friends") {
+                header(HttpHeaders.Authorization, "Bearer $token")
+            }
+
+            println("✔️ Referral Code Status: ${response.status}")
+            response.body()
+
+        } catch (e: ResponseException) {
+            val status = e.response.status
+            val text = try {
+                e.response.bodyAsText()
+            } catch (_: Exception) {
+                """{"success":false,"message":"Network error"}"""
+            }
+
+            println("❌ Referral Code Error: HTTP $status")
+            println("   response body: $text")
+
+            val json = Json { ignoreUnknownKeys = true }
+            json.decodeFromString<ReferralCodeResponse>(text)
+
+        } catch (e: Exception) {
+            println("❌ Referral Code Error: ${e.message}")
+            ReferralCodeResponse(
+                success = false,
+                message = e.message ?: "Unknown error"
+            )
+        }
+    }
+
     // ===============================================
     // SHOP / PRODUCT APIs (existing code)
     // ===============================================
