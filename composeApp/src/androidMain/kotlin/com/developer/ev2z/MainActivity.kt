@@ -1,6 +1,5 @@
 package com.developer.ev2z
 
-import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -8,26 +7,40 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
 import com.developer.ev2z.data.local.initStorageManager
-import com.developer.ev2z.phonepe.PHONEPE_REQUEST_CODE
 import com.developer.ev2z.phonepe.PaymentBus
 import com.developer.ev2z.ui.screens.Profile.GlobalContext
-import com.developer.ev2z.util.AppSignatureHelper
+//import com.developer.ev2z.util.AppSignatureHelper
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        initStorageManager(this)
 
-        // ✅ Activity ko set karo
-        ActivityProvider.setActivity(this)
-        val signatureHelper = AppSignatureHelper(this)
-        signatureHelper.printAppSignaturesToLog()
+        Log.d("MainActivity", "🚀 EVA2Z Connect v5.0.0 starting")
 
-        // Initialize GlobalContext for URL opening
-        GlobalContext.set(this)
+        try {
+            // ✅ Initialize storage
+            initStorageManager(this)
 
-        setContent {
-            App()
+            // ✅ Setup activity
+            ActivityProvider.setActivity(this)
+
+            // ✅ Print signatures for SMS Retriever
+//            AppSignatureHelper(this).printAppSignaturesToLog()
+
+            // ✅ Setup global context
+            GlobalContext.set(this)
+
+            // ❌ REMOVED: Play Integrity check (was causing Play Protect warnings)
+            // PlayIntegrityHelper.verifyIntegrity() - THIS WAS THE PROBLEM!
+
+            // ✅ Set UI content
+            setContent {
+                App()
+            }
+
+            Log.d("MainActivity", "✅ App initialized successfully")
+        } catch (e: Exception) {
+            Log.e("MainActivity", "❌ Initialization error", e)
         }
     }
 
@@ -41,10 +54,8 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
 
         intent.data?.let { uri ->
-            Log.d("PhonePe", "🔗 Callback URI: $uri")
+            Log.d("PhonePe", "🔗 Payment callback: $uri")
 
-            // Extract payment info from URL
-            // Example: ev2z://payment/callback?status=SUCCESS&transactionId=TX123
             val status = uri.getQueryParameter("status")
             val txnId = uri.getQueryParameter("transactionId")
                 ?: uri.getQueryParameter("providerReferenceId")
@@ -72,53 +83,9 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-
-
 }
 
 @Composable
 fun AppAndroidPreview() {
     App()
 }
-
-//package com.developer.ev2z
-//
-//import android.os.Bundle
-//import androidx.activity.ComponentActivity
-//import androidx.activity.compose.setContent
-//import androidx.compose.material3.MaterialTheme
-//import com.developer.ev2z.network.ApiService
-//import com.developer.ev2z.repository.AuthRepository
-//import com.developer.ev2z.data.local.initStorageManager
-//import com.developer.ev2z.data.local.createStorageManager
-//import com.developer.ev2z.ui.screens.AuthPagerScreen
-//import com.developer.ev2z.viewmodel.AuthViewModel
-//
-//class MainActivity : ComponentActivity() {
-//    override fun onCreate(savedInstanceState: Bundle?) {
-//        super.onCreate(savedInstanceState)
-//
-//        // Initialize storage manager with context (no return value)
-//        initStorageManager(this)
-//
-//        // Create instances
-//        val apiService = ApiService()
-//        val repository = AuthRepository(apiService)
-//        val storage = createStorageManager()  // ✅ Yeh StorageManager return karta hai
-//        val viewModel = AuthViewModel(repository, storage)
-//
-//        setContent {
-//            MaterialTheme {
-//                AuthPagerScreen(
-//                    viewModel = viewModel,
-//                    onLoginSuccess = {
-//                        // Navigate to HomeActivity
-//                        // startActivity(Intent(this, HomeActivity::class.java))
-//                        // finish()
-//                    }
-//                )
-//            }
-//        }
-//    }
-//}
-

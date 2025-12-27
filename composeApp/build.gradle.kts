@@ -1,6 +1,8 @@
 import org.gradle.kotlin.dsl.implementation
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
+import java.io.FileInputStream
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -8,14 +10,15 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     kotlin("plugin.serialization") version "2.1.0"
+    alias(libs.plugins.googleServices)
+    alias(libs.plugins.firebaseCrashlytics)
 }
 
 repositories {
     google()
     mavenCentral()
     maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
-    maven("https://phonepe.mycloudrepo.io/public/repositories/phonepe-intentsdk-android") // Add this
-
+    maven("https://phonepe.mycloudrepo.io/public/repositories/phonepe-intentsdk-android")
 }
 
 kotlin {
@@ -39,38 +42,29 @@ kotlin {
         androidMain.dependencies {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
-
-            // Android-only lifecycle
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
-
-            // Android-only navigation
             implementation(libs.androidx.navigation.compose)
-
-            // Android-only Material3 (remove from commonMain)
             implementation(libs.androidx.material3)
             implementation(libs.androidx.material.icons.extended)
-
-            // Ktor
             implementation(libs.ktor.client.okhttp)
-
             implementation(libs.play.services.maps)
             implementation(libs.maps.compose)
-
-            // CameraX for Android
             implementation(libs.androidx.camera.camera2)
             implementation(libs.androidx.camera.lifecycle)
             implementation(libs.androidx.camera.view)
-
-            // ML Kit Barcode Scanning for Android
             implementation(libs.barcode.scanning)
             implementation(libs.intentsdk)
-
-
-
-            // ✅ SMS Retriever API for OTP Auto-read
             implementation(libs.play.services.auth)
             implementation(libs.play.services.auth.api.phone)
+
+            // ✅ FIREBASE ONLY - NO PLAY INTEGRITY
+            implementation(project.dependencies.platform("com.google.firebase:firebase-bom:33.7.0"))
+            implementation(libs.firebase.analytics)
+            implementation(libs.firebase.crashlytics)
+
+            // ❌ REMOVED: Play Integrity API (causes Play Protect warnings)
+            // implementation(libs.integrity)
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
@@ -78,43 +72,36 @@ kotlin {
         commonMain.dependencies {
             implementation(compose.runtime)
             implementation(compose.foundation)
-            implementation(compose.material3)                  // Jetbrains MPP
+            implementation(compose.material3)
             implementation(compose.ui)
-            implementation(compose.materialIconsExtended)       // Jetbrains MPP
-
+            implementation(compose.materialIconsExtended)
             implementation(compose.components.resources)
             implementation(compose.components.uiToolingPreview)
-
-            // Ktor common
             implementation(libs.ktor.client.core)
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.serialization.kotlinx.json)
             implementation(libs.ktor.client.logging)
             implementation(libs.kotlinx.serialization.json)
-
             implementation(libs.voyager.navigator)
             implementation(libs.voyager.tab.navigator)
-
-            // ViewModel for KMP (common)
             implementation(libs.lifecycle.viewmodel.compose.v296)
             implementation(libs.lifecycle.runtime.compose.v296)
-
             implementation(libs.coil.compose)
             implementation(libs.coil.network.ktor3)
-
-//            implementation(libs.components.map)
-//            implementation(libs.maplibre)
-//            implementation(libs.accompanist.pager)
-
-            // kotlinx-datetime library
             implementation(libs.kotlinx.datetime)
-
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
         }
-
     }
+}
+
+// ✅ LOAD KEYSTORE PROPERTIES
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties()
+
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
 android {
@@ -125,20 +112,52 @@ android {
         applicationId = "com.developer.ev2z"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 70  // ✅ INCREMENTED
+        versionName = "5.0.0"  // ✅ NEW MAJOR VERSION (Play Protect fixed)
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
+
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+
+        create("release") {
+            if (keystorePropertiesFile.exists()) {
+                storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+            } else {
+                // Fallback to debug
+                println("⚠️ keystore.properties not found, using debug keystore")
+                storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
+    }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
+        }
+        getByName("debug") {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
