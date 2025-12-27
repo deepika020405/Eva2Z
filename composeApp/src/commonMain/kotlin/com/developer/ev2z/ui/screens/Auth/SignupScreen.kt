@@ -17,6 +17,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.developer.ev2z.util.Analytics
 import com.developer.ev2z.utils.EmailValidator
 import com.developer.ev2z.viewmodel.AuthViewModel
 import kotlinx.coroutines.delay
@@ -45,6 +46,13 @@ fun SignupScreen(
     val error by viewModel.error.collectAsState()
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        Analytics.logEvent(
+            name = "signup_screen_view"
+        )
+    }
+
 
     // ✅ Clear pre-filled phone after using it
     LaunchedEffect(preFilledPhone) {
@@ -188,6 +196,28 @@ fun SignupScreen(
         Button(
             onClick = {
                 val fullPhone = "+91$phoneNumber"
+
+                // 🔥 EVENT 1: Signup details filled
+                Analytics.logEvent(
+                    name = "signup_details_entered",
+                    params = mapOf(
+                        "name_length" to fullName.length,
+                        "phone_masked" to maskPhone(phoneNumber),
+                        "email_domain" to email.substringAfter("@", ""),
+                        "country_code" to "IN"
+                    )
+                )
+
+//                // 🔥 EVENT 2: Generate Lead (marketing / Meta)
+//                Analytics.logEvent(
+//                    name = "generate_lead",
+//                    params = mapOf(
+//                        "source" to "signup_screen",
+//                        "phone_masked" to maskPhone(phoneNumber),
+//                        "email_domain" to email.substringAfter("@", ""),
+//                        "country_code" to "IN"
+//                    )
+//                )
 
                 // ✅ First check if phone is already registered
                 viewModel.checkPhoneRegistered(fullPhone) { isRegistered, message ->
