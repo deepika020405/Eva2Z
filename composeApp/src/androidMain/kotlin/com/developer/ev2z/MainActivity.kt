@@ -6,19 +6,16 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.lifecycleScope
 import com.developer.ev2z.data.local.initStorageManager
 import com.developer.ev2z.phonepe.PaymentBus
 import com.developer.ev2z.ui.screens.Profile.GlobalContext
-import com.developer.ev2z.util.AppSignatureHelper
-import com.developer.ev2z.utils.PlayIntegrityHelper
-import kotlinx.coroutines.launch
+//import com.developer.ev2z.util.AppSignatureHelper
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        Log.d("MainActivity", "🚀 App starting v4.9.5")
+        Log.d("MainActivity", "🚀 EVA2Z Connect v5.0.0 starting")
 
         try {
             // ✅ Initialize storage
@@ -27,21 +24,14 @@ class MainActivity : ComponentActivity() {
             // ✅ Setup activity
             ActivityProvider.setActivity(this)
 
-            // ✅ Print signatures
-            AppSignatureHelper(this).printAppSignaturesToLog()
+            // ✅ Print signatures for SMS Retriever
+//            AppSignatureHelper(this).printAppSignaturesToLog()
 
             // ✅ Setup global context
             GlobalContext.set(this)
 
-            // ✅ IMPORTANT: Verify Play Integrity
-            lifecycleScope.launch {
-                try {
-                    val isLegit = PlayIntegrityHelper.verifyIntegrity(this@MainActivity)
-                    Log.d("MainActivity", if (isLegit) "✅ App verified as legitimate" else "⚠️ Integrity check inconclusive")
-                } catch (e: Exception) {
-                    Log.w("MainActivity", "Integrity check skipped: ${e.message}")
-                }
-            }
+            // ❌ REMOVED: Play Integrity check (was causing Play Protect warnings)
+            // PlayIntegrityHelper.verifyIntegrity() - THIS WAS THE PROBLEM!
 
             // ✅ Set UI content
             setContent {
@@ -71,6 +61,8 @@ class MainActivity : ComponentActivity() {
                 ?: uri.getQueryParameter("providerReferenceId")
             val code = uri.getQueryParameter("code")
 
+            Log.d("PhonePe", "Status: $status, TxnId: $txnId, Code: $code")
+
             when (status?.uppercase()) {
                 "SUCCESS" -> {
                     Log.d("PhonePe", "✅ Payment SUCCESS")
@@ -85,7 +77,7 @@ class MainActivity : ComponentActivity() {
                     PaymentBus.notify(false, txnId, "PENDING")
                 }
                 else -> {
-                    Log.d("PhonePe", "❓ Unknown: $status")
+                    Log.d("PhonePe", "❓ Unknown status: $status")
                     PaymentBus.notify(false, txnId, code ?: "UNKNOWN")
                 }
             }

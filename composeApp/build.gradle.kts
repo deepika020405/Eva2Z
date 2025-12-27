@@ -11,7 +11,7 @@ plugins {
     alias(libs.plugins.composeCompiler)
     kotlin("plugin.serialization") version "2.1.0"
     alias(libs.plugins.googleServices)
-     alias(libs.plugins.firebaseCrashlytics)
+    alias(libs.plugins.firebaseCrashlytics)
 }
 
 repositories {
@@ -58,13 +58,13 @@ kotlin {
             implementation(libs.play.services.auth)
             implementation(libs.play.services.auth.api.phone)
 
-            // ✅ FIREBASE BOM - Only Analytics (minimal)
-            implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+            // ✅ FIREBASE ONLY - NO PLAY INTEGRITY
+            implementation(project.dependencies.platform("com.google.firebase:firebase-bom:33.7.0"))
             implementation(libs.firebase.analytics)
-             implementation(libs.firebase.crashlytics)
+            implementation(libs.firebase.crashlytics)
 
-            // ✅ PLAY INTEGRITY API
-            implementation(libs.integrity)
+            // ❌ REMOVED: Play Integrity API (causes Play Protect warnings)
+            // implementation(libs.integrity)
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)
@@ -99,7 +99,10 @@ kotlin {
 // ✅ LOAD KEYSTORE PROPERTIES
 val keystorePropertiesFile = rootProject.file("keystore.properties")
 val keystoreProperties = Properties()
-keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
 
 android {
     namespace = "com.developer.ev2z"
@@ -109,8 +112,8 @@ android {
         applicationId = "com.developer.ev2z"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 69
-        versionName = "4.9.4"
+        versionCode = 70  // ✅ INCREMENTED
+        versionName = "5.0.0"  // ✅ NEW MAJOR VERSION (Play Protect fixed)
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -123,10 +126,19 @@ android {
         }
 
         create("release") {
-            storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
-            storePassword = keystoreProperties["storePassword"] as String
-            keyAlias = keystoreProperties["keyAlias"] as String
-            keyPassword = keystoreProperties["keyPassword"] as String
+            if (keystorePropertiesFile.exists()) {
+                storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+            } else {
+                // Fallback to debug
+                println("⚠️ keystore.properties not found, using debug keystore")
+                storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
         }
     }
 

@@ -8,15 +8,16 @@
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
-    <!-- Internet permission -->
+    <!-- Internet -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-    <!-- SMS for OTP -->
-    <uses-permission android:name="android.permission.RECEIVE_SMS" />
+    <!-- ❌ NO SMS PERMISSION NEEDED - Using SMS User Consent API instead -->
+
+    <!-- Telephony feature (optional) -->
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
-    <!-- ✅ Simplified queries - only essential UPI apps -->
+    <!-- ✅ Only essential UPI apps -->
     <queries>
         <!-- PhonePe -->
         <package android:name="com.phonepe.app" />
@@ -42,7 +43,7 @@
         android:usesCleartextTraffic="false"
         tools:targetApi="31">
 
-        <!-- ✅ FileProvider -->
+        <!-- FileProvider -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -53,14 +54,14 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- ✅ Payment Handler -->
+        <!-- Payment Handler -->
         <activity
             android:name="com.developer.ev2z.phonepe.PaymentHandlerActivity"
             android:exported="false"
             android:launchMode="singleTop"
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
-        <!-- ✅ Main Activity -->
+        <!-- Main Activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -85,7 +86,7 @@
             </intent-filter>
         </activity>
 
-        <!-- ✅ Google Maps API Key -->
+        <!-- Google Maps API Key -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyDJLtuwZbTCHxEriYAjfDf5gYT3a7s4a20"/>
@@ -93,110 +94,3 @@
     </application>
 
 </manifest>
-
-<!--<?xml version="1.0" encoding="utf-8"?>-->
-<!--<manifest xmlns:android="http://schemas.android.com/apk/res/android">-->
-
-<!--    &lt;!&ndash; Camera permissions &ndash;&gt;-->
-<!--    <uses-permission android:name="android.permission.CAMERA" />-->
-<!--    <uses-feature android:name="android.hardware.camera" android:required="false" />-->
-<!--    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />-->
-<!--    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />-->
-
-<!--    &lt;!&ndash; Internet permission &ndash;&gt;-->
-<!--    <uses-permission android:name="android.permission.INTERNET" />-->
-
-<!--    &lt;!&ndash; ✅ CRITICAL: Add queries for UPI apps (Android 11+) &ndash;&gt;-->
-<!--    <queries>-->
-<!--        &lt;!&ndash; PhonePe &ndash;&gt;-->
-<!--        <package android:name="com.phonepe.app" />-->
-
-<!--        &lt;!&ndash; Google Pay &ndash;&gt;-->
-<!--        <package android:name="com.google.android.apps.nbu.paisa.user" />-->
-
-<!--        &lt;!&ndash; Paytm &ndash;&gt;-->
-<!--        <package android:name="net.one97.paytm" />-->
-
-<!--        &lt;!&ndash; BHIM UPI &ndash;&gt;-->
-<!--        <package android:name="in.org.npci.upiapp" />-->
-
-<!--        &lt;!&ndash; Amazon Pay &ndash;&gt;-->
-<!--        <package android:name="in.amazon.mShop.android.shopping" />-->
-
-<!--        &lt;!&ndash; WhatsApp &ndash;&gt;-->
-<!--        <package android:name="com.whatsapp" />-->
-
-<!--        &lt;!&ndash; Generic UPI intent &ndash;&gt;-->
-<!--        <intent>-->
-<!--            <action android:name="android.intent.action.VIEW" />-->
-<!--            <category android:name="android.intent.category.BROWSABLE" />-->
-<!--            <data android:scheme="upi" />-->
-<!--        </intent>-->
-<!--    </queries>-->
-
-
-<!--    &lt;!&ndash; ✅ SMS Permissions for OTP Auto-read (User Consent API) &ndash;&gt;-->
-<!--    <uses-permission android:name="android.permission.RECEIVE_SMS" />-->
-
-<!--    &lt;!&ndash; Telephony feature (optional) &ndash;&gt;-->
-<!--    <uses-feature android:name="android.hardware.telephony" android:required="false" />-->
-
-<!--    <application-->
-<!--        android:name=".MainApplication"-->
-<!--        android:allowBackup="true"-->
-<!--        android:icon="@mipmap/ic_launcher"-->
-<!--        android:label="@string/app_name"-->
-<!--        android:roundIcon="@mipmap/ic_launcher_round"-->
-<!--        android:supportsRtl="true"-->
-<!--        android:theme="@android:style/Theme.Material.Light.NoActionBar">-->
-
-<!--        <provider-->
-<!--            android:name="androidx.core.content.FileProvider"-->
-<!--            android:authorities="${applicationId}.fileprovider"-->
-<!--            android:exported="false"-->
-<!--            android:grantUriPermissions="true">-->
-<!--            <meta-data-->
-<!--                android:name="android.support.FILE_PROVIDER_PATHS"-->
-<!--                android:resource="@xml/file_paths" />-->
-<!--        </provider>-->
-
-<!--        &lt;!&ndash; Add inside <application> tag &ndash;&gt;-->
-<!--        <activity-->
-<!--            android:name="com.developer.ev2z.phonepe.PaymentHandlerActivity"-->
-<!--            android:exported="false"-->
-<!--            android:launchMode="singleTop"-->
-<!--            android:theme="@android:style/Theme.Translucent.NoTitleBar" />-->
-
-<!--        <activity-->
-<!--            android:name=".MainActivity"-->
-<!--            android:exported="true"-->
-<!--            android:launchMode="singleTop">-->
-
-<!--            &lt;!&ndash; ✅ LAUNCHER &ndash;&gt;-->
-<!--            <intent-filter>-->
-<!--                <action android:name="android.intent.action.MAIN" />-->
-<!--                <category android:name="android.intent.category.LAUNCHER" />-->
-<!--            </intent-filter>-->
-
-<!--            &lt;!&ndash; ✅ PhonePe CALLBACK &ndash;&gt;-->
-<!--            <intent-filter>-->
-<!--                <action android:name="android.intent.action.VIEW" />-->
-<!--                <category android:name="android.intent.category.DEFAULT" />-->
-<!--                <category android:name="android.intent.category.BROWSABLE" />-->
-
-<!--                &lt;!&ndash; MUST MATCH backend redirectUrl &ndash;&gt;-->
-<!--                <data-->
-<!--                    android:scheme="ev2z"-->
-<!--                    android:host="payment"-->
-<!--                    android:pathPrefix="/callback" />-->
-<!--            </intent-filter>-->
-
-
-<!--        </activity>-->
-
-<!--        <meta-data-->
-<!--            android:name="com.google.android.geo.API_KEY"-->
-<!--            android:value="AIzaSyDJLtuwZbTCHxEriYAjfDf5gYT3a7s4a20"/>-->
-<!--    </application>-->
-
-<!--</manifest>-->
