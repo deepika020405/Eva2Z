@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import com.developer.ev2z.util.Analytics
 import com.developer.ev2z.util.rememberImagePicker
 
 class CreatePostScreen : Screen {
@@ -39,6 +40,12 @@ class CreatePostScreen : Screen {
         var showImagePickerOptions by remember { mutableStateOf(false) }
 
         val viewModel = CommunityViewModelProvider.viewModel
+
+        LaunchedEffect(Unit) {
+            Analytics.logEvent(
+                name = "create_post_screen_view"
+            )
+        }
 
         // ✅ EXISTING cross-platform picker
         val imagePickerLauncher = rememberImagePicker { imageBytes ->

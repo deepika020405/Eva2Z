@@ -68,6 +68,7 @@ import com.developer.ev2z.response.Comment
 import com.developer.ev2z.response.Post
 import com.developer.ev2z.response.Story
 import com.developer.ev2z.response.Users
+import com.developer.ev2z.util.Analytics
 import io.ktor.util.date.getTimeMillis
 import kotlinx.coroutines.delay
 import kotlinx.datetime.*
@@ -1071,7 +1072,11 @@ class CommunityScreenWrapper : Screen {
         val navigator = LocalNavigator.currentOrThrow
         var openCommentsPostId by remember { mutableStateOf<Int?>(null) }
 
-
+        LaunchedEffect(Unit) {
+            Analytics.logEvent(
+                name = "community_screen_view"
+            )
+        }
 
         // 👇 refresh-aware API call
         val refreshKey = viewModel.observeRefreshKey()

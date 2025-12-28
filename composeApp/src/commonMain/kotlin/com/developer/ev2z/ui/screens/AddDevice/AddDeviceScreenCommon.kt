@@ -25,6 +25,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.developer.ev2z.util.Analytics
 
 private val primaryContainerLight = Color(0xFF00C853)
 
@@ -36,6 +37,13 @@ fun BottomSheetCommon(
     cameraScreen: @Composable () -> Unit
 ) {
     var currentScreen by remember { mutableStateOf("scan") }
+
+    LaunchedEffect(Unit) {
+        Analytics.logEvent(
+            name = "add_device_screen_view"
+        )
+    }
+
 
     if (currentScreen == "details") {
         AddDeviceDetailsCommon(
