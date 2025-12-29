@@ -42,7 +42,11 @@ fun LoginScreen(
 
     LaunchedEffect(Unit) {
         Analytics.logEvent(
-            name = "login_screen_view"
+            name = "screen_view",
+            params = mapOf(
+                "screen_name" to "login_screen",
+                "screen_class" to "LoginScreen"
+            )
         )
     }
 
