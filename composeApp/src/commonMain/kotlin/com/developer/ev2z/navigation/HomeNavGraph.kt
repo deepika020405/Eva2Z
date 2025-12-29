@@ -35,7 +35,7 @@ import com.developer.ev2z.ui.screens.community.CommunityScreenWrapper
 import com.developer.ev2z.ui.screens.market_screen.ShopViewModel
 import com.developer.ev2z.ui.screens.GeneralSettings.GeneralSettingsScreen
 import com.developer.ev2z.ui.screens.AccountActivity.AccountActivityScreen
-import com.developer.ev2z.ui.screens.GPSData.GPSDataScreen
+//import com.developer.ev2z.ui.screens.GPSData.GPSDataScreen
 import com.developer.ev2z.ui.screens.Profile.AboutAppScreen
 import com.developer.ev2z.ui.screens.ReferAndEarn.ReferAndEarnScreen
 import kotlinx.coroutines.CoroutineScope
@@ -258,14 +258,14 @@ fun HomeNavGraph(
             )
         }
         // GPS Data Screen
-        if (showGPSData) {
-            GPSDataScreen(
-                apiService = apiService,
-                storageManager = storageManager,
-//                onBackClick = {showGPSData = false },
-                onBackPressed = { showGPSData = false }
-            )
-        }
+//        if (showGPSData) {
+//            GPSDataScreen(
+//                apiService = apiService,
+//                storageManager = storageManager,
+////                onBackClick = {showGPSData = false },
+//                onBackPressed = { showGPSData = false }
+//            )
+//        }
 
         // Edit Device Name Screen
         if (showEditDeviceName) {
