@@ -35,6 +35,7 @@ import com.developer.ev2z.BackPressHandler
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
 import com.developer.ev2z.response.Device
 import com.developer.ev2z.response.DeviceAnalyticsData
+import com.developer.ev2z.util.Analytics
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
 import org.jetbrains.compose.resources.painterResource
@@ -73,6 +74,13 @@ fun DeviceReportScreen(
     BackPressHandler { onBack() }
 
     LaunchedEffect(Unit) {
+        Analytics.logEvent(
+            name = "screen_view",
+            params = mapOf(
+                "screen_name" to "device_report_screen",
+                "screen_class" to "DeviceReportScreen"
+            )
+        )
         viewModel.fetchMyDevices(token)
     }
 
@@ -143,19 +151,6 @@ fun DeviceReportContent(
                 zoom = 15.0
             )
         }
-//        PlatformMapView(
-//            modifier = Modifier.fillMaxSize(),
-//            latitude =  liveLocation?.data?.latestLocation?.latitude?.toDoubleOrNull() ?: 0.0,
-//            longitude =  liveLocation?.data?.latestLocation?.longitude?.toDoubleOrNull() ?: 0.0,
-//            zoom = 15.0
-//        )
-        // Map Marker Chip showing selected device
-//        if (selectedDevice != null && liveLocation != null) {
-////            MapMarkerChipWithData(
-////                deviceName = selectedDevice.device_name,
-////                speed = liveLocation.data?.latestLocation?.speed?.toString() ?: "0"
-////            )
-//        }
 
         // TOP BAR
         TopDeviceBoxWithData(
