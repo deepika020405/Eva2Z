@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import cafe.adriel.voyager.navigator.LocalNavigator
+import com.developer.ev2z.util.Analytics
 
 class ProductDetailsScreen(
     val product: ShopProduct
@@ -31,6 +32,7 @@ class ProductDetailsScreen(
         val viewModel = ShopViewModelProvider.viewModel
         ProductDetailsContent(product, viewModel)
     }
+
 }
 
 @Composable
@@ -46,6 +48,19 @@ fun ProductDetailsContent(
     val finalPrice = product.price + if (withRecharge) product.rechargePrice else 0.0
     val fakeOldPrice = (finalPrice * 1.5).toInt() // Example old price = +50%
     val discountPercent = (((fakeOldPrice - finalPrice) / fakeOldPrice) * 100).toInt()
+
+    LaunchedEffect(Unit) {
+        Analytics.logEvent(
+            name = "screen_view",
+            params = mapOf(
+                "screen_name" to "product_details",
+                "screen_class" to "ProductDetailsScreen",
+                "item_id" to product.id,
+                "item_name" to product.title,
+                "item_category" to "iot_devices"
+            )
+        )
+    }
 
     Box(Modifier.fillMaxSize()) {
 
@@ -147,7 +162,17 @@ fun ProductDetailsContent(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(
                             checked = withRecharge,
-                            onCheckedChange = { withRecharge = it }
+                            onCheckedChange = { withRecharge = it
+                                Analytics.logEvent(
+                                    name = "select_item",
+                                    params = mapOf(
+                                        "item_id" to product.id,
+                                        "item_name" to product.title,
+                                        "selection_type" to "recharge",
+                                        "selection_value" to if (it) "with_recharge" else "without_recharge"
+                                    )
+                                )
+                            }
                         )
                         Text("With Recharge (+₹${product.rechargePrice.toInt()})")
                     }
@@ -162,13 +187,37 @@ fun ProductDetailsContent(
                     Row {
                         FilterChip(
                             selected = selectedType == "android",
-                            onClick = { selectedType = "android" },
+                            onClick = {
+                                selectedType = "android"
+
+                                Analytics.logEvent(
+                                    name = "select_item",
+                                    params = mapOf(
+                                        "item_id" to product.id,
+                                        "item_name" to product.title,
+                                        "selection_type" to "device_type",
+                                        "selection_value" to "android"
+                                    )
+                                )
+                            },
                             label = { Text("Android") }
                         )
                         Spacer(Modifier.width(12.dp))
                         FilterChip(
                             selected = selectedType == "ios",
-                            onClick = { selectedType = "ios" },
+                            onClick = {
+                                selectedType = "ios"
+
+                                Analytics.logEvent(
+                                    name = "select_item",
+                                    params = mapOf(
+                                        "item_id" to product.id,
+                                        "item_name" to product.title,
+                                        "selection_type" to "device_type",
+                                        "selection_value" to "ios"
+                                    )
+                                )
+                            },
                             label = { Text("iOS") }
                         )
                     }
@@ -209,6 +258,27 @@ fun ProductDetailsContent(
                         } else {
                             null   // ⭐ For all other products, DO NOT send plan_type
                         }
+                    Analytics.logEvent(
+                        name = "add_to_cart",
+                        params = mapOf(
+                            "currency" to "INR",
+                            "value" to finalPrice,
+
+                            // Item level details
+                            "item_id" to product.id,
+                            "item_name" to product.title,
+                            "item_category" to "iot_devices",
+                            "item_variant" to (selectedType ?: "default"),
+                            "price" to finalPrice,
+                            "quantity" to 1,
+
+                            // Custom useful params
+                            "with_recharge" to withRecharge,
+                            "recharge_price" to product.rechargePrice,
+                            "device_type" to (selectedType ?: ""),
+                            "promo_code" to product.promoCode
+                        )
+                    )
 
                     viewModel.addToCart(
                         add = "add",
@@ -227,6 +297,20 @@ fun ProductDetailsContent(
             ) {
                 Text("Add to Cart", fontSize = 16.sp)
             }
+        }
+
+        LaunchedEffect(Unit) {
+            Analytics.logEvent(
+                name = "view_item",
+                params = mapOf(
+                    "currency" to "INR",
+                    "value" to product.price,
+                    "item_id" to product.id,
+                    "item_name" to product.title,
+                    "item_category" to "iot_devices",
+                    "item_variant" to product.deviceType
+                )
+            )
         }
     }
 }
