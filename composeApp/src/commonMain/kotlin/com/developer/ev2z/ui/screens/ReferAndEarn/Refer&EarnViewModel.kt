@@ -3,7 +3,6 @@ package com.developer.ev2z.ui.screens.ReferAndEarn
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.developer.ev2z.network.ApiService
-import com.developer.ev2z.response.ReferralCodeResponse
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,11 +12,15 @@ sealed class ReferralUiState {
     object Loading : ReferralUiState()
     data class Success(
         val referralCode: String,
+        val referralAmount: Int,
+        val referralBalance: String,
         val hasDevice: Boolean = true
     ) : ReferralUiState()
+    data class NoDevice(
+        val message: String
+    ) : ReferralUiState()
     data class Error(
-        val message: String,
-        val hasDevice: Boolean = false
+        val message: String
     ) : ReferralUiState()
 }
 
@@ -39,23 +42,35 @@ class ReferAndEarnViewModel(
                 val response = apiService.getReferralCode(token)
 
                 if (response.success && response.referral_code != null) {
+                    // ✅ Ready for API update - uncomment when API is updated
+                    /*
                     _uiState.value = ReferralUiState.Success(
                         referralCode = response.referral_code,
+                        referralAmount = response.referral_amount ?: 150,
+                        referralBalance = response.referral_balance ?: "0",
                         hasDevice = true
                     )
+                    */
+
+                    // ✅ Current implementation - comment out when API is updated
+                    _uiState.value = ReferralUiState.Success(
+                        referralCode = response.referral_code,
+                        referralAmount = 150, // Hardcoded for now
+                        referralBalance = "450", // Hardcoded for now
+                        hasDevice = true
+                    )
+
                     println("✅ Referral code loaded: ${response.referral_code}")
                 } else {
-                    // User doesn't have device
-                    _uiState.value = ReferralUiState.Error(
-                        message = response.message ?: "You need to add at least one device first",
-                        hasDevice = false
+                    // ✅ User doesn't have device - show NoDevice state
+                    _uiState.value = ReferralUiState.NoDevice(
+                        message = response.message ?: "You need to add at least one device before sharing referral code."
                     )
                     println("⚠️ No device found for referral")
                 }
             } catch (e: Exception) {
                 _uiState.value = ReferralUiState.Error(
-                    message = "Failed to load referral code: ${e.message}",
-                    hasDevice = false
+                    message = "Failed to load referral code: ${e.message}"
                 )
                 println("❌ Error loading referral code: ${e.message}")
             }
@@ -70,9 +85,10 @@ class ReferAndEarnViewModel(
         _showCopySnackbar.value = false
     }
 
-    fun getReferralMessage(referralCode: String): String {
+    // ✅ Dynamic referral amount in messages
+    fun getReferralMessage(referralCode: String, referralAmount: Int): String {
         return """
-            🎁 Join me on EVA2Z Connect and get ₹150 OFF!
+            🎁 Join me on EVA2Z Connect and get ₹$referralAmount OFF!
             
             EVA2Z Connect is the best GPS tracking app for your vehicles.
             
@@ -80,15 +96,15 @@ class ReferAndEarnViewModel(
             
             Download now: https://eva2z.in/download
             
-            Both of us will get ₹150 reward when you place your first order! 🎉
+            Both of us will get ₹$referralAmount reward when you place your first order! 🎉
         """.trimIndent()
     }
 
-    fun getWhatsAppMessage(referralCode: String): String {
+    fun getWhatsAppMessage(referralCode: String, referralAmount: Int): String {
         return "🎁 *Join me on EVA2Z Connect!*\n\n" +
-                "Get *₹150 OFF* on your first order!\n\n" +
+                "Get *₹$referralAmount OFF* on your first order!\n\n" +
                 "Use my referral code: *$referralCode*\n\n" +
                 "Download: https://eva2z.in/download\n\n" +
-                "Both of us will get ₹150 reward! 🎉"
+                "Both of us will get ₹$referralAmount reward! 🎉"
     }
 }

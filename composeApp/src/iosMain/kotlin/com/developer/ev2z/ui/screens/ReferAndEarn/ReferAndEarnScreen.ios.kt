@@ -3,6 +3,9 @@ package com.developer.ev2z.ui.screens.ReferAndEarn
 import platform.Foundation.NSURL
 import platform.UIKit.UIActivityViewController
 import platform.UIKit.UIApplication
+import platform.MessageUI.MFMessageComposeViewController
+import platform.MessageUI.MFMessageComposeViewControllerDelegateProtocol
+import platform.darwin.NSObject
 
 actual fun shareViaWhatsApp(context: Any?, message: String) {
     try {
@@ -48,5 +51,32 @@ actual fun shareViaOther(context: Any?, message: String) {
         println("✅ Opening iOS share sheet")
     } catch (e: Exception) {
         println("❌ Share failed: ${e.message}")
+    }
+}
+
+// ✅ NEW: Contact Picker for iOS
+actual fun openContactPicker(context: Any?, message: String) {
+    try {
+        // For iOS, we'll use the Messages app with pre-filled text
+        // The user can then select contacts from within the Messages app
+
+        val smsURL = "sms:&body=${message.addingPercentEncodingWithAllowedCharacters(
+            NSCharacterSet.URLQueryAllowedCharacterSet
+        )}"
+
+        val url = NSURL(string = smsURL)
+
+        if (UIApplication.sharedApplication.canOpenURL(url)) {
+            UIApplication.sharedApplication.openURL(url)
+            println("✅ Opening Messages app")
+        } else {
+            // Fallback to generic share
+            shareViaOther(context, message)
+            println("⚠️ Cannot open Messages, using generic share")
+        }
+    } catch (e: Exception) {
+        println("❌ Contact picker failed: ${e.message}")
+        // Fallback to generic share
+        shareViaOther(context, message)
     }
 }
