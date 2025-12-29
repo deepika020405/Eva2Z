@@ -380,7 +380,6 @@ fun ShopScreenHost() {
 
     LaunchedEffect(state.products) {
         if (state.products.isNotEmpty()) {
-
             Analytics.logEvent(
                 name = "view_item_list",
                 params = mapOf(
@@ -389,8 +388,9 @@ fun ShopScreenHost() {
                     "currency" to "INR",
                     "items" to state.products.mapIndexed { index, p ->
                         mapOf(
-                            "item_id" to p.id,
-                            "item_name" to p.name,
+                            "item_id" to p.id.toString(),
+                            "item_name" to (p.name ?: ""),
+                            "item_brand" to "EVA2Z",
                             "item_category" to "iot_devices",
                             "item_variant" to (p.device_type ?: ""),
                             "price" to (p.sale_price?.toDoubleOrNull() ?: 0.0),
@@ -426,6 +426,23 @@ fun ShopScreenHost() {
         cartCount = state.cartCount,
         onToggleFavorite = { p ->
             viewModel.toggleWishlist(p.id.toInt())
+
+            Analytics.logEvent(
+                name = "add_to_wishlist",
+                params = mapOf(
+                    "currency" to "INR",
+                    "items" to listOf(
+                        mapOf(
+                            "item_id" to p.id.toString(),
+                            "item_name" to p.title,
+                            "item_brand" to "EVA2Z",
+                            "item_category" to "iot_devices",
+                            "item_variant" to p.subtitle,
+                            "price" to p.price
+                        )
+                    )
+                )
+            )
         },
         onCartClick = {
             println("🛒 Cart clicked")
