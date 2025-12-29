@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.navigator.LocalNavigator
 import coil3.compose.AsyncImage
+import com.developer.ev2z.util.Analytics
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo // apna drawable
 import eva2z_connect_multiplatform.composeapp.generated.resources.shop_banner
@@ -353,11 +354,23 @@ fun ShopScreenHost() {
     val navigator = LocalNavigator.current
 
     // ✅ Debug: Check if navigator is null
+//    LaunchedEffect(Unit) {
+//        println("🔍 Navigator is: ${if (navigator == null) "NULL ❌" else "Available ✅"}")
+//        viewModel.loadData()
+//    }
     LaunchedEffect(Unit) {
-        println("🔍 Navigator is: ${if (navigator == null) "NULL ❌" else "Available ✅"}")
+        Analytics.logEvent(
+            name = "screen_view",
+            params = mapOf(
+                "screen_name" to "shop_screen",
+                "screen_class" to "ShopScreen",
+                "item_category" to "iot_devices",
+                "source" to "home_or_menu" // agar pata ho
+            )
+        )
+
         viewModel.loadData()
     }
-
     if (state.loading) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
@@ -365,6 +378,29 @@ fun ShopScreenHost() {
         return
     }
 
+    LaunchedEffect(state.products) {
+        if (state.products.isNotEmpty()) {
+
+            Analytics.logEvent(
+                name = "view_item_list",
+                params = mapOf(
+                    "item_list_id" to "shop_device_list",
+                    "item_list_name" to "Location Tracker Device",
+                    "currency" to "INR",
+                    "items" to state.products.mapIndexed { index, p ->
+                        mapOf(
+                            "item_id" to p.id,
+                            "item_name" to p.name,
+                            "item_category" to "iot_devices",
+                            "item_variant" to (p.device_type ?: ""),
+                            "price" to (p.sale_price?.toDoubleOrNull() ?: 0.0),
+                            "index" to index
+                        )
+                    }
+                )
+            )
+        }
+    }
     ShopScreen(
         products = state.products.map { dto ->
             ShopProduct(
