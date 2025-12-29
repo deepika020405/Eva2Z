@@ -10,6 +10,7 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.developer.ev2z.BackPressHandler
+import com.developer.ev2z.util.Analytics
 
 class AddNewAddressScreen : Screen {
 
@@ -18,6 +19,16 @@ class AddNewAddressScreen : Screen {
         val viewModel = ShopViewModelProvider.viewModel
 
         val navigator = LocalNavigator.currentOrThrow
+
+        LaunchedEffect(Unit) {
+            Analytics.logEvent(
+                name = "screen_view",
+                params = mapOf(
+                    "screen_name" to "add_shipping_address",
+                    "screen_class" to "AddNewAddressScreen"
+                )
+            )
+        }
 
         BackPressHandler { navigator.pop() }  // ← back button closes screen
 
@@ -33,6 +44,16 @@ class AddNewAddressScreen : Screen {
                     state = state,
                     pincode = pincode
                 ) {
+                    Analytics.logEvent(
+                        name = "add_shipping_info",
+                        params = mapOf(
+                            "shipping_city" to city,
+                            "shipping_state" to state,
+                            "shipping_pincode" to pincode,
+                            "country" to "IN"
+                        )
+                    )
+
                     navigator.pop()  // screen close
                 }
             },
