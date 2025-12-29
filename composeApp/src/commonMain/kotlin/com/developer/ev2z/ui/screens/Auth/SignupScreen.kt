@@ -49,7 +49,11 @@ fun SignupScreen(
 
     LaunchedEffect(Unit) {
         Analytics.logEvent(
-            name = "signup_screen_view"
+            name = "screen_view",
+            params = mapOf(
+                "screen_name" to "sign_up_screen",
+                "screen_class" to "SignupScreen"
+            )
         )
     }
 
