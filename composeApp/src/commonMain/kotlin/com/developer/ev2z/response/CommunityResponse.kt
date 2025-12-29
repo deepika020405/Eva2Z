@@ -18,7 +18,7 @@ data class Post(
     val comments_count: Int,
     val likes_count: Int,
     val liked: Boolean,
-    val user: Users
+    val user: Users? = null,   // ✅ IMPORTANT
 )
 
 @Serializable

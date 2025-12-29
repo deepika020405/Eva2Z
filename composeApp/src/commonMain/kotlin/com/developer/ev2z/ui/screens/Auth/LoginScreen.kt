@@ -15,6 +15,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.request.LoginRequest
+import com.developer.ev2z.util.Analytics
 import com.developer.ev2z.viewmodel.AuthViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -38,6 +39,12 @@ fun LoginScreen(
     val error by viewModel.error.collectAsState()
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        Analytics.logEvent(
+            name = "login_screen_view"
+        )
+    }
 
     // ✅ SIMPLE 3 CASES
     LaunchedEffect(error) {
@@ -239,10 +246,35 @@ fun LoginScreen(
         Spacer(modifier = Modifier.height(32.dp))
     }
 
+//    LaunchedEffect(loginSuccess) {
+//        if (loginSuccess) {
+//            onLoginSuccess()
+//            viewModel.resetLoginSuccess()
+//        }
+//    }
     LaunchedEffect(loginSuccess) {
         if (loginSuccess) {
+
+            Analytics.logEvent(
+                name = "login_success",
+                params = mapOf(
+                    "login_method" to "password",
+                    "country_code" to "IN",
+                    "phone_masked" to maskPhone(phoneNumber),
+                    "user_name" to viewModel.userName, // ya first name
+                )
+            )
+
             onLoginSuccess()
             viewModel.resetLoginSuccess()
         }
     }
+
+}
+
+fun maskPhone(phone: String): String {
+    return if (phone.length >= 4)
+        "XXXXXX${phone.takeLast(4)}"
+    else
+        "XXXX"
 }

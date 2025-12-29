@@ -37,6 +37,12 @@ class AuthViewModel(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
+    // User info state
+    private val _userName = MutableStateFlow<String?>(null)
+    val userName: StateFlow<String?> = _userName
+
+
+
     // ============================================
     // LOGIN
     // ============================================
@@ -68,6 +74,8 @@ class AuthViewModel(
 
                 _loginSuccess.value = true
                 println("🔥 Login success set to true")
+
+                _userName.value = result.user.name
 
             } catch (e: Exception) {
                 println("❌ Login error: ${e.message}")

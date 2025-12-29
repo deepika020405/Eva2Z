@@ -1,6 +1,7 @@
 // androidMain
 package com.developer.ev2z.upi
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -9,31 +10,32 @@ import com.developer.ev2z.data.local.model.UpiApp
 lateinit var appContext: Context   // init once from Application
 
 actual fun launchUpiPayment(
+    activity: Any,
     app: UpiApp,
     amount: String,
     txnId: String,
     onResult: (Boolean) -> Unit
 ) {
-    val cleanTxnId = "EV2Z${System.currentTimeMillis()}"
+    val act = activity as Activity
+
+    val formattedAmount = "%.2f".format(amount.toDouble())
 
     val uri = Uri.parse(
         "upi://pay" +
                 "?pa=9990758825@ptyes" +
                 "&pn=EV2Z" +
-                "&tr=$cleanTxnId" +
-                "&am=$amount" +
+                "&tr=$txnId" +
+                "&am=$formattedAmount" +
                 "&cu=INR"
     )
 
     val intent = Intent(Intent.ACTION_VIEW, uri).apply {
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        setPackage(app.packageName)
     }
 
     try {
-        appContext.startActivity(intent)
-
-        // ⚠️ DO NOT call success/failure here
-        onResult(true) // means "UPI APP OPENED"
+        act.startActivity(intent)
+        onResult(true)
     } catch (e: Exception) {
         onResult(false)
     }

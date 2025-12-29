@@ -53,13 +53,13 @@ import coil3.compose.AsyncImage
 import com.developer.ev2z.getPlatformContext
 import com.developer.ev2z.response.CartItemDto
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.runtime.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.animation.core.animateIntOffsetAsState
 import androidx.compose.foundation.layout.offset
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import com.developer.ev2z.data.local.model.UpiApp
@@ -724,11 +724,98 @@ fun SummaryRow(label: String, value: String, isBold: Boolean = false) {
     }
 }
 
+//@Composable
+//fun CheckoutBottomBar(viewModel: ShopViewModel) {
+//    val state by viewModel.state.collectAsState()
+//    val paymentState by viewModel.paymentState.collectAsState()
+//    val context = getPlatformContext()!! // returns Activity on Android
+//
+//
+//    var showUpiSheet by remember { mutableStateOf(false) } // 👈 OUTSIDE
+//    val navigator = LocalNavigator.currentOrThrow  // ✅ ADD THIS
+//
+//    Box(
+//        Modifier
+//            .fillMaxWidth()
+//            .padding(16.dp)
+//    ) {
+//        Row(
+//            Modifier
+//                .fillMaxWidth()
+//                .clip(RoundedCornerShape(30.dp))
+//                .background(Color.White)
+//                .padding(16.dp),
+//            horizontalArrangement = Arrangement.SpaceBetween,
+//            verticalAlignment = Alignment.CenterVertically
+//        ) {
+//            Column {
+//                Text("Total Amount", color = Color.Gray)
+//                Text(
+//                    "₹${state.finalAmount ?: state.totalPrice ?: "0"}",
+//                    fontSize = 20.sp,
+//                    fontWeight = FontWeight.Bold
+//                )
+//            }
+//
+//            if (paymentState is PaymentState.Processing) {
+//                CircularProgressIndicator(
+//                    modifier = Modifier.size(36.dp),
+//                    strokeWidth = 3.dp
+//                )
+//            } else {
+//                // ✅ CORRECT: Navigate to PaymentScreen
+//                Button(
+//                    onClick = {
+//                        navigator.push(PaymentScreen())
+//                    },
+//                    shape = RoundedCornerShape(30.dp)
+//                ) {
+//                    Text("Checkout")
+//                }
+//            }
+//        }
+//    }
+//
+//
+////    if (showUpiSheet) {
+////        UpiBottomSheet(
+////            amount = state.finalAmount ?: state.totalPrice ?: "0",
+////            onAppClick = { app ->
+////
+////                // ✅ Close sheet immediately
+////                showUpiSheet = false
+////
+////                viewModel.createOrder { txnId ->
+////
+////
+////                    launchUpiPayment(
+////                        activity = context,
+////                        app = app,
+////                        amount = state.finalAmount ?: state.totalPrice ?: "0",
+////                        txnId = txnId
+////                    ) {
+////                        viewModel.markPaymentPending(txnId)
+////                    }
+////
+////                }
+////            },
+////            onDismiss = { showUpiSheet = false }
+////        )
+////    }
+//
+//}
+
+
 @Composable
 fun CheckoutBottomBar(viewModel: ShopViewModel) {
     val state by viewModel.state.collectAsState()
     val paymentState by viewModel.paymentState.collectAsState()
-    val navigator = LocalNavigator.currentOrThrow  // ✅ ADD THIS
+    val navigator = LocalNavigator.currentOrThrow
+
+    // 👇 Android-only, SAFE
+//    val context = remember {
+//        runCatching { getPlatformContext() }.getOrNull()
+//    }
 
     Box(
         Modifier
@@ -759,7 +846,6 @@ fun CheckoutBottomBar(viewModel: ShopViewModel) {
                     strokeWidth = 3.dp
                 )
             } else {
-                // ✅ CORRECT: Navigate to PaymentScreen
                 Button(
                     onClick = {
                         navigator.push(PaymentScreen())
@@ -772,7 +858,6 @@ fun CheckoutBottomBar(viewModel: ShopViewModel) {
         }
     }
 }
-
 
 //@Composable
 //fun CheckoutBottomBar(viewModel: ShopViewModel) {

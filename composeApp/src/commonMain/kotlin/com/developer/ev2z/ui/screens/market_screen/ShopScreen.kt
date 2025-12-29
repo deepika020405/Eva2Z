@@ -29,6 +29,7 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import coil3.compose.AsyncImage
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo // apna drawable
+import eva2z_connect_multiplatform.composeapp.generated.resources.shop_banner
 import org.jetbrains.compose.resources.painterResource
 
 // ------------ DATA MODEL ------------
@@ -160,6 +161,32 @@ private fun ShopTopBar() {
 
 // ------------ BANNER ------------
 
+//@Composable
+//private fun ShopBanner() {
+//    Card(
+//        modifier = Modifier
+//            .fillMaxWidth()
+//            .padding(horizontal = 16.dp),
+//        shape = RoundedCornerShape(18.dp),
+//        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+//        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+//    ) {
+//        Box(
+//            modifier = Modifier
+//                .height(140.dp)
+//                .fillMaxWidth()
+//                .background(
+//                    brush = Brush.linearGradient(
+//                        listOf(
+//                            Color(0xFFAAFFB9),
+//                            Color(0xFF59E37C)
+//                        )
+//                    )
+//                )
+//        )
+//    }
+//}
+
 @Composable
 private fun ShopBanner() {
     Card(
@@ -170,18 +197,13 @@ private fun ShopBanner() {
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        Box(
+        Image(
+            painter = painterResource(Res.drawable.shop_banner),
+            contentDescription = "Shop Banner",
             modifier = Modifier
                 .height(140.dp)
-                .fillMaxWidth()
-                .background(
-                    brush = Brush.linearGradient(
-                        listOf(
-                            Color(0xFFAAFFB9),
-                            Color(0xFF59E37C)
-                        )
-                    )
-                )
+                .fillMaxWidth(),
+            contentScale = ContentScale.Crop   // 👈 image properly fill ho jayegi
         )
     }
 }

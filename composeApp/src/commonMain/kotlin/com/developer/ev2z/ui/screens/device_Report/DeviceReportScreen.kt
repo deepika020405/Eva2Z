@@ -132,12 +132,23 @@ fun DeviceReportContent(
     ) {
         // Map Area (You can integrate Google Maps here later)
 //        MapArea()
-        PlatformMapView(
-            modifier = Modifier.fillMaxSize(),
-            latitude =  liveLocation?.data?.latestLocation?.latitude?.toDoubleOrNull() ?: 0.0,
-            longitude =  liveLocation?.data?.latestLocation?.longitude?.toDoubleOrNull() ?: 0.0,
-            zoom = 15.0
-        )
+        val lat = liveLocation?.data?.latestLocation?.latitude?.toDoubleOrNull()
+        val lng = liveLocation?.data?.latestLocation?.longitude?.toDoubleOrNull()
+
+        if (lat != null && lng != null) {
+            PlatformMapView(
+                modifier = Modifier.fillMaxSize(),
+                latitude = lat,
+                longitude = lng,
+                zoom = 15.0
+            )
+        }
+//        PlatformMapView(
+//            modifier = Modifier.fillMaxSize(),
+//            latitude =  liveLocation?.data?.latestLocation?.latitude?.toDoubleOrNull() ?: 0.0,
+//            longitude =  liveLocation?.data?.latestLocation?.longitude?.toDoubleOrNull() ?: 0.0,
+//            zoom = 15.0
+//        )
         // Map Marker Chip showing selected device
 //        if (selectedDevice != null && liveLocation != null) {
 ////            MapMarkerChipWithData(
@@ -757,9 +768,17 @@ fun DeviceAnalysisContentWithData(
     val isLoading by viewModel.isAnalyticsLoading.collectAsState()
 
     // First load (default today)
-    LaunchedEffect(Unit) {
-        val deviceId = viewModel.selectedDevice.value?.device_id
-        if (deviceId != null) {
+//    LaunchedEffect(Unit) {
+//        val deviceId = viewModel.selectedDevice.value?.device_id
+//        if (deviceId != null) {
+//            viewModel.fetchDeviceAnalytics(token, deviceId, selectedRange)
+//        }
+//    }
+    val selectedDevice by viewModel.selectedDevice.collectAsState()
+
+    LaunchedEffect(selectedDevice, selectedRange) {
+        val deviceId = selectedDevice?.device_id
+        if (!deviceId.isNullOrBlank()) {
             viewModel.fetchDeviceAnalytics(token, deviceId, selectedRange)
         }
     }

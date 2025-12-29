@@ -6,7 +6,6 @@ import com.developer.ev2z.request.CartAddRequest
 import com.developer.ev2z.request.CommentRequest
 import com.developer.ev2z.request.CreateOrderRequest
 import com.developer.ev2z.request.DeviceAnalyticsRequest
-import com.developer.ev2z.request.LoginRequest
 import com.developer.ev2z.response.*
 import com.developer.ev2z.util.AppTokenProvider
 import io.ktor.client.call.*
@@ -1190,5 +1189,174 @@ class ApiService {
             header(HttpHeaders.Authorization, "Bearer $token")
         }.body()
     }
+
+
+    suspend fun getGeoFences(): GeoFenceResponse {
+        val token = AppTokenProvider.getToken()
+
+        return client.post("${baseUrl}get-geofences") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+        }.body()
+    }
+
+
+    // ---------------- SAVE GEOFENCE ----------------
+    suspend fun saveGeoFence(
+        token: String,
+        deviceId: String,
+        name: String,
+        latitude: Double,
+        longitude: Double,
+        radius: Int
+    ): JsonObject {
+
+        val url = "${baseUrl}geofences"
+
+        println("🌐 API: Saving GeoFence")
+
+        return client.submitForm(
+            url = url,
+            formParameters = Parameters.build {
+                append("device_id", deviceId)
+                append("name", name)
+                append("latitude", latitude.toString())
+                append("longitude", longitude.toString())
+                append("radius", radius.toString())
+            }
+        ) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+        }.body()
+    }
+
+
+
+    suspend fun deleteGeoFence(
+        token: String,
+        geoFenceId: Int,
+        deviceId: String,
+        name: String,
+        latitude: String,
+        longitude: String,
+        radius: String
+    ): JsonObject {
+
+        return client.delete("${baseUrl}geofences/$geoFenceId") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+
+            setBody(
+                FormDataContent(
+                    Parameters.build {
+                        append("device_id", deviceId)
+                        append("name", name)
+                        append("latitude", latitude.toString())
+                        append("longitude", longitude.toString())
+                        append("radius", radius.toString())
+                    }
+                )
+            )
+        }.body()
+    }
+
+
+    // ApiService.kt
+
+    suspend fun updateGeoFence(
+        geoFenceId: Int,
+        token: String,
+        deviceId: String,
+        name: String,
+        latitude: String,
+        longitude: String,
+        radius: Int
+    ): JsonObject {
+
+        return client.submitForm(
+            url = "${baseUrl}geofences-update/$geoFenceId",
+            formParameters = Parameters.build {
+                append("device_id", deviceId)
+                append("name", name)
+                append("latitude", latitude.toString())
+                append("longitude", longitude.toString())
+                append("radius", radius.toString())
+            }
+        ) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+        }.body()
+    }
+
+
+    // ---------------- STORIES ----------------
+    suspend fun getStories(): StoryResponse {
+        val token = AppTokenProvider.getToken()
+
+        println("🌐 API: Fetching stories")
+
+        return client.get("${baseUrl}stories") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }.body()
+    }
+
+
+    // ---------------- ADD STORY ----------------
+    suspend fun addStory(
+        body: String,
+        media: List<ByteArray>
+    ): JsonObject {
+
+        val token = AppTokenProvider.getToken()
+        val url = "${baseUrl}stories"
+
+        println("🌐 API: Add Story")
+
+        return client.submitFormWithBinaryData(
+            url = url,
+            formData = formData {
+
+                // ✅ text body
+                append("body", body)
+
+                // ✅ images (media[])
+                media.forEachIndexed { index, bytes ->
+                    append(
+                        key = "media[]",
+                        value = bytes,
+                        headers = Headers.build {
+                            append(HttpHeaders.ContentType, "image/png")
+                            append(
+                                HttpHeaders.ContentDisposition,
+                                "filename=story_$index.png"
+                            )
+                        }
+                    )
+                }
+            }
+        ) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }.body()
+    }
+
+
+    // ---------------- STORY VIEW ----------------
+    suspend fun viewStory(storyId: Int): JsonObject {
+        val token = AppTokenProvider.getToken()
+
+        return client.post("${baseUrl}stories/$storyId/view") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }.body()
+    }
+
+    // ---------------- STORY VIEWERS ----------------
+    suspend fun getStoryViewers(storyId: Int): StoryViewersResponse {
+        val token = AppTokenProvider.getToken()
+
+        return client.get("${baseUrl}stories/$storyId/viewers") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }.body()
+    }
+
 }
 

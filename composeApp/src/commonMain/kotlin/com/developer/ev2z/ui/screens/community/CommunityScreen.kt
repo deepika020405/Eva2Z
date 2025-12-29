@@ -6,21 +6,24 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -28,9 +31,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -38,6 +41,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,28 +52,38 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import coil3.compose.AsyncImage
 import com.developer.ev2z.response.Comment
 import com.developer.ev2z.response.Post
+import com.developer.ev2z.response.Story
 import com.developer.ev2z.response.Users
+import com.developer.ev2z.util.Analytics
 import io.ktor.util.date.getTimeMillis
+import kotlinx.coroutines.delay
 import kotlinx.datetime.*
 import kotlin.time.ExperimentalTime
 
 @Composable
 fun CommunityScreen(
     posts: List<Post>,
+    stories: List<Story>,
+    authUserId: Int,
     onCreatePostClick: () -> Unit,
     onLikeClick: (Int) -> Unit,
-    onCommentClick: (Int) -> Unit
+    onCommentClick: (Int) -> Unit,
+    onAddStory: () -> Unit,
+    onStoryClick: (Story) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier
@@ -77,6 +91,16 @@ fun CommunityScreen(
             .background(Color(0xFFf2f5f0))
     ) {
          val BASE_IMAGE_URL = "https://gps.eva2z.in"
+
+        item {
+            StoriesRow(
+                stories = stories,
+                authUserId = authUserId,
+                onAddStory = onAddStory,
+                onStoryClick = onStoryClick
+            )
+
+        }
 
         item {
             CreatePostCard(onClick = onCreatePostClick)
@@ -371,7 +395,7 @@ private fun RowScope.ImageCell(
 
 @Composable
 fun PostHeader(
-    user: Users,
+    user: Users?,
     createdAt: String,
     BASE_IMAGE_URL: String
 ) {
@@ -385,7 +409,7 @@ fun PostHeader(
                 .background(Color(0xFFE0E0E0)),
             contentAlignment = Alignment.Center
         ) {
-            if (!user.photo.isNullOrEmpty()) {
+            if (!user?.photo.isNullOrEmpty()) {
 //
                 AsyncImage(
                     model = "$BASE_IMAGE_URL/storage/${user.photo}",
@@ -397,7 +421,7 @@ fun PostHeader(
                 )
             } else {
                 Text(
-                    text = user.name.firstOrNull()?.uppercase() ?: "U",
+                    text = user?.name?.firstOrNull()?.uppercase() ?: "U",
                     fontWeight = FontWeight.Bold,
                     color = Color.Gray
                 )
@@ -409,7 +433,7 @@ fun PostHeader(
         Spacer(Modifier.width(10.dp))
 
         Column {
-            Text(text = user.name, fontWeight = FontWeight.SemiBold)
+            Text(text = user?.name ?: "N/A", fontWeight = FontWeight.SemiBold)
             Text(
                 text = formatPostDateCmp(createdAt),
                 style = MaterialTheme.typography.labelSmall,
@@ -543,26 +567,122 @@ fun PostFooter(
 }
 
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun CommentBottomSheet(
-    postId: Int,
-    viewModel: CommunityViewModel,
-    onDismiss: () -> Unit
-) {
-
-    val state = viewModel.state
-    var input by remember { mutableStateOf("") }
-
-    LaunchedEffect(postId) {
-        viewModel.load(postId)
-    }
-
-//    ModalBottomSheet(onDismissRequest = onDismiss) {
-//        Column(Modifier.fillMaxHeight(0.9f)) {
+//@OptIn(ExperimentalMaterial3Api::class)
+//@Composable
+//fun CommentBottomSheet(
+//    postId: Int,
+//    viewModel: CommunityViewModel,
+//    onDismiss: () -> Unit
+//) {
 //
+//    val state = viewModel.state
+//    var input by remember { mutableStateOf("") }
+//
+//    LaunchedEffect(postId) {
+//        viewModel.load(postId)
+//    }
+//
+//
+////    ModalBottomSheet(
+////        onDismissRequest = onDismiss
+////    ) {
+////        Column(
+////            modifier = Modifier
+////                .fillMaxHeight(0.95f)
+////                .imePadding()          // 👈 🔥 KEY LINE
+////        ) {
+////
+////            // 🔹 TOP BAR
+////            Text(
+////                "Comments",
+////                fontWeight = FontWeight.Bold,
+////                modifier = Modifier
+////                    .align(Alignment.CenterHorizontally)
+////                    .padding(vertical = 12.dp)
+////            )
+////
+////            Divider()
+////
+////            LazyColumn(
+////                modifier = Modifier.weight(1f)
+////            ) {
+////                items(state.comments) { comment ->
+////                    CommentItem(
+////                        comment = comment,
+////                        isReply = comment.parent_id != null,
+////                        onLike = {
+////                            viewModel.like(comment.id, postId)
+////                        },
+////                        onReply = {
+////                            viewModel.setReply(comment)
+////                        },
+////                        onRemoveReplyTag = {
+////                            viewModel.clearReply()
+////                        }
+////                    )
+////                }
+////            }
+////
+////            // Reply indicator
+////            state.replyTo?.let {
+////                Text(
+////                    "Replying to ${it.user.name}",
+////                    color = Color.Gray,
+////                    modifier = Modifier.padding(8.dp)
+////                )
+////            }
+////
+////            // 👇 INPUT ALWAYS AT BOTTOM
+////            Row(
+////                Modifier
+////                    .fillMaxWidth()
+////                    .padding(8.dp),
+////                verticalAlignment = Alignment.CenterVertically
+////            ) {
+////                OutlinedTextField(
+////                    value = input,
+////                    onValueChange = { input = it },
+////                    modifier = Modifier.weight(1f),
+////                    placeholder = { Text("Add a comment…") }
+////                )
+////
+////                TextButton(
+////                    enabled = input.isNotBlank(),
+////                    onClick = {
+////                        viewModel.sendComment(postId, input)
+////                        input = ""
+////                    }
+////                ) {
+////                    Text("Post")
+////                }
+////            }
+////        }
+//
+//    ModalBottomSheet(
+//        onDismissRequest = onDismiss
+//    ) {
+//        Column(
+//            modifier = Modifier
+//                .fillMaxHeight(0.95f)
+//                .imePadding() // 🔥 keyboard safe
+//        ) {
+//
+//            // 🔹 TOP BAR
+//            Text(
+//                "Comments",
+//                fontWeight = FontWeight.Bold,
+//                modifier = Modifier
+//                    .align(Alignment.CenterHorizontally)
+//                    .padding(vertical = 12.dp)
+//            )
+//
+//            Divider()
+//
+//            // 🔹 COMMENTS LIST
 //            LazyColumn(
-//                modifier = Modifier.weight(1f)
+//                modifier = Modifier
+//                    .weight(1f)
+//                    .fillMaxWidth()
 //            ) {
 //                items(state.comments) { comment ->
 //                    CommentItem(
@@ -573,56 +693,73 @@ fun CommentBottomSheet(
 //                        },
 //                        onReply = {
 //                            viewModel.setReply(comment)
+//                        },
+//                        onRemoveReplyTag = {
+//                            viewModel.clearReply()
 //                        }
 //                    )
 //                }
 //            }
 //
-//            // 🔽 Reply Indicator
-//            state.replyTo?.let {
-//                Text(
-//                    "Replying to ${it.user.name}",
-//                    color = Color.Gray,
-//                    modifier = Modifier.padding(8.dp)
-//                )
-//            }
-//
-//            // 🔽 Input
-//            Row(
-//                Modifier.padding(8.dp),
-//                verticalAlignment = Alignment.CenterVertically
-//            ) {
-//                OutlinedTextField(
-//                    value = input,
-//                    onValueChange = { input = it },
-//                    modifier = Modifier.weight(1f),
-//                    placeholder = { Text("Add a comment…") }
-//                )
-//
-//                TextButton(
-//                    enabled = input.isNotBlank(),
-//                    onClick = {
-//                        viewModel.sendComment(postId, input)
-//                        input = ""
-//                    }
-//                ) {
-//                    Text("Post")
+//            // 🔹 INPUT FIXED AT BOTTOM
+//            CommentInputBar(
+//                replyTo = state.replyTo,
+//                input = input,
+//                onInputChange = { input = it },
+//                onSend = {
+//                    viewModel.sendComment(postId, input)
+//                    input = ""
 //                }
-//            }
+//            )
 //        }
 //    }
+//
+//
+//}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CommentBottomSheet(
+    postId: Int,
+    viewModel: CommunityViewModel,
+    onDismiss: () -> Unit
+) {
+    val state = viewModel.state
+    var input by remember { mutableStateOf("") }
+
+    val sheetState = rememberModalBottomSheetState(
+        skipPartiallyExpanded = true
+    )
+
+    LaunchedEffect(postId) {
+        viewModel.load(postId)
+    }
 
     ModalBottomSheet(
+        sheetState = sheetState,
         onDismissRequest = onDismiss
     ) {
         Column(
             modifier = Modifier
-                .fillMaxHeight(0.9f)
-                .imePadding()          // 👈 🔥 KEY LINE
+                .fillMaxHeight()
         ) {
 
+            // 🔹 HEADER
+            Text(
+                text = "Comments",
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .padding(vertical = 12.dp)
+            )
+
+            Divider()
+
+            // 🔹 COMMENTS LIST
             LazyColumn(
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
             ) {
                 items(state.comments) { comment ->
                     CommentItem(
@@ -641,38 +778,73 @@ fun CommentBottomSheet(
                 }
             }
 
-            // Reply indicator
-            state.replyTo?.let {
-                Text(
-                    "Replying to ${it.user.name}",
-                    color = Color.Gray,
-                    modifier = Modifier.padding(8.dp)
-                )
-            }
-
-            // 👇 INPUT ALWAYS AT BOTTOM
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                OutlinedTextField(
-                    value = input,
-                    onValueChange = { input = it },
-                    modifier = Modifier.weight(1f),
-                    placeholder = { Text("Add a comment…") }
-                )
-
-                TextButton(
-                    enabled = input.isNotBlank(),
-                    onClick = {
-                        viewModel.sendComment(postId, input)
-                        input = ""
-                    }
-                ) {
-                    Text("Post")
+            // 🔥 INPUT BAR — handles keyboard safely
+            CommentInputBar(
+                replyTo = state.replyTo,
+                input = input,
+                onInputChange = { input = it },
+                onSend = {
+                    viewModel.sendComment(postId, input)
+                    input = ""
                 }
+            )
+        }
+    }
+
+}
+
+
+@Composable
+fun CommentInputBar(
+    replyTo: Comment?,
+    input: String,
+    onInputChange: (String) -> Unit,
+    onSend: () -> Unit
+) {
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+
+    LaunchedEffect(replyTo) {
+        if (replyTo != null) {
+            delay(150) // 🔥 let sheet settle
+            focusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .imePadding()
+    ) {
+
+        replyTo?.let {
+            Text(
+                text = "Replying to ${it.user.name}",
+                color = Color.Gray,
+                modifier = Modifier.padding(start = 12.dp, bottom = 4.dp)
+            )
+        }
+
+        Row(
+            modifier = Modifier.padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedTextField(
+                value = input,
+                onValueChange = onInputChange,
+                modifier = Modifier
+                    .weight(1f)
+                    .focusRequester(focusRequester),
+                placeholder = { Text("Add a comment…") }
+            )
+
+            TextButton(
+                enabled = input.isNotBlank(),
+                onClick = onSend
+            ) {
+                Text("Post")
             }
         }
     }
@@ -765,6 +937,130 @@ fun CommentItem(
     }
 }
 
+@Composable
+fun StoriesRow(
+    stories: List<Story>,
+    authUserId: Int,
+    onAddStory: () -> Unit,
+    onStoryClick: (Story) -> Unit
+) {
+    LazyRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        contentPadding = PaddingValues(horizontal = 12.dp)
+    ) {
+
+        // 🔹 YOUR STORY (FIRST)
+        item {
+            AddStoryItem(onClick = onAddStory)
+        }
+
+        // 🔹 OTHER STORIES
+        items(stories) { story ->
+            StoryItem(
+                story = story,
+                isMine = story.user.id == authUserId,
+                onClick = { onStoryClick(story) }
+            )
+        }
+    }
+}
+
+
+@Composable
+fun AddStoryItem(onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .padding(end = 12.dp)
+            .clickable { onClick() },
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+
+        Box {
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(CircleShape)
+                    .background(Color.LightGray)
+            )
+
+            Box(
+                modifier = Modifier
+                    .size(22.dp)
+                    .align(Alignment.BottomEnd)
+                    .clip(CircleShape)
+                    .background(Color(0xFF0066FF)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+
+        Spacer(Modifier.height(4.dp))
+        Text("Your story", style = MaterialTheme.typography.labelSmall)
+    }
+}
+
+
+@Composable
+fun StoryItem(
+    story: Story,
+    isMine: Boolean,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .padding(end = 12.dp)
+            .clickable { onClick() },
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+
+        Box(
+            modifier = Modifier
+                .size(68.dp)
+                .clip(CircleShape)
+                .background(
+                    Brush.linearGradient(
+                        listOf(Color.Magenta, Color.Red, Color.Yellow)
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+
+            AsyncImage(
+                model = "https://gps.eva2z.in/storage/${story.user.photo}",
+                contentDescription = null,
+                modifier = Modifier
+                    .size(60.dp)
+                    .clip(CircleShape)
+                    .background(Color.LightGray),
+                contentScale = ContentScale.Crop
+            )
+        }
+
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = story.user.name,
+            maxLines = 1,
+            style = MaterialTheme.typography.labelSmall
+        )
+    }
+}
+
+
+
+
+
+
+
+
+
 class CommunityScreenWrapper : Screen {
 
     @Composable
@@ -776,7 +1072,11 @@ class CommunityScreenWrapper : Screen {
         val navigator = LocalNavigator.currentOrThrow
         var openCommentsPostId by remember { mutableStateOf<Int?>(null) }
 
-
+        LaunchedEffect(Unit) {
+            Analytics.logEvent(
+                name = "community_screen_view"
+            )
+        }
 
         // 👇 refresh-aware API call
         val refreshKey = viewModel.observeRefreshKey()
@@ -807,18 +1107,28 @@ class CommunityScreenWrapper : Screen {
             else -> {
                 CommunityScreen(
                     posts = state.posts,
+                    stories = state.stories,
+                    authUserId = state.authUserId,
                     onCreatePostClick = {
-                        navigator.push(
-                            CreatePostScreen()
-                        )
+                        navigator.push(CreatePostScreen())
                     },
                     onLikeClick = { postId ->
                         viewModel.toggleLike(postId)
                     },
                     onCommentClick = { postId ->
                         openCommentsPostId = postId
+                    },
+                    onAddStory = {
+                        navigator.push(CreateStoryScreen())
+                    },
+                    onStoryClick = { story ->
+                        val index = state.stories.indexOfFirst { it.id == story.id }
+                        viewModel.startStory(index)
+                        navigator.push(StoryViewerScreen())
                     }
+
                 )
+
             }
 
         }
@@ -831,7 +1141,5 @@ class CommunityScreenWrapper : Screen {
         }
     }
 }
-
-
 
 
