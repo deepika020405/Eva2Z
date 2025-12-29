@@ -189,7 +189,8 @@ class CommunityViewModel(
             _state = _state.copy(replyTo = null)
 
             load(postId)
-            refreshPosts()
+            incrementCommentCount(postId)
+//            refreshPosts()
         }
     }
 
@@ -309,6 +310,18 @@ class CommunityViewModel(
 
     fun clearStoryViewers() {
         _state = _state.copy(storyViewers = emptyList())
+    }
+
+    fun incrementCommentCount(postId: Int) {
+        _state = state.copy(
+            posts = state.posts.map { post ->
+                if (post.id == postId) {
+                    post.copy(
+                        comments_count = post.comments_count + 1
+                    )
+                } else post
+            }
+        )
     }
 
 }
