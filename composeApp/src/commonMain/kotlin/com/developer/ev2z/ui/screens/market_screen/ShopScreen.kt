@@ -395,7 +395,7 @@ fun ShopScreenHost() {
                             "item_variant" to (p.device_type ?: ""),
                             "price" to (p.sale_price?.toDoubleOrNull() ?: 0.0),
                             "index" to index
-                        )
+                        ).toString()
                     }
                 )
             )
