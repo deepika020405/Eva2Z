@@ -334,8 +334,11 @@ fun HomeNavGraph(
         }
 
         // ✅ Refer And Earn
+        // ✅ Refer And Earn
         if (showReferAndEarn) {
             ReferAndEarnScreen(
+                token = token,
+                apiService = apiService,
                 onBackPressed = { showReferAndEarn = false }
             )
         }
