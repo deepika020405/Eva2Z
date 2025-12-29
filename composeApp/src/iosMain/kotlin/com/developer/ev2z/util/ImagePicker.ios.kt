@@ -103,7 +103,7 @@ actual fun rememberImagePicker(
                 showDialog = false
             },
             title = { Text("Select Image") },
-            text = { Text("Choose an option to select your profile picture") },
+            text = { Text("Choose an image from camera or gallery") },
             confirmButton = {
                 TextButton(
                     onClick = {
