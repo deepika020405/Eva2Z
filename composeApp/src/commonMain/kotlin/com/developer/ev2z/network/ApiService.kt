@@ -767,6 +767,27 @@ class ApiService {
         }
     }
 
+    // ---------------- DEVICE STATUS ----------------
+    suspend fun getDeviceStatus(
+        token: String,
+        deviceId: String
+    ): JsonObject {
+        println("🌐 API: Fetching device status for: $deviceId")
+
+        return try {
+            val response = client.get("${baseUrl}device-status/$deviceId") {
+                header(HttpHeaders.Authorization, token)
+            }
+
+            println("✔️ Device Status: ${response.status}")
+            response.body()
+
+        } catch (e: Exception) {
+            println("❌ Device Status Error: ${e.message}")
+            throw e
+        }
+    }
+
     // ===============================================
     // SHOP / PRODUCT APIs (existing code)
     // ===============================================

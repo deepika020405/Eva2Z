@@ -35,6 +35,7 @@ import com.developer.ev2z.ui.screens.community.CommunityScreenWrapper
 import com.developer.ev2z.ui.screens.market_screen.ShopViewModel
 import com.developer.ev2z.ui.screens.GeneralSettings.GeneralSettingsScreen
 import com.developer.ev2z.ui.screens.AccountActivity.AccountActivityScreen
+import com.developer.ev2z.ui.screens.GPSData.GPSDataScreen
 import com.developer.ev2z.ui.screens.Profile.AboutAppScreen
 import com.developer.ev2z.ui.screens.ReferAndEarn.ReferAndEarnScreen
 import kotlinx.coroutines.CoroutineScope
@@ -104,6 +105,7 @@ class ProfileTab(
     private val refreshTrigger: Int,
     private val onNavigateToEditProfile: () -> Unit,
     private val onNavigateToManageDevice: () -> Unit,
+    private val onNavigateToGPSData: () -> Unit,
     private val onNavigateToPrivacyPolicy: () -> Unit,
     private val onNavigateToTermsConditions: () -> Unit,
     private val onNavigateToRefundPolicy: () -> Unit,
@@ -125,6 +127,7 @@ class ProfileTab(
             refreshTrigger = refreshTrigger,
             onEditProfile = onNavigateToEditProfile,
             onManageDevice = onNavigateToManageDevice,
+            onGpsData = onNavigateToGPSData,
             onPrivacyPolicy = onNavigateToPrivacyPolicy,
             onTermsConditions = onNavigateToTermsConditions,
             onRefundPolicy = onNavigateToRefundPolicy,
@@ -172,6 +175,7 @@ fun HomeNavGraph(
     // Screen visibility states
     var showEditProfile by remember { mutableStateOf(false) }
     var showManageDevice by remember { mutableStateOf(false) }
+    var showGPSData by remember { mutableStateOf(false) }
     var showEditDeviceName by remember { mutableStateOf(false) }
     var showPrivacyPolicy by remember { mutableStateOf(false) }
     var showTermsConditions by remember { mutableStateOf(false) }
@@ -206,6 +210,7 @@ fun HomeNavGraph(
             onNavigateToDeviceReport = onNavigateToDeviceReport,
             onNavigateToEditProfile = { showEditProfile = true },
             onNavigateToManageDevice = { showManageDevice = true },
+            onNavigateToGPSData = { showGPSData = true },
             onNavigateToPrivacyPolicy = { showPrivacyPolicy = true },
             onNavigateToTermsConditions = { showTermsConditions = true },
             onNavigateToRefundPolicy = { showRefundPolicy = true },
@@ -250,6 +255,15 @@ fun HomeNavGraph(
                     editSimNumber = simNumber
                     showEditDeviceName = true
                 }
+            )
+        }
+        // GPS Data Screen
+        if (showGPSData) {
+            GPSDataScreen(
+                apiService = apiService,
+                storageManager = storageManager,
+//                onBackClick = {showGPSData = false },
+                onBackPressed = { showGPSData = false }
             )
         }
 
@@ -386,6 +400,7 @@ fun HomeNavGraphContent(
     onNavigateToDeviceReport: () -> Unit,
     onNavigateToEditProfile: () -> Unit,
     onNavigateToManageDevice: () -> Unit,
+    onNavigateToGPSData: () -> Unit,
     onNavigateToPrivacyPolicy: () -> Unit,
     onNavigateToTermsConditions: () -> Unit,
     onNavigateToRefundPolicy: () -> Unit,
@@ -416,6 +431,7 @@ fun HomeNavGraphContent(
             profileRefreshTrigger,
             onNavigateToEditProfile,
             onNavigateToManageDevice,
+            onNavigateToGPSData,
             onNavigateToPrivacyPolicy,
             onNavigateToTermsConditions,
             onNavigateToRefundPolicy,
