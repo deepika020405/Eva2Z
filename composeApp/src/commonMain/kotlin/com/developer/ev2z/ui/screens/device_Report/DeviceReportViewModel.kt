@@ -7,9 +7,12 @@ import com.developer.ev2z.repository.DeviceReportRepository
 import com.developer.ev2z.response.Device
 import com.developer.ev2z.response.DeviceAnalyticsData
 import com.developer.ev2z.response.TotalMilagesData
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 enum class AnalyticsRange(val apiValue: String) {
@@ -23,6 +26,7 @@ class DeviceReportViewModel(
     private val platformAddressProvider: PlatformAddressProvider   // 👈 NEW
 ) : ViewModel() {
 
+    private var liveLocationJob: Job? = null
     private val _uiState = MutableStateFlow<DeviceReportUiState>(DeviceReportUiState.Loading)
     val uiState: StateFlow<DeviceReportUiState> = _uiState.asStateFlow()
 
@@ -90,7 +94,12 @@ class DeviceReportViewModel(
 
                     if (response.devices.isNotEmpty()) {
                         _selectedDevice.value = response.devices.first()
-                        fetchDeviceLiveLocation(token, response.devices.first().device_id)
+//                        fetchDeviceLiveLocation(token, response.devices.first().device_id)
+                        // 🔥 START 10s POLLING
+                        startLiveLocationPolling(
+                            token = token,
+                            deviceId = response.devices.first().device_id
+                        )
                     } else {
                         _uiState.value = DeviceReportUiState.Success
                     }
@@ -103,26 +112,18 @@ class DeviceReportViewModel(
         }
     }
 
-//    fun fetchDeviceLiveLocation(token: String, deviceId: String) {
-//        viewModelScope.launch {
-//            try {
-//                val response = repository.getDeviceLiveLocation(token, deviceId)
-//                if (response.success) {
-//                    _liveLocation.value = response
-//                    _uiState.value = DeviceReportUiState.Success
-//
-//                    // jaise hi live location aaye, address nikaal lo
-//                    response.data?.latestLocation?.let {
-//                        getAddressFromLatLng(it.latitude.toDouble(), it.longitude.toDouble())
-//                    }
-//                } else {
-//                    _uiState.value = DeviceReportUiState.Error("Failed to fetch live location")
-//                }
-//            } catch (e: Exception) {
-//                _uiState.value = DeviceReportUiState.Error(e.message ?: "Unknown error occurred")
-//            }
-//        }
-//    }
+    private fun startLiveLocationPolling(token: String, deviceId: String) {
+
+        // 🔴 Purana polling band
+        liveLocationJob?.cancel()
+
+        liveLocationJob = viewModelScope.launch {
+            while (isActive) {
+                fetchDeviceLiveLocation(token, deviceId)
+                delay(10_000) // ⏱ 10 seconds
+            }
+        }
+    }
 
     fun fetchDeviceLiveLocation(token: String, deviceId: String) {
         viewModelScope.launch {
@@ -154,7 +155,9 @@ class DeviceReportViewModel(
 
     fun selectDevice(device: Device, token: String) {
         _selectedDevice.value = device
-        fetchDeviceLiveLocation(token, device.device_id)
+//        fetchDeviceLiveLocation(token, device.device_id)
+        startLiveLocationPolling(token, device.device_id)
+
     }
 
     fun refreshData(token: String) {
@@ -171,6 +174,10 @@ class DeviceReportViewModel(
     }
 
 
+    override fun onCleared() {
+        super.onCleared()
+        liveLocationJob?.cancel()
+    }
 
     fun fetchTotalMilages(token: String, terminalId: String) {
         viewModelScope.launch {
