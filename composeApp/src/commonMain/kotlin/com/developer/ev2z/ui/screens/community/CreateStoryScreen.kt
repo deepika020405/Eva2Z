@@ -44,6 +44,7 @@ import com.developer.ev2z.util.rememberImagePicker
 
 class CreateStoryScreen : Screen {
 
+
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
@@ -53,22 +54,19 @@ class CreateStoryScreen : Screen {
 
         var body by remember { mutableStateOf("") }
         var image by remember { mutableStateOf<ByteArray?>(null) }
-        var showPicker by remember { mutableStateOf(false) }
 
-        // ✅ same picker you already use
+        // ✅ SAME picker as EditProfile
         val imagePickerLauncher = rememberImagePicker { imageBytes ->
             if (imageBytes != null) {
                 image = imageBytes
+                println("✅ Story image selected: ${imageBytes.size} bytes")
             }
         }
 
+        // Analytics
         LaunchedEffect(Unit) {
-            Analytics.logEvent(
-                name = "Create_story_screen_view"
-            )
+            Analytics.logEvent(name = "Create_story_screen_view")
         }
-
-
 
         Scaffold(
             topBar = {
@@ -105,18 +103,21 @@ class CreateStoryScreen : Screen {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
 
-                // 🖼 Preview
+                // 🖼 DIRECT PICKER (NO BOTTOM SHEET)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(320.dp)
                         .clip(RoundedCornerShape(16.dp))
                         .background(Color(0xFFE0E0E0))
-                        .clickable { showPicker = true },
+                        .clickable {
+                            // 🚀 DIRECT OPEN CAMERA / GALLERY
+                            imagePickerLauncher.launch()
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     if (image == null) {
-                        Text("Tap to select image")
+                        Text("Tap to capture / select image")
                     } else {
                         Text("Image selected ✅")
                     }
@@ -132,23 +133,6 @@ class CreateStoryScreen : Screen {
                 )
             }
         }
-
-        // 🔥 Picker options
-        if (showPicker) {
-            SimpleImagePickerDialog(
-                onDismiss = { showPicker = false },
-                onCameraClick = {
-                    showPicker = false
-                    imagePickerLauncher.launch()
-                },
-                onGalleryClick = {
-                    showPicker = false
-                    imagePickerLauncher.launch()
-                }
-            )
-        }
-
-
     }
 }
 
