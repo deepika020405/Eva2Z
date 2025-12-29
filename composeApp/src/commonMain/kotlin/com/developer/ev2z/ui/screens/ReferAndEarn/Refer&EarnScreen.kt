@@ -31,7 +31,9 @@ import com.developer.ev2z.network.ApiService
 fun ReferAndEarnScreen(
     token: String,
     apiService: ApiService,
-    onBackPressed: () -> Unit
+    onBackPressed: () -> Unit,
+    onNavigateToShop: () -> Unit = {}, // ✅ Navigate to shop tab
+    onNavigateToAddDevice: () -> Unit = {} // ✅ Navigate to actual add device flow
 ) {
     val viewModel = remember { ReferAndEarnViewModel(apiService) }
     val uiState by viewModel.uiState.collectAsState()
@@ -40,7 +42,9 @@ fun ReferAndEarnScreen(
     val clipboardManager = LocalClipboardManager.current
     val context = getPlatformContext()
 
-    var showEligibilityDialog by remember { mutableStateOf(false) }
+    var showBalanceDialog by remember { mutableStateOf(false) } // ✅ Changed from Coming Soon
+    var showContactPicker by remember { mutableStateOf(false) } // ✅ For contacts
+    var showNoDeviceDialog by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     // Load referral code on first composition
@@ -99,19 +103,48 @@ fun ReferAndEarnScreen(
                 is ReferralUiState.Success -> {
                     ReferralContentScreen(
                         referralCode = state.referralCode,
+                        referralAmount = state.referralAmount,
+                        referralBalance = state.referralBalance,
                         onCopyCode = {
                             clipboardManager.setText(AnnotatedString(state.referralCode))
                             viewModel.showCopySuccess()
                         },
                         onShareWhatsApp = {
-                            shareViaWhatsApp(context, viewModel.getWhatsAppMessage(state.referralCode))
+                            shareViaWhatsApp(context, viewModel.getWhatsAppMessage(state.referralCode, state.referralAmount))
                         },
                         onShareOther = {
-                            shareViaOther(context, viewModel.getReferralMessage(state.referralCode))
+                            shareViaOther(context, viewModel.getReferralMessage(state.referralCode, state.referralAmount))
                         },
-                        onShowEligibility = {
-                            showEligibilityDialog = true
+                        onShowBalance = {
+                            showBalanceDialog = true // ✅ Show balance dialog
+                        },
+                        onInviteContacts = {
+                            showContactPicker = true // ✅ Open contact picker
                         }
+                    )
+                }
+
+                is ReferralUiState.NoDevice -> {
+                    ReferralContentScreen(
+                        referralCode = "XXXXXXXX",
+                        referralAmount = 150,
+                        referralBalance = "0",
+                        onCopyCode = {
+                            showNoDeviceDialog = true
+                        },
+                        onShareWhatsApp = {
+                            showNoDeviceDialog = true
+                        },
+                        onShareOther = {
+                            showNoDeviceDialog = true
+                        },
+                        onShowBalance = {
+                            showNoDeviceDialog = true
+                        },
+                        onInviteContacts = {
+                            showNoDeviceDialog = true
+                        },
+                        isDisabled = false // ✅ Keep everything enabled, just show dialog
                     )
                 }
 
@@ -123,31 +156,21 @@ fun ReferAndEarnScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        Text(
-                            text = "⚠️",
-                            fontSize = 64.sp
-                        )
-
+                        Text("❌", fontSize = 64.sp)
                         Spacer(modifier = Modifier.height(16.dp))
-
                         Text(
-                            text = "Referral Eligibility Required",
+                            text = "Something went wrong",
                             style = MaterialTheme.typography.headlineSmall,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center
+                            fontWeight = FontWeight.Bold
                         )
-
                         Spacer(modifier = Modifier.height(16.dp))
-
                         Text(
                             text = state.message,
                             style = MaterialTheme.typography.bodyLarge,
                             color = Color.Gray,
                             textAlign = TextAlign.Center
                         )
-
                         Spacer(modifier = Modifier.height(32.dp))
-
                         Button(
                             onClick = onBackPressed,
                             colors = ButtonDefaults.buttonColors(
@@ -161,10 +184,43 @@ fun ReferAndEarnScreen(
                 }
             }
 
-            // Eligibility Dialog
-            if (showEligibilityDialog) {
-                ReferralEligibilityDialog(
-                    onDismiss = { showEligibilityDialog = false }
+            // ✅ Balance Dialog (shows referral balance)
+            if (showBalanceDialog) {
+                val state = uiState as? ReferralUiState.Success
+                state?.let {
+                    ReferralBalanceDialog(
+                        balance = it.referralBalance,
+                        onDismiss = { showBalanceDialog = false }
+                    )
+                }
+            }
+
+            // ✅ Contact Picker
+            if (showContactPicker) {
+                val state = uiState as? ReferralUiState.Success
+                state?.let {
+                    LaunchedEffect(Unit) {
+                        openContactPicker(
+                            context = context,
+                            message = viewModel.getReferralMessage(it.referralCode, it.referralAmount)
+                        )
+                        showContactPicker = false
+                    }
+                }
+            }
+
+            // ✅ No Device Dialog
+            if (showNoDeviceDialog) {
+                NoDeviceDialog(
+                    onDismiss = { showNoDeviceDialog = false },
+                    onAddDevice = {
+                        showNoDeviceDialog = false
+                        onNavigateToAddDevice() // ✅ Open actual add device flow
+                    },
+                    onGoToShop = {
+                        showNoDeviceDialog = false
+                        onNavigateToShop() // ✅ Navigate to shop tab
+                    }
                 )
             }
         }
@@ -174,10 +230,14 @@ fun ReferAndEarnScreen(
 @Composable
 private fun ReferralContentScreen(
     referralCode: String,
+    referralAmount: Int,
+    referralBalance: String,
     onCopyCode: () -> Unit,
     onShareWhatsApp: () -> Unit,
     onShareOther: () -> Unit,
-    onShowEligibility: () -> Unit
+    onShowBalance: () -> Unit, // ✅ Changed from onShowComingSoon
+    onInviteContacts: () -> Unit, // ✅ New callback
+    isDisabled: Boolean = false
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
         // Scrollable Content
@@ -185,7 +245,7 @@ private fun ReferralContentScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(bottom = 88.dp) // Space for bottom buttons
+                .padding(bottom = 88.dp)
                 .background(Color.White)
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -220,7 +280,7 @@ private fun ReferralContentScreen(
 
             // Offer Text
             Text(
-                text = "Get ₹150 OFF",
+                text = "Get ₹$referralAmount OFF",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold,
                 color = Color.Black,
@@ -231,7 +291,7 @@ private fun ReferralContentScreen(
 
             // Description
             Text(
-                text = "refer your friends and get ₹150 off coupon\nfor each successful referral.",
+                text = "refer your friends and get ₹$referralAmount off coupon\nfor each successful referral.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.Gray,
                 fontSize = 14.sp,
@@ -253,7 +313,10 @@ private fun ReferralContentScreen(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp))
+                        .background(
+                            if (isDisabled) Color(0xFFEEEEEE) else Color(0xFFF5F5F5),
+                            RoundedCornerShape(12.dp)
+                        )
                         .padding(horizontal = 20.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -261,7 +324,7 @@ private fun ReferralContentScreen(
                         text = referralCode,
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Bold,
-                        color = Color.Black,
+                        color = if (isDisabled) Color.Gray else Color.Black,
                         fontSize = 18.sp
                     )
                 }
@@ -270,8 +333,11 @@ private fun ReferralContentScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxHeight()
-                        .background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp))
-                        .clickable(onClick = onCopyCode)
+                        .background(
+                            if (isDisabled) Color(0xFFEEEEEE) else Color(0xFFF5F5F5),
+                            RoundedCornerShape(12.dp)
+                        )
+                        .clickable(enabled = !isDisabled, onClick = onCopyCode)
                         .padding(horizontal = 20.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -282,13 +348,13 @@ private fun ReferralContentScreen(
                         Icon(
                             Icons.Default.ContentCopy,
                             contentDescription = "Copy",
-                            tint = Color.Black,
+                            tint = if (isDisabled) Color.Gray else Color.Black,
                             modifier = Modifier.size(20.dp)
                         )
                         Text(
                             text = "Copy",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = Color.Black,
+                            color = if (isDisabled) Color.Gray else Color.Black,
                             fontSize = 14.sp
                         )
                     }
@@ -302,12 +368,18 @@ private fun ReferralContentScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Invite from contacts
+                // ✅ Invite from contacts - Opens contact picker
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp))
-                        .clickable(onClick = onShowEligibility)
+                        .background(
+                            if (isDisabled) Color(0xFFEEEEEE) else Color(0xFFF5F5F5),
+                            RoundedCornerShape(12.dp)
+                        )
+                        .clickable(
+                            enabled = !isDisabled,
+                            onClick = onInviteContacts
+                        )
                         .padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -319,7 +391,7 @@ private fun ReferralContentScreen(
                         Text(
                             text = "Invite from\ncontacts",
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color.Black,
+                            color = if (isDisabled) Color.Gray else Color.Black,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium,
                             lineHeight = 18.sp,
@@ -328,22 +400,27 @@ private fun ReferralContentScreen(
                         Icon(
                             Icons.Default.NavigateNext,
                             contentDescription = null,
-                            tint = Color.Black,
+                            tint = if (isDisabled) Color.Gray else Color.Black,
                             modifier = Modifier.size(20.dp)
                         )
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
-
                     Text("👥", fontSize = 60.sp)
                 }
 
-                // Track referral earning
+                // ✅ Show referral balance - Opens balance dialog
                 Column(
                     modifier = Modifier
                         .weight(1f)
-                        .background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp))
-                        .clickable(onClick = onShowEligibility)
+                        .background(
+                            if (isDisabled) Color(0xFFEEEEEE) else Color(0xFFF5F5F5),
+                            RoundedCornerShape(12.dp)
+                        )
+                        .clickable(
+                            enabled = !isDisabled,
+                            onClick = onShowBalance
+                        )
                         .padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -355,7 +432,7 @@ private fun ReferralContentScreen(
                         Text(
                             text = "Show referral\nbalance",
                             style = MaterialTheme.typography.bodySmall,
-                            color = Color.Black,
+                            color = if (isDisabled) Color.Gray else Color.Black,
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium,
                             lineHeight = 18.sp,
@@ -364,7 +441,7 @@ private fun ReferralContentScreen(
                         Icon(
                             Icons.Default.NavigateNext,
                             contentDescription = null,
-                            tint = Color.Black,
+                            tint = if (isDisabled) Color.Gray else Color.Black,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -391,18 +468,16 @@ private fun ReferralContentScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Steps
                 StepItem(number = "1", text = "Invite a friend")
                 Spacer(modifier = Modifier.height(12.dp))
                 StepItem(number = "2", text = "They sign up")
                 Spacer(modifier = Modifier.height(12.dp))
                 StepItem(number = "3", text = "First order placed")
                 Spacer(modifier = Modifier.height(12.dp))
-                StepItem(number = "4", text = "Both get ₹150 reward")
+                StepItem(number = "4", text = "Both get ₹$referralAmount reward")
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Note
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -438,11 +513,13 @@ private fun ReferralContentScreen(
                 // Share via WhatsApp Button
                 Button(
                     onClick = onShareWhatsApp,
+                    enabled = !isDisabled,
                     modifier = Modifier
                         .weight(1f)
                         .height(48.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF25D366)
+                        containerColor = Color(0xFF25D366),
+                        disabledContainerColor = Color(0xFFCCCCCC)
                     ),
                     shape = RoundedCornerShape(36.dp)
                 ) {
@@ -464,14 +541,18 @@ private fun ReferralContentScreen(
                 // Share Icon Button
                 IconButton(
                     onClick = onShareOther,
+                    enabled = !isDisabled,
                     modifier = Modifier
                         .size(56.dp)
-                        .background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp))
+                        .background(
+                            if (isDisabled) Color(0xFFEEEEEE) else Color(0xFFF5F5F5),
+                            RoundedCornerShape(12.dp)
+                        )
                 ) {
                     Icon(
                         Icons.Default.Share,
                         contentDescription = "Share",
-                        tint = Color(0xFF6A9F50),
+                        tint = if (isDisabled) Color.Gray else Color(0xFF6A9F50),
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -511,8 +592,12 @@ private fun StepItem(number: String, text: String) {
     }
 }
 
+// ✅ NEW: Referral Balance Dialog
 @Composable
-private fun ReferralEligibilityDialog(onDismiss: () -> Unit) {
+private fun ReferralBalanceDialog(
+    balance: String,
+    onDismiss: () -> Unit
+) {
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
@@ -527,24 +612,48 @@ private fun ReferralEligibilityDialog(onDismiss: () -> Unit) {
                     .padding(32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = "Feature Coming Soon!",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Black,
-                    fontSize = 22.sp,
-                    textAlign = TextAlign.Center
-                )
+                // Icon
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFE3F1DC)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("💰", fontSize = 40.sp)
+                }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Text(
-                    text = "This feature will be available soon. Stay tuned!",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Color.DarkGray,
-                    fontSize = 16.sp,
+                    text = "Your Referral Balance",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black,
+                    fontSize = 20.sp,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Balance Amount
+                Text(
+                    text = "₹$balance",
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF6A9F50),
+                    fontSize = 36.sp
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "Keep referring friends to earn more rewards!",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.Gray,
+                    fontSize = 14.sp,
                     textAlign = TextAlign.Center,
-                    lineHeight = 24.sp
+                    lineHeight = 20.sp
                 )
 
                 Spacer(modifier = Modifier.height(32.dp))
@@ -560,7 +669,7 @@ private fun ReferralEligibilityDialog(onDismiss: () -> Unit) {
                     shape = RoundedCornerShape(28.dp)
                 ) {
                     Text(
-                        text = "Okay",
+                        text = "Close",
                         color = Color.White,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.SemiBold
@@ -571,6 +680,106 @@ private fun ReferralEligibilityDialog(onDismiss: () -> Unit) {
     }
 }
 
+// ✅ UPDATED: No Device Dialog with Shop navigation
+@Composable
+private fun NoDeviceDialog(
+    onDismiss: () -> Unit,
+    onAddDevice: () -> Unit,
+    onGoToShop: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Referral Eligibility Required",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black,
+                    fontSize = 20.sp,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Text(
+                    text = "To refer friends, you must have at least 1 active device on your account.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.DarkGray,
+                    fontSize = 15.sp,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 22.sp
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = "Referrals are available only after the minimum device requirement is met.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.Gray,
+                    fontSize = 14.sp,
+                    textAlign = TextAlign.Center,
+                    lineHeight = 20.sp
+                )
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                // Add Device Button
+                Button(
+                    onClick = onGoToShop,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF6A9F50)
+                    ),
+                    shape = RoundedCornerShape(28.dp)
+                ) {
+                    Icon(
+                        Icons.Default.ShoppingCart,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Text(
+                        text = "Go to Shop",
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                TextButton(onClick = onAddDevice) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "Add Device",
+                            color = Color(0xFF6A9F50),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 // Platform-specific sharing functions
 expect fun shareViaWhatsApp(context: Any?, message: String)
 expect fun shareViaOther(context: Any?, message: String)
+expect fun openContactPicker(context: Any?, message: String) // ✅ New function

@@ -3,6 +3,7 @@ package com.developer.ev2z.navigation
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -15,7 +16,6 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.Navigator
-import cafe.adriel.voyager.navigator.currentOrThrow
 import cafe.adriel.voyager.navigator.tab.*
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.network.ApiService
@@ -35,8 +35,11 @@ import com.developer.ev2z.ui.screens.community.CommunityScreenWrapper
 import com.developer.ev2z.ui.screens.market_screen.ShopViewModel
 import com.developer.ev2z.ui.screens.GeneralSettings.GeneralSettingsScreen
 import com.developer.ev2z.ui.screens.AccountActivity.AccountActivityScreen
+import com.developer.ev2z.ui.screens.GPSData.GPSDataScreen
+//import com.developer.ev2z.ui.screens.GPSData.GPSDataScreen
 import com.developer.ev2z.ui.screens.Profile.AboutAppScreen
 import com.developer.ev2z.ui.screens.ReferAndEarn.ReferAndEarnScreen
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 // ------------------ TABS -------------------
@@ -100,9 +103,10 @@ class ShopScreenWrapper : Screen {
 class ProfileTab(
     private val apiService: ApiService,
     private val storageManager: StorageManager,
-    private val refreshTrigger: Int, // ✅ Add refresh trigger
+    private val refreshTrigger: Int,
     private val onNavigateToEditProfile: () -> Unit,
     private val onNavigateToManageDevice: () -> Unit,
+    private val onNavigateToGPSData: () -> Unit,
     private val onNavigateToPrivacyPolicy: () -> Unit,
     private val onNavigateToTermsConditions: () -> Unit,
     private val onNavigateToRefundPolicy: () -> Unit,
@@ -121,9 +125,10 @@ class ProfileTab(
         ProfileScreen(
             apiService = apiService,
             storageManager = storageManager,
-            refreshTrigger = refreshTrigger, // ✅ Pass refresh trigger
+            refreshTrigger = refreshTrigger,
             onEditProfile = onNavigateToEditProfile,
             onManageDevice = onNavigateToManageDevice,
+            onGpsData = onNavigateToGPSData,
             onPrivacyPolicy = onNavigateToPrivacyPolicy,
             onTermsConditions = onNavigateToTermsConditions,
             onRefundPolicy = onNavigateToRefundPolicy,
@@ -164,9 +169,14 @@ fun HomeNavGraph(
 ) {
     SetupStatusBar()
 
-    // ✅ Screen visibility states
+    // ✅ CREATE pagerState and coroutineScope HERE (at parent level)
+    val pagerState = rememberPagerState(pageCount = { 4 })
+    val coroutineScope = rememberCoroutineScope()
+
+    // Screen visibility states
     var showEditProfile by remember { mutableStateOf(false) }
     var showManageDevice by remember { mutableStateOf(false) }
+    var showGPSData by remember { mutableStateOf(false) }
     var showEditDeviceName by remember { mutableStateOf(false) }
     var showPrivacyPolicy by remember { mutableStateOf(false) }
     var showTermsConditions by remember { mutableStateOf(false) }
@@ -179,12 +189,12 @@ fun HomeNavGraph(
     var showReferAndEarn by remember { mutableStateOf(false) }
     var showAboutApp by remember { mutableStateOf(false) }
 
-    // ✅ Edit device state
+    // Edit device state
     var editDeviceId by remember { mutableStateOf("") }
     var editDeviceName by remember { mutableStateOf("") }
     var editSimNumber by remember { mutableStateOf("") }
 
-    // ✅ Refresh triggers
+    // Refresh triggers
     var manageDeviceRefresh by remember { mutableStateOf(0) }
     var profileRefresh by remember { mutableStateOf(0) }
 
@@ -194,11 +204,14 @@ fun HomeNavGraph(
             apiService = apiService,
             storageManager = storageManager,
             token = token,
-            profileRefreshTrigger = profileRefresh, // ✅ Pass refresh trigger
+            profileRefreshTrigger = profileRefresh,
+            pagerState = pagerState, // ✅ PASS HERE
+            coroutineScope = coroutineScope, // ✅ PASS HERE
             onNavigateToAddDevice = onNavigateToAddDevice,
             onNavigateToDeviceReport = onNavigateToDeviceReport,
             onNavigateToEditProfile = { showEditProfile = true },
             onNavigateToManageDevice = { showManageDevice = true },
+            onNavigateToGPSData = { showGPSData = true },
             onNavigateToPrivacyPolicy = { showPrivacyPolicy = true },
             onNavigateToTermsConditions = { showTermsConditions = true },
             onNavigateToRefundPolicy = { showRefundPolicy = true },
@@ -213,24 +226,24 @@ fun HomeNavGraph(
             onLogout = onLogout
         )
 
-        // ✅ Edit Profile Screen
+        // Edit Profile Screen
         if (showEditProfile) {
             EditProfileScreen(
                 apiService = apiService,
                 storageManager = storageManager,
                 onBackPressed = {
                     showEditProfile = false
-                    profileRefresh++ // ✅ Trigger profile refresh
+                    profileRefresh++
                 }
             )
         }
 
-        // ✅ Manage Device Screen
+        // Manage Device Screen
         if (showManageDevice) {
             ManageDeviceScreen(
                 apiService = apiService,
                 storageManager = storageManager,
-                refreshTrigger = manageDeviceRefresh, // ✅ Pass refresh trigger
+                refreshTrigger = manageDeviceRefresh,
                 onBackClick = { showManageDevice = false },
                 onProfileClick = { showManageDevice = false },
                 onAddDeviceClick = {
@@ -245,8 +258,17 @@ fun HomeNavGraph(
                 }
             )
         }
+//         GPS Data Screen
+        if (showGPSData) {
+            GPSDataScreen(
+                apiService = apiService,
+                storageManager = storageManager,
+//                onBackClick = {showGPSData = false },
+                onBackPressed = { showGPSData = false }
+            )
+        }
 
-        // ✅ Edit Device Name Screen
+        // Edit Device Name Screen
         if (showEditDeviceName) {
             EditDeviceNameScreen(
                 apiService = apiService,
@@ -257,12 +279,12 @@ fun HomeNavGraph(
                 onBackPressed = { showEditDeviceName = false },
                 onUpdateSuccess = {
                     showEditDeviceName = false
-                    manageDeviceRefresh++ // ✅ Trigger device list refresh
+                    manageDeviceRefresh++
                 }
             )
         }
 
-        // ✅ Privacy Policy
+        // Privacy Policy
         if (showPrivacyPolicy) {
             PrivacyPolicy_TandCScreen(
                 type = WebViewType.PRIVACY_POLICY,
@@ -270,7 +292,7 @@ fun HomeNavGraph(
             )
         }
 
-        // ✅ Terms & Conditions
+        // Terms & Conditions
         if (showTermsConditions) {
             PrivacyPolicy_TandCScreen(
                 type = WebViewType.TERMS_CONDITIONS,
@@ -278,8 +300,7 @@ fun HomeNavGraph(
             )
         }
 
-
-        // ✅ Refund Policy
+        // Refund Policy
         if (showRefundPolicy) {
             PrivacyPolicy_TandCScreen(
                 type = WebViewType.REFUND_POLICY,
@@ -287,7 +308,7 @@ fun HomeNavGraph(
             )
         }
 
-        // ✅ Shipping Policy
+        // Shipping Policy
         if (showShippingPolicy) {
             PrivacyPolicy_TandCScreen(
                 type = WebViewType.SHIPPING_POLICY,
@@ -295,7 +316,7 @@ fun HomeNavGraph(
             )
         }
 
-        // ✅ Geo Fencing
+        // Geo Fencing
         if (showGeoFencing) {
             GeoFencingScreenWrapper(
                 apiService = apiService,
@@ -304,7 +325,7 @@ fun HomeNavGraph(
             )
         }
 
-        // ✅ History Playback
+        // History Playback
         if (showHistoryPlayback) {
             HistoryPlaybackScreen(
                 apiService = apiService,
@@ -313,14 +334,14 @@ fun HomeNavGraph(
             )
         }
 
-        // ✅ General Settings
+        // General Settings
         if (showGeneralSettings) {
             GeneralSettingsScreen(
                 onBackPressed = { showGeneralSettings = false }
             )
         }
 
-        // ✅ Account Activity
+        // Account Activity
         if (showAccountActivity) {
             AccountActivityScreen(
                 apiService = apiService,
@@ -333,16 +354,31 @@ fun HomeNavGraph(
             )
         }
 
-        // ✅ Refer And Earn
-        // ✅ Refer And Earn
+        // ✅ Refer And Earn - WITH SHOP NAVIGATION
         if (showReferAndEarn) {
             ReferAndEarnScreen(
                 token = token,
                 apiService = apiService,
-                onBackPressed = { showReferAndEarn = false }
+                onBackPressed = { showReferAndEarn = false },
+                onNavigateToShop = {
+                    println("🛒 Navigating to Shop tab...")
+                    showReferAndEarn = false
+                    // ✅ Navigate to shop tab (index 2)
+                    coroutineScope.launch {
+                        pagerState.animateScrollToPage(2)
+                        println("✅ Shop tab navigation complete")
+                    }
+                },
+                onNavigateToAddDevice = {
+                    println("➕ Navigating to Add Device...")
+                    showReferAndEarn = false
+                    // ✅ Open actual add device flow
+                    onNavigateToAddDevice()
+                }
             )
         }
 
+        // About App
         if (showAboutApp) {
             AboutAppScreen(
                 onBackClick = { showAboutApp = false }
@@ -351,17 +387,21 @@ fun HomeNavGraph(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeNavGraphContent(
     viewModel: HomeViewModel,
     apiService: ApiService,
     storageManager: StorageManager,
     token: String,
-    profileRefreshTrigger: Int = 0, // ✅ Add refresh trigger
+    profileRefreshTrigger: Int = 0,
+    pagerState: PagerState, // ✅ RECEIVE pagerState
+    coroutineScope: CoroutineScope, // ✅ RECEIVE coroutineScope
     onNavigateToAddDevice: () -> Unit,
     onNavigateToDeviceReport: () -> Unit,
     onNavigateToEditProfile: () -> Unit,
     onNavigateToManageDevice: () -> Unit,
+    onNavigateToGPSData: () -> Unit,
     onNavigateToPrivacyPolicy: () -> Unit,
     onNavigateToTermsConditions: () -> Unit,
     onNavigateToRefundPolicy: () -> Unit,
@@ -385,14 +425,14 @@ fun HomeNavGraphContent(
 
     val homeTab = remember { HomeTab(viewModel, token, onNavigateToAddDevice, onNavigateToDeviceReport) }
 
-    // ✅ Update ProfileTab with refresh trigger
     val profileTab = remember(profileRefreshTrigger) {
         ProfileTab(
             apiService,
             storageManager,
-            profileRefreshTrigger, // ✅ Pass refresh trigger
+            profileRefreshTrigger,
             onNavigateToEditProfile,
             onNavigateToManageDevice,
+            onNavigateToGPSData,
             onNavigateToPrivacyPolicy,
             onNavigateToTermsConditions,
             onNavigateToRefundPolicy,
@@ -411,8 +451,7 @@ fun HomeNavGraphContent(
     val ordersTab = remember { OrdersTab() }
     val tabs = listOf(homeTab, CommunityTab, ordersTab, profileTab)
 
-    val pagerState = rememberPagerState(pageCount = { tabs.size })
-    val coroutineScope = rememberCoroutineScope()
+    // ✅ DON'T CREATE pagerState here - use the passed one
 
     Scaffold(
         containerColor = Color.White,

@@ -33,6 +33,7 @@ fun ProfileScreen(
     refreshTrigger: Int = 0,
     onEditProfile: () -> Unit = {},
     onManageDevice: () -> Unit = {},
+    onGpsData: () -> Unit = {},
     onPrivacyPolicy: () -> Unit = {},
     onTermsConditions: () -> Unit = {},
     onRefundPolicy: () -> Unit = {},
@@ -73,6 +74,7 @@ fun ProfileScreen(
         onReferAndEarn = onReferAndEarn,
         onChangePassword = onChangePassword,
         onManageDevice = onManageDevice,
+        onGPSData = onGpsData,
         onAddFence = onGeoFencing,
         onHistoryPlayback = onHistoryPlayback,
         onRateApp = { viewModel.openPlayStore() },
@@ -109,6 +111,7 @@ fun ProfileScreenContent(
     onReferAndEarn: () -> Unit = {},
     onChangePassword: () -> Unit = {},
     onManageDevice: () -> Unit = {},
+    onGPSData: () -> Unit = {},
     onAddFence: () -> Unit = {},
     onHistoryPlayback: () -> Unit = {},
     onRateApp: () -> Unit = {},
@@ -197,6 +200,7 @@ fun ProfileScreenContent(
                     ProfileMenuCard(
                         items = listOf(
                             ProfileMenuItem("Manage Device", Icons.Rounded.Devices, onManageDevice),
+                            ProfileMenuItem("GPS Device Data", Icons.Rounded.GpsFixed, onGPSData),
                             ProfileMenuItem("Manage Geo Fence", Icons.Rounded.LocationOn, onAddFence),
                             ProfileMenuItem("History Playback", Icons.Rounded.History, onHistoryPlayback)
                         )
