@@ -12,6 +12,11 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -34,6 +39,30 @@ class StoryViewerScreen : Screen {
         val state = vm.state
 
         val story = state.stories[state.storyIndex]
+        var lastStoryTimerStarted by remember { mutableStateOf(false) }
+
+        LaunchedEffect(state.storyIndex) {
+
+            val isLastStory =
+                state.storyIndex == state.stories.lastIndex
+
+            if (isLastStory && !lastStoryTimerStarted) {
+                lastStoryTimerStarted = true
+
+                // ⏳ last story poora dikhane ka time
+                kotlinx.coroutines.delay(15_000)
+
+                // Safety check
+                if (state.storyIndex == state.stories.lastIndex) {
+                    navigator.pop() // 🔥 AUTO BACK
+                }
+            }
+
+            // 🔄 Agar user prev story pe gaya
+            if (!isLastStory) {
+                lastStoryTimerStarted = false
+            }
+        }
 
         Box(
             Modifier
