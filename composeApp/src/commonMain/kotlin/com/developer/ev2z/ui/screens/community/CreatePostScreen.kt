@@ -37,7 +37,7 @@ class CreatePostScreen : Screen {
         var title by remember { mutableStateOf("") }
         var body by remember { mutableStateOf("") }
         var images by remember { mutableStateOf<List<ByteArray>>(emptyList()) }
-        var showImagePickerOptions by remember { mutableStateOf(false) }
+//        var showImagePickerOptions by remember { mutableStateOf(false) }
 
         val viewModel = CommunityViewModelProvider.viewModel
 
@@ -149,7 +149,9 @@ class CreatePostScreen : Screen {
 
                 OutlinedButton(
                     enabled = images.size < 5,
-                    onClick = { showImagePickerOptions = true },
+                    onClick = {
+                        imagePickerLauncher.launch()   // 🔥 DIRECT CAMERA / GALLERY
+                    },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Default.Image, null)
@@ -160,17 +162,7 @@ class CreatePostScreen : Screen {
         }
 
         // ✅ Dialog ALWAYS outside Scaffold
-        if (showImagePickerOptions) {
-            ImagePickerOptionDialog(
-                onDismiss = { showImagePickerOptions = false },
-                onCameraClick = {
-                    imagePickerLauncher.launch()
-                },
-                onGalleryClick = {
-                    imagePickerLauncher.launch()
-                }
-            )
-        }
+
     }
 }
 
