@@ -1,6 +1,6 @@
 package com.developer.ev2z.util
 
-import cocoapods.FirebaseAnalytics.FIRAnalytics
+//import cocoapods.FirebaseAnalytics.FIRAnalytics
 
 actual object Analytics {
 
@@ -8,9 +8,9 @@ actual object Analytics {
         name: String,
         params: Map<String, Any?>
     ) {
-        FIRAnalytics.logEventWithName(
-            name = name,
-            parameters = params
-        )
+//        FIRAnalytics.logEventWithName(
+//            name = name,
+//            parameters = params
+//        )
     }
 }
