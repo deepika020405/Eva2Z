@@ -24,6 +24,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import com.developer.ev2z.util.Analytics
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
 import org.jetbrains.compose.resources.painterResource
@@ -45,7 +46,13 @@ fun HomeScreen(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
 
     LaunchedEffect(Unit) {
-        println("🏠 HomeScreen: Loading devices with token")
+        Analytics.logEvent(
+            name = "screen_view",
+            params = mapOf(
+                "screen_name" to "home_screen",
+                "screen_class" to "HomeScreen"
+            )
+        )
         viewModel.loadDevices(token)
     }
 
