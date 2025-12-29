@@ -67,6 +67,7 @@ import com.developer.ev2z.phonepe.PaymentState
 import com.developer.ev2z.phonepe.openPhonePeSdk
 import com.developer.ev2z.upi.UPI_APPS
 import com.developer.ev2z.upi.launchUpiPayment
+import com.developer.ev2z.util.Analytics
 import kotlin.math.roundToInt
 
 class CartScreen : Screen {
@@ -85,6 +86,13 @@ fun CartScreenContent() {
     val navigator = LocalNavigator.currentOrThrow
 
     LaunchedEffect(Unit) {
+        Analytics.logEvent(
+            name = "screen_view",
+            params = mapOf(
+                "screen_name" to "cart_screen",
+                "screen_class" to "CartScreen"
+            )
+        )
         viewModel.loadCart()
         viewModel.loadBillingAddresses()
     }
@@ -94,6 +102,19 @@ fun CartScreenContent() {
             CircularProgressIndicator()
         }
         return
+    }
+
+    LaunchedEffect(state.cart) {
+        if (state.cart.isNotEmpty()) {
+            Analytics.logEvent(
+                name = "view_cart",
+                params = mapOf(
+                    "currency" to "INR",
+                    "value" to (state.finalAmount ?: state.totalPrice ?: 0),
+                    "items_count" to state.cart.size
+                )
+            )
+        }
     }
 
     Column(
@@ -130,7 +151,18 @@ fun CartScreenContent() {
             AddressSection(
                 selectedAddress = state.selectedAddress,
                 addresses = state.addresses,
-                onSelect = { viewModel.selectAddress(it) },
+                onSelect = {
+                    viewModel.selectAddress(it)
+
+                    Analytics.logEvent(
+                        name = "select_shipping_info",
+                        params = mapOf(
+                            "shipping_city" to it.city,
+                            "shipping_state" to it.state,
+                            "shipping_pincode" to it.pincode
+                        )
+                    )
+                },
                 onAddNew = {
                     navigator.push(AddNewAddressScreen())
                 },
@@ -289,6 +321,15 @@ fun CartItemCard(item: CartItemDto,viewModel: ShopViewModel) {
                         .clip(CircleShape)
                         .background(Color(0xFFE53935))
                         .clickable {
+                            Analytics.logEvent(
+                                name = "remove_from_cart",
+                                params = mapOf(
+                                    "item_id" to item.product_id,
+                                    "item_name" to item.product?.name,
+                                    "item_variant" to (item.device_type ?: ""),
+                                    "quantity" to item.quantity
+                                )
+                            )
                             viewModel.removeFromCart(item)
                         },
                     contentAlignment = Alignment.Center
@@ -591,6 +632,18 @@ fun CouponsSection(viewModel: ShopViewModel) {
                 }
             }
         }
+        LaunchedEffect(state.promoApplied) {
+            if (state.promoApplied) {
+                Analytics.logEvent(
+                    name = "select_promotion",
+                    params = mapOf(
+                        "promotion_name" to state.appliedPromoCode,
+                        "discount_value" to state.discountApplied,
+                        "currency" to "INR"
+                    )
+                )
+            }
+        }
     }
 }
 
@@ -724,88 +777,6 @@ fun SummaryRow(label: String, value: String, isBold: Boolean = false) {
     }
 }
 
-//@Composable
-//fun CheckoutBottomBar(viewModel: ShopViewModel) {
-//    val state by viewModel.state.collectAsState()
-//    val paymentState by viewModel.paymentState.collectAsState()
-//    val context = getPlatformContext()!! // returns Activity on Android
-//
-//
-//    var showUpiSheet by remember { mutableStateOf(false) } // 👈 OUTSIDE
-//    val navigator = LocalNavigator.currentOrThrow  // ✅ ADD THIS
-//
-//    Box(
-//        Modifier
-//            .fillMaxWidth()
-//            .padding(16.dp)
-//    ) {
-//        Row(
-//            Modifier
-//                .fillMaxWidth()
-//                .clip(RoundedCornerShape(30.dp))
-//                .background(Color.White)
-//                .padding(16.dp),
-//            horizontalArrangement = Arrangement.SpaceBetween,
-//            verticalAlignment = Alignment.CenterVertically
-//        ) {
-//            Column {
-//                Text("Total Amount", color = Color.Gray)
-//                Text(
-//                    "₹${state.finalAmount ?: state.totalPrice ?: "0"}",
-//                    fontSize = 20.sp,
-//                    fontWeight = FontWeight.Bold
-//                )
-//            }
-//
-//            if (paymentState is PaymentState.Processing) {
-//                CircularProgressIndicator(
-//                    modifier = Modifier.size(36.dp),
-//                    strokeWidth = 3.dp
-//                )
-//            } else {
-//                // ✅ CORRECT: Navigate to PaymentScreen
-//                Button(
-//                    onClick = {
-//                        navigator.push(PaymentScreen())
-//                    },
-//                    shape = RoundedCornerShape(30.dp)
-//                ) {
-//                    Text("Checkout")
-//                }
-//            }
-//        }
-//    }
-//
-//
-////    if (showUpiSheet) {
-////        UpiBottomSheet(
-////            amount = state.finalAmount ?: state.totalPrice ?: "0",
-////            onAppClick = { app ->
-////
-////                // ✅ Close sheet immediately
-////                showUpiSheet = false
-////
-////                viewModel.createOrder { txnId ->
-////
-////
-////                    launchUpiPayment(
-////                        activity = context,
-////                        app = app,
-////                        amount = state.finalAmount ?: state.totalPrice ?: "0",
-////                        txnId = txnId
-////                    ) {
-////                        viewModel.markPaymentPending(txnId)
-////                    }
-////
-////                }
-////            },
-////            onDismiss = { showUpiSheet = false }
-////        )
-////    }
-//
-//}
-
-
 @Composable
 fun CheckoutBottomBar(viewModel: ShopViewModel) {
     val state by viewModel.state.collectAsState()
@@ -848,6 +819,14 @@ fun CheckoutBottomBar(viewModel: ShopViewModel) {
             } else {
                 Button(
                     onClick = {
+                        Analytics.logEvent(
+                            name = "begin_checkout",
+                            params = mapOf(
+                                "currency" to "INR",
+                                "value" to (state.finalAmount ?: state.totalPrice ?: 0),
+                                "items_count" to state.cart.size
+                            )
+                        )
                         navigator.push(PaymentScreen())
                     },
                     shape = RoundedCornerShape(30.dp)
@@ -858,85 +837,6 @@ fun CheckoutBottomBar(viewModel: ShopViewModel) {
         }
     }
 }
-
-//@Composable
-//fun CheckoutBottomBar(viewModel: ShopViewModel) {
-//
-//    val state by viewModel.state.collectAsState()
-//    val paymentState by viewModel.paymentState.collectAsState()
-//
-//    var showUpiSheet by remember { mutableStateOf(false) } // 👈 OUTSIDE
-//
-//    Box(
-//        Modifier
-//            .fillMaxWidth()
-//            .padding(16.dp)
-//    ) {
-//        Row(
-//            Modifier
-//                .fillMaxWidth()
-//                .clip(RoundedCornerShape(30.dp))
-//                .background(Color.White)
-//                .padding(16.dp),
-//            horizontalArrangement = Arrangement.SpaceBetween,
-//            verticalAlignment = Alignment.CenterVertically
-//        ) {
-//
-//            Column {
-//                Text("Total Amount", color = Color.Gray)
-//                Text(
-//                    "₹${state.finalAmount ?: state.totalPrice ?: "0"}",
-//                    fontSize = 20.sp,
-//                    fontWeight = FontWeight.Bold
-//                )
-//            }
-//
-//            if (paymentState is PaymentState.Processing) {
-//                CircularProgressIndicator(
-//                    modifier = Modifier.size(36.dp),
-//                    strokeWidth = 3.dp
-//                )
-//            } else {
-//                Button(
-//                    onClick = { showUpiSheet = true },
-//                    shape = RoundedCornerShape(30.dp)
-//                ) {
-//                    Text("Checkout")
-//                }
-//            }
-//        }
-//    }
-//
-//    if (showUpiSheet) {
-//        UpiBottomSheet(
-//            amount = state.finalAmount ?: state.totalPrice ?: "0",
-//            onAppClick = { app ->
-//
-//                // ✅ Close sheet immediately
-//                showUpiSheet = false
-//
-//                viewModel.createOrder { txnId ->
-//
-//                    launchUpiPayment(
-//                        app = app,
-//                        amount = state.finalAmount ?: state.totalPrice ?: "0",
-//                        txnId = txnId
-//                    ) { opened ->
-//
-//                        if (opened) {
-//                            // ✅ ONLY mark pending
-//                            viewModel.markPaymentPending(txnId)
-//                        } else {
-//                            // ❌ UPI app not found / intent failed
-//                            viewModel.paymentFailed("No UPI app found")
-//                        }
-//                    }
-//                }
-//            },
-//            onDismiss = { showUpiSheet = false }
-//        )
-//    }
-//}
 
 
 
@@ -969,49 +869,5 @@ fun SwipeToRemove(
             }
     ) {
         content()
-    }
-}
-@Composable
-fun UpiBottomSheet(
-    amount: String,
-    onAppClick: (UpiApp) -> Unit,
-    onDismiss: () -> Unit
-) {
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(Modifier.padding(16.dp)) {
-
-                Text(
-                    "Pay via UPI",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 18.sp
-                )
-
-                Spacer(Modifier.height(12.dp))
-
-                UPI_APPS.forEach { app ->
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable { onAppClick(app) }
-                            .padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(app.name, fontSize = 16.sp)
-                    }
-                }
-
-                Spacer(Modifier.height(8.dp))
-
-                Text(
-                    "UPI ID: 9990758825@ptyes",
-                    fontSize = 13.sp,
-                    color = Color.Gray
-                )
-            }
-        }
     }
 }
