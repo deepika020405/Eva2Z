@@ -62,6 +62,7 @@ fun ManageDeviceScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(card_bg)
+            .statusBarsPadding()
     ) {
         // Top Bar
         TopBar(
