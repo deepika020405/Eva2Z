@@ -35,6 +35,22 @@ import com.developer.ev2z.util.AppTokenProvider
 import com.developer.ev2z.ui.screens.AuthFlows.ForgetPasswordFlow
 import com.developer.ev2z.ui.screens.AuthFlows.RegistrationFlow
 import kotlinx.coroutines.delay
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import eva2z_connect_multiplatform.composeapp.generated.resources.Res
+import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
+import org.jetbrains.compose.resources.painterResource
 
 @Composable
 fun App() {
@@ -340,38 +356,131 @@ fun App() {
 
 @Composable
 fun SplashScreen() {
+
+    val infiniteTransition = rememberInfiniteTransition()
+
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = 2000,
+                easing = LinearEasing
+            ),
+            repeatMode = RepeatMode.Restart
+        )
+    )
+
+    val scale by infiniteTransition.animateFloat(
+        initialValue = 0.95f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = 1000,
+                easing = FastOutSlowInEasing
+            ),
+            repeatMode = RepeatMode.Reverse
+        )
+    )
+
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.7f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(
+                durationMillis = 1500,
+                easing = FastOutSlowInEasing
+            ),
+            repeatMode = RepeatMode.Reverse
+        )
+    )
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFF4CAF50)),
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF1B5E20),
+                        Color(0xFF2E7D32),
+                        Color(0xFF388E3C),
+                        Color(0xFF4CAF50),
+                        Color(0xFF66BB6A),
+                        Color(0xFF81C784)
+                    )
+                )
+            ),
         contentAlignment = Alignment.Center
     ) {
+
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
+
+            Box(
+                modifier = Modifier
+                    .size(120.dp)
+                    .scale(scale)
+                    .rotate(rotation),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(Res.drawable.app_logo),
+                    contentDescription = "App Logo",
+                    modifier = Modifier.size(100.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
             Text(
                 text = "EVA2Z",
                 fontSize = 48.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White
+                color = Color.White.copy(alpha = alpha)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "Connect",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color.White.copy(alpha = alpha * 0.9f),
+                letterSpacing = 2.sp
+            )
+
+            Spacer(modifier = Modifier.height(48.dp))
+
+            CircularProgressIndicator(
+                color = Color.White,
+                modifier = Modifier.size(48.dp),
+                strokeWidth = 4.dp
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "Connect",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Normal,
-                color = Color.White.copy(alpha = 0.9f)
+                text = "Loading...",
+                fontSize = 14.sp,
+                color = Color.White.copy(alpha = 0.8f),
+                letterSpacing = 1.sp
             )
+        }
 
-            Spacer(modifier = Modifier.height(32.dp))
-
-            CircularProgressIndicator(
-                color = Color.White,
-                modifier = Modifier.size(40.dp),
-                strokeWidth = 4.dp
+        // ✅ Bottom Version Text (safe for gesture nav)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .navigationBarsPadding() // 👈🔥 bottom safe
+                .padding(bottom = 16.dp),
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            Text(
+                text = "Version 1.0.0",
+                fontSize = 12.sp,
+                color = Color.White.copy(alpha = 0.6f)
             )
         }
     }
