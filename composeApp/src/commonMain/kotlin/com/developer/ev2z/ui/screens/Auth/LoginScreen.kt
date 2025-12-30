@@ -137,7 +137,7 @@ fun LoginScreen(
                     color = Color.Black
                 )
             },
-            placeholder = { Text("98765 54321") },
+            placeholder = { Text("Enter Your Registered Number") },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
@@ -174,7 +174,7 @@ fun LoginScreen(
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
-            placeholder = { Text("Enter your password") },
+            placeholder = { Text("Enter Your Password") },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),

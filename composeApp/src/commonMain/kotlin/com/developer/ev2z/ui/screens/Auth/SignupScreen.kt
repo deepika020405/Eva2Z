@@ -97,7 +97,7 @@ fun SignupScreen(
             onValueChange = {
                 if (it.length <= 50) fullName = it
             },
-            placeholder = { Text("Enter your full name") },
+            placeholder = { Text("Enter Your Full Name") },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
@@ -135,7 +135,7 @@ fun SignupScreen(
                     color = Color.Black
                 )
             },
-            placeholder = { Text("98765 54321") },
+            placeholder = { Text("Enter Your Valid Number") },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
@@ -172,7 +172,7 @@ fun SignupScreen(
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
-            placeholder = { Text("example@email.com") },
+            placeholder = { Text("Enter Your Valid E-mail") },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
@@ -298,14 +298,14 @@ fun SignupScreen(
             }
         }
 
-        Text(
-            text = annotatedText,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            textAlign = TextAlign.Center,
-            lineHeight = 18.sp
-        )
+//        Text(
+//            text = annotatedText,
+//            modifier = Modifier
+//                .fillMaxWidth()
+//                .padding(horizontal = 16.dp),
+//            textAlign = TextAlign.Center,
+//            lineHeight = 18.sp
+//        )
 
         Spacer(modifier = Modifier.height(32.dp))
     }

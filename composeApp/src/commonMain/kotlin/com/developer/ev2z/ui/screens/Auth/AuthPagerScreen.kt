@@ -1,6 +1,7 @@
 package com.developer.ev2z.ui.screens.Auth
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
@@ -18,7 +19,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.viewmodel.AuthViewModel
+import eva2z_connect_multiplatform.composeapp.generated.resources.Res
+import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.painterResource
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -39,7 +43,7 @@ fun AuthPagerScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(color = Color(0xFFE6EDE3)),
+            .background(color = Color(0xFFE6EEE6)),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
@@ -47,6 +51,33 @@ fun AuthPagerScreen(
             modifier = Modifier.fillMaxSize()
         ) {
             val screenHeight = maxHeight
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(screenHeight * 0.20f),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Image(
+                        painter = painterResource(Res.drawable.app_logo),
+                        contentDescription = "App Logo",
+                        modifier = Modifier.size(80.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = "Eva2z Connect",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                }
+            }
 
             Column(
                 Modifier
@@ -67,7 +98,7 @@ fun AuthPagerScreen(
 
                     // ✅ OLD DESIGN: Title
                     Text(
-                        text = "Log in or Sign up today",
+                        text = "Log in or Sign up ",
                         modifier = Modifier.fillMaxWidth(),
                         style = TextStyle(
                             fontSize = 24.sp,
