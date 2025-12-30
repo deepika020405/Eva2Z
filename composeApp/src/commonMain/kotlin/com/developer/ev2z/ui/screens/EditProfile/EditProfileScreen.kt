@@ -137,7 +137,8 @@ fun EditProfileScreenContent(
     onUpdateProfile: () -> Unit = {},
     onDismissError: () -> Unit = {}
 ) {
-    Scaffold(
+    Scaffold(    modifier = Modifier.statusBarsPadding(), // 👈🔥 ADD THIS
+
         topBar = {
             TopAppBar(
                 title = {
