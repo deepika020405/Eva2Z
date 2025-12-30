@@ -108,14 +108,35 @@ fun App() {
     }
 
     // Login success handler
+//    LaunchedEffect(loginSuccess) {
+//        if (loginSuccess) {
+//            authToken = userPrefs.getToken() ?: ""
+//            isLoggedIn = authToken.isNotEmpty()
+//            println("✅ Login successful! Token: $authToken")
+//        }
+//    }
+
+
     LaunchedEffect(loginSuccess) {
         if (loginSuccess) {
-            authToken = userPrefs.getToken() ?: ""
-            isLoggedIn = authToken.isNotEmpty()
-            println("✅ Login successful! Token: $authToken")
+            delay(300) // Storage complete hone ka wait
+
+            val token = userPrefs.getToken() ?: ""
+            val name = userPrefs.getName() ?: "User"
+
+            if (token.isNotEmpty()) {
+                authToken = token
+                username = name
+                isLoggedIn = true
+                AppTokenProvider.getToken = { token }
+
+                println("✅ Login state updated - Token: $authToken, Username: $username")
+
+                // ✅ Now reset after state is updated
+                authViewModel.resetLoginSuccess()
+            }
         }
     }
-
     // AddDevice result handler
     LaunchedEffect(addDeviceResult) {
         when (val result = addDeviceResult) {
@@ -293,8 +314,8 @@ fun App() {
                     viewModel = authViewModel,
                     onLoginSuccess = {
                         println("🎉 onLoginSuccess triggered")
-                        authViewModel.resetLoginSuccess()
-                        authViewModel.clearError()
+//                            authViewModel.resetLoginSuccess()
+//                            authViewModel.clearError()
                         authViewModel.setLoginSuccess(true)
                     },
                     onForgetPasswordClick = { phone ->

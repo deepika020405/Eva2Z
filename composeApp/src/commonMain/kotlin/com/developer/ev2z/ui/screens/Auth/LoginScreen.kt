@@ -270,7 +270,7 @@ fun LoginScreen(
             )
 
             onLoginSuccess()
-            viewModel.resetLoginSuccess()
+//            viewModel.resetLoginSuccess()
         }
     }
 
