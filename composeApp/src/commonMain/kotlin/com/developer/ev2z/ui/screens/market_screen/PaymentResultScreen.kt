@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.developer.ev2z.util.Analytics
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
@@ -59,6 +60,29 @@ fun PaymentResultContent(
     // ✅ Auto-navigate back after 5 seconds ONLY on success
     LaunchedEffect(isSuccess) {
         if (isSuccess) {
+
+            Analytics.logEvent(
+                name = "purchase",
+                params = mapOf(
+                    "transaction_id" to (transactionId ?: ""),
+                    "currency" to "INR",
+                    "value" to (amount?.toDoubleOrNull()
+                        ?: state.finalAmount?.toDoubleOrNull()
+                        ?: state.totalPrice?.toDoubleOrNull()
+                        ?: 0.0),
+                    "items" to state.cart.mapIndexed { index, item ->
+                        mapOf(
+                            "item_id" to (item.product?.id?.toString() ?: ""),
+                            "item_name" to (item.product?.name ?: ""),
+                            "item_category" to "iot_devices",
+                            "price" to (item.product?.sale_price?.toDoubleOrNull() ?: 0.0),
+                            "quantity" to item.quantity,
+                            "index" to index
+                        )
+                    }
+                )
+            )
+
             delay(5000)
             viewModel.resetPaymentState()
             navigator.popUntilRoot()
@@ -156,6 +180,32 @@ fun PaymentResultContent(
         }
     } else {
         // ❌ FAILURE: Show Error Design
+
+        LaunchedEffect(Unit) {
+            Analytics.logEvent(
+                name = "payment_failed",
+                params = mapOf(
+                    "transaction_id" to (transactionId ?: ""),
+                    "reason" to (reason ?: "unknown"),
+                    "currency" to "INR",
+                    "value" to (amount?.toDoubleOrNull()
+                        ?: state.finalAmount?.toDoubleOrNull()
+                        ?: state.totalPrice?.toDoubleOrNull()
+                        ?: 0.0),
+                    "items" to state.cart.mapIndexed { index, item ->
+                        mapOf(
+                            "item_id" to (item.product?.id?.toString() ?: ""),
+                            "item_name" to (item.product?.name ?: ""),
+                            "item_category" to "iot_devices",
+                            "price" to (item.product?.sale_price?.toDoubleOrNull() ?: 0.0),
+                            "quantity" to item.quantity,
+                            "index" to index
+                        )
+                    }
+                )
+            )
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
