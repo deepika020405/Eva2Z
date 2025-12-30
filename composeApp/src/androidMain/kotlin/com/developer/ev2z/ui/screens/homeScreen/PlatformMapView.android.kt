@@ -1,12 +1,13 @@
-
 // androidMain/ui/screens/homeScreen/PlatformMapView.android.kt
 package com.developer.ev2z.ui.screens.homeScreen
 
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.developer.ev2z.data.local.model.Device
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.*
 
 @Composable
@@ -16,16 +17,83 @@ actual fun PlatformMapView(
     selectedDevice: Device?,
     onMarkerClick: (Device) -> Unit
 ) {
-    val defaultLocation = LatLng(28.6139, 77.2090)
-    val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(defaultLocation, 10f)
+    var isMapLoaded by remember { mutableStateOf(false) }
+    val cameraPositionState = rememberCameraPositionState()
+
+    // Initial camera position - will be updated when map loads
+    LaunchedEffect(Unit) {
+        if (devices.isNotEmpty()) {
+            val firstDevice = devices.firstOrNull { it.hasValidLocation() }
+            firstDevice?.getLatitudeDouble()?.let { lat ->
+                firstDevice.getLongitudeDouble()?.let { lng ->
+                    cameraPositionState.position = CameraPosition.fromLatLngZoom(
+                        LatLng(lat, lng),
+                        10f
+                    )
+                }
+            }
+        }
+    }
+
+    // Zoom to all devices when map is loaded
+    LaunchedEffect(isMapLoaded, devices) {
+        if (isMapLoaded && devices.isNotEmpty()) {
+            val boundsBuilder = LatLngBounds.Builder()
+            var hasValidLocation = false
+
+            devices.forEach { device ->
+                device.getLatitudeDouble()?.let { lat ->
+                    device.getLongitudeDouble()?.let { lng ->
+                        boundsBuilder.include(LatLng(lat, lng))
+                        hasValidLocation = true
+                    }
+                }
+            }
+
+            if (hasValidLocation) {
+                try {
+                    val bounds = boundsBuilder.build()
+                    val padding = 100
+                    cameraPositionState.animate(
+                        CameraUpdateFactory.newLatLngBounds(bounds, padding),
+                        durationMs = 1000
+                    )
+                } catch (e: Exception) {
+                    println("❌ Error zooming to bounds: ${e.message}")
+                }
+            }
+        }
+    }
+
+    // Zoom to selected device
+    LaunchedEffect(isMapLoaded, selectedDevice) {
+        if (isMapLoaded) {
+            selectedDevice?.let { device ->
+                device.getLatitudeDouble()?.let { lat ->
+                    device.getLongitudeDouble()?.let { lng ->
+                        try {
+                            cameraPositionState.animate(
+                                CameraUpdateFactory.newLatLngZoom(LatLng(lat, lng), 15f),
+                                durationMs = 1000
+                            )
+                        } catch (e: Exception) {
+                            println("❌ Error zooming to device: ${e.message}")
+                        }
+                    }
+                }
+            }
+        }
     }
 
     GoogleMap(
         modifier = modifier,
         cameraPositionState = cameraPositionState,
         properties = MapProperties(isMyLocationEnabled = false),
-        uiSettings = MapUiSettings(zoomControlsEnabled = false)
+        uiSettings = MapUiSettings(zoomControlsEnabled = true),
+        onMapLoaded = {
+            println("✅ Google Map loaded successfully")
+            isMapLoaded = true
+        }
     ) {
         devices.forEach { device ->
             device.getLatitudeDouble()?.let { lat ->

@@ -113,6 +113,10 @@ fun HomeScreen(
                         onDropdownClick = {
                             println("🔽 Dropdown clicked")
                             viewModel.toggleDeviceDropdown()
+                        },
+                        onLocationClick = {
+                            println("📍 Location icon clicked")
+                            viewModel.showOverviewSheet()
                         }
                     )
 
@@ -172,7 +176,8 @@ fun TopDeviceCard(
     userName: String,
     deviceCount: Int,
     selectedDevice: Device?,
-    onDropdownClick: () -> Unit
+    onDropdownClick: () -> Unit,
+    onLocationClick: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -192,11 +197,22 @@ fun TopDeviceCard(
                     fontWeight = FontWeight.Medium
                 )
 
-                Text(
-                    text = "$deviceCount Devices Listed",
-                    fontSize = 12.sp,
-                    color = Color.Gray
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.LocationOn,
+                        contentDescription = "Location Overview",
+                        tint = Color(0xFF4CAF50),
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clickable { onLocationClick() }
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "$deviceCount Devices Listed",
+                        fontSize = 12.sp,
+                        color = Color.Gray
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(12.dp))
@@ -360,7 +376,7 @@ fun DeviceListItem(device: Device, onClick: () -> Unit) {
 fun OverviewBottomSheet(
     response: DeviceResponse,
     onClose: () -> Unit,
-    onNavigateToDeviceReport : () -> Unit
+    onNavigateToDeviceReport: () -> Unit
 ) {
     val totalDistance = response.data.sumOf { (it.speed * (it.lastSeenMinutesAgo ?: 0)).toLong() }
     val avgSpeed = response.data.filter { it.speed > 0 }.map { it.speed }.average().takeIf { !it.isNaN() } ?: 0.0
@@ -426,11 +442,6 @@ fun OverviewBottomSheet(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-//        response.data.filter { it.hasValidLocation() }.forEach { device ->
-//            DeviceOverviewItem(device)
-//            onNavigateToDeviceReport()
-//        }
-
         response.data
             .filter { it.hasValidLocation() }
             .forEach { device ->
@@ -442,62 +453,9 @@ fun OverviewBottomSheet(
                 )
             }
 
-//        Spacer(modifier = Modifier.height(8.dp))
-//
-//        Text(
-//            text = "See All",
-//            color = Color(0xFF4CAF50),
-//            fontSize = 14.sp,
-//            fontWeight = FontWeight.Medium,
-//            modifier = Modifier
-//                .align(Alignment.End)
-//                .clickable { }
-//        )
-
         Spacer(modifier = Modifier.height(20.dp))
     }
 }
-
-//@Composable
-//fun DeviceOverviewItem(device: Device) {
-//    val statusColor = Color(device.getStatusColor())
-//
-//    Row(
-//        modifier = Modifier
-//            .fillMaxWidth()
-//            .padding(vertical = 8.dp),
-//        verticalAlignment = Alignment.CenterVertically
-//    ) {
-//        Box(
-//            modifier = Modifier
-//                .size(8.dp)
-//                .background(statusColor, CircleShape)
-//        )
-//
-//        Spacer(modifier = Modifier.width(12.dp))
-//
-//        Column(modifier = Modifier.weight(1f)) {
-//            Text(
-//                text = device.getDisplayName(),
-//                fontSize = 14.sp,
-//                fontWeight = FontWeight.Medium
-//            )
-//            Text(
-//                text = "Device ID: ${device.deviceId}",
-//                fontSize = 11.sp,
-//                color = Color.Gray
-//            )
-//        }
-//
-//        Text(
-//            text = device.getStatusDisplay(),
-//            fontSize = 12.sp,
-//            color = statusColor,
-//            fontWeight = FontWeight.Medium
-//        )
-//    }
-//}
-
 
 @Composable
 fun DeviceOverviewItem(
@@ -509,7 +467,7 @@ fun DeviceOverviewItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onClick() }   // 👈 yaha se callback fire hoga
+            .clickable { onClick() }
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -542,6 +500,7 @@ fun DeviceOverviewItem(
         )
     }
 }
+
 @Composable
 fun StatItem(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
