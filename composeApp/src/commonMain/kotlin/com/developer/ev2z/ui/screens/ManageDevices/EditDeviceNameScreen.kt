@@ -57,7 +57,8 @@ fun EditDeviceNameScreen(
             .fillMaxSize()
             .background(Color.White)
             .verticalScroll(rememberScrollState())
-            .padding(24.dp),
+            .padding(24.dp)
+            .statusBarsPadding(),
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         // Back Button
