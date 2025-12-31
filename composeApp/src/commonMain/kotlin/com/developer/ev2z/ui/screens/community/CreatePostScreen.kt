@@ -78,16 +78,20 @@ class CreatePostScreen : Screen {
                         ) {
                             Text("Post")
                         }
-                    }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.White
+                    )
                 )
-            }
+            },
+            contentWindowInsets = WindowInsets(0)
         ) { padding ->
 
             Column(
                 modifier = Modifier
                     .padding(padding)
                     .fillMaxSize()
-                    .background(Color.White)
+                    .background(Color(0xFFf2f5f0))
                     .padding(16.dp)
             ) {
 
