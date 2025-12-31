@@ -81,7 +81,8 @@ fun ReferAndEarnScreen(
                     containerColor = Color.White
                 )
             )
-        }
+        },
+        contentWindowInsets = WindowInsets(0)
     ) { padding ->
         Box(
             modifier = Modifier
