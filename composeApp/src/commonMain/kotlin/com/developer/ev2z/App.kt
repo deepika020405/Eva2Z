@@ -477,11 +477,11 @@ fun SplashScreen() {
                 .padding(bottom = 16.dp),
             contentAlignment = Alignment.BottomCenter
         ) {
-            Text(
-                text = "Version 1.0.0",
-                fontSize = 12.sp,
-                color = Color.White.copy(alpha = 0.6f)
-            )
+//            Text(
+//                text = "Version 1.0.0",
+//                fontSize = 12.sp,
+//                color = Color.White.copy(alpha = 0.6f)
+//            )
         }
     }
 }

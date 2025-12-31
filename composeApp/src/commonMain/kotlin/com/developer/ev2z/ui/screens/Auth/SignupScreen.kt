@@ -39,8 +39,10 @@ fun SignupScreen(
     }
 
     var email by remember { mutableStateOf("") }
-    var showDialog by remember { mutableStateOf(false) }
-    var dialogMessage by remember { mutableStateOf("") }
+//    var showDialog by remember { mutableStateOf(false) }
+//    var dialogMessage by remember { mutableStateOf("") }
+    var phoneAlreadyRegisteredError by remember { mutableStateOf<String?>(null) }
+    var submitAttempted by remember { mutableStateOf(false) }
 
     val isLoading by viewModel.loading.collectAsState()
     val error by viewModel.error.collectAsState()
@@ -66,14 +68,14 @@ fun SignupScreen(
     }
 
     // ✅ Show dialog when needed
-    if (showDialog) {
-        AlertDialog(
-            onDismissRequest = { },
-            title = { Text("Notice") },
-            text = { Text(dialogMessage) },
-            confirmButton = { }
-        )
-    }
+//    if (showDialog) {
+//        AlertDialog(
+//            onDismissRequest = { },
+//            title = { Text("Notice") },
+//            text = { Text(dialogMessage) },
+//            confirmButton = { }
+//        )
+//    }
 
     Column(
         modifier = Modifier
@@ -126,6 +128,7 @@ fun SignupScreen(
             onValueChange = {
                 if (it.length <= 10 && it.all { char -> char.isDigit() }) {
                     phoneNumber = it
+                    phoneAlreadyRegisteredError = null
                 }
             },
             prefix = {
@@ -146,17 +149,40 @@ fun SignupScreen(
             ),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
             singleLine = true,
-            isError = phoneNumber.isNotEmpty() && phoneNumber.length < 10
+            isError = submitAttempted && (
+                    phoneNumber.length < 10 || phoneAlreadyRegisteredError != null
+                    )
         )
 
-        if (phoneNumber.isNotEmpty() && phoneNumber.length < 10) {
-            Text(
-                text = "Phone number must be 10 digits",
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-            )
+        if (submitAttempted) {
+            when {
+                phoneNumber.isNotEmpty() && phoneNumber.length < 10 -> {
+                    Text(
+                        text = "Phone number must be 10 digits",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                    )
+                }
+
+                phoneAlreadyRegisteredError != null -> {
+                    Text(
+                        text = phoneAlreadyRegisteredError!!,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                    )
+                }
+            }
         }
+//        if (phoneNumber.isNotEmpty() && phoneNumber.length < 10) {
+//            Text(
+//                text = "Phone number must be 10 digits",
+//                color = MaterialTheme.colorScheme.error,
+//                style = MaterialTheme.typography.bodySmall,
+//                modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+//            )
+//        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -199,6 +225,11 @@ fun SignupScreen(
 
         Button(
             onClick = {
+                submitAttempted = true
+                phoneAlreadyRegisteredError = null
+
+                if (phoneNumber.length < 10) return@Button
+
                 val fullPhone = "+91$phoneNumber"
 
                 // 🔥 EVENT 1: Signup details filled
@@ -227,10 +258,10 @@ fun SignupScreen(
                 viewModel.checkPhoneRegistered(fullPhone) { isRegistered, message ->
                     if (isRegistered) {
                         scope.launch {
-                            dialogMessage = "Phone number already registered!\nRedirecting to login..."
-                            showDialog = true
+//                            dialogMessage = "Phone number already registered!\nRedirecting to login..."
+//                            showDialog = true
                             delay(2000)
-                            showDialog = false
+//                            showDialog = false
                             delay(300)
                             // ✅ Pass ONLY digits (without +91)
                             onAlreadyRegistered(phoneNumber)
