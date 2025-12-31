@@ -1,6 +1,7 @@
 // ChangePasswordScreen.kt - FIXED NAVIGATION
 package com.developer.ev2z.ui.screens.ChangePassword
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -25,7 +26,10 @@ import androidx.compose.ui.unit.sp
 import com.developer.ev2z.BackPressHandler
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.network.ApiService
+import eva2z_connect_multiplatform.composeapp.generated.resources.Res
+import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
 import kotlinx.coroutines.delay
+import org.jetbrains.compose.resources.painterResource
 
 @Composable
 fun ChangePasswordScreen(
@@ -43,47 +47,73 @@ fun ChangePasswordScreen(
     var newPasswordVisible by remember { mutableStateOf(false) }
     var confirmPasswordVisible by remember { mutableStateOf(false) }
 
-    var showSuccessDialog by remember { mutableStateOf(false) }
-    var showErrorDialog by remember { mutableStateOf(false) }
-    var dialogMessage by remember { mutableStateOf("") }
+//    var showSuccessDialog by remember { mutableStateOf(false) }
+//    var showErrorDialog by remember { mutableStateOf(false) }
+//    var dialogMessage by remember { mutableStateOf("") }
+    var submitAttempted by remember { mutableStateOf(false) }
+
+    var currentPasswordError by remember { mutableStateOf<String?>(null) }
+    var newPasswordError by remember { mutableStateOf<String?>(null) }
+    var confirmPasswordError by remember { mutableStateOf<String?>(null) }
 
     val isLoading by viewModel.loading.collectAsState()
     val updateSuccess by viewModel.updateSuccess.collectAsState()
     val error by viewModel.error.collectAsState()
 
     // ✅ FIXED: Success handler with proper navigation
+//    LaunchedEffect(updateSuccess) {
+//        if (updateSuccess) {
+//            println("✅ Password changed successfully - showing dialog")
+////            dialogMessage = "Password changed successfully!"
+////            showSuccessDialog = true
+//            delay(2000)
+//            println("✅ Hiding dialog")
+////            showSuccessDialog = false
+//            viewModel.resetUpdateSuccess()
+//            delay(300) // Extra delay for smooth transition
+//            println("✅ Navigating back")
+//            onBackPressed()
+//        }
+//    }
+//
+//    // ✅ Error handler with dialog
+//    LaunchedEffect(error) {
+//        error?.let {
+//            println("❌ Error: $it")
+////            dialogMessage = when {
+////                it.contains("incorrect", ignoreCase = true) -> "Current password is incorrect"
+////                it.contains("network", ignoreCase = true) ||
+////                        it.contains("failed", ignoreCase = true) -> "Network error. Please try again."
+////                else -> it
+////            }
+////            showErrorDialog = true
+//            delay(2000)
+////            showErrorDialog = false
+//            viewModel.clearError()
+//        }
+//    }
+
     LaunchedEffect(updateSuccess) {
         if (updateSuccess) {
-            println("✅ Password changed successfully - showing dialog")
-            dialogMessage = "Password changed successfully!"
-            showSuccessDialog = true
-            delay(2000)
-            println("✅ Hiding dialog")
-            showSuccessDialog = false
             viewModel.resetUpdateSuccess()
-            delay(300) // Extra delay for smooth transition
-            println("✅ Navigating back")
-            onBackPressed()
+            onBackPressed() // ✅ Direct navigation
         }
     }
 
-    // ✅ Error handler with dialog
     LaunchedEffect(error) {
         error?.let {
-            println("❌ Error: $it")
-            dialogMessage = when {
-                it.contains("incorrect", ignoreCase = true) -> "Current password is incorrect"
-                it.contains("network", ignoreCase = true) ||
-                        it.contains("failed", ignoreCase = true) -> "Network error. Please try again."
+            submitAttempted = true
+
+            currentPasswordError = when {
+                it.contains("incorrect", true) -> "Current password is incorrect"
+                it.contains("network", true) || it.contains("failed", true) ->
+                    "Network error. Please try again."
                 else -> it
             }
-            showErrorDialog = true
-            delay(2000)
-            showErrorDialog = false
+
             viewModel.clearError()
         }
     }
-
     // Validation
     val isValid = currentPassword.length >= 6 &&
             newPassword.length >= 6 &&
@@ -93,12 +123,12 @@ fun ChangePasswordScreen(
     val scrollState = rememberScrollState()
 
     // ✅ BackPress Handler - Only when NOT showing success dialog
-    if (!showSuccessDialog) {
-        BackPressHandler {
-            println("🔙 Back pressed")
-            onBackPressed()
-        }
-    }
+//    if (!showSuccessDialog) {
+//        BackPressHandler {
+//            println("🔙 Back pressed")
+//            onBackPressed()
+//        }
+//    }
 
     Column(
         modifier = Modifier
@@ -111,6 +141,33 @@ fun ChangePasswordScreen(
             modifier = Modifier.fillMaxSize()
         ) {
             val screenHeight = maxHeight
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(screenHeight * 0.20f),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Image(
+                        painter = painterResource(Res.drawable.app_logo),
+                        contentDescription = "App Logo",
+                        modifier = Modifier.size(80.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = "Eva2z Connect",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                }
+            }
 
             Column(
                 Modifier
@@ -159,7 +216,10 @@ fun ChangePasswordScreen(
 
                 OutlinedTextField(
                     value = currentPassword,
-                    onValueChange = { currentPassword = it },
+                    onValueChange = {
+                        currentPassword = it
+                        currentPasswordError = null
+                    },
                     placeholder = { Text("Enter current password") },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -180,8 +240,17 @@ fun ChangePasswordScreen(
                             )
                         }
                     },
-                    isError = currentPassword.isNotEmpty() && currentPassword.length < 6
+                    isError = submitAttempted && currentPasswordError != null
                 )
+
+                if (submitAttempted && currentPasswordError != null) {
+                    Text(
+                        text = currentPasswordError!!,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                    )
+                }
 
                 if (currentPassword.isNotEmpty() && currentPassword.length < 6) {
                     Text(
@@ -206,7 +275,10 @@ fun ChangePasswordScreen(
 
                 OutlinedTextField(
                     value = newPassword,
-                    onValueChange = { newPassword = it },
+                    onValueChange = {
+                        newPassword = it
+                        newPasswordError = null
+                    },
                     placeholder = { Text("Enter new password") },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -227,7 +299,7 @@ fun ChangePasswordScreen(
                             )
                         }
                     },
-                    isError = newPassword.isNotEmpty() && newPassword.length < 6
+                    isError = submitAttempted && newPasswordError != null
                 )
 
                 if (newPassword.isNotEmpty() && newPassword.length < 6) {
@@ -266,7 +338,10 @@ fun ChangePasswordScreen(
 
                 OutlinedTextField(
                     value = confirmPassword,
-                    onValueChange = { confirmPassword = it },
+                    onValueChange = {
+                        confirmPassword = it
+                        confirmPasswordError = null
+                    },
                     placeholder = { Text("Confirm new password") },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -287,7 +362,7 @@ fun ChangePasswordScreen(
                             )
                         }
                     },
-                    isError = confirmPassword.isNotEmpty() && confirmPassword != newPassword
+                    isError = submitAttempted && confirmPasswordError != null
                 )
 
                 if (confirmPassword.isNotEmpty() && confirmPassword != newPassword) {
@@ -304,8 +379,33 @@ fun ChangePasswordScreen(
                 // ✅ SUBMIT BUTTON
                 Button(
                     onClick = {
-                        println("🔐 Update password clicked")
-                        viewModel.changePassword(currentPassword, newPassword, confirmPassword)
+                        submitAttempted = true
+
+                        currentPasswordError = null
+                        newPasswordError = null
+                        confirmPasswordError = null
+
+                        when {
+                            currentPassword.length < 6 ->
+                                currentPasswordError = "Password must be at least 6 characters"
+
+                            newPassword.length < 6 ->
+                                newPasswordError = "Password must be at least 6 characters"
+
+                            currentPassword == newPassword ->
+                                newPasswordError = "New password must be different from current password"
+
+                            newPassword != confirmPassword ->
+                                confirmPasswordError = "Passwords do not match"
+
+                            else -> {
+                                viewModel.changePassword(
+                                    currentPassword,
+                                    newPassword,
+                                    confirmPassword
+                                )
+                            }
+                        }
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -339,70 +439,70 @@ fun ChangePasswordScreen(
     }
 
     // ✅ Success Dialog - BLOCKS back press
-    if (showSuccessDialog) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.5f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Card(
-                modifier = Modifier.padding(32.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "✓ Success",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF4CAF50)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = dialogMessage,
-                        fontSize = 14.sp,
-                        color = Color.Gray
-                    )
-                }
-            }
-        }
-    }
-
-    // ✅ Error Dialog - Auto-dismiss
-    if (showErrorDialog) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.5f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Card(
-                modifier = Modifier.padding(32.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "✗ Error",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFF44336)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = dialogMessage,
-                        fontSize = 14.sp,
-                        color = Color.Gray
-                    )
-                }
-            }
-        }
-    }
+//    if (showSuccessDialog) {
+//        Box(
+//            modifier = Modifier
+//                .fillMaxSize()
+//                .background(Color.Black.copy(alpha = 0.5f)),
+//            contentAlignment = Alignment.Center
+//        ) {
+//            Card(
+//                modifier = Modifier.padding(32.dp),
+//                colors = CardDefaults.cardColors(containerColor = Color.White),
+//                shape = RoundedCornerShape(16.dp)
+//            ) {
+//                Column(
+//                    modifier = Modifier.padding(24.dp),
+//                    horizontalAlignment = Alignment.CenterHorizontally
+//                ) {
+//                    Text(
+//                        text = "✓ Success",
+//                        fontSize = 24.sp,
+//                        fontWeight = FontWeight.Bold,
+//                        color = Color(0xFF4CAF50)
+//                    )
+//                    Spacer(modifier = Modifier.height(8.dp))
+//                    Text(
+//                        text = dialogMessage,
+//                        fontSize = 14.sp,
+//                        color = Color.Gray
+//                    )
+//                }
+//            }
+//        }
+//    }
+//
+//    // ✅ Error Dialog - Auto-dismiss
+//    if (showErrorDialog) {
+//        Box(
+//            modifier = Modifier
+//                .fillMaxSize()
+//                .background(Color.Black.copy(alpha = 0.5f)),
+//            contentAlignment = Alignment.Center
+//        ) {
+//            Card(
+//                modifier = Modifier.padding(32.dp),
+//                colors = CardDefaults.cardColors(containerColor = Color.White),
+//                shape = RoundedCornerShape(16.dp)
+//            ) {
+//                Column(
+//                    modifier = Modifier.padding(24.dp),
+//                    horizontalAlignment = Alignment.CenterHorizontally
+//                ) {
+//                    Text(
+//                        text = "✗ Error",
+//                        fontSize = 24.sp,
+//                        fontWeight = FontWeight.Bold,
+//                        color = Color(0xFFF44336)
+//                    )
+//                    Spacer(modifier = Modifier.height(8.dp))
+//                    Text(
+//                        text = dialogMessage,
+//                        fontSize = 14.sp,
+//                        color = Color.Gray
+//                    )
+//                }
+//            }
+//        }
+//    }
 }
