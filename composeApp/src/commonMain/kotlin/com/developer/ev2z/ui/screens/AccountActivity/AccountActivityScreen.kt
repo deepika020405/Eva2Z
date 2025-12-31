@@ -80,7 +80,8 @@ fun AccountActivityScreen(
                     containerColor = Color.White
                 )
             )
-        }
+        },
+        contentWindowInsets = WindowInsets(0)
     ) { padding ->
         LazyColumn(
             modifier = Modifier
