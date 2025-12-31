@@ -167,7 +167,9 @@ fun EditProfileScreenContent(
                     containerColor = Color.White
                 )
             )
-        }
+        },
+        contentWindowInsets = WindowInsets(0) // 🔥 IMPORTANT
+
     ) { paddingValues ->
         Box(
             modifier = Modifier
