@@ -1,5 +1,6 @@
 package com.developer.ev2z.ui.screens.AuthFlows
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,10 +13,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.developer.ev2z.BackPressHandler
 import com.developer.ev2z.ui.screens.Auth.OTPScreen
 import com.developer.ev2z.ui.screens.Auth.PasswordScreen
 import com.developer.ev2z.viewmodel.AuthViewModel
+import eva2z_connect_multiplatform.composeapp.generated.resources.Res
+import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
+import org.jetbrains.compose.resources.painterResource
 
 enum class RegistrationStep {
     VERIFY_OTP,
@@ -80,10 +85,38 @@ fun RegistrationFlow(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+
         BoxWithConstraints(
             modifier = Modifier.fillMaxSize()
         ) {
             val screenHeight = maxHeight
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(screenHeight * 0.20f),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Image(
+                        painter = painterResource(Res.drawable.app_logo),
+                        contentDescription = "App Logo",
+                        modifier = Modifier.size(80.dp)
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = "Eva2z Connect",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+                }
+            }
 
             Box(
                 Modifier
