@@ -192,27 +192,61 @@ class GPSDataViewModel(
 //        }
 //    }
 
+//    private fun convertUtcToIst(utcTime: String): String {
+//        return try {
+//            // Expected: "2025-12-29 14:30:00"
+//            val parts = utcTime.replace("T", " ").split(" ", ":", "-")
+//            val year = parts[0].toInt()
+//            val month = parts[1].toInt()
+//            val day = parts[2].toInt()
+//            val hour = parts[3].toInt() + 5
+//            val minute = parts[4].toInt() + 30
+//            val second = parts[5].toInt()
+//
+//            val finalHour = (hour + minute / 60) % 24
+//            val finalMinute = minute % 60
+//
+//            "%04d-%02d-%02d %02d:%02d:%02d".format(
+//                year, month, day, finalHour, finalMinute, second
+//            )
+//        } catch (e: Exception) {
+//            utcTime
+//        }
+//    }
+
     private fun convertUtcToIst(utcTime: String): String {
         return try {
-            // Expected: "2025-12-29 14:30:00"
-            val parts = utcTime.replace("T", " ").split(" ", ":", "-")
+            val parts = utcTime.replace("T", " ")
+                .split(" ", ":", "-")
+
             val year = parts[0].toInt()
             val month = parts[1].toInt()
             val day = parts[2].toInt()
-            val hour = parts[3].toInt() + 5
-            val minute = parts[4].toInt() + 30
+
+            var hour = parts[3].toInt()
+            var minute = parts[4].toInt()
             val second = parts[5].toInt()
 
-            val finalHour = (hour + minute / 60) % 24
-            val finalMinute = minute % 60
+            // IST offset
+            hour += 5
+            minute += 30
 
-            "%04d-%02d-%02d %02d:%02d:%02d".format(
-                year, month, day, finalHour, finalMinute, second
-            )
+            hour += minute / 60
+            minute %= 60
+            hour %= 24
+
+            // ✅ KMP-safe formatting
+            "${year.pad()}-${month.pad()}-${day.pad()} " +
+                    "${hour.pad()}:${minute.pad()}:${second.pad()}"
+
         } catch (e: Exception) {
             utcTime
         }
     }
+
+    private fun Int.pad(): String =
+        if (this < 10) "0$this" else this.toString()
+
 
     private fun getCurrentTime(): String {
         return "Just now"
