@@ -62,6 +62,8 @@ kotlin {
             implementation(project.dependencies.platform("com.google.firebase:firebase-bom:33.7.0"))
             implementation(libs.firebase.analytics)
             implementation(libs.firebase.crashlytics)
+            implementation("com.google.firebase:firebase-messaging:24.0.0")
+
 
             // ❌ REMOVED: Play Integrity API (causes Play Protect warnings)
             // implementation(libs.integrity)
