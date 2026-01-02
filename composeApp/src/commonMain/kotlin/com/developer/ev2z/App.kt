@@ -398,17 +398,17 @@ fun SplashScreen() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color(0xFF1B5E20),
-                        Color(0xFF2E7D32),
-                        Color(0xFF388E3C),
-                        Color(0xFF4CAF50),
-                        Color(0xFF66BB6A),
-                        Color(0xFF81C784)
-                    )
-                )
+            .background(Color(0xFFFFFFFF)
+//                brush = Brush.verticalGradient(
+//                    colors = listOf(
+//                        Color(0xFF1B5E20),
+//                        Color(0xFF2E7D32),
+//                        Color(0xFF388E3C),
+//                        Color(0xFF4CAF50),
+//                        Color(0xFF66BB6A),
+//                        Color(0xFF81C784)
+//                    )
+//                )
             ),
         contentAlignment = Alignment.Center
     ) {
@@ -420,7 +420,7 @@ fun SplashScreen() {
 
             Box(
                 modifier = Modifier
-                    .size(120.dp)
+                    .size(160.dp)
                     .scale(scale)
                     .rotate(rotation),
                 contentAlignment = Alignment.Center
@@ -428,7 +428,7 @@ fun SplashScreen() {
                 Image(
                     painter = painterResource(Res.drawable.app_logo),
                     contentDescription = "App Logo",
-                    modifier = Modifier.size(100.dp)
+                    modifier = Modifier.size(140.dp)
                 )
             }
 
@@ -438,7 +438,7 @@ fun SplashScreen() {
                 text = "EVA2Z",
                 fontSize = 48.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.White.copy(alpha = alpha)
+                color = Color.Black.copy(alpha = alpha)
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -447,14 +447,14 @@ fun SplashScreen() {
                 text = "Connect",
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Medium,
-                color = Color.White.copy(alpha = alpha * 0.9f),
+                color = Color.Black.copy(alpha = alpha * 0.9f),
                 letterSpacing = 2.sp
             )
 
             Spacer(modifier = Modifier.height(48.dp))
 
             CircularProgressIndicator(
-                color = Color.White,
+                color = Color.Black,
                 modifier = Modifier.size(48.dp),
                 strokeWidth = 4.dp
             )
@@ -464,7 +464,7 @@ fun SplashScreen() {
             Text(
                 text = "Loading...",
                 fontSize = 14.sp,
-                color = Color.White.copy(alpha = 0.8f),
+                color = Color.Black.copy(alpha = 0.8f),
                 letterSpacing = 1.sp
             )
         }
