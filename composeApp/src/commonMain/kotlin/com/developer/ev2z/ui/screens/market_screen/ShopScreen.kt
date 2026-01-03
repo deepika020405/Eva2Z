@@ -455,7 +455,31 @@ fun ShopScreenHost() {
             println("🧭 Navigator: ${navigator != null}")
 
             // ✅ Navigation
-            navigator?.push(ProductDetailsScreen(product = product))
+            navigator?.push(
+                ProductDetailsScreen(
+                    product = product,
+                    onToggleFavorite = { p ->
+                        viewModel.toggleWishlist(p.id)
+
+                        Analytics.logEvent(
+                            name = "add_to_wishlist",
+                            params = mapOf(
+                                "currency" to "INR",
+                                "items" to listOf(
+                                    mapOf(
+                                        "item_id" to p.id.toString(),
+                                        "item_name" to p.title,
+                                        "item_brand" to "EVA2Z",
+                                        "item_category" to "iot_devices",
+                                        "item_variant" to p.subtitle,
+                                        "price" to p.price
+                                    )
+                                )
+                            )
+                        )
+                    }
+                )
+            )
         }
     )
 }

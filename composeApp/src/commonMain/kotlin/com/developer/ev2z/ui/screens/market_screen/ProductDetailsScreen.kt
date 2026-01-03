@@ -2,6 +2,7 @@ package com.developer.ev2z.ui.screens.market_screen
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -18,19 +19,28 @@ import cafe.adriel.voyager.core.screen.Screen
 import coil3.compose.AsyncImage
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import cafe.adriel.voyager.navigator.LocalNavigator
 import com.developer.ev2z.util.Analytics
 
 class ProductDetailsScreen(
-    val product: ShopProduct
+    val product: ShopProduct,
+    val onToggleFavorite: (ShopProduct) -> Unit
 ) : Screen {
 
     @Composable
     override fun Content() {
         val viewModel = ShopViewModelProvider.viewModel
-        ProductDetailsContent(product, viewModel)
+        ProductDetailsContent(
+            product = product,
+            viewModel = viewModel,
+            onToggleFavorite = {
+                onToggleFavorite(product)
+            }
+        )
     }
 
 }
@@ -38,7 +48,8 @@ class ProductDetailsScreen(
 @Composable
 fun ProductDetailsContent(
     product: ShopProduct,
-    viewModel: ShopViewModel
+    viewModel: ShopViewModel,
+    onToggleFavorite: () -> Unit,
 ) {
     val navigator = LocalNavigator.current
 
@@ -48,6 +59,7 @@ fun ProductDetailsContent(
     val finalPrice = product.price + if (withRecharge) product.rechargePrice else 0.0
     val fakeOldPrice = (finalPrice * 1.5).toInt() // Example old price = +50%
     val discountPercent = (((fakeOldPrice - finalPrice) / fakeOldPrice) * 100).toInt()
+    var showDeviceTypePrompt by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         Analytics.logEvent(
@@ -132,6 +144,23 @@ fun ProductDetailsContent(
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp
                     )
+
+                    Spacer(Modifier.width(10.dp))
+                    Column(
+                        modifier = Modifier
+                            .padding(end = 8.dp)
+                            .width(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = if (product.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = "Favorite",
+                            tint = if (product.isFavorite) Color(0xFFFF5252) else Color(0xFFCCCCCC),
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clickable { onToggleFavorite() }
+                        )
+                    }
                 }
 
                 Spacer(Modifier.height(14.dp))
@@ -250,29 +279,32 @@ fun ProductDetailsContent(
                 .padding(16.dp)
         ) {
             Button(
-                enabled = product.deviceType == "none" || selectedType != null,
+//                enabled = product.deviceType == "none" || selectedType != null,
+                enabled = true,
                 onClick = {
+
+                    // 🔴 Device type required but not selected
+                    if (product.deviceType != "none" && selectedType == null) {
+                        showDeviceTypePrompt = true
+                        return@Button
+                    }
+
                     val planType =
                         if (product.id == 10 || product.id == 11) {
                             if (withRecharge) "with_recharge" else "without_recharge"
-                        } else {
-                            null   // ⭐ For all other products, DO NOT send plan_type
-                        }
+                        } else null
+
                     Analytics.logEvent(
                         name = "add_to_cart",
                         params = mapOf(
                             "currency" to "INR",
                             "value" to finalPrice,
-
-                            // Item level details
                             "item_id" to product.id,
                             "item_name" to product.title,
                             "item_category" to "iot_devices",
                             "item_variant" to (selectedType ?: "default"),
                             "price" to finalPrice,
                             "quantity" to 1,
-
-                            // Custom useful params
                             "with_recharge" to withRecharge,
                             "recharge_price" to product.rechargePrice,
                             "device_type" to (selectedType ?: ""),
@@ -284,9 +316,10 @@ fun ProductDetailsContent(
                         add = "add",
                         productId = product.id,
                         quantity = 1,
-                        plan_type = planType ?: "",  // backend expects string OR empty
+                        plan_type = planType ?: "",
                         device_type = selectedType ?: ""
                     )
+
                     navigator?.pop()
                 },
                 modifier = Modifier
@@ -312,6 +345,22 @@ fun ProductDetailsContent(
                 )
             )
         }
+    }
+    if (showDeviceTypePrompt) {
+        AlertDialog(
+            onDismissRequest = { showDeviceTypePrompt = false },
+            confirmButton = {
+                TextButton(onClick = { showDeviceTypePrompt = false }) {
+                    Text("OK")
+                }
+            },
+            title = {
+                Text("Device Type Required")
+            },
+            text = {
+                Text("Please select device type (Android or iOS) to continue.")
+            }
+        )
     }
 }
 
