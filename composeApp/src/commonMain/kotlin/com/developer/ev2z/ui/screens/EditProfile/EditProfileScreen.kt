@@ -28,6 +28,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import com.developer.ev2z.data.local.StorageManager
+import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.util.rememberImagePicker
 import kotlinx.coroutines.delay
@@ -48,6 +49,11 @@ fun EditProfileScreen(
     LaunchedEffect(Unit) {
         viewModel.loadUserData()
     }
+    // ✅ System back = same as top back
+    PlatformBackHandler(enabled = true) {
+        onBackPressed()
+    }
+
 
     // ✅ Image Picker Launcher - NO auto upload
     val imagePickerLauncher = rememberImagePicker { imageBytes ->
