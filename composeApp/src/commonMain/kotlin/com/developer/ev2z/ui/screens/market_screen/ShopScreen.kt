@@ -31,6 +31,7 @@ import com.developer.ev2z.util.Analytics
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo // apna drawable
 import eva2z_connect_multiplatform.composeapp.generated.resources.banner_img_1
+import eva2z_connect_multiplatform.composeapp.generated.resources.banner_img_2
 import eva2z_connect_multiplatform.composeapp.generated.resources.shop_banner
 import org.jetbrains.compose.resources.painterResource
 
@@ -200,10 +201,10 @@ private fun ShopBanner() {
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Image(
-            painter = painterResource(Res.drawable.banner_img_1),
+            painter = painterResource(Res.drawable.banner_img_2),
             contentDescription = "Shop Banner",
             modifier = Modifier
-                .height(140.dp)
+                .height(160.dp)
                 .fillMaxWidth(),
             contentScale = ContentScale.Crop   // 👈 image properly fill ho jayegi
         )
