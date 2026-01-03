@@ -80,6 +80,7 @@ fun SignupScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .imePadding()
             .verticalScroll(scrollState)
             .padding(horizontal = 12.dp, vertical = 24.dp)
     ) {
