@@ -30,6 +30,7 @@ import coil3.compose.AsyncImage
 import com.developer.ev2z.util.Analytics
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo // apna drawable
+import eva2z_connect_multiplatform.composeapp.generated.resources.banner_img_1
 import eva2z_connect_multiplatform.composeapp.generated.resources.shop_banner
 import org.jetbrains.compose.resources.painterResource
 
@@ -199,7 +200,7 @@ private fun ShopBanner() {
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Image(
-            painter = painterResource(Res.drawable.shop_banner),
+            painter = painterResource(Res.drawable.banner_img_1),
             contentDescription = "Shop Banner",
             modifier = Modifier
                 .height(140.dp)
@@ -222,7 +223,8 @@ private fun ProductCard(
             .fillMaxWidth()
             .shadow(2.dp, RoundedCornerShape(18.dp)),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        onClick = {onPlaceOrder()}
     ) {
         Row(
             modifier = Modifier
@@ -287,16 +289,16 @@ private fun ProductCard(
                     )
                 }
             }
-            Button(
-                onClick = {
-                    println("🟢 Button clicked for: ${product.title}")
-                    onPlaceOrder()
-                },
-                shape = RoundedCornerShape(30.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF34A853))
-            ) {
-                Text("View Details", fontSize = 12.sp)
-            }
+//            Button(
+//                onClick = {
+//                    println("🟢 Button clicked for: ${product.title}")
+//                    onPlaceOrder()
+//                },
+//                shape = RoundedCornerShape(30.dp),
+//                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF34A853))
+//            ) {
+//                Text("View Details", fontSize = 12.sp)
+//            }
         }
     }
 }
