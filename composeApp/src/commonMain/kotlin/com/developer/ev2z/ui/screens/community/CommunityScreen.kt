@@ -68,6 +68,7 @@ import com.developer.ev2z.response.Comment
 import com.developer.ev2z.response.Post
 import com.developer.ev2z.response.Story
 import com.developer.ev2z.response.Users
+import com.developer.ev2z.ui.screens.Profile.ProfileImageZoomDialog
 import com.developer.ev2z.util.Analytics
 import io.ktor.util.date.getTimeMillis
 import kotlinx.coroutines.delay
@@ -160,37 +161,47 @@ fun CreatePostCard(onClick: () -> Unit) {
 }
 
 
+
 @Composable
-fun PostItem(post: Post,BASE_IMAGE_URL: String,onLikeClick: (Int) -> Unit,onCommentClick: (Int) -> Unit) {
+fun PostItem(
+    post: Post,
+    BASE_IMAGE_URL: String,
+    onLikeClick: (Int) -> Unit,
+    onCommentClick: (Int) -> Unit
+) {
     Card(
         modifier = Modifier
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
             .fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
-        elevation = CardDefaults.cardElevation(3.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        )
+        shape = RoundedCornerShape(18.dp),
+        elevation = CardDefaults.cardElevation(4.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        Column(
+            modifier = Modifier
+                .clip(RoundedCornerShape(18.dp)) // 🔥 MASTER CLIP
+                .clipToBounds()
+                .padding(14.dp)
+        ) {
 
-            PostHeader(post.user, post.created_at,BASE_IMAGE_URL)
+            PostHeader(post.user, post.created_at, BASE_IMAGE_URL)
 
             Spacer(Modifier.height(8.dp))
 
-            // ✅ Text-only OR Text+Image
             post.title?.takeIf { it.isNotBlank() }?.let {
-                Text(text = it, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+                Text(it, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(4.dp))
             }
+
             post.body?.takeIf { it.isNotBlank() }?.let {
-                Text(text = it, style = MaterialTheme.typography.bodyMedium)
+                Text(it)
                 Spacer(Modifier.height(8.dp))
             }
 
-            // ✅ Image-only OR Text+Image
             if (post.media_urls.isNotEmpty()) {
-                PostImages(post.media_urls,BASE_IMAGE_URL)
+                FacebookPostImages(
+                    images = post.media_urls.map { "$BASE_IMAGE_URL$it" }
+                )
                 Spacer(Modifier.height(8.dp))
             }
 
@@ -202,191 +213,184 @@ fun PostItem(post: Post,BASE_IMAGE_URL: String,onLikeClick: (Int) -> Unit,onComm
         }
     }
 }
-@Composable
-fun PostImages(
-    images: List<String>,
-    BASE_IMAGE_URL: String
-) {
-    if (images.isEmpty()) return
 
-    val urls = images.map { "$BASE_IMAGE_URL$it" }
+@Composable
+fun FacebookPostImages(images: List<String>) {
     var previewImage by remember { mutableStateOf<String?>(null) }
 
-    when (urls.size) {
-        1 -> SingleImage(urls[0]) { previewImage = it }
-        2 -> TwoImages(urls) { previewImage = it }
-        3 -> ThreeImages(urls) { previewImage = it }
-        else -> FourPlusImages(urls) { previewImage = it }
+    when (images.size) {
+        1 -> FBOneImage(images[0]) { previewImage = it }
+        2 -> FBTwoImages(images) { previewImage = it }
+        3 -> FBThreeImages(images) { previewImage = it }
+        else -> FBFourPlusImages(images) { previewImage = it }
     }
 
     previewImage?.let {
-        FullScreenImage(
+        ProfileImageZoomDialog(
             imageUrl = it,
+            userName = "",
             onDismiss = { previewImage = null }
         )
     }
 }
 
 @Composable
-fun SingleImage(
+fun FBOneImage(
     url: String,
     onClick: (String) -> Unit
 ) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(220.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .clipToBounds()
+            .height(240.dp)
+            .clip(RoundedCornerShape(14.dp))
             .clickable { onClick(url) }
     ) {
-        NetworkImage(
-            url = url,
-            modifier = Modifier.fillMaxSize()
+        AsyncImage(
+            model = url,
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
         )
     }
 }
-
-
-
 @Composable
-fun TwoImages(
+fun FBTwoImages(
     urls: List<String>,
     onClick: (String) -> Unit
 ) {
-    Row {
-        urls.take(2).forEach { url ->
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(180.dp)
-                    .padding(end = 4.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { onClick(url) }
-                        .clipToBounds()
-                ) {
-                    NetworkImage(
-                        url = url,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-            }
-        }
-    }
-}
-
-
-@Composable
-fun ThreeImages(
-    urls: List<String>,
-    onClick: (String) -> Unit
-) {
-    Column {
-        Row {
-            urls.take(2).forEach { url ->
-                NetworkImage(
-                    url = url,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(140.dp)
-                        .padding(end = 4.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { onClick(url) }
-                )
-            }
-        }
-
-        Spacer(Modifier.height(4.dp))
-
-        NetworkImage(
-            url = urls[2],
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(180.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .clickable { onClick(urls[2]) }
-        )
-    }
-}
-
-@Composable
-fun FourPlusImages(
-    urls: List<String>,
-    onClick: (String) -> Unit
-) {
-    Column {
-        Row {
-            ImageCell(urls[0], onClick)
-            ImageCell(urls[1], onClick)
-        }
-
-        Spacer(Modifier.height(4.dp))
-
-        Row {
-            ImageCell(urls[2], onClick)
-
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(140.dp)
-                    .padding(start = 4.dp)
-                    .clip(RoundedCornerShape(12.dp))   // ✅ ONE CLIP ONLY
-                    .clickable { onClick(urls[3]) }
-            ) {
-                NetworkImage(
-                    url = urls[3],
-                    modifier = Modifier.fillMaxSize()
-                )
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color.Black.copy(alpha = 0.55f)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "+${urls.size - 3}",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.headlineMedium
-                    )
-                }
-            }
-
-        }
-    }
-}
-
-@Composable
-private fun RowScope.ImageCell(
-    url: String,
-    onClick: (String) -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .weight(1f)
-            .height(140.dp)
-            .padding(end = 4.dp)              // ✅ padding OUTSIDE
+    Row(
+        modifier = Modifier.height(200.dp)
     ) {
+        urls.take(2).forEachIndexed { index, url ->
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(if (index == 0) 0.dp else 4.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { onClick(url) }
+            ) {
+                AsyncImage(
+                    model = url,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun FBThreeImages(
+    urls: List<String>,
+    onClick: (String) -> Unit
+) {
+    Column(modifier = Modifier.height(260.dp)) {
+
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
+                .weight(1f)
                 .clip(RoundedCornerShape(12.dp))
-                .background(Color.LightGray)
-                .clickable { onClick(url) }
-                .clipToBounds()               // 🔥 MOST IMPORTANT
+                .clickable { onClick(urls[0]) }
         ) {
-            NetworkImage(
-                url = url,
-                modifier = Modifier.fillMaxSize()
+            AsyncImage(
+                model = urls[0],
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
             )
+        }
+
+        Spacer(Modifier.height(4.dp))
+
+        Row(modifier = Modifier.weight(1f)) {
+            urls.drop(1).take(2).forEach { url ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(2.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onClick(url) }
+                ) {
+                    AsyncImage(
+                        model = url,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+            }
         }
     }
 }
+
+@Composable
+fun FBFourPlusImages(
+    urls: List<String>,
+    onClick: (String) -> Unit
+) {
+    Column(modifier = Modifier.height(260.dp)) {
+
+        Row(modifier = Modifier.weight(1f)) {
+            urls.take(2).forEach { url ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(2.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onClick(url) }
+                ) {
+                    AsyncImage(
+                        model = url,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+            }
+        }
+
+        Row(modifier = Modifier.weight(1f)) {
+            urls.drop(2).take(2).forEachIndexed { index, url ->
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(2.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onClick(url) }
+                ) {
+                    AsyncImage(
+                        model = url,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+
+                    if (index == 1 && urls.size > 4) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black.copy(alpha = 0.55f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "+${urls.size - 4}",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.headlineMedium
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+
 
 
 
