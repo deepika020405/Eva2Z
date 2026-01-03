@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
@@ -18,6 +19,8 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.navigator.tab.*
 import com.developer.ev2z.data.local.StorageManager
+import com.developer.ev2z.getAppContext
+import com.developer.ev2z.getPlatformContext
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.repository.ProductRepository
 import com.developer.ev2z.ui.screens.EditProfile.EditProfileScreen
@@ -154,7 +157,7 @@ class ProfileTab(
 
 // ------------------ MAIN NAV GRAPH -------------------
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
 @Composable
 fun HomeNavGraph(
     viewModel: HomeViewModel,
@@ -198,6 +201,8 @@ fun HomeNavGraph(
     var manageDeviceRefresh by remember { mutableStateOf(0) }
     var profileRefresh by remember { mutableStateOf(0) }
 
+    var showExitDialog by remember { mutableStateOf(false) }
+
     Box(modifier = Modifier.fillMaxSize()) {
         HomeNavGraphContent(
             viewModel = viewModel,
@@ -225,6 +230,34 @@ fun HomeNavGraph(
             onNavigateToAboutApp = { showAboutApp = true },
             onLogout = onLogout
         )
+
+        val isOnRootTabs =
+            !showEditProfile &&
+                    !showManageDevice &&
+                    !showGPSData &&
+                    !showEditDeviceName &&
+                    !showPrivacyPolicy &&
+                    !showTermsConditions &&
+                    !showRefundPolicy &&
+                    !showShippingPolicy &&
+                    !showGeoFencing &&
+                    !showHistoryPlayback &&
+                    !showGeneralSettings &&
+                    !showAccountActivity &&
+                    !showReferAndEarn &&
+                    !showAboutApp
+
+        PlatformBackHandler(enabled = isOnRootTabs) {
+            when (pagerState.currentPage) {
+                0 -> showExitDialog = true
+                1, 2, 3 -> {
+                    coroutineScope.launch {
+                        pagerState.animateScrollToPage(0)
+                    }
+                }
+            }
+        }
+
 
         // Edit Profile Screen
         if (showEditProfile) {
@@ -384,6 +417,31 @@ fun HomeNavGraph(
                 onBackClick = { showAboutApp = false }
             )
         }
+
+        if (showExitDialog) {
+            AlertDialog(
+                onDismissRequest = { showExitDialog = false },
+                title = { Text("Exit App") },
+                text = { Text("Are you sure you want to exit?") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showExitDialog = false
+
+                            // ✅ KMP-safe exit
+                            exitApp()
+                        }
+                    ) {
+                        Text("Yes")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showExitDialog = false }) {
+                        Text("No")
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -524,9 +582,3 @@ fun CustomBottomNavBar(
 @Composable
 expect fun SetupStatusBar()
 
-@Composable
-fun WalletScreen() {
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text("Explore Screen", style = MaterialTheme.typography.headlineMedium)
-    }
-}
