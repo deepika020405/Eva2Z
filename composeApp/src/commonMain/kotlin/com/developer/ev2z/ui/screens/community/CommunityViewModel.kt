@@ -14,6 +14,8 @@ import kotlinx.coroutines.launch
 import com.developer.ev2z.response.Post
 import com.developer.ev2z.response.Story
 import com.developer.ev2z.response.StoryViewer
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 data class CommunityUiState(
     val loading: Boolean = false,
@@ -41,36 +43,66 @@ class CommunityViewModel(
 
     // 🔑 Refresh trigger
     private var refreshKey by mutableStateOf(0)
+    private val CACHE_VALIDITY = 2 * 60 * 1000 // ⏱️ 2 minutes
+    // 🔥 In-memory cache
+    private var cachedPosts: List<Post>? = null
+    private var cachedStories: List<Story>? = null
+    private var cachedAuthUserId: Int = 0
+    private var lastLoadedAt: Long = 0L
+
 
     fun observeRefreshKey(): Int = refreshKey
     private val viewedStoryIds = mutableSetOf<Int>()
 
 
-    // ❌ init me loadPosts mat karo
-    // init { loadPosts() }
+
+
 
 //    fun loadPosts() {
-//        if (_state.loading) return   // 👈 safety: double call avoid
+//        if (_state.loading) return
 //
-//        _state = _state.copy(loading = true, error = null)
+//        _state = _state.copy(loading = true)
 //
 //        scope.launch {
 //            try {
 //                val posts = repository.fetchPosts()
-//                _state = CommunityUiState(
+//                val storiesRes = repository.fetchStories()
+//
+//                _state = _state.copy(
 //                    loading = false,
-//                    posts = posts
+//                    posts = posts,
+//                    stories = storiesRes.stories,
+//                    authUserId = storiesRes.auth_user_id
 //                )
 //            } catch (e: Exception) {
-//                _state = CommunityUiState(
+//                _state = _state.copy(
 //                    loading = false,
-//                    error = e.message ?: "Something went wrong"
+//                    error = e.message
 //                )
 //            }
 //        }
 //    }
 
-    fun loadPosts() {
+    @OptIn(ExperimentalTime::class)
+    fun loadPosts(forceRefresh: Boolean = false) {
+        val now = Clock.System.now().toEpochMilliseconds()
+        // ✅ USE CACHE
+        if (
+            !forceRefresh &&
+            cachedPosts != null &&
+            cachedStories != null &&
+            now - lastLoadedAt < CACHE_VALIDITY
+        ) {
+            _state = _state.copy(
+                loading = false,
+                posts = cachedPosts!!,
+                stories = cachedStories!!,
+                authUserId = cachedAuthUserId,
+                error = null
+            )
+            return
+        }
+
         if (_state.loading) return
 
         _state = _state.copy(loading = true)
@@ -80,11 +112,18 @@ class CommunityViewModel(
                 val posts = repository.fetchPosts()
                 val storiesRes = repository.fetchStories()
 
+                // 🔥 SAVE TO CACHE
+                cachedPosts = posts
+                cachedStories = storiesRes.stories
+                cachedAuthUserId = storiesRes.auth_user_id
+                lastLoadedAt = Clock.System.now().toEpochMilliseconds()
+
                 _state = _state.copy(
                     loading = false,
                     posts = posts,
                     stories = storiesRes.stories,
-                    authUserId = storiesRes.auth_user_id
+                    authUserId = storiesRes.auth_user_id,
+                    error = null
                 )
             } catch (e: Exception) {
                 _state = _state.copy(
@@ -99,6 +138,7 @@ class CommunityViewModel(
     // 🔥 Call this when ANY change happens
     fun refreshPosts() {
         refreshKey++
+        loadPosts(forceRefresh = true)
     }
 
     fun createPost(
@@ -167,6 +207,7 @@ class CommunityViewModel(
                 )
             }
         }
+        cachedPosts = _state.posts
     }
 
     fun load(postId: Int) {
@@ -322,6 +363,7 @@ class CommunityViewModel(
                 } else post
             }
         )
+        cachedPosts = _state.posts
     }
 
 }
