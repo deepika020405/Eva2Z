@@ -53,6 +53,7 @@ class CommunityViewModel(
 
     fun observeRefreshKey(): Int = refreshKey
     private val viewedStoryIds = mutableSetOf<Int>()
+    private val cachedViewedStoryIds = mutableSetOf<Int>()
 
 
 
@@ -93,6 +94,9 @@ class CommunityViewModel(
             cachedStories != null &&
             now - lastLoadedAt < CACHE_VALIDITY
         ) {
+            viewedStoryIds.clear()
+            viewedStoryIds.addAll(cachedViewedStoryIds)
+
             _state = _state.copy(
                 loading = false,
                 posts = cachedPosts!!,
@@ -283,6 +287,31 @@ class CommunityViewModel(
     }
 
 
+//    fun startStory(index: Int) {
+//        val story = _state.stories.getOrNull(index) ?: return
+//
+//        _state = _state.copy(
+//            storyIndex = index,
+//            storyProgress = 0f,
+//            storyPaused = false
+//        )
+//
+//        if (!viewedStoryIds.contains(story.id)) {
+//            viewedStoryIds.add(story.id)
+//
+//            // 🔥 cache ko sync rakho
+//            cachedViewedStoryIds.add(story.id)
+//
+//            scope.launch {
+//                repository.viewStory(story.id)
+//            }
+//        }
+//        onStoryOpened(story)
+//
+//        loadStoryViewers(story.id)
+//        runStoryTimer()
+//    }
+
     fun startStory(index: Int) {
         val story = _state.stories.getOrNull(index) ?: return
 
@@ -292,17 +321,10 @@ class CommunityViewModel(
             storyPaused = false
         )
 
-        // ✅ VIEW API only once
-        if (!viewedStoryIds.contains(story.id)) {
-            viewedStoryIds.add(story.id)
-            scope.launch {
-                repository.viewStory(story.id)
-            }
-        }
-
+        onStoryOpened(story)      // ✅ SINGLE SOURCE
+        loadStoryViewers(story.id)
         runStoryTimer()
     }
-
     private fun runStoryTimer() {
         scope.launch {
             while (_state.storyProgress < 1f) {
@@ -353,6 +375,20 @@ class CommunityViewModel(
         _state = _state.copy(storyViewers = emptyList())
     }
 
+    fun isStoryViewed(storyId: Int): Boolean {
+        return viewedStoryIds.contains(storyId)
+    }
+
+    fun onStoryOpened(story: Story) {
+        if (!viewedStoryIds.contains(story.id)) {
+            viewedStoryIds.add(story.id)
+            cachedViewedStoryIds.add(story.id)
+
+            scope.launch {
+                repository.viewStory(story.id)
+            }
+        }
+    }
     fun incrementCommentCount(postId: Int) {
         _state = state.copy(
             posts = state.posts.map { post ->

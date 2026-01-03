@@ -60,6 +60,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
@@ -67,6 +69,7 @@ import coil3.compose.AsyncImage
 import com.developer.ev2z.response.Comment
 import com.developer.ev2z.response.Post
 import com.developer.ev2z.response.Story
+import com.developer.ev2z.response.StoryViewer
 import com.developer.ev2z.response.Users
 import com.developer.ev2z.ui.screens.Profile.ProfileImageZoomDialog
 import com.developer.ev2z.util.Analytics
@@ -82,6 +85,7 @@ fun CommunityScreen(
     authUserId: Int,
     onCreatePostClick: () -> Unit,
     onLikeClick: (Int) -> Unit,
+    viewModel: CommunityViewModel, // ✅ ADD THIS
     onCommentClick: (Int) -> Unit,
     onAddStory: () -> Unit,
     onStoryClick: (Story) -> Unit
@@ -97,6 +101,7 @@ fun CommunityScreen(
             StoriesRow(
                 stories = stories,
                 authUserId = authUserId,
+                viewModel = viewModel ,
                 onAddStory = onAddStory,
                 onStoryClick = onStoryClick
             )
@@ -941,10 +946,41 @@ fun CommentItem(
     }
 }
 
+//@Composable
+//fun StoriesRow(
+//    stories: List<Story>,
+//    authUserId: Int,
+//    onAddStory: () -> Unit,
+//    onStoryClick: (Story) -> Unit
+//) {
+//    LazyRow(
+//        modifier = Modifier
+//            .fillMaxWidth()
+//            .padding(vertical = 8.dp),
+//        contentPadding = PaddingValues(horizontal = 12.dp)
+//    ) {
+//
+//        // 🔹 YOUR STORY (FIRST)
+//        item {
+//            AddStoryItem(onClick = onAddStory)
+//        }
+//
+//        // 🔹 OTHER STORIES
+//        items(stories) { story ->
+//            StoryItem(
+//                story = story,
+//                isMine = story.user.id == authUserId,
+//                onClick = { onStoryClick(story) }
+//            )
+//        }
+//    }
+//}
+
 @Composable
 fun StoriesRow(
     stories: List<Story>,
     authUserId: Int,
+    viewModel: CommunityViewModel,
     onAddStory: () -> Unit,
     onStoryClick: (Story) -> Unit
 ) {
@@ -955,16 +991,14 @@ fun StoriesRow(
         contentPadding = PaddingValues(horizontal = 12.dp)
     ) {
 
-        // 🔹 YOUR STORY (FIRST)
         item {
             AddStoryItem(onClick = onAddStory)
         }
 
-        // 🔹 OTHER STORIES
         items(stories) { story ->
             StoryItem(
                 story = story,
-                isMine = story.user.id == authUserId,
+                isViewed = viewModel.isStoryViewed(story.id),
                 onClick = { onStoryClick(story) }
             )
         }
@@ -1012,12 +1046,79 @@ fun AddStoryItem(onClick: () -> Unit) {
 }
 
 
+//@Composable
+//fun StoryItem(
+//    story: Story,
+//    isMine: Boolean,
+//    onClick: () -> Unit
+//) {
+//    Column(
+//        modifier = Modifier
+//            .padding(end = 12.dp)
+//            .clickable { onClick() },
+//        horizontalAlignment = Alignment.CenterHorizontally
+//    ) {
+//
+//        Box(
+//            modifier = Modifier
+//                .size(68.dp)
+//                .clip(CircleShape)
+//                .background(
+//                    Brush.linearGradient(
+//                        listOf(Color.Magenta, Color.Red, Color.Yellow)
+//                    )
+//                ),
+//            contentAlignment = Alignment.Center
+//        ) {
+//
+//            AsyncImage(
+//                model = "https://gps.eva2z.in/storage/${story.user.photo}",
+//                contentDescription = null,
+//                modifier = Modifier
+//                    .size(60.dp)
+//                    .clip(CircleShape)
+//                    .background(Color.LightGray),
+//                contentScale = ContentScale.Crop
+//            )
+//        }
+//
+//        Spacer(Modifier.height(4.dp))
+//        Text(
+//            text = story.user.name,
+//            maxLines = 1,
+//            style = MaterialTheme.typography.labelSmall
+//        )
+//    }
+//}
+
+
+
 @Composable
 fun StoryItem(
     story: Story,
-    isMine: Boolean,
+    isViewed: Boolean,
     onClick: () -> Unit
 ) {
+    val ringBrush =
+        if (isViewed) {
+            // ✅ Viewed → faded ring
+            Brush.linearGradient(
+                listOf(
+                    Color.LightGray,
+                    Color.Gray
+                )
+            )
+        } else {
+            // 🔥 Unviewed → Instagram gradient
+            Brush.linearGradient(
+                listOf(
+                    Color(0xFFD62976), // pink
+                    Color(0xFFFA7E1E), // orange
+                    Color(0xFFFEDA75)  // yellow
+                )
+            )
+        }
+
     Column(
         modifier = Modifier
             .padding(end = 12.dp)
@@ -1027,13 +1128,9 @@ fun StoryItem(
 
         Box(
             modifier = Modifier
-                .size(68.dp)
+                .size(70.dp)
                 .clip(CircleShape)
-                .background(
-                    Brush.linearGradient(
-                        listOf(Color.Magenta, Color.Red, Color.Yellow)
-                    )
-                ),
+                .background(ringBrush),
             contentAlignment = Alignment.Center
         ) {
 
@@ -1049,19 +1146,54 @@ fun StoryItem(
         }
 
         Spacer(Modifier.height(4.dp))
+
         Text(
             text = story.user.name,
             maxLines = 1,
-            style = MaterialTheme.typography.labelSmall
+            style = MaterialTheme.typography.labelSmall,
+            color = if (isViewed) Color.Gray else Color.Black
         )
     }
 }
 
+@Composable
+fun StoryViewersBar(
+    viewers: List<StoryViewer>
+) {
+    if (viewers.isEmpty()) return
 
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.Black.copy(alpha = 0.4f))
+            .padding(12.dp)
+    ) {
 
+        Text(
+            text = "👁️ ${viewers.size} views",
+            color = Color.White,
+            fontWeight = FontWeight.SemiBold
+        )
 
+        Spacer(Modifier.height(8.dp))
 
+        viewers.take(5).forEach { viewer ->
+            Text(
+                text = viewer.user.name,
+                color = Color.White,
+                fontSize = 12.sp
+            )
+        }
 
+        if (viewers.size > 5) {
+            Text(
+                text = "+${viewers.size - 5} more",
+                color = Color.LightGray,
+                fontSize = 12.sp
+            )
+        }
+    }
+}
 
 
 
@@ -1129,7 +1261,8 @@ class CommunityScreenWrapper : Screen {
                         val index = state.stories.indexOfFirst { it.id == story.id }
                         viewModel.startStory(index)
                         navigator.push(StoryViewerScreen())
-                    }
+                    },
+                    viewModel = viewModel
 
                 )
 
