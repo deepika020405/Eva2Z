@@ -17,6 +17,8 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import com.developer.ev2z.phonepe.openPhonePeSdk
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 data class ShopUiState(
     val loading: Boolean = false,
@@ -58,8 +60,68 @@ class ShopViewModel(
 
     private val _paymentState = MutableStateFlow<PaymentState>(PaymentState.Idle)
     val paymentState: StateFlow<PaymentState> = _paymentState
+    private val CACHE_VALIDITY = 2 * 60 * 1000 // 2 min
 
-    fun loadData() {
+    // 🔥 In-memory cache
+    private var cachedProducts: List<ProductDto>? = null
+    private var cachedWishlist: List<WishlistProductWrapper>? = null
+    private var cachedCart: List<CartItemDto>? = null
+    private var cachedCartCount: Int = 0
+    private var cachedTotalPrice: String? = null
+    private var lastLoadedAt: Long = 0L
+
+//    fun loadData() {
+//        _state.value = _state.value.copy(loading = true)
+//        val token = tokenProvider()
+//
+//        scope.launch {
+//            try {
+//                val products = repo.getProducts(token)
+//                val wishlist = repo.getWishlist(token)
+//                val cartResp = repo.getCart(token)
+//                val count = cartResp.cart.sumOf { it.quantity }
+//
+//                _state.value = ShopUiState(
+//                    loading = false,
+//                    products = products,
+//                    wishlist = wishlist,
+//                    cart = cartResp.cart,
+//                    cartCount = count,
+//                    totalPrice = cartResp.totalPrice
+//                )
+//
+//            } catch (e: Exception) {
+//                _state.value = ShopUiState(
+//                    loading = false,
+//                    error = e.message ?: "Unknown Error"
+//                )
+//            }
+//        }
+//    }
+@OptIn(ExperimentalTime::class)
+    fun loadData(forceRefresh: Boolean = false) {
+        val now = Clock.System.now().toEpochMilliseconds()
+
+        // ✅ USE CACHE
+        if (
+            !forceRefresh &&
+            cachedProducts != null &&
+            cachedWishlist != null &&
+            cachedCart != null &&
+            now - lastLoadedAt < CACHE_VALIDITY
+        ) {
+            _state.value = _state.value.copy(
+                loading = false,
+                products = cachedProducts!!,
+                wishlist = cachedWishlist!!,
+                cart = cachedCart!!,
+                cartCount = cachedCartCount,
+                totalPrice = cachedTotalPrice,
+                error = null
+            )
+            return
+        }
+
         _state.value = _state.value.copy(loading = true)
         val token = tokenProvider()
 
@@ -70,32 +132,43 @@ class ShopViewModel(
                 val cartResp = repo.getCart(token)
                 val count = cartResp.cart.sumOf { it.quantity }
 
-                _state.value = ShopUiState(
+                // 🔥 SAVE CACHE
+                cachedProducts = products
+                cachedWishlist = wishlist
+                cachedCart = cartResp.cart
+                cachedCartCount = count
+                cachedTotalPrice = cartResp.totalPrice
+                lastLoadedAt = Clock.System.now().toEpochMilliseconds()
+
+                _state.value = _state.value.copy(
                     loading = false,
                     products = products,
                     wishlist = wishlist,
                     cart = cartResp.cart,
                     cartCount = count,
-                    totalPrice = cartResp.totalPrice
+                    totalPrice = cartResp.totalPrice,
+                    error = null
                 )
 
             } catch (e: Exception) {
-                _state.value = ShopUiState(
+                _state.value = _state.value.copy(
                     loading = false,
                     error = e.message ?: "Unknown Error"
                 )
             }
         }
     }
-
     fun toggleWishlist(productId: Int) {
         val token = tokenProvider()
         scope.launch {
             val isWishlisted = _state.value.wishlist.any { it.product_id == productId }
             if (isWishlisted) repo.removeWishlist(token, productId)
             else repo.addWishlist(token, productId)
+
             val wishlist = repo.getWishlist(token)
             _state.value = _state.value.copy(wishlist = wishlist)
+
+            cachedWishlist = wishlist // 🔥
         }
     }
 
@@ -106,17 +179,18 @@ class ShopViewModel(
     fun refreshCart() {
         val token = tokenProvider()
         scope.launch {
-            try {
-                val cartResp = repo.getCart(token)
-                val count = cartResp.cart.sumOf { it.quantity }
-                _state.value = _state.value.copy(
-                    cart = cartResp.cart,
-                    cartCount = count,
-                    totalPrice = cartResp.totalPrice
-                )
-            } catch (e: Exception) {
-                println("❌ refreshCart error: ${e.message}")
-            }
+            val cartResp = repo.getCart(token)
+            val count = cartResp.cart.sumOf { it.quantity }
+
+            _state.value = _state.value.copy(
+                cart = cartResp.cart,
+                cartCount = count,
+                totalPrice = cartResp.totalPrice
+            )
+
+            cachedCart = cartResp.cart
+            cachedCartCount = count
+            cachedTotalPrice = cartResp.totalPrice
         }
     }
 
@@ -450,6 +524,9 @@ class ShopViewModel(
                 println("❌ Cart clear error: ${e.message}")
             }
         }
+        cachedCart = emptyList()
+        cachedCartCount = 0
+        cachedTotalPrice = "0"
     }
 
     // ✅ Reset payment state (for retry)
