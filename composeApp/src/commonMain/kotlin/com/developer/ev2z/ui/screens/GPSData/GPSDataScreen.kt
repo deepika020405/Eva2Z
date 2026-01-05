@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.data.local.StorageManager
+import com.developer.ev2z.navigation.PlatformBackHandler
 
 // ✅ FIXED: Only 3 parameters now
 @Composable
@@ -32,6 +33,10 @@ fun GPSDataScreen(
 ) {
     val viewModel = remember { GPSDataViewModel(apiService, storageManager) }
     val state by viewModel.state.collectAsState()
+
+    PlatformBackHandler(enabled = true) {
+        onBackPressed()
+    }
 
     if (state.selectedDevice != null) {
         DeviceDetailFullScreen(

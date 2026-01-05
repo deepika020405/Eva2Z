@@ -43,7 +43,11 @@ fun EditProfileScreen(
     val state by viewModel.state.collectAsState()
 
     var showImageZoom by remember { mutableStateOf(false) }
-    var showSuccessDialog by remember { mutableStateOf(false) }
+//    var showSuccessDialog by remember { mutableStateOf(false) }
+
+    var emailError by remember(state.userEmail) {
+        mutableStateOf(!isValidEmail(state.userEmail))
+    }
 
     // ✅ Reload data when screen is opened
     LaunchedEffect(Unit) {
@@ -66,23 +70,23 @@ fun EditProfileScreen(
     // ✅ Handle update success with delay
     LaunchedEffect(state.updateSuccess) {
         if (state.updateSuccess) {
-            showSuccessDialog = true
-            delay(1500) // Show success for 1.5 seconds
-            showSuccessDialog = false
             viewModel.resetUpdateSuccess()
-            delay(200) // Small delay before navigation
             onBackPressed()
         }
     }
 
     EditProfileScreenContent(
         state = state,
+        emailError = emailError,
         onBackPressed = onBackPressed,
         onNameChange = { viewModel.updateName(it) },
-        onEmailChange = { viewModel.updateEmail(it) },
+        onEmailChange = {
+            viewModel.updateEmail(it)
+            emailError = !isValidEmail(it)
+        },
         onImageClick = { showImageZoom = true },
         onImageEditClick = { imagePickerLauncher.launch() },
-        onUpdateProfile = { viewModel.updateProfile() }, // ✅ Manual upload only
+        onUpdateProfile = { viewModel.updateProfile() },
         onDismissError = { viewModel.clearError() }
     )
 
@@ -95,46 +99,47 @@ fun EditProfileScreen(
     }
 
     // ✅ Success Dialog
-    if (showSuccessDialog) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.5f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Card(
-                modifier = Modifier.padding(32.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = Color.White
-                ),
-                shape = RoundedCornerShape(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "✓ Success",
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF4CAF50)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Profile updated successfully",
-                        fontSize = 14.sp,
-                        color = Color.Gray
-                    )
-                }
-            }
-        }
-    }
+//    if (showSuccessDialog) {
+//        Box(
+//            modifier = Modifier
+//                .fillMaxSize()
+//                .background(Color.Black.copy(alpha = 0.5f)),
+//            contentAlignment = Alignment.Center
+//        ) {
+//            Card(
+//                modifier = Modifier.padding(32.dp),
+//                colors = CardDefaults.cardColors(
+//                    containerColor = Color.White
+//                ),
+//                shape = RoundedCornerShape(16.dp)
+//            ) {
+//                Column(
+//                    modifier = Modifier.padding(24.dp),
+//                    horizontalAlignment = Alignment.CenterHorizontally
+//                ) {
+//                    Text(
+//                        text = "✓ Success",
+//                        fontSize = 24.sp,
+//                        fontWeight = FontWeight.Bold,
+//                        color = Color(0xFF4CAF50)
+//                    )
+//                    Spacer(modifier = Modifier.height(8.dp))
+//                    Text(
+//                        text = "Profile updated successfully",
+//                        fontSize = 14.sp,
+//                        color = Color.Gray
+//                    )
+//                }
+//            }
+//        }
+//    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditProfileScreenContent(
     state: EditProfileState,
+    emailError: Boolean,
     onBackPressed: () -> Unit = {},
     onNameChange: (String) -> Unit = {},
     onEmailChange: (String) -> Unit = {},
@@ -265,14 +270,23 @@ fun EditProfileScreenContent(
                 Spacer(modifier = Modifier.height(20.dp))
 
                 // Email Field (Optional)
+//                ProfileInputField(
+//                    label = "Email (Optional)",
+//                    value = state.userEmail,
+//                    onValueChange = onEmailChange,
+//                    placeholder = "Enter your email (optional)",
+//                    keyboardType = KeyboardType.Email
+//                )
+
                 ProfileInputField(
                     label = "Email (Optional)",
                     value = state.userEmail,
                     onValueChange = onEmailChange,
                     placeholder = "Enter your email (optional)",
-                    keyboardType = KeyboardType.Email
+                    keyboardType = KeyboardType.Email,
+                    isError = emailError,
+                    errorText = if (emailError) "Please enter a valid email address" else null
                 )
-
                 Spacer(modifier = Modifier.height(20.dp))
 
                 // Phone Number Field (Disabled)
@@ -296,7 +310,9 @@ fun EditProfileScreenContent(
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFF4CAF50)
                     ),
-                    enabled = !state.isLoading && state.userName.isNotEmpty()
+                    enabled = !state.isLoading &&
+                            state.userName.isNotEmpty() &&
+                            !emailError
                 ) {
                     if (state.isLoading) {
                         CircularProgressIndicator(
@@ -408,6 +424,7 @@ fun ProfileImageZoomDialog(
     }
 }
 
+
 @Composable
 fun ProfileInputField(
     label: String,
@@ -415,7 +432,9 @@ fun ProfileInputField(
     onValueChange: (String) -> Unit,
     placeholder: String = "",
     keyboardType: KeyboardType = KeyboardType.Text,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    isError: Boolean = false,
+    errorText: String? = null
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -436,6 +455,7 @@ fun ProfileInputField(
                 )
             },
             enabled = enabled,
+            isError = isError,
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             colors = OutlinedTextFieldDefaults.colors(
@@ -459,5 +479,23 @@ fun ProfileInputField(
                 }
             } else null
         )
+        if (isError && !errorText.isNullOrEmpty()) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = errorText,
+                color = Color(0xFFD32F2F),
+                fontSize = 12.sp,
+                modifier = Modifier.padding(start = 4.dp)
+            )
+        }
     }
+}
+
+fun isValidEmail(email: String): Boolean {
+    if (email.isBlank()) return true // ✅ optional email allowed
+
+    val emailRegex = Regex(
+        "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"
+    )
+    return emailRegex.matches(email)
 }

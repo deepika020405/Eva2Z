@@ -18,7 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
+import com.developer.ev2z.navigation.PlatformBackHandler
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -26,6 +26,10 @@ import androidx.compose.ui.unit.sp
 fun AboutAppScreen(
     onBackClick: () -> Unit
 ) {
+
+    PlatformBackHandler(enabled = true) {
+        onBackClick()
+    }
     Scaffold(
         topBar = {
             TopAppBar(

@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.BackPressHandler
 import com.developer.ev2z.data.local.StorageManager
+import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.network.ApiService
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
@@ -113,6 +114,10 @@ fun ChangePasswordScreen(
 
             viewModel.clearError()
         }
+    }
+
+    PlatformBackHandler(enabled = true) {
+        onBackPressed()
     }
     // Validation
     val isValid = currentPassword.length >= 6 &&

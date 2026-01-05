@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.developer.ev2z.data.local.model.GeoFencePolygon
+import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.response.Device
 import com.developer.ev2z.response.GeoFenceDto
 
@@ -41,6 +42,9 @@ fun GeoFencingScreen(
     val viewModel: GeoFenceViewModel = rememberGeoFenceViewModel()
     val state by viewModel.uiState.collectAsState()
 
+    PlatformBackHandler(enabled = true) {
+        onBackPressed()
+    }
 
     Scaffold(
         topBar = {
@@ -268,6 +272,9 @@ fun AddEditGeoFenceScreen(
     var showDeviceSheet by remember { mutableStateOf(false) }
     var showLocationPicker by remember { mutableStateOf(false) }
 
+    PlatformBackHandler(enabled = true) {
+        onBack()
+    }
 
     // 🔁 PREFILL FOR EDIT
     LaunchedEffect(editingGeoFence) {
@@ -285,6 +292,7 @@ fun AddEditGeoFenceScreen(
 
         }
     }
+
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },

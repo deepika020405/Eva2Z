@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.developer.ev2z.navigation.PlatformBackHandler
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -27,6 +28,10 @@ fun GeneralSettingsScreen(
     var notificationsEnabled by remember { mutableStateOf(true) }
     var darkModeEnabled by remember { mutableStateOf(false) }
     var locationEnabled by remember { mutableStateOf(true) }
+
+    PlatformBackHandler(enabled = true) {
+        onBackPressed()
+    }
 
     Scaffold(
         topBar = {

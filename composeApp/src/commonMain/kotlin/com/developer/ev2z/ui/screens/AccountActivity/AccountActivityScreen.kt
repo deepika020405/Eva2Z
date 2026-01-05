@@ -20,6 +20,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.data.local.StorageManager
+import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.network.ApiService
 import kotlinx.coroutines.delay
 
@@ -56,6 +57,10 @@ fun AccountActivityScreen(
             // Trigger logout callback
             onAccountDeleted()
         }
+    }
+
+    PlatformBackHandler(enabled = true) {
+        onBackPressed()
     }
 
     Scaffold(

@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.data.local.UserPrefs
+import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.response.Device
 
 // Theme colors
@@ -56,6 +57,9 @@ fun ManageDeviceScreen(
         if (token.isNotEmpty()) {
             viewModel.loadDevices(token)
         }
+    }
+    PlatformBackHandler(enabled = true) {
+        onBackClick()
     }
 
     Column(

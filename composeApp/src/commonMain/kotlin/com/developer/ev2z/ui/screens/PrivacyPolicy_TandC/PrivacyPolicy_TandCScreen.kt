@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.developer.ev2z.navigation.PlatformBackHandler
 
 enum class WebViewType {
     PRIVACY_POLICY,
@@ -37,6 +38,10 @@ fun PrivacyPolicy_TandCScreen(
         WebViewType.TERMS_CONDITIONS -> "Terms & Conditions"
         WebViewType.REFUND_POLICY -> "Refund & Cancellation Policy"
         WebViewType.SHIPPING_POLICY -> "Shipping & Installation Policy"
+    }
+
+    PlatformBackHandler(enabled = true) {
+        onBackPressed()
     }
 
     Scaffold(

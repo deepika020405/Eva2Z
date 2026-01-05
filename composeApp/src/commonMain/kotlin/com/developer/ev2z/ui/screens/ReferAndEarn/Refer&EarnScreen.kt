@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.developer.ev2z.getPlatformContext
+import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.network.ApiService
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,6 +62,10 @@ fun ReferAndEarnScreen(
             )
             viewModel.resetCopySnackbar()
         }
+    }
+
+    PlatformBackHandler(enabled = true) {
+        onBackPressed()
     }
 
     Scaffold(
@@ -500,7 +505,8 @@ private fun ReferralContentScreen(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .align(Alignment.BottomCenter),
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding(),
             shadowElevation = 8.dp,
             color = Color.White
         ) {
@@ -558,6 +564,7 @@ private fun ReferralContentScreen(
                     )
                 }
             }
+
         }
     }
 }

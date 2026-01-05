@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.developer.ev2z.BackPressHandler
 import com.developer.ev2z.data.local.StorageManager
+import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.response.Device
 import com.developer.ev2z.response.RoutePoint
@@ -58,7 +59,9 @@ fun HistoryPlaybackScreen(
 
     var showDatePicker by remember { mutableStateOf(false) }
 
-    BackPressHandler { onBackPressed() }
+    PlatformBackHandler(enabled = true) {
+        onBackPressed()
+    }
 
     LaunchedEffect(Unit) {
         viewModel.loadDevices()

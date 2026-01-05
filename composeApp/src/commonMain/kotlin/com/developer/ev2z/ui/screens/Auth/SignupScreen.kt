@@ -155,16 +155,25 @@ fun SignupScreen(
                     )
         )
 
+        if (phoneNumber.isNotEmpty() && phoneNumber.length < 10) {
+            Text(
+                text = "Phone number must be 10 digits",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+            )
+        }
+
         if (submitAttempted) {
             when {
-                phoneNumber.isNotEmpty() && phoneNumber.length < 10 -> {
-                    Text(
-                        text = "Phone number must be 10 digits",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-                    )
-                }
+//                phoneNumber.isNotEmpty() && phoneNumber.length < 10 -> {
+//                    Text(
+//                        text = "Phone number must be 10 digits",
+//                        color = MaterialTheme.colorScheme.error,
+//                        style = MaterialTheme.typography.bodySmall,
+//                        modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+//                    )
+//                }
 
                 phoneAlreadyRegisteredError != null -> {
                     Text(
