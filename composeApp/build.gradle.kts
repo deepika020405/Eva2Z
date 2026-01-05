@@ -100,13 +100,22 @@ kotlin {
     }
 }
 
-// ✅ LOAD KEYSTORE PROPERTIES
+// ✅ LOAD KEYSTORE PROPERTIES (SAFE WAY)
 val keystorePropertiesFile = rootProject.file("keystore.properties")
 val keystoreProperties = Properties()
 
-if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+require(keystorePropertiesFile.exists()) {
+    "❌ keystore.properties file not found at project root"
 }
+
+keystorePropertiesFile.inputStream().use {
+    keystoreProperties.load(it)
+}
+
+// 🔍 TEMP DEBUG (remove after successful build)
+println("KEYSTORE_FILE = ${keystoreProperties.getProperty("storeFile")}")
+println("KEY_ALIAS = ${keystoreProperties.getProperty("keyAlias")}")
+
 
 android {
     namespace = "com.developer.ev2z"
@@ -129,21 +138,35 @@ android {
             keyPassword = "android"
         }
 
+//        create("release") {
+//            if (keystorePropertiesFile.exists()) {
+//                storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
+//                storePassword = keystoreProperties["storePassword"] as String
+//                keyAlias = keystoreProperties["keyAlias"] as String
+//                keyPassword = keystoreProperties["keyPassword"] as String
+//            } else {
+//                // Fallback to debug
+//                println("⚠️ keystore.properties not found, using debug keystore")
+//                storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
+//                storePassword = "android"
+//                keyAlias = "androiddebugkey"
+//                keyPassword = "android"
+//            }
+//        }
+
         create("release") {
-            if (keystorePropertiesFile.exists()) {
-                storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
-                storePassword = keystoreProperties["storePassword"] as String
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
-            } else {
-                // Fallback to debug
-                println("⚠️ keystore.properties not found, using debug keystore")
-                storeFile = file("${System.getProperty("user.home")}/.android/debug.keystore")
-                storePassword = "android"
-                keyAlias = "androiddebugkey"
-                keyPassword = "android"
-            }
+            val keystorePath = rootProject.layout.projectDirectory
+                .file("keystores/evatozkey.jks")
+                .asFile
+
+            storeFile = keystorePath
+            storePassword = keystoreProperties.getProperty("storePassword")
+            keyAlias = keystoreProperties.getProperty("keyAlias")
+            keyPassword = keystoreProperties.getProperty("keyPassword")
         }
+
+
+
     }
 
     packaging {
