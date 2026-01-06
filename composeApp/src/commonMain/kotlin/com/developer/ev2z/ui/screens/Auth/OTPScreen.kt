@@ -23,17 +23,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.BackPressHandler
 import com.developer.ev2z.util.OTPAutoReader
+import kotlinx.coroutines.delay
 
 @Composable
 fun OTPScreen(
-    title: String = "Enter OTP",
-    subtitle: String = "Enter the OTP code we just sent\nyou on your registered phone number",
+    title: String = "Verify OTP",
+    subtitle: String = "Enter the OTP sent to your mobile number",
     isLoading: Boolean = false,
     error: String? = null,
-    onOTPComplete: (String) -> Unit = {},
-    onResendOTP: () -> Unit = {},
-    onBack: () -> Unit = {}
+    onOTPComplete: (String) -> Unit,
+    onResendOTP: () -> Unit,
+    onBack: () -> Unit
 ) {
+
     var otp1 by remember { mutableStateOf("") }
     var otp2 by remember { mutableStateOf("") }
     var otp3 by remember { mutableStateOf("") }
@@ -41,60 +43,73 @@ fun OTPScreen(
     var otp5 by remember { mutableStateOf("") }
     var otp6 by remember { mutableStateOf("") }
 
-    val focusRequester1 = remember { FocusRequester() }
-    val focusRequester2 = remember { FocusRequester() }
-    val focusRequester3 = remember { FocusRequester() }
-    val focusRequester4 = remember { FocusRequester() }
-    val focusRequester5 = remember { FocusRequester() }
-    val focusRequester6 = remember { FocusRequester() }
+    val focus1 = remember { FocusRequester() }
+    val focus2 = remember { FocusRequester() }
+    val focus3 = remember { FocusRequester() }
+    val focus4 = remember { FocusRequester() }
+    val focus5 = remember { FocusRequester() }
+    val focus6 = remember { FocusRequester() }
 
     var showBackDialog by remember { mutableStateOf(false) }
+    var hasSubmitted by remember { mutableStateOf(false) }
+    var lastSubmittedOtp by remember { mutableStateOf<String?>(null) }
 
-    // ✅ Cross-platform back button handler
     BackPressHandler { showBackDialog = true }
 
-    // ✅ Cross-platform OTP Auto-read
-    OTPAutoReader { receivedOTP ->
-        println("📱 Auto-filling OTP: $receivedOTP")
-        if (receivedOTP.length == 6) {
-            otp1 = receivedOTP[0].toString()
-            otp2 = receivedOTP[1].toString()
-            otp3 = receivedOTP[2].toString()
-            otp4 = receivedOTP[3].toString()
-            otp5 = receivedOTP[4].toString()
-            otp6 = receivedOTP[5].toString()
+    // ✅ Auto read OTP
+    OTPAutoReader { received ->
+        if (received.length == 6) {
+            otp1 = received[0].toString()
+            otp2 = received[1].toString()
+            otp3 = received[2].toString()
+            otp4 = received[3].toString()
+            otp5 = received[4].toString()
+            otp6 = received[5].toString()
         }
     }
 
-    val otpList = listOf(otp1, otp2, otp3, otp4, otp5, otp6)
-    val isOTPComplete = otpList.all { it.isNotEmpty() }
+    val isOtpComplete = listOf(otp1, otp2, otp3, otp4, otp5, otp6).all { it.isNotEmpty() }
 
-    LaunchedEffect(isOTPComplete) {
-        if (isOTPComplete && !isLoading) {
-            val fullOTP = "$otp1$otp2$otp3$otp4$otp5$otp6"
-            println("🔐 Auto-submitting OTP: $fullOTP")
-            kotlinx.coroutines.delay(300)
-            onOTPComplete(fullOTP)
+    // ✅ AUTO SUBMIT (SAFE)
+    LaunchedEffect(isOtpComplete, isLoading) {
+        if (!isOtpComplete || isLoading) return@LaunchedEffect
+
+        val currentOtp = "$otp1$otp2$otp3$otp4$otp5$otp6"
+
+        if (currentOtp == lastSubmittedOtp) return@LaunchedEffect
+
+        lastSubmittedOtp = currentOtp
+        hasSubmitted = true
+
+        delay(300)
+        onOTPComplete(currentOtp)
+    }
+
+    // ✅ Allow retry only if user changes OTP
+    LaunchedEffect(otp1, otp2, otp3, otp4, otp5, otp6) {
+        hasSubmitted = false
+    }
+
+    // ✅ Reset submit flag on error (but keep OTP)
+    LaunchedEffect(error) {
+        if (error != null) {
+            hasSubmitted = false
         }
     }
 
-    // ✅ Back confirmation dialog
     if (showBackDialog) {
         AlertDialog(
             onDismissRequest = { showBackDialog = false },
-            title = { Text("Confirm", fontWeight = FontWeight.Bold) },
+            title = { Text("Confirm") },
             text = { Text("Are you sure you want to go back?") },
             confirmButton = {
-                TextButton(onClick = {
-                    showBackDialog = false
-                    onBack()
-                }) {
-                    Text("Yes", color = Color(0xFF6A9F50), fontWeight = FontWeight.Bold)
+                TextButton(onClick = { showBackDialog = false; onBack() }) {
+                    Text("Yes", color = Color(0xFF6A9F50))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showBackDialog = false }) {
-                    Text("No", fontWeight = FontWeight.Bold)
+                    Text("No")
                 }
             }
         )
@@ -103,10 +118,10 @@ fun OTPScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp, vertical = 24.dp),
+            .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // ✅ HEADER
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -123,124 +138,156 @@ fun OTPScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(Modifier.height(24.dp))
 
-        Text(
-            text = title,
-            fontSize = 28.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF252A23),
-            textAlign = TextAlign.Center
-        )
+        Text(title, fontSize = 26.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(8.dp))
+        Text(subtitle, fontSize = 14.sp, color = Color.Gray, textAlign = TextAlign.Center)
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = subtitle,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Normal,
-            color = Color(0xFF666666),
-            textAlign = TextAlign.Center,
-            lineHeight = 20.sp
-        )
-
-        Spacer(modifier = Modifier.height(48.dp))
+        Spacer(Modifier.height(40.dp))
 
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth()
         ) {
-            OTPBox(value = otp1, onValueChange = { if (it.isEmpty() && otp1.isNotEmpty()) otp1 = "" else if (it.isNotEmpty()) { otp1 = it; focusRequester2.requestFocus() } }, focusRequester = focusRequester1)
-            OTPBox(value = otp2, onValueChange = { if (it.isEmpty() && otp2.isNotEmpty()) { otp2 = ""; focusRequester1.requestFocus() } else if (it.isNotEmpty()) { otp2 = it; focusRequester3.requestFocus() } }, focusRequester = focusRequester2)
-            OTPBox(value = otp3, onValueChange = { if (it.isEmpty() && otp3.isNotEmpty()) { otp3 = ""; focusRequester2.requestFocus() } else if (it.isNotEmpty()) { otp3 = it; focusRequester4.requestFocus() } }, focusRequester = focusRequester3)
-            OTPBox(value = otp4, onValueChange = { if (it.isEmpty() && otp4.isNotEmpty()) { otp4 = ""; focusRequester3.requestFocus() } else if (it.isNotEmpty()) { otp4 = it; focusRequester5.requestFocus() } }, focusRequester = focusRequester4)
-            OTPBox(value = otp5, onValueChange = { if (it.isEmpty() && otp5.isNotEmpty()) { otp5 = ""; focusRequester4.requestFocus() } else if (it.isNotEmpty()) { otp5 = it; focusRequester6.requestFocus() } }, focusRequester = focusRequester5)
-            OTPBox(value = otp6, onValueChange = { if (it.isEmpty() && otp6.isNotEmpty()) { otp6 = ""; focusRequester5.requestFocus() } else otp6 = it }, focusRequester = focusRequester6)
+            OTPBox(otp1, focus1, null, error) {
+                otp1 = it
+                if (it.isNotEmpty()) focus2.requestFocus()
+            }
+
+            OTPBox(otp2, focus2, focus1, error) {
+                otp2 = it
+                if (it.isNotEmpty()) focus3.requestFocus()
+            }
+
+            OTPBox(otp3, focus3, focus2, error) {
+                otp3 = it
+                if (it.isNotEmpty()) focus4.requestFocus()
+            }
+
+            OTPBox(otp4, focus4, focus3, error) {
+                otp4 = it
+                if (it.isNotEmpty()) focus5.requestFocus()
+            }
+
+            OTPBox(otp5, focus5, focus4, error) {
+                otp5 = it
+                if (it.isNotEmpty()) focus6.requestFocus()
+            }
+
+            OTPBox(otp6, focus6, focus5, error) {
+                otp6 = it
+            }
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        // ✅ ERROR BELOW OTP BOXES
+        error?.let {
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = it,
+                color = MaterialTheme.colorScheme.error,
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center
+            )
+        }
+
+        Spacer(Modifier.height(28.dp))
 
         Button(
             onClick = {
-                if (isOTPComplete) {
-                    onOTPComplete("$otp1$otp2$otp3$otp4$otp5$otp6")
+                val otp = "$otp1$otp2$otp3$otp4$otp5$otp6"
+                if (isOtpComplete && otp != lastSubmittedOtp) {
+                    lastSubmittedOtp = otp
+                    hasSubmitted = true
+                    onOTPComplete(otp)
                 }
             },
+            enabled = isOtpComplete && !isLoading,
             modifier = Modifier.fillMaxWidth().height(50.dp),
-            shape = RoundedCornerShape(30.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFF6A9F50),
-                contentColor = Color.White
-            ),
-            enabled = !isLoading && isOTPComplete
+            shape = RoundedCornerShape(30.dp)
         ) {
             if (isLoading) {
-                CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                CircularProgressIndicator(
+                    color = Color.White,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier.size(22.dp)
+                )
             } else {
-                Text("Continue", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                Text("Continue")
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(Modifier.height(16.dp))
 
-        Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-            Text("Didn't get OTP? ", fontSize = 14.sp, color = Color(0xFF666666))
-            TextButton(onClick = onResendOTP) {
-                Text("Resend OTP", fontSize = 14.sp, color = Color(0xFF6A9F50), fontWeight = FontWeight.SemiBold)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Didn't get OTP?",
+                fontSize = 14.sp,
+                color = Color(0xFF666666)
+            )
+
+            Spacer(modifier = Modifier.width(4.dp))
+
+            TextButton(
+                onClick = onResendOTP,
+                contentPadding = PaddingValues(0.dp) // 🔥 no extra padding
+            ) {
+                Text(
+                    text = "Resend OTP",
+                    fontSize = 14.sp,
+                    color = Color(0xFF6A9F50),
+                    fontWeight = FontWeight.SemiBold
+                )
             }
         }
-
-        error?.let {
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
-        }
     }
 
-    LaunchedEffect(Unit) {
-        focusRequester1.requestFocus()
-    }
+    LaunchedEffect(Unit) { focus1.requestFocus() }
 }
 
 @Composable
-fun OTPBox(
+private fun OTPBox(
     value: String,
-    onValueChange: (String) -> Unit,
-    focusRequester: FocusRequester
-) {
+    focusRequester: FocusRequester,
+    previousFocusRequester: FocusRequester?,
+    error: String?,
+    onChange: (String) -> Unit
+){
     BasicTextField(
         value = value,
         onValueChange = {
-            if (it.length <= 1 && (it.isEmpty() || it.all { c -> c.isDigit() }))
-                onValueChange(it)
+            when {
+                it.length == 1 && it.all { c -> c.isDigit() } -> {
+                    onChange(it)
+                }
+
+                it.isEmpty() -> {
+                    onChange("")
+                    previousFocusRequester?.requestFocus()
+                }
+            }
         },
         modifier = Modifier
-            .width(48.dp)
-            .height(58.dp)
+            .width(52.dp)
+            .height(60.dp)
             .focusRequester(focusRequester)
             .border(
                 1.5.dp,
-                if (value.isNotEmpty()) Color(0xFF6A9F50) else Color(0xFFE0E0E0),
+                if (error != null) Color.Red else Color(0xFFE0E0E0),
                 RoundedCornerShape(12.dp)
             )
             .background(Color.White, RoundedCornerShape(12.dp)),
         textStyle = TextStyle(
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            color = Color.Black
+            textAlign = TextAlign.Center
         ),
-        keyboardOptions = KeyboardOptions(
-            keyboardType = KeyboardType.NumberPassword
-        ),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
         singleLine = true,
-        decorationBox = { innerTextField ->
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier.fillMaxSize()
-            ) {
-                innerTextField()
-            }
-        }
+        decorationBox = { Box(Modifier.fillMaxSize(), Alignment.Center) { it() } }
     )
 }
