@@ -43,6 +43,7 @@ fun HomeScreen(
     val showOverview by viewModel.showOverview.collectAsState()
     val showDeviceDropdown by viewModel.showDeviceDropdown.collectAsState()
 
+
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
 
     LaunchedEffect(Unit) {
@@ -87,6 +88,9 @@ fun HomeScreen(
 
         is HomeUiState.Success -> {
             val response = state.deviceResponse
+            val devices = response.data ?: emptyList()
+            val showDropdownAllowed = devices.size > 1
+
 
             Box(modifier = Modifier.fillMaxSize()) {
                 val devicesWithLocation = response.data.filter { it.hasValidLocation() }
@@ -111,13 +115,14 @@ fun HomeScreen(
                         deviceCount = response.totalDevices ?: 0,
                         selectedDevice = selectedDevice,
                         onDropdownClick = {
-                            println("🔽 Dropdown clicked")
-                            viewModel.toggleDeviceDropdown()
+                            if (showDropdownAllowed) {
+                                viewModel.toggleDeviceDropdown()
+                            }
                         },
                         onLocationClick = {
-                            println("📍 Location icon clicked")
                             viewModel.showOverviewSheet()
-                        }
+                        },
+                        showDropdown = showDropdownAllowed
                     )
 
                     if (showDeviceDropdown) {
@@ -177,7 +182,8 @@ fun TopDeviceCard(
     deviceCount: Int,
     selectedDevice: Device?,
     onDropdownClick: () -> Unit,
-    onLocationClick: () -> Unit
+    onLocationClick: () -> Unit,
+    showDropdown: Boolean
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -217,41 +223,43 @@ fun TopDeviceCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFFF5F5F5), RoundedCornerShape(8.dp))
-                    .clickable { onDropdownClick() }
-                    .padding(12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Image(
-                        painter = painterResource(Res.drawable.app_logo),
-                        contentDescription = "App Logo",
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = selectedDevice?.getDisplayName() ?: "Select Device",
-                        fontSize = 14.sp
-                    )
-                }
+            if (showDropdown) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFF5F5F5), RoundedCornerShape(8.dp))
+                        .clickable { onDropdownClick() }
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painter = painterResource(Res.drawable.app_logo),
+                            contentDescription = "App Logo",
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = selectedDevice?.getDisplayName() ?: "Select Device",
+                            fontSize = 14.sp
+                        )
+                    }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowDropDown,
-                        contentDescription = null,
-                        tint = Color.Gray
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = null,
-                        tint = Color.Gray,
-                        modifier = Modifier.size(20.dp)
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = null,
+                            tint = Color.Gray
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null,
+                            tint = Color.Gray,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
         }
