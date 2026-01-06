@@ -1,5 +1,6 @@
 package com.developer.ev2z.ui.screens.AuthFlows
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,8 +18,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.viewmodel.AuthViewModel
+import eva2z_connect_multiplatform.composeapp.generated.resources.Res
+import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.painterResource
 
 @Composable
 fun ForgetPasswordPhoneScreen(
@@ -29,8 +33,8 @@ fun ForgetPasswordPhoneScreen(
     onNotRegistered: (String) -> Unit = {}
 ) {
     var phoneNumber by remember(preFilledPhone) { mutableStateOf(preFilledPhone) }
-    var showDialog by remember { mutableStateOf(false) }
-    var dialogMessage by remember { mutableStateOf("") }
+//    var showDialog by remember { mutableStateOf(false) }
+//    var dialogMessage by remember { mutableStateOf("") }
 
     // ✅ Track if we handled the current request
     var hasHandledResult by remember { mutableStateOf(false) }
@@ -47,6 +51,7 @@ fun ForgetPasswordPhoneScreen(
     val error by viewModel.error.collectAsState()
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
+    var phoneError by remember { mutableStateOf<String?>(null) }
 
     // ✅ Track previous loading state
     var previousLoading by remember { mutableStateOf(false) }
@@ -62,40 +67,27 @@ fun ForgetPasswordPhoneScreen(
     }
 
     // ✅ Handle BOTH success and error when loading finishes
-    LaunchedEffect(isLoading, phoneNumber) {
-        // When loading transitions from true to false
+    LaunchedEffect(isLoading) {
         if (previousLoading && !isLoading && !hasHandledResult) {
             hasHandledResult = true
 
             val currentError = error
 
             when {
-                // CASE 1: User not registered - redirect to signup
-                currentError != null && currentError.contains("not registered", ignoreCase = true) -> {
-                    println("❌ CASE 1: User not registered")
-                    dialogMessage = "Phone number not registered!\nRedirecting to signup..."
-                    showDialog = true
-                    delay(2000)
-                    showDialog = false
+                currentError != null &&
+                        currentError.contains("not registered", ignoreCase = true) -> {
+
+                    phoneError = "This phone number is not registered"
                     viewModel.clearError()
-                    delay(300)
-                    onNotRegistered(phoneNumber)
                 }
 
-                // CASE 2: Other errors
                 currentError != null -> {
-                    println("❌ CASE 2: Other error: $currentError")
-                    dialogMessage = currentError
-                    showDialog = true
-                    delay(3000)
-                    showDialog = false
+                    phoneError = currentError
                     viewModel.clearError()
                 }
 
-                // CASE 3: Success - OTP sent
                 currentError == null && phoneNumber.length == 10 -> {
-                    println("✅ CASE 3: Success! Calling onOtpSent with: $phoneNumber")
-                    onOtpSent(phoneNumber) // ✅ Pass current phone number
+                    onOtpSent(phoneNumber)
                 }
             }
         }
@@ -103,14 +95,14 @@ fun ForgetPasswordPhoneScreen(
         previousLoading = isLoading
     }
 
-    if (showDialog) {
-        AlertDialog(
-            onDismissRequest = { },
-            title = { Text("Notice", fontWeight = FontWeight.Bold) },
-            text = { Text(dialogMessage) },
-            confirmButton = { }
-        )
-    }
+//    if (showDialog) {
+//        AlertDialog(
+//            onDismissRequest = { },
+//            title = { Text("Notice", fontWeight = FontWeight.Bold) },
+//            text = { Text(dialogMessage) },
+//            confirmButton = { }
+//        )
+//    }
 
     Column(
         modifier = Modifier
@@ -151,11 +143,10 @@ fun ForgetPasswordPhoneScreen(
             OutlinedTextField(
                 value = phoneNumber,
                 onValueChange = {
-                    if (it.length <= 10 && it.all { char -> char.isDigit() }) {
+                    if (it.length <= 10 && it.all { c -> c.isDigit() }) {
                         phoneNumber = it
-                        if (it != preFilledPhone) {
-                            manuallyEdited = true
-                        }
+                        manuallyEdited = true
+                        phoneError = null          // ✅ clear inline error
                     }
                 },
                 prefix = {
@@ -165,7 +156,7 @@ fun ForgetPasswordPhoneScreen(
                         color = Color.Black
                     )
                 },
-                placeholder = { Text("98765 54321") },
+                placeholder = { Text("Enter Your valid Number") },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(56.dp),
@@ -179,12 +170,12 @@ fun ForgetPasswordPhoneScreen(
                 isError = phoneNumber.isNotEmpty() && phoneNumber.length < 10
             )
 
-            if (phoneNumber.isNotEmpty() && phoneNumber.length < 10) {
+            if (phoneError != null) {
                 Text(
-                    text = "Phone number must be 10 digits",
+                    text = phoneError!!,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                    modifier = Modifier.padding(start = 16.dp, top = 6.dp)
                 )
             }
 
