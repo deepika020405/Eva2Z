@@ -19,20 +19,25 @@ actual fun PlatformMapView(
 ) {
     var isMapLoaded by remember { mutableStateOf(false) }
     val cameraPositionState = rememberCameraPositionState()
+    val indiaLatLng = LatLng(22.9734, 78.6569)
 
     // Initial camera position - will be updated when map loads
-    LaunchedEffect(Unit) {
-        if (devices.isNotEmpty()) {
-            val firstDevice = devices.firstOrNull { it.hasValidLocation() }
-            firstDevice?.getLatitudeDouble()?.let { lat ->
-                firstDevice.getLongitudeDouble()?.let { lng ->
-                    cameraPositionState.position = CameraPosition.fromLatLngZoom(
-                        LatLng(lat, lng),
-                        10f
-                    )
-                }
+    LaunchedEffect(Unit, devices) {
+        val firstValidDevice = devices.firstOrNull { it.hasValidLocation() }
+
+        cameraPositionState.position =
+            if (firstValidDevice != null) {
+                CameraPosition.fromLatLngZoom(
+                    LatLng(
+                        firstValidDevice.getLatitudeDouble()!!,
+                        firstValidDevice.getLongitudeDouble()!!
+                    ),
+                    10f
+                )
+            } else {
+                // 🇮🇳 No device / no valid location
+                CameraPosition.fromLatLngZoom(indiaLatLng, 4f)
             }
-        }
     }
 
     // Zoom to all devices when map is loaded
