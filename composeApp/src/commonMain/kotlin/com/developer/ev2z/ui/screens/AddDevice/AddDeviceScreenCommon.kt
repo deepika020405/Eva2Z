@@ -25,11 +25,98 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.util.Analytics
+import kotlinx.coroutines.launch
 
 private val primaryContainerLight = Color(0xFF00C853)
+private val BottomSheetPeek = 72.dp
 
 // ✅ COMMON BottomSheet with scaffold
+//@Composable
+//fun BottomSheetCommon(
+//    onNavigate: (String) -> Unit,
+//    viewModel: AddDeviceViewModel,
+//    cameraScreen: @Composable () -> Unit
+//) {
+//    var currentScreen by remember { mutableStateOf("scan") }
+//
+//
+//    LaunchedEffect(Unit) {
+//        Analytics.logEvent(
+//            name = "add_device_screen_view"
+//        )
+//    }
+//
+//
+//    if (currentScreen == "details") {
+//        AddDeviceDetailsCommon(
+//            onNavigate = { route ->
+//                when (route) {
+//                    "home" -> onNavigate("home")
+//                    "addDevice" -> currentScreen = "scan"
+//                    else -> onNavigate(route)
+//                }
+//            },
+//            viewModel = viewModel
+//        )
+//    } else {
+//        val sheetState = rememberBottomSheetScaffoldState()
+//
+//
+//        LaunchedEffect(sheetState.bottomSheetState.currentValue) {
+//            if (sheetState.bottomSheetState.currentValue == SheetValue.Expanded) {
+//                currentScreen = "details"
+//            }
+//        }
+//
+//        BottomSheetScaffold(
+//            scaffoldState = sheetState,
+//            sheetContainerColor = Color.White,
+//            sheetDragHandle = {
+//                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+//                    Box(
+//                        Modifier
+//                            .padding(top = 16.dp, bottom = 8.dp)
+//                            .width(36.dp)
+//                            .height(4.dp)
+//                            .clip(RoundedCornerShape(50))
+//                            .background(Color.Gray.copy(alpha = 0.6f))
+//                    )
+//                    Row {
+//                        Spacer(modifier = Modifier.weight(1f))
+//                        Text(
+//                            text = "or enter details manually",
+//                            textAlign = TextAlign.Center,
+//                            style = MaterialTheme.typography.bodyLarge,
+//                            color = Color.Black,
+//                            modifier = Modifier.weight(4f)
+//                        )
+//                        IconButton(
+//                            onClick = { currentScreen = "details" },
+//                            modifier = Modifier.weight(1f)
+//                        ) {
+//                            Icon(
+//                                imageVector = Icons.Default.KeyboardArrowUp,
+//                                contentDescription = "Open",
+//                                tint = Color.Black,
+//                                modifier = Modifier.padding(end = 12.dp)
+//                            )
+//                        }
+//                    }
+//                }
+//            },
+//            sheetPeekHeight = 82.dp,
+//            sheetContent = {
+//                Box(modifier = Modifier.height(1.dp))
+//            }
+//        ) {
+//            cameraScreen()
+//        }
+//    }
+//}
+
+
 @Composable
 fun BottomSheetCommon(
     onNavigate: (String) -> Unit,
@@ -37,27 +124,44 @@ fun BottomSheetCommon(
     cameraScreen: @Composable () -> Unit
 ) {
     var currentScreen by remember { mutableStateOf("scan") }
+    val sheetState = rememberBottomSheetScaffoldState()
 
-    LaunchedEffect(Unit) {
-        Analytics.logEvent(
-            name = "add_device_screen_view"
-        )
+    // ✅ Coroutine scope for events
+    val scope = rememberCoroutineScope()
+
+    // ✅ SYSTEM BACK HANDLER (MASTER)
+    PlatformBackHandler(enabled = true) {
+        when {
+            // 1️⃣ Bottom sheet expanded → collapse
+            sheetState.bottomSheetState.currentValue == SheetValue.Expanded -> {
+                scope.launch {
+                    sheetState.bottomSheetState.partialExpand()
+                }
+            }
+
+            // 2️⃣ Details screen → go back to scan
+            currentScreen == "details" -> {
+                currentScreen = "scan"
+            }
+
+            // 3️⃣ Scan screen → go one screen back
+            else -> {
+                onNavigate("back") // navigator.pop()
+            }
+        }
     }
-
 
     if (currentScreen == "details") {
         AddDeviceDetailsCommon(
             onNavigate = { route ->
                 when (route) {
-                    "home" -> onNavigate("home")
-                    "addDevice" -> currentScreen = "scan"
+                    "scan" -> currentScreen = "scan"
                     else -> onNavigate(route)
                 }
             },
             viewModel = viewModel
         )
     } else {
-        val sheetState = rememberBottomSheetScaffoldState()
 
         LaunchedEffect(sheetState.bottomSheetState.currentValue) {
             if (sheetState.bottomSheetState.currentValue == SheetValue.Expanded) {
@@ -101,16 +205,16 @@ fun BottomSheetCommon(
                     }
                 }
             },
-            sheetPeekHeight = 60.dp,
+            sheetPeekHeight = 82.dp,
             sheetContent = {
                 Box(modifier = Modifier.height(1.dp))
             }
         ) {
             cameraScreen()
         }
+
     }
 }
-
 // ✅ COMMON Camera Screen UI
 @Composable
 fun AddDeviceCommon(
@@ -119,30 +223,44 @@ fun AddDeviceCommon(
     cameraView: @Composable () -> Unit,
     onGalleryClick: () -> Unit
 ) {
+
+
     var scanStep by remember { mutableStateOf(1) }
 
     val scannedDeviceId by viewModel.scannedDeviceId.collectAsState()
     val scannedSimNumber by viewModel.scannedSimNumber.collectAsState()
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(
+                WindowInsets.systemBars
+                    .only(WindowInsetsSides.Bottom)
+                    .asPaddingValues()
+            )
+    ) {
         cameraView()
 
         IconButton(
             onClick = onGalleryClick,
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(top = 24.dp, end = 24.dp)
-                .size(48.dp) // ✅ Add proper size
-                .background(Color.White, shape = RoundedCornerShape(8.dp)) // ✅ Add background
+                .padding(
+                    WindowInsets.systemBars
+                        .only(WindowInsetsSides.Top)
+                        .asPaddingValues()
+                )
+                .padding(top = 12.dp, end = 24.dp)
+                .size(48.dp)
+                .background(Color.White, shape = RoundedCornerShape(8.dp))
         ) {
             Icon(
                 imageVector = Icons.Outlined.Image,
                 contentDescription = "Gallery",
                 tint = Color.Black,
-                modifier = Modifier.size(24.dp) // ✅ Icon size
+                modifier = Modifier.size(24.dp)
             )
         }
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -261,7 +379,7 @@ fun AddDeviceDetailsCommon(
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         IconButton(
-            onClick = { onNavigate("home") },
+            onClick = { onNavigate("back") },
             modifier = Modifier
                 .size(40.dp)
                 .clip(CircleShape)

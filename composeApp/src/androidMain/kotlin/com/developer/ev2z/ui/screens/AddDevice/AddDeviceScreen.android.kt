@@ -13,7 +13,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -21,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import com.developer.ev2z.navigation.PlatformBackHandler
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.barcode.common.Barcode
 import com.google.mlkit.vision.common.InputImage
@@ -44,6 +48,9 @@ actual fun AddDevice(
     onNavigate: (String) -> Unit,
     viewModel: AddDeviceViewModel
 ) {
+    PlatformBackHandler(enabled = true) {
+        onNavigate("home") // ya jo bhi tumhara back route ho
+    }
     val context = LocalContext.current
     var hasCameraPermission by remember { mutableStateOf(false) }
     var scanStep by remember { mutableStateOf(1) }
@@ -64,6 +71,8 @@ actual fun AddDevice(
             }
         }
     }
+
+
 
     LaunchedEffect(Unit) {
         cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
@@ -129,7 +138,10 @@ actual fun OpenCamera(
 
             previewView.apply { scaleType = PreviewView.ScaleType.FILL_CENTER }
         },
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
+            // ✅ STATUS BAR + NAV BAR SAFE
+            .windowInsetsPadding(WindowInsets.systemBars)
     )
 
     DisposableEffect(Unit) {

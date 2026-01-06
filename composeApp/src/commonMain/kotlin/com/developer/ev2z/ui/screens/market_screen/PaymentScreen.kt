@@ -17,6 +17,7 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.developer.ev2z.phonepe.PaymentState
+import com.developer.ev2z.util.Analytics
 
 class PaymentScreen : Screen {
     @Composable
@@ -128,6 +129,14 @@ fun PaymentScreenContent() {
             onClick = {
                 println("📱 PhonePe button clicked")
                 // ✅ Reset state before initiating new payment
+                Analytics.logEvent(
+                    name = "add_payment_info",
+                    params = mapOf(
+                        "currency" to "INR",
+                        "value" to (state.finalAmount ?: state.totalPrice ?: 0),
+                        "items_count" to state.cart.size
+                    )
+                )
                 viewModel.resetPaymentState()
                 viewModel.initiatePhonePePayment()
             },

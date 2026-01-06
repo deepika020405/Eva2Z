@@ -1,5 +1,6 @@
 package com.developer.ev2z.ui.screens.Profile
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -25,6 +26,17 @@ import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.ui.screens.PrivacyPolicy_TandC.PrivacyPolicy_TandCScreen
+import com.developer.ev2z.ui.screens.PrivacyPolicy_TandC.WebViewType
+import com.developer.ev2z.ui.screens.social_media.openUrl
+import eva2z_connect_multiplatform.composeapp.generated.resources.Res
+import eva2z_connect_multiplatform.composeapp.generated.resources.ic_facebook
+import eva2z_connect_multiplatform.composeapp.generated.resources.ic_instagram
+import eva2z_connect_multiplatform.composeapp.generated.resources.ic_linkedin
+import eva2z_connect_multiplatform.composeapp.generated.resources.ic_twitter
+import eva2z_connect_multiplatform.composeapp.generated.resources.ic_youtube
+import org.jetbrains.compose.resources.DrawableResource
+import org.jetbrains.compose.resources.painterResource
 
 @Composable
 fun ProfileScreen(
@@ -50,6 +62,7 @@ fun ProfileScreen(
     val viewModel = remember { ProfileViewModel(apiService, storageManager) }
     val state by viewModel.state.collectAsState()
     var showImageZoom by remember { mutableStateOf(false) }
+    var webViewType by remember { mutableStateOf<WebViewType?>(null) }
 
     // ✅ FIX: Reload data when refreshTrigger changes
     LaunchedEffect(refreshTrigger) {
@@ -86,7 +99,11 @@ fun ProfileScreen(
         onContactUs = { viewModel.openWhatsApp() },
         onAboutApp = onAboutApp,
         onLogout = { viewModel.logout() },
-        onDismissError = { viewModel.clearError() }
+        onDismissError = { viewModel.clearError() },
+        onFacebook = { webViewType = WebViewType.FACEBOOK },
+        onInstagram = { webViewType = WebViewType.INSTAGRAM },
+        onLinkedIn = { webViewType = WebViewType.LINKEDIN },
+        onYouTube = { webViewType = WebViewType.YOUTUBE }
     )
 
     // Image Zoom Dialog
@@ -95,6 +112,12 @@ fun ProfileScreen(
             imageUrl = state.userImage!!,
             userName = state.userName,
             onDismiss = { showImageZoom = false }
+        )
+    }
+    webViewType?.let { type ->
+        PrivacyPolicy_TandCScreen(
+            type = type,
+            onBackPressed = { webViewType = null }
         )
     }
 }
@@ -123,7 +146,11 @@ fun ProfileScreenContent(
     onContactUs: () -> Unit = {},
     onAboutApp: () -> Unit = {},
     onLogout: () -> Unit = {},
-    onDismissError: () -> Unit = {}
+    onDismissError: () -> Unit = {},
+    onFacebook: () -> Unit,
+    onInstagram: () -> Unit,
+    onLinkedIn: () -> Unit,
+    onYouTube: () -> Unit
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
 
@@ -228,7 +255,11 @@ fun ProfileScreenContent(
                         onRefundPolicy = onRefundPolicy,
                         onShippingPolicy = onShippingPolicy,
                         onContactUs = onContactUs,
-                        onAboutApp = onAboutApp
+                        onAboutApp = onAboutApp,
+                        onFacebook = onFacebook,
+                        onInstagram = onInstagram,
+                        onLinkedIn = onLinkedIn,
+                        onYouTube = onYouTube
                     )
                 }
 
@@ -289,6 +320,8 @@ fun ProfileScreenContent(
             }
         )
     }
+
+
 }
 
 @Composable
@@ -469,8 +502,13 @@ fun AboutSection(
     onRefundPolicy: () -> Unit,
     onShippingPolicy: () -> Unit,
     onContactUs: () -> Unit,
-    onAboutApp: () -> Unit  // ✅ ADD THIS
+    onAboutApp: () -> Unit,
+    onFacebook: () -> Unit,
+    onInstagram: () -> Unit,
+    onLinkedIn: () -> Unit,
+    onYouTube: () -> Unit// ✅ ADD THIS
 ) {
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -528,6 +566,19 @@ fun AboutSection(
                 color = Color(0xFFE0E0E0)
             )
             AboutMenuItem("Contact Us", Icons.Rounded.Support, onContactUs)
+
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = Color(0xFFE0E0E0)
+            )
+
+            SocialLinksRow(
+                onFacebook = { openUrl("https://www.facebook.com/eva2zconnect") },
+                onInstagram = { openUrl("https://www.instagram.com/eva2z_connect/") },
+                onLinkedIn = { openUrl("https://www.linkedin.com/company/eva2zconnect/") },
+                onYouTube = { openUrl("https://youtube.com/@eva2z_connect?si=MDx3Obn2fAxwSyL7") },
+                onTwitter = { openUrl("https://www.youtube.com/@eva2zconnect") }
+            )
         }
     }
 }
@@ -572,3 +623,74 @@ fun AboutMenuItem(
         )
     }
 }
+
+@Composable
+fun SocialLinksRow(
+    onFacebook: () -> Unit,
+    onInstagram: () -> Unit,
+    onLinkedIn: () -> Unit,
+    onYouTube: () -> Unit,
+    onTwitter: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        SocialPngIcon(
+            icon = Res.drawable.ic_facebook,
+            contentDescription = "Facebook",
+            onClick = onFacebook
+        )
+
+        SocialPngIcon(
+            icon = Res.drawable.ic_instagram,
+            contentDescription = "Instagram",
+            onClick = onInstagram
+        )
+
+        SocialPngIcon(
+            icon = Res.drawable.ic_linkedin,
+            contentDescription = "LinkedIn",
+            onClick = onLinkedIn
+        )
+
+        SocialPngIcon(
+            icon = Res.drawable.ic_youtube,
+            contentDescription = "YouTube",
+            onClick = onYouTube
+        )
+
+        SocialPngIcon(
+            icon = Res.drawable.ic_twitter,
+            contentDescription = "Twitter",
+            onClick = onTwitter
+        )
+    }
+}
+
+
+@Composable
+fun SocialPngIcon(
+    icon: DrawableResource,
+    contentDescription: String,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .size(46.dp)
+            .clip(CircleShape)
+            .background(Color(0xFFF1F8F1))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Image(
+            painter = painterResource(icon),
+            contentDescription = contentDescription,
+            modifier = Modifier.size(22.dp)
+        )
+    }
+}
+

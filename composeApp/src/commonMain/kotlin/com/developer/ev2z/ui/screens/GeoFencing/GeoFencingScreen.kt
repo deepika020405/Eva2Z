@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
@@ -23,6 +24,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -368,8 +370,16 @@ fun AddEditGeoFenceScreen(
             item {
                 OutlinedTextField(
                     value = radius,
-                    onValueChange = { radius = it },
-                    placeholder = { Text("Radius (meters)") },
+                    onValueChange = { input ->
+                        // ✅ Allow only digits
+                        if (input.all { it.isDigit() }) {
+                            radius = input
+                        }
+                    },
+                    placeholder = { Text("Radius (km)") },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
             }

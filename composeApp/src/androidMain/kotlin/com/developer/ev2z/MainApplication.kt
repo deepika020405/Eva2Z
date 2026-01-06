@@ -2,6 +2,7 @@ package com.developer.ev2z
 
 import android.app.Application
 import android.util.Log
+import com.developer.ev2z.ui.screens.social_media.initOpenUrl
 import com.developer.ev2z.util.Analytics
 
 class MainApplication : Application() {
@@ -11,6 +12,8 @@ class MainApplication : Application() {
 
         try {
             Analytics.init(this)
+            initOpenUrl(this)
+            initAppContext(this)
             // ✅ Set Activity Provider context
             Log.d("MainApplication", "✅ Application initialized")
 
