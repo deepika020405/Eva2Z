@@ -27,9 +27,9 @@ data class AddStoryResponse(
 )
 @Serializable
 data class StoryViewersResponse(
-    val story_id: Int,
-    val total_views: Int,
-    val viewers: List<StoryViewer>
+    val story_id: Int= 0,
+    val total_views: Int= 0,
+    val viewers: List<StoryViewer> = emptyList()
 )
 @Serializable
 data class StoryViewer(
