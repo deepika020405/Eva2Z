@@ -48,6 +48,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.developer.ev2z.ui.screens.deviceStatus.DeviceStatusScreen
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
 import org.jetbrains.compose.resources.painterResource
@@ -84,6 +85,8 @@ fun App() {
     var showAddDevice by remember { mutableStateOf(false) }
     var showDeviceReport by remember { mutableStateOf(false) }
     var showAddDeviceSuccess by remember { mutableStateOf(false) }
+    var showDeviceStatus by remember { mutableStateOf(false) }
+
 
     // Authentication flow states
     var showForgetPassword by remember { mutableStateOf(false) }
@@ -281,6 +284,17 @@ fun App() {
                 )
             }
 
+
+            showDeviceStatus -> {
+                println("📱 Rendering: Device Status Screen")
+                DeviceStatusScreen(
+                    onBack = {
+                        showDeviceStatus = false
+                    }
+                )
+            }
+
+
             isLoggedIn && authToken.isNotEmpty() -> {
                 println("📱 Rendering: Home Screen")
                 HomeNavGraph(
@@ -299,6 +313,9 @@ fun App() {
                     onNavigateToChangePassword = {
                         println("🔑 Navigate to Change Password triggered")
                         showChangePassword = true
+                    },
+                    onOpenDeviceStatus = {
+                        showDeviceStatus = true
                     },
                     onLogout = {
                         println("🚪 Logging out...")

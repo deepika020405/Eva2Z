@@ -788,6 +788,23 @@ class ApiService {
         }
     }
 
+
+    suspend fun getDevicesStatus(token: String, deviceId: String): DeviceStatusResponse {
+        val response = client.get("${baseUrl}device/status-details/$deviceId") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }
+
+        // Always parse body as text first
+        val text = response.bodyAsText()
+        println("DEBUG: Response body: $text")
+
+        // Now deserialize manually
+        return kotlinx.serialization.json.Json {
+            ignoreUnknownKeys = true  // ✅ ignore extra fields
+        }.decodeFromString(DeviceStatusResponse.serializer(), text)
+    }
+
+
     // ===============================================
     // SHOP / PRODUCT APIs (existing code)
     // ===============================================

@@ -577,7 +577,7 @@ fun AboutSection(
                 onInstagram = { openUrl("https://www.instagram.com/eva2z_connect/") },
                 onLinkedIn = { openUrl("https://www.linkedin.com/company/eva2zconnect/") },
                 onYouTube = { openUrl("https://youtube.com/@eva2z_connect?si=MDx3Obn2fAxwSyL7") },
-                onTwitter = { openUrl("https://www.youtube.com/@eva2zconnect") }
+//                onTwitter = { openUrl("https://www.youtube.com/@eva2zconnect") }
             )
         }
     }
@@ -630,7 +630,7 @@ fun SocialLinksRow(
     onInstagram: () -> Unit,
     onLinkedIn: () -> Unit,
     onYouTube: () -> Unit,
-    onTwitter: () -> Unit
+//    onTwitter: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -663,11 +663,11 @@ fun SocialLinksRow(
             onClick = onYouTube
         )
 
-        SocialPngIcon(
-            icon = Res.drawable.ic_twitter,
-            contentDescription = "Twitter",
-            onClick = onTwitter
-        )
+//        SocialPngIcon(
+//            icon = Res.drawable.ic_twitter,
+//            contentDescription = "Twitter",
+//            onClick = onTwitter
+//        )
     }
 }
 

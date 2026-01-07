@@ -51,6 +51,7 @@ class HomeTab(
     private val viewModel: HomeViewModel,
     private val token: String,
     private val onNavigateToAddDevice: () -> Unit,
+    private val onOpenDeviceStatus: () -> Unit,
     private val onNavigateToDeviceReport: () -> Unit
 ) : Tab {
     @Composable
@@ -58,7 +59,8 @@ class HomeTab(
         viewModel = viewModel,
         token = token,
         onNavigateToAddDevice = onNavigateToAddDevice,
-        onNavigateToDeviceReport = onNavigateToDeviceReport
+        onNavigateToDeviceReport = onNavigateToDeviceReport,
+        onOpenDeviceStatus = onOpenDeviceStatus
     )
 
     override val options: TabOptions
@@ -166,6 +168,7 @@ fun HomeNavGraph(
     token: String,
     onNavigateToAddDevice: () -> Unit,
     onNavigateToDeviceReport: () -> Unit,
+    onOpenDeviceStatus: () -> Unit,
     onNavigateToChangePassword: () -> Unit = {},
     onNavigateToAboutApp: () -> Unit = {},
     onLogout: () -> Unit = {}
@@ -214,6 +217,7 @@ fun HomeNavGraph(
             coroutineScope = coroutineScope, // ✅ PASS HERE
             onNavigateToAddDevice = onNavigateToAddDevice,
             onNavigateToDeviceReport = onNavigateToDeviceReport,
+            onOpenDeviceStatus = onOpenDeviceStatus,
             onNavigateToEditProfile = { showEditProfile = true },
             onNavigateToManageDevice = { showManageDevice = true },
             onNavigateToGPSData = { showGPSData = true },
@@ -457,6 +461,7 @@ fun HomeNavGraphContent(
     coroutineScope: CoroutineScope, // ✅ RECEIVE coroutineScope
     onNavigateToAddDevice: () -> Unit,
     onNavigateToDeviceReport: () -> Unit,
+    onOpenDeviceStatus: () -> Unit,
     onNavigateToEditProfile: () -> Unit,
     onNavigateToManageDevice: () -> Unit,
     onNavigateToGPSData: () -> Unit,
@@ -481,7 +486,7 @@ fun HomeNavGraphContent(
         ShopViewModel(repo = productRepository, tokenProvider = tokenProvider)
     }
 
-    val homeTab = remember { HomeTab(viewModel, token, onNavigateToAddDevice, onNavigateToDeviceReport) }
+    val homeTab = remember { HomeTab(viewModel, token, onNavigateToAddDevice, onOpenDeviceStatus ,onNavigateToDeviceReport) }
 
     val profileTab = remember(profileRefreshTrigger) {
         ProfileTab(

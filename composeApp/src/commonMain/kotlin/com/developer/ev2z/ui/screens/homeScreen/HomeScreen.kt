@@ -1,6 +1,11 @@
 // composeApp/src/commonMain/kotlin/com/developer/ev2z/ui/screens/homeScreen/HomeScreen.kt
 package com.developer.ev2z.ui.screens.homeScreen
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -24,6 +29,7 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.graphicsLayer
 import com.developer.ev2z.util.Analytics
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
@@ -36,12 +42,14 @@ fun HomeScreen(
     viewModel: HomeViewModel,
     token: String,
     onNavigateToAddDevice: () -> Unit,
-    onNavigateToDeviceReport: () -> Unit
+    onNavigateToDeviceReport: () -> Unit,
+    onOpenDeviceStatus: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val selectedDevice by viewModel.selectedDevice.collectAsState()
     val showOverview by viewModel.showOverview.collectAsState()
     val showDeviceDropdown by viewModel.showDeviceDropdown.collectAsState()
+    val isRefreshing by viewModel.isRefreshing.collectAsState()
 
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
@@ -166,7 +174,11 @@ fun HomeScreen(
                         OverviewBottomSheet(
                             response = response,
                             onClose = { viewModel.hideOverviewSheet() },
-                            onNavigateToDeviceReport = onNavigateToDeviceReport
+                            onNavigateToDeviceReport = onNavigateToDeviceReport,
+                            onOpenDeviceStatus = onOpenDeviceStatus,
+                            token = token,
+                            viewModel = viewModel,
+                            isRefreshing = isRefreshing
                         )
                     }
                 }
@@ -384,7 +396,11 @@ fun DeviceListItem(device: Device, onClick: () -> Unit) {
 fun OverviewBottomSheet(
     response: DeviceResponse,
     onClose: () -> Unit,
-    onNavigateToDeviceReport: () -> Unit
+    onNavigateToDeviceReport: () -> Unit,
+    onOpenDeviceStatus: () -> Unit,
+    token: String,
+    viewModel : HomeViewModel,
+    isRefreshing : Boolean
 ) {
     val totalDistance = response.data.sumOf { (it.speed * (it.lastSeenMinutesAgo ?: 0)).toLong() }
     val avgSpeed = response.data.filter { it.speed > 0 }.map { it.speed }.average().takeIf { !it.isNaN() } ?: 0.0
@@ -406,11 +422,13 @@ fun OverviewBottomSheet(
             )
 
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Icon(
-                    imageVector = Icons.Default.Refresh,
-                    contentDescription = "Refresh",
-                    modifier = Modifier.size(24.dp)
+                RefreshIcon(
+                    isRefreshing = isRefreshing,
+                    onClick = {
+                        viewModel.refreshDevices(token)
+                    }
                 )
+
                 Icon(
                     imageVector = Icons.Default.Download,
                     contentDescription = "Download",
@@ -435,6 +453,24 @@ fun OverviewBottomSheet(
             StatItem("Average Speed", "${avgSpeed.toInt()} km")
             StatItem("Total Distance", "${totalDistance}km")
         }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Button(
+            onClick = {
+                onOpenDeviceStatus()
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp)
+        ) {
+            Text(
+                text = "Open Device Status",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+
 
         Spacer(modifier = Modifier.height(20.dp))
 
@@ -567,6 +603,35 @@ fun ColorIndicator(value: String, color: Color, label: String) {
             )
         }
     }
+}
+
+@Composable
+fun RefreshIcon(
+    isRefreshing: Boolean,
+    onClick: () -> Unit
+) {
+    val rotation by animateFloatAsState(
+        targetValue = if (isRefreshing) 360f else 0f,
+        animationSpec = if (isRefreshing)
+            infiniteRepeatable(
+                animation = tween(800, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            )
+        else tween(0),
+        label = "refresh_rotation"
+    )
+
+    Icon(
+        imageVector = Icons.Default.Refresh,
+        contentDescription = "Refresh",
+        modifier = Modifier
+            .size(24.dp)
+            .graphicsLayer { rotationZ = rotation }
+            .clickable(enabled = !isRefreshing) {
+                onClick()
+            },
+        tint = if (isRefreshing) Color.Gray else Color.Black
+    )
 }
 
 @Composable

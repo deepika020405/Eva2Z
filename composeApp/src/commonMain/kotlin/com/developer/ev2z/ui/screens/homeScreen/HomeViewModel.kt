@@ -29,7 +29,9 @@ class HomeViewModel(
 
     private val _showOverview = MutableStateFlow(false)
     val showOverview: StateFlow<Boolean> = _showOverview.asStateFlow()
-    var isRefreshing = MutableStateFlow(false)
+    private val _isRefreshing = MutableStateFlow(false)
+    val isRefreshing = _isRefreshing.asStateFlow()
+
 
     private val _showDeviceDropdown = MutableStateFlow(false)
     val showDeviceDropdown: StateFlow<Boolean> = _showDeviceDropdown.asStateFlow()
@@ -74,6 +76,15 @@ class HomeViewModel(
     }
 
     fun refreshDevices(token: String) {
-        loadDevices(token)
+        if (_isRefreshing.value) return // 👈 double click block
+
+        viewModelScope.launch {
+            _isRefreshing.value = true
+            try {
+                loadDevices(token) // tumhari existing API call
+            } finally {
+                _isRefreshing.value = false
+            }
+        }
     }
 }

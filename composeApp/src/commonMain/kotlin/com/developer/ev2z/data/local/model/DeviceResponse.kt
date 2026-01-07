@@ -29,7 +29,7 @@ data class Device(
     val timestamp: String?,
     @SerialName("last_seen_minutes_ago") val lastSeenMinutesAgo: Int?
 ) {
-    fun getDisplayName(): String = deviceName ?: "Device ${deviceId.take(8)}"
+    fun getDisplayName(): String = deviceName?.takeIf { it.isNotBlank() } ?: "Device ${deviceId.take(8)}"
 
     fun getLatitudeDouble(): Double? = latitude?.toDoubleOrNull()
 

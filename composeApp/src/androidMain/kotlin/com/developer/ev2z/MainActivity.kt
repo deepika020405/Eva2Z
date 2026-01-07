@@ -9,6 +9,8 @@ import androidx.compose.runtime.Composable
 import com.developer.ev2z.data.local.initStorageManager
 import com.developer.ev2z.phonepe.PaymentBus
 import com.developer.ev2z.ui.screens.Profile.GlobalContext
+import com.developer.ev2z.util.initGeocoder
+
 //import com.developer.ev2z.util.AppSignatureHelper
 
 class MainActivity : ComponentActivity() {
@@ -23,6 +25,7 @@ class MainActivity : ComponentActivity() {
 
             // ✅ Setup activity
             ActivityProvider.setActivity(this)
+            initGeocoder(this)
 
             // ✅ Print signatures for SMS Retriever
 //            AppSignatureHelper(this).printAppSignaturesToLog()
