@@ -5,8 +5,10 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class DeviceStatusResponse(
     val success: Boolean,
-    val data: DeviceStatusData
+    val message: String? = null,
+    val data: DeviceStatusData? = null
 )
+
 
 @Serializable
 data class DeviceStatusData(

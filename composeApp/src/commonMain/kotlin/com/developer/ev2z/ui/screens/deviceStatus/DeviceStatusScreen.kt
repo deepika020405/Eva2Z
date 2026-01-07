@@ -98,26 +98,72 @@ fun DeviceStatusScreen(onBack: () -> Unit) {
                 onSelect = viewModel::setFilter
             )
 
+//            Spacer(Modifier.height(12.dp))
+//
+//            LazyColumn {
+//                items(sessions) { session ->
+//
+//                    val lat = session.latitude.toDouble()
+//                    val lng = session.longitude.toDouble()
+//                    val key = "$lat,$lng"
+//
+//                    // 🔁 address fetch trigger
+//                    LaunchedEffect(key) {
+//                        viewModel.resolveAddress(lat, lng)
+//                    }
+//
+//                    StatusSessionCard(
+//                        session = session,
+//                        address = addressMap[key]
+//                    )
+//                }
+//            }
+
             Spacer(Modifier.height(12.dp))
 
-            LazyColumn {
-                items(sessions) { session ->
-
-                    val lat = session.latitude.toDouble()
-                    val lng = session.longitude.toDouble()
-                    val key = "$lat,$lng"
-
-                    // 🔁 address fetch trigger
-                    LaunchedEffect(key) {
-                        viewModel.resolveAddress(lat, lng)
-                    }
-
-                    StatusSessionCard(
-                        session = session,
-                        address = addressMap[key]
+            when {
+                viewModel.selectedDeviceId.collectAsState().value == null -> {
+                    EmptyState(
+                        title = "Select a device",
+                        subtitle = "Please select a device to view status history"
                     )
                 }
+
+                statusResponse?.success == false -> {
+                    EmptyState(
+                        title = "No data found",
+                        subtitle = statusResponse?.message ?: "No status available for today"
+                    )
+                }
+
+                sessions.isEmpty() -> {
+                    EmptyState(
+                        title = "No activity",
+                        subtitle = "This device has no status records today"
+                    )
+                }
+
+                else -> {
+                    LazyColumn {
+                        items(sessions) { session ->
+
+                            val lat = session.latitude.toDouble()
+                            val lng = session.longitude.toDouble()
+                            val key = "$lat,$lng"
+
+                            LaunchedEffect(key) {
+                                viewModel.resolveAddress(lat, lng)
+                            }
+
+                            StatusSessionCard(
+                                session = session,
+                                address = addressMap[key]
+                            )
+                        }
+                    }
+                }
             }
+
         }
     }
 }
@@ -367,3 +413,30 @@ fun statusUi(status: String): Pair<String, Color> {
 }
 
 
+@Composable
+fun EmptyState(
+    title: String,
+    subtitle: String
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 80.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(
+            text = title,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = Color.DarkGray
+        )
+
+        Spacer(Modifier.height(8.dp))
+
+        Text(
+            text = subtitle,
+            fontSize = 14.sp,
+            color = Color.Gray
+        )
+    }
+}
