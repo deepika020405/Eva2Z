@@ -420,7 +420,7 @@ fun OverviewBottomSheet(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Daily Overview",
+                text = "Device Overview",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -474,7 +474,7 @@ fun OverviewBottomSheet(
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text(
-                    text = "Device Status",
+                    text = "Today's Report",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Medium
                 )
