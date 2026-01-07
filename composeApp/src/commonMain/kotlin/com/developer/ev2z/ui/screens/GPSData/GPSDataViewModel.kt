@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.data.local.StorageManager
+import com.developer.ev2z.util.getAddressFromLatLng
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -83,6 +84,11 @@ class GPSDataViewModel(
                         val latestLocation = locationResponse.data?.latestLocation
 
                         if (latestLocation != null) {
+                            val address = getAddressFromLatLng(
+                                latestLocation.latitude.toDouble(),
+                                latestLocation.longitude.toDouble()
+                            )
+
                             gpsDevices.add(
                                 GPSDevice(
                                     deviceId = device.device_id,
@@ -93,7 +99,7 @@ class GPSDataViewModel(
                                     batteryStatus = parseBatteryStatus(latestLocation.batteryStatus),
                                     distance = 0.0,
                                     speed = latestLocation.speed.toDouble(),
-                                    location = "Loading address...",
+                                    location = address,
                                     latitude = latestLocation.latitude.toDoubleOrNull() ?: 0.0,
                                     longitude = latestLocation.longitude.toDoubleOrNull() ?: 0.0,
                                     fixTime = convertUtcToIst(latestLocation.timestamp),
