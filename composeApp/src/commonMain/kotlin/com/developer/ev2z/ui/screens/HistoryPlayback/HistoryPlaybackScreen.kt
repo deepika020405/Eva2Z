@@ -501,7 +501,8 @@ fun BoxScope.HistoryPlaybackBottomSheet(
                     enabled = hasData
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Play History", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                        var statePlay = if (!isPlaying) "Play History" else "Pause "
+                        Text(statePlay, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Medium)
                         Spacer(modifier = Modifier.height(4.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text("1X", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
