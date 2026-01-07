@@ -139,7 +139,8 @@ fun HomeScreen(
                             devices = response.data ?: emptyList(),
                             onDeviceSelect = {
                                 viewModel.selectDevice(it)
-                                viewModel.toggleDeviceDropdown()
+//                                viewModel.toggleDeviceDropdown()
+                                onNavigateToDeviceReport()
                             },
                             onAddDevice = {
                                 println("➕ Add Device clicked from dropdown")
