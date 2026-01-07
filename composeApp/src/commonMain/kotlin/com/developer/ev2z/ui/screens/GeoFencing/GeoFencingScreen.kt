@@ -193,7 +193,7 @@ fun GeoFenceCard(item: GeoFenceDto, onDelete: (GeoFenceDto) -> Unit,onEdit: (Geo
             Spacer(Modifier.height(6.dp))
 
             Text(
-                text = "Radius: ${item.radius} m",
+                text = "Radius: ${item.radius} meter",
                 fontSize = 12.sp
             )
 
@@ -376,7 +376,7 @@ fun AddEditGeoFenceScreen(
                             radius = input
                         }
                     },
-                    placeholder = { Text("Radius (km)") },
+                    placeholder = { Text("Radius (meter)") },
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Number
                     ),
