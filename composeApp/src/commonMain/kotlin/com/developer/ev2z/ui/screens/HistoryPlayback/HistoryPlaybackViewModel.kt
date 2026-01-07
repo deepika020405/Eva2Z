@@ -43,20 +43,35 @@ class HistoryPlaybackViewModel(
     val selectedDevice: StateFlow<Device?> = _selectedDevice.asStateFlow()
 
     // ✅ FIXED: Initialize with YESTERDAY's date
+//    private val today = Instant.fromEpochMilliseconds(getTimeMillis())
+//        .toLocalDateTime(TimeZone.currentSystemDefault())
+//        .date
     private val today = Instant.fromEpochMilliseconds(getTimeMillis())
         .toLocalDateTime(TimeZone.currentSystemDefault())
         .date
 
+
+
     private val yesterday = today.minus(1, DateTimeUnit.DAY)
 
-    private val _startDate = MutableStateFlow(yesterday.toString())
+//    private val _startDate = MutableStateFlow(yesterday.toString())
+//    val startDate: StateFlow<String> = _startDate.asStateFlow()
+//
+//    private val _endDate = MutableStateFlow(yesterday.toString())
+//    val endDate: StateFlow<String> = _endDate.asStateFlow()
+
+    private val _startDate = MutableStateFlow(today.toString())
     val startDate: StateFlow<String> = _startDate.asStateFlow()
 
-    private val _endDate = MutableStateFlow(yesterday.toString())
+    private val _endDate = MutableStateFlow(today.toString())
     val endDate: StateFlow<String> = _endDate.asStateFlow()
 
-    val maxSelectableDate = today.minus(1, DateTimeUnit.DAY)
+
+//    val maxSelectableDate = today.minus(1, DateTimeUnit.DAY)
+//    val minSelectableDate = today.minus(3, DateTimeUnit.MONTH)
+val maxSelectableDate = today
     val minSelectableDate = today.minus(3, DateTimeUnit.MONTH)
+
 
     private val _routePoints = MutableStateFlow<List<RoutePoint>>(emptyList())
     val routePoints: StateFlow<List<RoutePoint>> = _routePoints.asStateFlow()

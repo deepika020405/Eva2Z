@@ -577,15 +577,33 @@ fun DateRangePickerDialog(
     onDatesSelected: (String, String) -> Unit,
     onDismiss: () -> Unit
 ) {
+//    val dateRangePickerState = rememberDateRangePickerState(
+//        selectableDates = object : SelectableDates {
+//            override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+//                val instant = Instant.fromEpochMilliseconds(utcTimeMillis)
+////                val date = instant.toLocalDateTime(TimeZone.UTC).date
+//                val date = instant
+//                    .toLocalDateTime(TimeZone.currentSystemDefault())
+//                    .date
+//
+//                return date in minDate..maxDate
+//            }
+//        }
+//    )
+
     val dateRangePickerState = rememberDateRangePickerState(
         selectableDates = object : SelectableDates {
             override fun isSelectableDate(utcTimeMillis: Long): Boolean {
-                val instant = Instant.fromEpochMilliseconds(utcTimeMillis)
-                val date = instant.toLocalDateTime(TimeZone.UTC).date
+                val date = Instant
+                    .fromEpochMilliseconds(utcTimeMillis)
+                    .toLocalDateTime(TimeZone.currentSystemDefault())
+                    .date
+
                 return date in minDate..maxDate
             }
         }
     )
+
 
     DatePickerDialog(
         onDismissRequest = onDismiss,
@@ -596,10 +614,14 @@ fun DateRangePickerDialog(
 
                 when {
                     startMillis != null && endMillis != null -> {
+//                        val start = Instant.fromEpochMilliseconds(startMillis)
+//                            .toLocalDateTime(TimeZone.UTC).date
                         val start = Instant.fromEpochMilliseconds(startMillis)
-                            .toLocalDateTime(TimeZone.UTC).date
+                            .toLocalDateTime(TimeZone.currentSystemDefault())
+                            .date
+
                         val end = Instant.fromEpochMilliseconds(endMillis)
-                            .toLocalDateTime(TimeZone.UTC).date
+                            .toLocalDateTime(TimeZone.currentSystemDefault()).date
 
                         onDatesSelected(
                             minOf(start, end).toString(),
@@ -609,7 +631,7 @@ fun DateRangePickerDialog(
                     }
                     startMillis != null -> {
                         val date = Instant.fromEpochMilliseconds(startMillis)
-                            .toLocalDateTime(TimeZone.UTC).date
+                            .toLocalDateTime(TimeZone.currentSystemDefault()).date
                         onDatesSelected(date.toString(), date.toString())
                         onDismiss()
                     }

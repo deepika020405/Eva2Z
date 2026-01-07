@@ -11,6 +11,7 @@ import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
 
+
 @Composable
 actual fun HistoryMapView(
     routePoints: List<RoutePoint>,
@@ -24,35 +25,29 @@ actual fun HistoryMapView(
         val lng = point.getLngDouble()
         if (lat != null && lng != null) LatLng(lat, lng) else null
     }
-
     if (latLngList.isEmpty()) return
 
-    val currentPoint = if (currentIndex in latLngList.indices) {
-        latLngList[currentIndex]
-    } else {
-        latLngList.firstOrNull() ?: return
-    }
+    val currentPoint = latLngList.getOrElse(currentIndex) { latLngList.first() }
 
-    val cameraPositionState = rememberCameraPositionState {
-        position = CameraPosition.fromLatLngZoom(currentPoint, 15f)
-    }
+//    val cameraPositionState = rememberCameraPositionState {
+//        position = CameraPosition.fromLatLngZoom(currentPoint, 15f)
+//    }
 
-    // ✅ FIX: Remember marker state
-    val markerState = remember(currentPoint) {
-        MarkerState(position = currentPoint)
-    }
+    val markerState = remember(currentPoint) { MarkerState(position = currentPoint) }
 
-    LaunchedEffect(currentIndex) {
+    val cameraPositionState = rememberCameraPositionState()
+
+    LaunchedEffect(currentIndex, latLngList) {
         if (currentIndex in latLngList.indices) {
-            val newPosition = latLngList[currentIndex]
+            val newLatLng = latLngList[currentIndex]
+
+            // ✅ Animate camera safely
             cameraPositionState.animate(
-                CameraUpdateFactory.newLatLngZoom(newPosition, 15f),
-                durationMs = 500
+                CameraUpdateFactory.newLatLngZoom(newLatLng, 15f)
             )
-            // ✅ Update marker position
-            markerState.position = newPosition
         }
     }
+
 
     GoogleMap(
         modifier = modifier,
@@ -66,7 +61,6 @@ actual fun HistoryMapView(
             width = 10f
         )
 
-        // ✅ FIX: Use remembered state
         Marker(
             state = markerState,
             title = "Point ${currentIndex + 1}",
@@ -74,3 +68,4 @@ actual fun HistoryMapView(
         )
     }
 }
+
