@@ -5,8 +5,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.UIKitView
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.CoreLocation.CLLocationCoordinate2DMake
-import platform.CoreLocation.CLLocationDegrees
 import platform.MapKit.*
+import platform.UIKit.UIImage
+import platform.darwin.NSObject
 
 @OptIn(ExperimentalForeignApi::class)
 @Composable
@@ -16,23 +17,55 @@ actual fun PlatformMapView(
     longitude: Double,
     zoom: Double
 ) {
-    UIKitView(factory = {
-        val mapView = MKMapView()
-        val coord = CLLocationCoordinate2DMake(latitude, longitude)
+    UIKitView(
+        modifier = modifier,
+        factory = {
+            val mapView = MKMapView()
 
-        val region = MKCoordinateRegionMake(
-            coord,
-            MKCoordinateSpanMake(0.01, 0.01)
-        )
-        mapView.setRegion(region, true)
+            val coordinate = CLLocationCoordinate2DMake(latitude, longitude)
 
-        val marker = MKPointAnnotation().apply {
-            this.setCoordinate(coord)
-            this.setTitle("Device")        // ✅ correct
+            val region = MKCoordinateRegionMakeWithDistance(
+                coordinate,
+                zoom * 1000,
+                zoom * 1000
+            )
+            mapView.setRegion(region, animated = true)
+
+            // 📍 Annotation
+            val annotation = MKPointAnnotation().apply {
+                setCoordinate(coordinate)
+                setTitle("Device")
+            }
+
+            mapView.addAnnotation(annotation)
+
+            // 🎯 Delegate
+            mapView.delegate = object : NSObject(), MKMapViewDelegateProtocol {
+
+                override fun mapView(
+                    mapView: MKMapView,
+                    viewForAnnotation: MKAnnotationProtocol
+                ): MKAnnotationView? {
+
+                    if (viewForAnnotation is MKUserLocation) return null
+
+                    val identifier = "bike_marker"
+
+                    val annotationView =
+                        mapView.dequeueReusableAnnotationViewWithIdentifier(identifier)
+                            ?: MKAnnotationView(viewForAnnotation, identifier)
+
+                    annotationView.annotation = viewForAnnotation
+                    annotationView.canShowCallout = true
+
+                    // ✅ Custom icon
+                    annotationView.image = UIImage.imageNamed("ic_vechile")
+
+                    return annotationView
+                }
+            }
+
+            mapView
         }
-
-        mapView.addAnnotation(marker)
-
-        mapView
-    }, modifier = modifier)
+    )
 }

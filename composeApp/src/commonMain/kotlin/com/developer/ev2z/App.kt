@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.ui.screens.deviceStatus.DeviceStatusScreen
+import com.developer.ev2z.ui.screens.trackTrace.TrackTraceScreen
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
 import org.jetbrains.compose.resources.painterResource
@@ -86,6 +87,7 @@ fun App() {
     var showDeviceReport by remember { mutableStateOf(false) }
     var showAddDeviceSuccess by remember { mutableStateOf(false) }
     var showDeviceStatus by remember { mutableStateOf(false) }
+    var showTrackTrace by remember { mutableStateOf(false) }
 
 
     // Authentication flow states
@@ -293,6 +295,15 @@ fun App() {
                     }
                 )
             }
+             showTrackTrace -> {
+                println("📱 Rendering: Track Trace Screen")
+                TrackTraceScreen  (
+                    onBack = {
+                        showTrackTrace = false
+                    }
+                )
+            }
+
 
 
             isLoggedIn && authToken.isNotEmpty() -> {
@@ -316,6 +327,9 @@ fun App() {
                     },
                     onOpenDeviceStatus = {
                         showDeviceStatus = true
+                    },
+                    onOpenTrackTrace = {
+                        showTrackTrace = true
                     },
                     onLogout = {
                         println("🚪 Logging out...")

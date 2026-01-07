@@ -47,7 +47,8 @@ data class MyDevicesResponse(
     val success: Boolean,
     @SerialName("total_devices")
     val total_devices: Int,
-    val devices: List<Device>
+    val devices: List<Device>,
+    val username: String?
 )
 
 @Serializable

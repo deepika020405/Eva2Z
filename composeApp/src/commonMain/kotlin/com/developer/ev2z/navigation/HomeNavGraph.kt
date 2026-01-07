@@ -52,7 +52,8 @@ class HomeTab(
     private val token: String,
     private val onNavigateToAddDevice: () -> Unit,
     private val onOpenDeviceStatus: () -> Unit,
-    private val onNavigateToDeviceReport: () -> Unit
+    private val onNavigateToDeviceReport: () -> Unit,
+    private val onOpenTrackTrace: () -> Unit,
 ) : Tab {
     @Composable
     override fun Content() = HomeScreen(
@@ -60,7 +61,8 @@ class HomeTab(
         token = token,
         onNavigateToAddDevice = onNavigateToAddDevice,
         onNavigateToDeviceReport = onNavigateToDeviceReport,
-        onOpenDeviceStatus = onOpenDeviceStatus
+        onOpenDeviceStatus = onOpenDeviceStatus,
+        onOpenTrackTrace = onOpenTrackTrace
     )
 
     override val options: TabOptions
@@ -169,6 +171,7 @@ fun HomeNavGraph(
     onNavigateToAddDevice: () -> Unit,
     onNavigateToDeviceReport: () -> Unit,
     onOpenDeviceStatus: () -> Unit,
+    onOpenTrackTrace: () -> Unit,
     onNavigateToChangePassword: () -> Unit = {},
     onNavigateToAboutApp: () -> Unit = {},
     onLogout: () -> Unit = {}
@@ -218,6 +221,7 @@ fun HomeNavGraph(
             onNavigateToAddDevice = onNavigateToAddDevice,
             onNavigateToDeviceReport = onNavigateToDeviceReport,
             onOpenDeviceStatus = onOpenDeviceStatus,
+            onOpenTrackTrace = onOpenTrackTrace,
             onNavigateToEditProfile = { showEditProfile = true },
             onNavigateToManageDevice = { showManageDevice = true },
             onNavigateToGPSData = { showGPSData = true },
@@ -465,6 +469,7 @@ fun HomeNavGraphContent(
     onNavigateToEditProfile: () -> Unit,
     onNavigateToManageDevice: () -> Unit,
     onNavigateToGPSData: () -> Unit,
+    onOpenTrackTrace: () -> Unit,
     onNavigateToPrivacyPolicy: () -> Unit,
     onNavigateToTermsConditions: () -> Unit,
     onNavigateToRefundPolicy: () -> Unit,
@@ -486,7 +491,7 @@ fun HomeNavGraphContent(
         ShopViewModel(repo = productRepository, tokenProvider = tokenProvider)
     }
 
-    val homeTab = remember { HomeTab(viewModel, token, onNavigateToAddDevice, onOpenDeviceStatus ,onNavigateToDeviceReport) }
+    val homeTab = remember { HomeTab(viewModel, token, onNavigateToAddDevice, onOpenDeviceStatus ,onNavigateToDeviceReport,onOpenTrackTrace) }
 
     val profileTab = remember(profileRefreshTrigger) {
         ProfileTab(

@@ -467,135 +467,7 @@ fun ReportHeaderWithData(
     }
 }
 
-//@Composable
-//fun DeviceBasicInfoWithData(
-//    liveLocation: LiveLocationResponse?,
-//    device: Device,
-//    token: String,
-//    viewModel: DeviceReportViewModel
-//) {
-//    val latest = liveLocation?.data?.latestLocation
-//    val currentStatus = latest?.status ?: device.status
-//    val dialogState by viewModel.showConfirmationDialog.collectAsState()
-//    // jab bhi location change ho, address fetch karo
-//    LaunchedEffect(latest?.latitude, latest?.longitude) {
-//        latest?.let {
-//            viewModel.getAddressFromLatLng(it.latitude.toDouble(), it.longitude.toDouble())
-//        }
-//    }
-//
-//    val address by viewModel.address.collectAsState()
-//
-//    Text(
-//        "Live Location\n${address ?: "Fetching..."}",
-//        fontSize = 14.sp,
-//        modifier = Modifier.padding(horizontal = 18.dp),
-//        color = Color.DarkGray
-//    )
-//
-//    Spacer(Modifier.height(10.dp))
-//
-////    Row(
-////        Modifier
-////            .fillMaxWidth()
-////            .padding(horizontal = 18.dp),
-////        horizontalArrangement = Arrangement.spacedBy(14.dp)
-////    ) {
-////        val currentStatus = latest?.status ?: device.status
-////
-////        OutlinedButton(
-////            onClick = { /* Handle Turn On */ },
-////            enabled = currentStatus != "moving" && currentStatus != "Running",
-////            modifier = Modifier.weight(1f)
-////        ) {
-////            Text("Turn On")
-////        }
-////
-////        Button(
-////            onClick = { /* Handle Turn Off */ },
-////            modifier = Modifier.weight(1f),
-////            enabled = currentStatus == "moving" || currentStatus == "Running",
-////            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF6B6B))
-////        ) {
-////            Text("Turn Off")
-////        }
-////    }
-//
-//    Row(
-//        Modifier
-//            .fillMaxWidth()
-//            .padding(horizontal = 18.dp),
-//        horizontalArrangement = Arrangement.spacedBy(14.dp)
-//    ) {
-//        val isMoving = currentStatus == "moving" || currentStatus == "Running"
-//
-//        // TURN ON → restore
-//        OutlinedButton(
-//            onClick = {
-//                viewModel.openMobilizeDialog("restore", device.device_id)
-//            },
-//            enabled = !isMoving,   // cannot ON when already moving
-//            modifier = Modifier.weight(1f),
-//            colors = ButtonDefaults.outlinedButtonColors(
-//                contentColor = if (!isMoving) Color(0xFF3EBB3E) else Color.Gray
-//            )
-//        ) {
-//            Text("Turn On")
-//        }
-//
-//        // TURN OFF → cut
-//        Button(
-//            onClick = {
-//                viewModel.openMobilizeDialog("cut", device.device_id)
-//            },
-//            enabled = isMoving,  // Off only allowed if running
-//            modifier = Modifier.weight(1f),
-//            colors = ButtonDefaults.buttonColors(
-//                containerColor = if (isMoving) Color(0xFFFF4E4E) else Color.Gray
-//            )
-//        ) {
-//            Text("Turn Off", color = Color.White)
-//        }
-//    }
-//
-//    Spacer(Modifier.height(12.dp))
-//
-//    val activeTime = latest?.timestamp ?: "N/A"
-//    val lastSeenMinutes = latest?.lastSeenMinutesAgo
-//    val displayTime = if (lastSeenMinutes != null) {
-//        when {
-//            lastSeenMinutes == 0 -> "Just now"
-//            lastSeenMinutes < 60 -> "$lastSeenMinutes minutes ago"
-//            else -> "${lastSeenMinutes / 60} hours ago"
-//        }
-//    } else activeTime
-//
-//    Text(
-//        "Active from: $displayTime",
-//        color = Color.Gray,
-//        fontSize = 12.sp,
-//        modifier = Modifier.padding(horizontal = 18.dp)
-//    )
-//
-//    val dialogData by viewModel.showConfirmationDialog.collectAsState()
-//
-//    if (dialogData != null) {
-//        MobilizeConfirmationDialog(
-//            command = dialogData!!.command,
-//            onConfirm = {
-//                viewModel.sendMobilizeCommand(
-//                    token,
-//                    dialogData!!.terminalId,
-//                    dialogData!!.command
-//                )
-//                viewModel.closeMobilizeDialog()
-//            },
-//            onCancel = {
-//                viewModel.closeMobilizeDialog()
-//            }
-//        )
-//    }
-//}
+
 
 
 @Composable
@@ -734,23 +606,6 @@ fun DeviceBasicInfoWithData(
         )
     }
 }
-//@Composable
-//fun DeviceAnalysisContentWithData(liveLocation: LiveLocationResponse?,viewModel: DeviceReportViewModel) {
-//    Spacer(Modifier.height(8.dp))
-//    FilterChipsBar()
-//    Spacer(Modifier.height(16.dp))
-//
-//    // You can calculate total distance from device data later
-////    TotalDistanceCard()
-//    TotalDistanceCard(
-//        totalKm = viewModel.totalMilages.collectAsState().value?.total_distance_km ?: 0.0
-//    )
-//    Spacer(Modifier.height(16.dp))
-//
-//    // Pass status count to the graph
-//    HeadingGraphCardWithData(liveLocation?.data?.statusCount)
-//    Spacer(Modifier.height(20.dp))
-//}
 
 @Composable
 fun DeviceAnalysisContentWithData(
@@ -762,13 +617,7 @@ fun DeviceAnalysisContentWithData(
     val analytics by viewModel.deviceAnalytics.collectAsState()
     val isLoading by viewModel.isAnalyticsLoading.collectAsState()
 
-    // First load (default today)
-//    LaunchedEffect(Unit) {
-//        val deviceId = viewModel.selectedDevice.value?.device_id
-//        if (deviceId != null) {
-//            viewModel.fetchDeviceAnalytics(token, deviceId, selectedRange)
-//        }
-//    }
+
     val selectedDevice by viewModel.selectedDevice.collectAsState()
 
     LaunchedEffect(selectedDevice, selectedRange) {
@@ -804,64 +653,7 @@ fun DeviceAnalysisContentWithData(
 
 
 
-//@Composable
-//fun HeadingGraphCardWithData(
-//    analytics: DeviceAnalyticsData?
-//) {
-//    Surface(
-//        Modifier
-//            .padding(horizontal = 18.dp)
-//            .fillMaxWidth(),
-//        shape = RoundedCornerShape(18.dp),
-//        color = Color(0xFFF2F4F2)
-//    ) {
-//        Column(Modifier.padding(18.dp)) {
-//            Text("Heading", fontSize = 18.sp, fontWeight = FontWeight.Medium)
-//
-//            Spacer(Modifier.height(8.dp))
-//
-//            Row(
-//                verticalAlignment = Alignment.CenterVertically,
-//                modifier = Modifier.fillMaxWidth()
-//            ) {
-//                Text("Total Activity :", color = Color.Gray)
-//                Spacer(Modifier.weight(1f))
-//                Text(
-//                    "${analytics?.totalActivityHours ?: 0.0} hr",
-//                    fontSize = 16.sp,
-//                    fontWeight = FontWeight.SemiBold
-//                )
-//            }
-//
-//            Spacer(Modifier.height(12.dp))
-//
-//            // TODO: yahan donut chart laga dena
-//            Box(
-//                Modifier
-//                    .size(160.dp)
-//                    .align(Alignment.CenterHorizontally),
-//                contentAlignment = Alignment.Center
-//            ) {
-//                Text("Chart Placeholder", fontSize = 12.sp, color = Color.Gray)
-//            }
-//
-//            Spacer(Modifier.height(12.dp))
-//
-//            analytics?.let {
-//                val total = it.totalActivityHours.takeIf { t -> t > 0 } ?: 1.0
-//                val runningPct = (it.runningHours * 100 / total).toInt()
-//                val stoppedPct = (it.stoppedHours * 100 / total).toInt()
-//                val parkedPct = (it.parkedHours * 100 / total).toInt()
-//
-//                Text("• Running   ${it.runningHours} hr ($runningPct%)")
-//                Text("• Stopped   ${it.stoppedHours} hr ($stoppedPct%)")
-//                Text("• Parked    ${it.parkedHours} hr ($parkedPct%)")
-//            } ?: run {
-//                Text("No analytics data", color = Color.Gray)
-//            }
-//        }
-//    }
-//}
+
 
 @Composable
 fun HeadingGraphCardWithData(

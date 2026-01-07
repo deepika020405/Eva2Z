@@ -43,7 +43,8 @@ fun HomeScreen(
     token: String,
     onNavigateToAddDevice: () -> Unit,
     onNavigateToDeviceReport: () -> Unit,
-    onOpenDeviceStatus: () -> Unit
+    onOpenDeviceStatus: () -> Unit,
+    onOpenTrackTrace: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val selectedDevice by viewModel.selectedDevice.collectAsState()
@@ -176,6 +177,7 @@ fun HomeScreen(
                             onClose = { viewModel.hideOverviewSheet() },
                             onNavigateToDeviceReport = onNavigateToDeviceReport,
                             onOpenDeviceStatus = onOpenDeviceStatus,
+                            onOpenTrackTrace = onOpenTrackTrace,
                             token = token,
                             viewModel = viewModel,
                             isRefreshing = isRefreshing
@@ -398,6 +400,7 @@ fun OverviewBottomSheet(
     onClose: () -> Unit,
     onNavigateToDeviceReport: () -> Unit,
     onOpenDeviceStatus: () -> Unit,
+    onOpenTrackTrace: () -> Unit,
     token: String,
     viewModel : HomeViewModel,
     isRefreshing : Boolean
@@ -456,20 +459,43 @@ fun OverviewBottomSheet(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Button(
-            onClick = {
-                onOpenDeviceStatus()
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                text = "Open Device Status",
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold
-            )
+
+            // 🔹 Secondary
+            Button(
+                onClick = { onOpenDeviceStatus() },
+                modifier = Modifier
+                    .weight(1f)
+                    .height(52.dp),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(
+                    text = "Device Status",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+
+            // 🔹 Primary
+            Button(
+                onClick = { onOpenTrackTrace() },
+                modifier = Modifier
+                    .weight(1f)
+                    .height(52.dp),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(
+                    text = "Track & Trace",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
         }
+
+
 
 
         Spacer(modifier = Modifier.height(20.dp))

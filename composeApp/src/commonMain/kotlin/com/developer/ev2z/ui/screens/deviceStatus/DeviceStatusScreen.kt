@@ -82,7 +82,7 @@ fun DeviceStatusScreen(onBack: () -> Unit) {
 
             devices?.let {
                 DeviceDropdownCardSimple(
-                    userName = "User",
+                    userName = devices!!.username!!,
                     devices = it,
                     selectedDeviceId = viewModel.selectedDeviceId.collectAsState().value,
                     onDeviceSelect = viewModel::selectDevice,
