@@ -136,7 +136,7 @@ class ProfileViewModel(
         val encodedMessage = message.replace(" ", "%20")
             .replace("\n", "%0A")
 
-        val supportNumber = "9971917216"
+        val supportNumber = "919971917216"
         val url = "https://wa.me/$supportNumber?text=$encodedMessage"
         openUrl(url)
     }
