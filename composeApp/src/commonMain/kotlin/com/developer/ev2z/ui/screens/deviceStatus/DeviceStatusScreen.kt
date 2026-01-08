@@ -60,7 +60,7 @@ fun DeviceStatusScreen(onBack: () -> Unit) {
         containerColor = Color(0xFFF5F5F5), // 👈 screen background
         topBar = {
             TopAppBar(
-                title = { Text("Device Status") },
+                title = { Text("Today's Report") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, null)

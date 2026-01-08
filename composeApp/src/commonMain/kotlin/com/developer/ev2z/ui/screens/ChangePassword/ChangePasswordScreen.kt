@@ -61,43 +61,15 @@ fun ChangePasswordScreen(
     val updateSuccess by viewModel.updateSuccess.collectAsState()
     val error by viewModel.error.collectAsState()
 
-    // ✅ FIXED: Success handler with proper navigation
-//    LaunchedEffect(updateSuccess) {
-//        if (updateSuccess) {
-//            println("✅ Password changed successfully - showing dialog")
-////            dialogMessage = "Password changed successfully!"
-////            showSuccessDialog = true
-//            delay(2000)
-//            println("✅ Hiding dialog")
-////            showSuccessDialog = false
-//            viewModel.resetUpdateSuccess()
-//            delay(300) // Extra delay for smooth transition
-//            println("✅ Navigating back")
-//            onBackPressed()
-//        }
-//    }
-//
-//    // ✅ Error handler with dialog
-//    LaunchedEffect(error) {
-//        error?.let {
-//            println("❌ Error: $it")
-////            dialogMessage = when {
-////                it.contains("incorrect", ignoreCase = true) -> "Current password is incorrect"
-////                it.contains("network", ignoreCase = true) ||
-////                        it.contains("failed", ignoreCase = true) -> "Network error. Please try again."
-////                else -> it
-////            }
-////            showErrorDialog = true
-//            delay(2000)
-////            showErrorDialog = false
-//            viewModel.clearError()
-//        }
-//    }
+    PlatformBackHandler(enabled = true) {
+        onBackPressed()
+    }
+
 
     LaunchedEffect(updateSuccess) {
         if (updateSuccess) {
             viewModel.resetUpdateSuccess()
-            onBackPressed() // ✅ Direct navigation
+//            onBackPressed() // ✅ Direct navigation
         }
     }
 
@@ -116,9 +88,7 @@ fun ChangePasswordScreen(
         }
     }
 
-    PlatformBackHandler(enabled = true) {
-        onBackPressed()
-    }
+
     // Validation
     val isValid = currentPassword.length >= 6 &&
             newPassword.length >= 6 &&
@@ -127,13 +97,7 @@ fun ChangePasswordScreen(
 
     val scrollState = rememberScrollState()
 
-    // ✅ BackPress Handler - Only when NOT showing success dialog
-//    if (!showSuccessDialog) {
-//        BackPressHandler {
-//            println("🔙 Back pressed")
-//            onBackPressed()
-//        }
-//    }
+
 
     Column(
         modifier = Modifier

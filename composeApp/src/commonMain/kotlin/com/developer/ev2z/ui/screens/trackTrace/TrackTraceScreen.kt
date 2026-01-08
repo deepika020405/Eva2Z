@@ -57,7 +57,7 @@ fun TrackTraceScreen(
     val lat = liveLocation?.data?.latestLocation?.latitude?.toDoubleOrNull()
     val lng = liveLocation?.data?.latestLocation?.longitude?.toDoubleOrNull()
 
-    Scaffold(
+    Scaffold(containerColor = Color(0xFFFFFFFF),
         topBar = {
             TopAppBar(
                 title = { Text("Track & Trace") },
@@ -71,7 +71,6 @@ fun TrackTraceScreen(
                 )
             )
         },
-                contentWindowInsets = WindowInsets(0)
     ) { padding ->
 
         Box(
