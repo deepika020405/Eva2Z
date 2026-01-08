@@ -91,53 +91,68 @@ class AuthViewModel(
     // ============================================
     // CHECK IF PHONE IS REGISTERED - ✅ USING REGISTER API
     // ============================================
-    fun checkPhoneRegistered(phone: String, onResult: (Boolean, String) -> Unit) {
+//    fun checkPhoneRegistered(phone: String, onResult: (Boolean, String) -> Unit) {
+//        viewModelScope.launch {
+//            _loading.value = true
+//            try {
+//                // ✅ Use register API to check if phone exists
+//                // If phone exists, API will return error
+//                val result = repository.signUp("temp", phone, "", "temp@email.com")
+//
+//                // If we get success with OTP, phone is NOT registered
+//                if (result.success) {
+//                    println("✅ Phone not registered, can proceed")
+//                    onResult(false, "")
+//                } else {
+//                    // Check if error message indicates phone already registered
+//                    val msg = result.message.lowercase()
+//                    if (msg.contains("already registered") || msg.contains("already exists")) {
+//                        println("⚠️ Phone already registered")
+//                        onResult(true, "This phone number is already registered!")
+//                    } else {
+//                        println("✅ Phone not registered")
+//                        onResult(false, "")
+//                    }
+//                }
+//
+//            } catch (e: Exception) {
+//                val errorMsg = (e.message ?: "").lowercase()
+//
+//                when {
+//                    // Phone already registered
+//                    errorMsg.contains("already registered") ||
+//                            errorMsg.contains("already exists") ||
+//                            errorMsg.contains("phone is already") -> {
+//                        println("⚠️ Phone already registered")
+//                        onResult(true, "This phone number is already registered!")
+//                    }
+//
+//                    // Phone not registered - can proceed
+//                    else -> {
+//                        println("✅ Phone not registered, can proceed")
+//                        onResult(false, "")
+//                    }
+//                }
+//            } finally {
+//                _loading.value = false
+//            }
+//        }
+//    }
+
+
+    fun checkPhoneRegistered(phone: String, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
-            _loading.value = true
             try {
-                // ✅ Use register API to check if phone exists
-                // If phone exists, API will return error
-                val result = repository.signUp("temp", phone, "", "temp@email.com")
-
-                // If we get success with OTP, phone is NOT registered
-                if (result.success) {
-                    println("✅ Phone not registered, can proceed")
-                    onResult(false, "")
-                } else {
-                    // Check if error message indicates phone already registered
-                    val msg = result.message.lowercase()
-                    if (msg.contains("already registered") || msg.contains("already exists")) {
-                        println("⚠️ Phone already registered")
-                        onResult(true, "This phone number is already registered!")
-                    } else {
-                        println("✅ Phone not registered")
-                        onResult(false, "")
-                    }
-                }
-
+                repository.login(LoginRequest(phone, "wrong_password"))
+                // login chal gaya → user exists
+                onResult(true)
             } catch (e: Exception) {
-                val errorMsg = (e.message ?: "").lowercase()
-
-                when {
-                    // Phone already registered
-                    errorMsg.contains("already registered") ||
-                            errorMsg.contains("already exists") ||
-                            errorMsg.contains("phone is already") -> {
-                        println("⚠️ Phone already registered")
-                        onResult(true, "This phone number is already registered!")
-                    }
-
-                    // Phone not registered - can proceed
-                    else -> {
-                        println("✅ Phone not registered, can proceed")
-                        onResult(false, "")
-                    }
-                }
-            } finally {
-                _loading.value = false
+                // login fail → user not registered
+                onResult(false)
             }
         }
     }
+
 
     // ============================================
     // SIGN UP

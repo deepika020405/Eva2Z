@@ -39,8 +39,6 @@ fun SignupScreen(
     }
 
     var email by remember { mutableStateOf("") }
-//    var showDialog by remember { mutableStateOf(false) }
-//    var dialogMessage by remember { mutableStateOf("") }
     var phoneAlreadyRegisteredError by remember { mutableStateOf<String?>(null) }
     var submitAttempted by remember { mutableStateOf(false) }
 
@@ -67,14 +65,6 @@ fun SignupScreen(
         }
     }
 
-    // ✅ Show dialog when needed
-//    if (showDialog) {
-//        AlertDialog(
-//            onDismissRequest = { },
-//            title = { Text("Notice") },
-//            text = { Text(dialogMessage) },
-//            confirmButton = { }
-//        )
 //    }
 
     Column(
@@ -166,14 +156,6 @@ fun SignupScreen(
 
         if (submitAttempted) {
             when {
-//                phoneNumber.isNotEmpty() && phoneNumber.length < 10 -> {
-//                    Text(
-//                        text = "Phone number must be 10 digits",
-//                        color = MaterialTheme.colorScheme.error,
-//                        style = MaterialTheme.typography.bodySmall,
-//                        modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-//                    )
-//                }
 
                 phoneAlreadyRegisteredError != null -> {
                     Text(
@@ -185,15 +167,7 @@ fun SignupScreen(
                 }
             }
         }
-//        if (phoneNumber.isNotEmpty() && phoneNumber.length < 10) {
-//            Text(
-//                text = "Phone number must be 10 digits",
-//                color = MaterialTheme.colorScheme.error,
-//                style = MaterialTheme.typography.bodySmall,
-//                modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-//            )
-//        }
-
+//
         Spacer(modifier = Modifier.height(16.dp))
 
         Text(
@@ -265,22 +239,26 @@ fun SignupScreen(
                 )
 
                 // ✅ First check if phone is already registered
-                viewModel.checkPhoneRegistered(fullPhone) { isRegistered, message ->
+//                viewModel.checkPhoneRegistered(fullPhone) { isRegistered, message ->
+//                    if (isRegistered) {
+//                        scope.launch {
+//                            onAlreadyRegistered(phoneNumber)
+//                        }
+//                    } else {
+//                        // ✅ Proceed with signup
+//                        onSendOTPClick(fullName, phoneNumber, email)
+//                    }
+//                }
+
+                viewModel.checkPhoneRegistered(fullPhone) { isRegistered ->
                     if (isRegistered) {
-                        scope.launch {
-//                            dialogMessage = "Phone number already registered!\nRedirecting to login..."
-//                            showDialog = true
-                            delay(2000)
-//                            showDialog = false
-                            delay(300)
-                            // ✅ Pass ONLY digits (without +91)
-                            onAlreadyRegistered(phoneNumber)
-                        }
+                        phoneAlreadyRegisteredError = "This phone number is already registered!"
+                        onAlreadyRegistered(phoneNumber)
                     } else {
-                        // ✅ Proceed with signup
                         onSendOTPClick(fullName, phoneNumber, email)
                     }
                 }
+
             },
             modifier = Modifier
                 .fillMaxWidth()
@@ -339,14 +317,6 @@ fun SignupScreen(
             }
         }
 
-//        Text(
-//            text = annotatedText,
-//            modifier = Modifier
-//                .fillMaxWidth()
-//                .padding(horizontal = 16.dp),
-//            textAlign = TextAlign.Center,
-//            lineHeight = 18.sp
-//        )
 
         Spacer(modifier = Modifier.height(32.dp))
     }
