@@ -2,6 +2,7 @@ package com.developer.ev2z.ui.screens.EditProfile
 
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.util.compressImageBytes
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -74,17 +75,42 @@ class EditProfileViewModel(
     }
 
     // ✅ FIX 2: Email is optional now
+
     fun updateProfile() {
         viewModelScope.launch {
-            // Validate: Name is required
-            if (_state.value.userName.trim().isEmpty()) {
+
+            val name = _state.value.userName.trim()
+            val email = _state.value.userEmail.trim()
+
+            // 🔴 VALIDATION: Name required
+            if (name.isEmpty()) {
                 _state.value = _state.value.copy(
                     error = "Name is required"
                 )
                 return@launch
             }
 
-            _state.value = _state.value.copy(isLoading = true, error = null)
+            // 🔴 VALIDATION: Email required
+            if (email.isEmpty()) {
+                _state.value = _state.value.copy(
+                    error = "Email is required"
+                )
+                return@launch
+            }
+
+            // 🔴 VALIDATION: Email format
+            if (!isValidEmail(email)) {
+                _state.value = _state.value.copy(
+                    error = "Please enter a valid email address"
+                )
+                return@launch
+            }
+
+            // ✅ All validations passed
+            _state.value = _state.value.copy(
+                isLoading = true,
+                error = null
+            )
 
             try {
                 val token = storageManager.getString("token", "")
@@ -97,93 +123,85 @@ class EditProfileViewModel(
                 }
 
                 println("🌐 Updating profile...")
-                println("   Name: ${_state.value.userName}")
-                println("   Email: ${_state.value.userEmail}")
+                println("   Name: $name")
+                println("   Email: $email")
                 println("   Has Image: ${selectedImageBytes != null}")
                 println("   Image size: ${selectedImageBytes?.size ?: 0} bytes")
 
+                val compressedImage = selectedImageBytes?.let {
+                    compressImageBytes(it, maxSizeKB = 500)
+                }
+
                 val response = apiService.updateProfile(
                     token = "Bearer $token",
-                    name = _state.value.userName,
-                    email = _state.value.userEmail.ifEmpty { "" }, // ✅ Email optional
-                    photo = selectedImageBytes
+                    name = name,
+                    email = email, // 🔥 Email now required
+                    photo = compressedImage
                 )
 
-                println("✅ API Response received:")
-                println("   Response: $response")
-
-                // Parse response
                 val userObject = response["user"] as? Map<*, *>
                 val photoUrl = response["photo_url"]?.toString()?.trim('"')
 
-                if (userObject != null) {
-                    val newName = userObject["name"]?.toString()?.trim('"') ?: _state.value.userName
-                    val newEmail = userObject["email"]?.toString()?.trim('"') ?: ""
-                    val newPhone = userObject["phone"]?.toString()?.trim('"') ?: _state.value.userPhone
-                    val newPhoto = userObject["photo"]?.toString()?.trim('"')
-
-                    println("✅ Parsed user data:")
-                    println("   Name: $newName")
-                    println("   Email: $newEmail")
-                    println("   Phone: $newPhone")
-                    println("   Photo: $newPhoto")
-                    println("   Photo URL: $photoUrl")
-
-                    // Build full photo URL
-                    val fullPhotoUrl = when {
-                        photoUrl != null && photoUrl.startsWith("http") -> photoUrl
-                        photoUrl != null -> "https://gps.eva2z.in$photoUrl"
-                        newPhoto != null && newPhoto.startsWith("http") -> newPhoto
-                        newPhoto != null -> "https://gps.eva2z.in/storage/$newPhoto"
-                        else -> _state.value.userImage // Keep existing if no new photo
-                    }
-
-                    println("✅ Final photo URL: $fullPhotoUrl")
-
-                    // ✅ Save to storage
-                    storageManager.saveString("name", newName)
-                    storageManager.saveString("email", newEmail)
-                    storageManager.saveString("phone", newPhone)
-                    if (fullPhotoUrl != null) {
-                        storageManager.saveString("photo", fullPhotoUrl)
-                    }
-
-                    println("✅ Saved to local storage")
-
-                    // ✅ FIX 3: Update state BEFORE marking success
-                    _state.value = _state.value.copy(
-                        isLoading = false,
-                        userName = newName,
-                        userEmail = newEmail,
-                        userPhone = newPhone,
-                        userImage = fullPhotoUrl,
-                        error = null
-                    )
-
-                    // Clear selected image after successful upload
-                    selectedImageBytes = null
-
-                    // ✅ Set success flag AFTER state is updated
-                    _state.value = _state.value.copy(updateSuccess = true)
-
-                    println("✅ Profile update completed successfully!")
-                } else {
-                    println("❌ Invalid response structure")
+                if (userObject == null) {
                     _state.value = _state.value.copy(
                         isLoading = false,
                         error = "Invalid response from server"
                     )
+                    return@launch
                 }
+
+                val newName = userObject["name"]?.toString()?.trim('"') ?: name
+                val newEmail = userObject["email"]?.toString()?.trim('"') ?: email
+                val newPhone = userObject["phone"]?.toString()?.trim('"') ?: _state.value.userPhone
+                val newPhoto = userObject["photo"]?.toString()?.trim('"')
+
+                val fullPhotoUrl = when {
+                    photoUrl != null && photoUrl.startsWith("http") -> photoUrl
+                    photoUrl != null -> "https://gps.eva2z.in$photoUrl"
+                    newPhoto != null && newPhoto.startsWith("http") -> newPhoto
+                    newPhoto != null -> "https://gps.eva2z.in/storage/$newPhoto"
+                    else -> _state.value.userImage
+                }
+
+                // ✅ Save locally
+                storageManager.saveString("name", newName)
+                storageManager.saveString("email", newEmail)
+                storageManager.saveString("phone", newPhone)
+                fullPhotoUrl?.let { storageManager.saveString("photo", it) }
+
+                // ✅ Update UI state
+                _state.value = _state.value.copy(
+                    isLoading = false,
+                    userName = newName,
+                    userEmail = newEmail,
+                    userPhone = newPhone,
+                    userImage = fullPhotoUrl,
+                    error = null,
+                    updateSuccess = true
+                )
+
+                // Clear image after success
+                selectedImageBytes = null
+
+                println("✅ Profile updated successfully")
 
             } catch (e: Exception) {
                 println("❌ Profile update error: ${e.message}")
-                e.printStackTrace()
                 _state.value = _state.value.copy(
                     isLoading = false,
                     error = e.message ?: "Failed to update profile"
                 )
             }
         }
+    }
+
+
+
+    fun isValidEmail(email: String): Boolean {
+        val emailRegex = Regex(
+            "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"
+        )
+        return emailRegex.matches(email)
     }
 
     fun clearError() {

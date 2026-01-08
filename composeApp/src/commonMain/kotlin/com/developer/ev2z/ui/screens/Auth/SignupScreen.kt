@@ -87,8 +87,11 @@ fun SignupScreen(
 
         OutlinedTextField(
             value = fullName,
-            onValueChange = {
-                if (it.length <= 50) fullName = it
+            onValueChange = { input ->
+                val formatted = formatFullName(input)
+                if (formatted.length <= 50) {
+                    fullName = formatted
+                }
             },
             placeholder = { Text("Enter Your Full Name") },
             modifier = Modifier
@@ -100,8 +103,18 @@ fun SignupScreen(
                 focusedBorderColor = Color(0xFF6A9F50)
             ),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
-            singleLine = true
+            singleLine = true,
+            isError = submitAttempted && fullName.isBlank()
         )
+
+        if (submitAttempted && fullName.isBlank()) {
+            Text(
+                text = "Please enter a valid full name (letters only)",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+            )
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -320,4 +333,17 @@ fun SignupScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
     }
+}
+
+private fun formatFullName(input: String): String {
+    return input
+        .filter { it.isLetter() || it == ' ' }   // only letters & space
+        .replace("\\s+".toRegex(), " ")          // remove extra spaces
+        .trimStart()                              // no space at start
+        .split(" ")
+        .joinToString(" ") { word ->
+            word.lowercase().replaceFirstChar {
+                if (it.isLowerCase()) it.titlecase() else it.toString()
+            }
+        }
 }

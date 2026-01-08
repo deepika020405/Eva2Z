@@ -279,10 +279,10 @@ fun EditProfileScreenContent(
 //                )
 
                 ProfileInputField(
-                    label = "Email (Optional)",
+                    label = "Email *",
                     value = state.userEmail,
                     onValueChange = onEmailChange,
-                    placeholder = "Enter your email (optional)",
+                    placeholder = "Enter your email ",
                     keyboardType = KeyboardType.Email,
                     isError = emailError,
                     errorText = if (emailError) "Please enter a valid email address" else null
@@ -310,8 +310,12 @@ fun EditProfileScreenContent(
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color(0xFF4CAF50)
                     ),
+//                    enabled = !state.isLoading &&
+//                            state.userName.isNotEmpty() &&
+//                            !emailError
                     enabled = !state.isLoading &&
-                            state.userName.isNotEmpty() &&
+                            state.userName.isNotBlank() &&
+                            state.userEmail.isNotBlank() &&
                             !emailError
                 ) {
                     if (state.isLoading) {

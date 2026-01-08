@@ -240,14 +240,27 @@ fun PasswordScreen(
             }
         }
 
-        error?.let { errorMessage ->
-            Spacer(modifier = Modifier.height(16.dp))
+//        error?.let { errorMessage ->
+//            Spacer(modifier = Modifier.height(16.dp))
+//            Text(
+//                text = errorMessage,
+//                color = MaterialTheme.colorScheme.error,
+//                style = MaterialTheme.typography.bodyMedium,
+//                textAlign = TextAlign.Center,
+//                modifier = Modifier.fillMaxWidth()
+//            )
+//        }
+
+        // 🔴 SERVER / API ERROR (below confirm password)
+        if (error != null) {
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = errorMessage,
+                text = error,
                 color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
+                fontSize = 13.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 16.dp)
             )
         }
     }

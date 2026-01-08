@@ -70,34 +70,6 @@ class ShopViewModel(
     private var cachedTotalPrice: String? = null
     private var lastLoadedAt: Long = 0L
 
-//    fun loadData() {
-//        _state.value = _state.value.copy(loading = true)
-//        val token = tokenProvider()
-//
-//        scope.launch {
-//            try {
-//                val products = repo.getProducts(token)
-//                val wishlist = repo.getWishlist(token)
-//                val cartResp = repo.getCart(token)
-//                val count = cartResp.cart.sumOf { it.quantity }
-//
-//                _state.value = ShopUiState(
-//                    loading = false,
-//                    products = products,
-//                    wishlist = wishlist,
-//                    cart = cartResp.cart,
-//                    cartCount = count,
-//                    totalPrice = cartResp.totalPrice
-//                )
-//
-//            } catch (e: Exception) {
-//                _state.value = ShopUiState(
-//                    loading = false,
-//                    error = e.message ?: "Unknown Error"
-//                )
-//            }
-//        }
-//    }
 @OptIn(ExperimentalTime::class)
     fun loadData(forceRefresh: Boolean = false) {
         val now = Clock.System.now().toEpochMilliseconds()
@@ -176,6 +148,24 @@ class ShopViewModel(
         return _state.value.wishlist.any { it.product_id == productId }
     }
 
+//    fun refreshCart() {
+//        val token = tokenProvider()
+//        scope.launch {
+//            val cartResp = repo.getCart(token)
+//            val count = cartResp.cart.sumOf { it.quantity }
+//
+//            _state.value = _state.value.copy(
+//                cart = cartResp.cart,
+//                cartCount = count,
+//                totalPrice = cartResp.totalPrice
+//            )
+//
+//            cachedCart = cartResp.cart
+//            cachedCartCount = count
+//            cachedTotalPrice = cartResp.totalPrice
+//        }
+//    }
+
     fun refreshCart() {
         val token = tokenProvider()
         scope.launch {
@@ -194,12 +184,44 @@ class ShopViewModel(
         }
     }
 
-    fun addToCart(add: String, productId: Int, quantity: Int = 1, plan_type: String, device_type: String) {
+//    fun addToCart(add: String, productId: Int, quantity: Int = 1, plan_type: String, device_type: String) {
+//        val token = tokenProvider()
+//        scope.launch {
+//            try {
+//                val ok = repo.addToCart(token, add, productId, quantity, plan_type, device_type)
+//                if (!ok) println("❌ Failed to add to cart")
+//            } catch (e: Exception) {
+//                println("❌ addToCart error: ${e.message}")
+//            }
+//        }
+//    }
+
+    fun addToCart(
+        add: String,
+        productId: Int,
+        quantity: Int = 1,
+        plan_type: String,
+        device_type: String
+    ) {
         val token = tokenProvider()
         scope.launch {
             try {
-                val ok = repo.addToCart(token, add, productId, quantity, plan_type, device_type)
-                if (!ok) println("❌ Failed to add to cart")
+                val ok = repo.addToCart(
+                    token,
+                    add,
+                    productId,
+                    quantity,
+                    plan_type,
+                    device_type
+                )
+
+                if (ok) {
+                    // 🔥 IMPORTANT: Refresh cart & update UI
+                    refreshCart()
+                } else {
+                    println("❌ Failed to add to cart")
+                }
+
             } catch (e: Exception) {
                 println("❌ addToCart error: ${e.message}")
             }

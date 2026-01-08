@@ -369,6 +369,7 @@ fun BoxScope.HistoryPlaybackBottomSheet(
         modifier = Modifier
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
+            .navigationBarsPadding()
             .padding(12.dp),
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         color = Color.White,

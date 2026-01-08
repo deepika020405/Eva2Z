@@ -12,7 +12,12 @@ actual fun PlatformBackHandler(
     // Intentionally NO-OP
 }
 
-actual fun exitApp() {
-    // ❌ Apple does NOT allow apps to close themselves
-    // This must be a NO-OP to avoid App Store rejection
+//actual fun exitApp() {
+//    // ❌ Apple does NOT allow apps to close themselves
+//    // This must be a NO-OP to avoid App Store rejection
+//}
+
+// iosMain
+actual fun exitApp(activity: Any?) {
+    // do nothing
 }

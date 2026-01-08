@@ -17,9 +17,25 @@ actual fun PlatformBackHandler(
     }
 }
 
-actual fun exitApp() {
-    val ctx = getAppContext()
-    if (ctx is Activity) {
-        ctx.finish()
+//actual fun exitApp() {
+//    val ctx = getAppContext()
+//    if (ctx is Activity) {
+//        ctx.finishAffinity()   // ✅ closes all activities
+//    }
+//}
+
+//actual fun exitApp() {
+//    val ctx = getAppContext()
+//    if (ctx is Activity) {
+//        ctx.finishAffinity()
+//        android.os.Process.killProcess(android.os.Process.myPid())
+//    }
+//}
+
+
+// androidMain
+actual fun exitApp(activity: Any?) {
+    if (activity is Activity) {
+        activity.moveTaskToBack(true)
     }
 }

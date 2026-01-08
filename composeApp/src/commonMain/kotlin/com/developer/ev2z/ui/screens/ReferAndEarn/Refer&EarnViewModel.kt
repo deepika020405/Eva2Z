@@ -94,17 +94,23 @@ class ReferAndEarnViewModel(
             
             Use my referral code: $referralCode
             
-            Download now: https://eva2z.in/download
+            Download Apk now: https://play.google.com/store/apps/details?id=com.developer.ev2z
             
             Both of us will get ₹$referralAmount reward when you place your first order! 🎉
         """.trimIndent()
     }
 
     fun getWhatsAppMessage(referralCode: String, referralAmount: Int): String {
-        return "🎁 *Join me on EVA2Z Connect!*\n\n" +
-                "Get *₹$referralAmount OFF* on your first order!\n\n" +
-                "Use my referral code: *$referralCode*\n\n" +
-                "Download: https://eva2z.in/download\n\n" +
-                "Both of us will get ₹$referralAmount reward! 🎉"
+        return """
+            🎁 Join me on EVA2Z Connect and get ₹$referralAmount OFF!
+            
+            EVA2Z Connect is the best GPS tracking app for your vehicles.
+            
+            Use my referral code: $referralCode
+            
+            Download Apk now: https://play.google.com/store/apps/details?id=com.developer.ev2z
+            
+            Both of us will get ₹$referralAmount reward when you place your first order! 🎉
+        """.trimIndent()
     }
 }

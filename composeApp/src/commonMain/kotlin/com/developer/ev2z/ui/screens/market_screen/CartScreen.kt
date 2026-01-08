@@ -56,12 +56,21 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.animation.core.animateIntOffsetAsState
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.text.input.KeyboardType
 import com.developer.ev2z.data.local.model.UpiApp
 import com.developer.ev2z.phonepe.PaymentState
 import com.developer.ev2z.phonepe.openPhonePeSdk
@@ -648,6 +657,61 @@ fun CouponsSection(viewModel: ShopViewModel) {
 }
 
 
+//@Composable
+//fun AddAddressUI(
+//    onSave: (
+//        String, String, String, String, String, String, String
+//    ) -> Unit,
+//    onCancel: () -> Unit
+//) {
+//    var fname by remember { mutableStateOf("") }
+//    var phone by remember { mutableStateOf("") }
+//    var email by remember { mutableStateOf("") }
+//    var address by remember { mutableStateOf("") }
+//    var city by remember { mutableStateOf("") }
+//    var state by remember { mutableStateOf("") }
+//    var pincode by remember { mutableStateOf("") }
+//
+//    Column(
+//        Modifier
+//            .fillMaxSize()
+//            .padding(16.dp)
+//            .verticalScroll(rememberScrollState())
+//    ) {
+//
+//        Text("Add New Address", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+//        Spacer(Modifier.height(16.dp))
+//
+//        CustomInput("Full Name", fname) { fname = it }
+//        CustomInput("Phone Number", phone) { phone = it }
+//        CustomInput("Email Address", email) { email = it }
+//        CustomInput("House / Street", address) { address = it }
+//        CustomInput("City", city) { city = it }
+//        CustomInput("State", state) { state = it }
+//        CustomInput("Pincode", pincode) { pincode = it }
+//
+//        Spacer(Modifier.height(20.dp))
+//
+//        Button(
+//            onClick = {
+//                onSave(fname, phone, email, address, city, state, pincode)
+//            },
+//            modifier = Modifier.fillMaxWidth(),
+//            shape = RoundedCornerShape(12.dp),
+//            colors = ButtonDefaults.buttonColors(Color(0xFF34A853))
+//        ) {
+//            Text("Save Address", color = Color.White)
+//        }
+//
+//        Spacer(Modifier.height(10.dp))
+//
+//        TextButton(onClick = onCancel) {
+//            Text("Cancel")
+//        }
+//    }
+//}
+
+
 @Composable
 fun AddAddressUI(
     onSave: (
@@ -663,54 +727,182 @@ fun AddAddressUI(
     var state by remember { mutableStateOf("") }
     var pincode by remember { mutableStateOf("") }
 
+    // 🔴 Errors
+    var fnameErr by remember { mutableStateOf<String?>(null) }
+    var phoneErr by remember { mutableStateOf<String?>(null) }
+    var emailErr by remember { mutableStateOf<String?>(null) }
+    var addressErr by remember { mutableStateOf<String?>(null) }
+    var cityErr by remember { mutableStateOf<String?>(null) }
+    var stateErr by remember { mutableStateOf<String?>(null) }
+    var pincodeErr by remember { mutableStateOf<String?>(null) }
+
+    fun validate(): Boolean {
+        var valid = true
+
+        fnameErr = if (fname.isBlank()) "Full name required" else null
+        phoneErr =
+            if (phone.length != 10) "Phone number must be 10 digits" else null
+            emailErr =
+            if (!isValidEmail(email))
+                "Invalid email address" else null
+        addressErr = if (address.isBlank()) "Address required" else null
+        cityErr = if (city.isBlank()) "City required" else null
+        stateErr = if (state.isBlank()) "State required" else null
+        pincodeErr =
+            if (pincode.length != 6) "Pincode must be 6 digits" else null
+
+        listOf(
+            fnameErr, phoneErr, emailErr,
+            addressErr, cityErr, stateErr, pincodeErr
+        ).forEach { if (it != null) valid = false }
+
+        return valid
+    }
+
     Column(
-        Modifier
+        modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
+            .imePadding()
             .verticalScroll(rememberScrollState())
     ) {
 
-        Text("Add New Address", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(16.dp))
-
-        CustomInput("Full Name", fname) { fname = it }
-        CustomInput("Phone Number", phone) { phone = it }
-        CustomInput("Email Address", email) { email = it }
-        CustomInput("House / Street", address) { address = it }
-        CustomInput("City", city) { city = it }
-        CustomInput("State", state) { state = it }
-        CustomInput("Pincode", pincode) { pincode = it }
+        Text(
+            "Add New Address",
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold
+        )
 
         Spacer(Modifier.height(20.dp))
 
+        ValidatedInput("Full Name", fname, { fname = it }, fnameErr)
+
+        ValidatedInput(
+            "Phone Number",
+            phone,
+            {
+                if (it.all { ch -> ch.isDigit() } && it.length <= 10) {
+                    phone = it
+                }
+            },
+            phoneErr,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Number
+            )
+        )
+
+        ValidatedInput(
+            "Email Address",
+            email,
+            { email = it },
+            emailErr,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
+        )
+
+        ValidatedInput("House / Street", address, { address = it }, addressErr)
+        ValidatedInput("City", city, { city = it }, cityErr)
+        ValidatedInput("State", state, { state = it }, stateErr)
+
+        ValidatedInput(
+            "Pincode",
+            pincode,
+            {
+                if (it.all { ch -> ch.isDigit() } && it.length <= 6) {
+                    pincode = it
+                }
+            },
+            pincodeErr,
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Number
+            )
+        )
+
+        Spacer(Modifier.height(10.dp))
+
         Button(
             onClick = {
-                onSave(fname, phone, email, address, city, state, pincode)
+                if (validate()) {
+                    onSave(
+                        fname, phone, email,
+                        address, city, state, pincode
+                    )
+                }
             },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp),
+            shape = RoundedCornerShape(14.dp),
             colors = ButtonDefaults.buttonColors(Color(0xFF34A853))
         ) {
             Text("Save Address", color = Color.White)
         }
 
-        // Replace the UPI bottom sheet button with:
+        Spacer(Modifier.height(8.dp))
 
-//        Button(
-//            onClick = {
-//                // ✅ Navigate to payment method selector
-//                navigator.push(PaymentScreen())
-//            },
-//            shape = RoundedCornerShape(30.dp)
-//        ) {
-//            Text("Proceed to Payment")
-//        }
-
-        Spacer(Modifier.height(10.dp))
-
-        TextButton(onClick = onCancel) {
+        TextButton(
+            onClick = onCancel,
+            modifier = Modifier.align(Alignment.CenterHorizontally)
+        ) {
             Text("Cancel")
         }
+    }
+}
+
+private fun isValidEmail(email: String): Boolean {
+    val emailRegex = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$"
+    return email.matches(emailRegex.toRegex())
+}
+
+
+@Composable
+fun ValidatedInput(
+    label: String,
+    value: String,
+    onChange: (String) -> Unit,
+    error: String? = null,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default
+) {
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    var isFocused by remember { mutableStateOf(false) }
+
+    // ✅ LaunchedEffect OUTSIDE callbacks
+    LaunchedEffect(isFocused) {
+        if (isFocused) {
+            bringIntoViewRequester.bringIntoView()
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .bringIntoViewRequester(bringIntoViewRequester)
+    ) {
+        Text(label, fontWeight = FontWeight.SemiBold)
+        Spacer(Modifier.height(6.dp))
+
+        OutlinedTextField(
+            value = value,
+            onValueChange = onChange,
+            modifier = Modifier
+                .fillMaxWidth()
+                .onFocusChanged {
+                    isFocused = it.isFocused
+                },
+            isError = error != null,
+            singleLine = true,
+            keyboardOptions = keyboardOptions,
+            shape = RoundedCornerShape(10.dp)
+        )
+
+        if (error != null) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = error,
+                color = MaterialTheme.colorScheme.error,
+                fontSize = 12.sp
+            )
+        }
+
+        Spacer(Modifier.height(14.dp))
     }
 }
 
@@ -777,16 +969,93 @@ fun SummaryRow(label: String, value: String, isBold: Boolean = false) {
     }
 }
 
+//@Composable
+//fun CheckoutBottomBar(viewModel: ShopViewModel) {
+//    val state by viewModel.state.collectAsState()
+//    val paymentState by viewModel.paymentState.collectAsState()
+//    val navigator = LocalNavigator.currentOrThrow
+//
+//    // 👇 Android-only, SAFE
+////    val context = remember {
+////        runCatching { getPlatformContext() }.getOrNull()
+////    }
+//
+//    Box(
+//        Modifier
+//            .fillMaxWidth()
+//            .padding(16.dp)
+//    ) {
+//        Row(
+//            Modifier
+//                .fillMaxWidth()
+//                .clip(RoundedCornerShape(30.dp))
+//                .background(Color.White)
+//                .padding(16.dp),
+//            horizontalArrangement = Arrangement.SpaceBetween,
+//            verticalAlignment = Alignment.CenterVertically
+//        ) {
+//            Column {
+//                Text("Total Amount", color = Color.Gray)
+//                Text(
+//                    "₹${state.finalAmount ?: state.totalPrice ?: "0"}",
+//                    fontSize = 20.sp,
+//                    fontWeight = FontWeight.Bold
+//                )
+//            }
+//
+//            if (paymentState is PaymentState.Processing) {
+//                CircularProgressIndicator(
+//                    modifier = Modifier.size(36.dp),
+//                    strokeWidth = 3.dp
+//                )
+//            } else {
+//                Button(
+//                    onClick = {
+//                        Analytics.logEvent(
+//                            name = "begin_checkout",
+//                            params = mapOf(
+//                                "currency" to "INR",
+//                                "value" to (state.finalAmount ?: state.totalPrice ?: 0),
+//                                "items_count" to state.cart.size
+//                            )
+//                        )
+//                        navigator.push(PaymentScreen())
+//                    },
+//                    shape = RoundedCornerShape(30.dp)
+//                ) {
+//                    Text("Checkout")
+//                }
+//            }
+//        }
+//    }
+//}
+
+
 @Composable
 fun CheckoutBottomBar(viewModel: ShopViewModel) {
     val state by viewModel.state.collectAsState()
     val paymentState by viewModel.paymentState.collectAsState()
     val navigator = LocalNavigator.currentOrThrow
 
-    // 👇 Android-only, SAFE
-//    val context = remember {
-//        runCatching { getPlatformContext() }.getOrNull()
-//    }
+    var showAddressError by remember { mutableStateOf(false) }
+
+    // 🚨 ADDRESS NOT SELECTED POPUP
+    if (showAddressError) {
+        AlertDialog(
+            onDismissRequest = { showAddressError = false },
+            confirmButton = {
+                TextButton(onClick = { showAddressError = false }) {
+                    Text("OK")
+                }
+            },
+            title = {
+                Text("Address Required")
+            },
+            text = {
+                Text("Please select or add a delivery address before checkout.")
+            }
+        )
+    }
 
     Box(
         Modifier
@@ -802,6 +1071,7 @@ fun CheckoutBottomBar(viewModel: ShopViewModel) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+
             Column {
                 Text("Total Amount", color = Color.Gray)
                 Text(
@@ -819,6 +1089,14 @@ fun CheckoutBottomBar(viewModel: ShopViewModel) {
             } else {
                 Button(
                     onClick = {
+
+                        // 🔴 VALIDATION FIRST
+                        if (state.selectedAddress == null) {
+                            showAddressError = true
+                            return@Button
+                        }
+
+                        // ✅ ADDRESS OK → CONTINUE
                         Analytics.logEvent(
                             name = "begin_checkout",
                             params = mapOf(
@@ -827,6 +1105,7 @@ fun CheckoutBottomBar(viewModel: ShopViewModel) {
                                 "items_count" to state.cart.size
                             )
                         )
+
                         navigator.push(PaymentScreen())
                     },
                     shape = RoundedCornerShape(30.dp)
@@ -837,8 +1116,6 @@ fun CheckoutBottomBar(viewModel: ShopViewModel) {
         }
     }
 }
-
-
 
 @Composable
 fun SwipeToRemove(

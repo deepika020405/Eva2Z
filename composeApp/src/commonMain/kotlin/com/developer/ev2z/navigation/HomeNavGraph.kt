@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.navigator.tab.*
+import com.developer.ev2z.LocalPlatformActivity
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.getAppContext
 import com.developer.ev2z.getPlatformContext
@@ -38,6 +39,9 @@ import com.developer.ev2z.ui.screens.community.CommunityScreenWrapper
 import com.developer.ev2z.ui.screens.market_screen.ShopViewModel
 import com.developer.ev2z.ui.screens.GeneralSettings.GeneralSettingsScreen
 import com.developer.ev2z.ui.screens.AccountActivity.AccountActivityScreen
+import com.developer.ev2z.ui.screens.AddDevice.AddDeviceDetailsCommon
+import com.developer.ev2z.ui.screens.AddDevice.AddDeviceViewModel
+import com.developer.ev2z.ui.screens.ChangePassword.ChangePasswordScreen
 import com.developer.ev2z.ui.screens.GPSData.GPSDataScreen
 //import com.developer.ev2z.ui.screens.GPSData.GPSDataScreen
 import com.developer.ev2z.ui.screens.Profile.AboutAppScreen
@@ -197,6 +201,10 @@ fun HomeNavGraph(
     var showAccountActivity by remember { mutableStateOf(false) }
     var showReferAndEarn by remember { mutableStateOf(false) }
     var showAboutApp by remember { mutableStateOf(false) }
+    var showChangePassword by remember { mutableStateOf(false) }
+    var showAddDevice by remember { mutableStateOf(false) }
+
+
 
     // Edit device state
     var editDeviceId by remember { mutableStateOf("") }
@@ -229,7 +237,7 @@ fun HomeNavGraph(
             onNavigateToTermsConditions = { showTermsConditions = true },
             onNavigateToRefundPolicy = { showRefundPolicy = true },
             onNavigateToShippingPolicy = { showShippingPolicy = true },
-            onNavigateToChangePassword = onNavigateToChangePassword,
+            onNavigateToChangePassword = { showChangePassword = true },
             onNavigateToGeoFencing = { showGeoFencing = true },
             onNavigateToHistoryPlayback = { showHistoryPlayback = true },
             onNavigateToGeneralSettings = { showGeneralSettings = true },
@@ -238,6 +246,10 @@ fun HomeNavGraph(
             onNavigateToAboutApp = { showAboutApp = true },
             onLogout = onLogout
         )
+        val addDeviceViewModel = remember {
+            AddDeviceViewModel()
+        }
+
 
         val isOnRootTabs =
             !showEditProfile &&
@@ -308,6 +320,22 @@ fun HomeNavGraph(
                 onBackPressed = { showGPSData = false }
             )
         }
+
+        if (showChangePassword) {
+            ChangePasswordScreen(
+                apiService = apiService,
+                storageManager = storageManager,
+                onBackPressed = {
+                    showChangePassword = false
+
+                    // ✅ FORCE Profile tab
+                    coroutineScope.launch {
+                        pagerState.animateScrollToPage(3)
+                    }
+                }
+            )
+        }
+
 
         // Edit Device Name Screen
         if (showEditDeviceName) {
@@ -410,14 +438,40 @@ fun HomeNavGraph(
                         println("✅ Shop tab navigation complete")
                     }
                 },
+//                onNavigateToAddDevice = {
+//                    println("➕ Navigating to Add Device...")
+//                    showReferAndEarn = false
+//                    // ✅ Open actual add device flow
+//                    onNavigateToAddDevice()
+//                }
                 onNavigateToAddDevice = {
-                    println("➕ Navigating to Add Device...")
                     showReferAndEarn = false
-                    // ✅ Open actual add device flow
-                    onNavigateToAddDevice()
+                    showAddDevice = true
+                }
+
+            )
+        }
+
+        if (showAddDevice) {
+
+            // 🔙 System back enable
+            PlatformBackHandler(enabled = true) {
+                showAddDevice = false
+            }
+
+            AddDeviceDetailsCommon(
+                viewModel = addDeviceViewModel,
+                onNavigate = { route ->
+                    when (route) {
+                        "back", "home" -> {
+                            showAddDevice = false
+                        }
+                    }
                 }
             )
         }
+
+
 
         // About App
         if (showAboutApp) {
@@ -427,6 +481,7 @@ fun HomeNavGraph(
         }
 
         if (showExitDialog) {
+            val activity = LocalPlatformActivity.current
             AlertDialog(
                 onDismissRequest = { showExitDialog = false },
                 title = { Text("Exit App") },
@@ -437,7 +492,7 @@ fun HomeNavGraph(
                             showExitDialog = false
 
                             // ✅ KMP-safe exit
-                            exitApp()
+                            exitApp(activity)
                         }
                     ) {
                         Text("Yes")

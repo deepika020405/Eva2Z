@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import com.developer.ev2z.data.local.initStorageManager
 import com.developer.ev2z.phonepe.PaymentBus
 import com.developer.ev2z.ui.screens.Profile.GlobalContext
@@ -33,14 +34,21 @@ class MainActivity : ComponentActivity() {
             // ✅ Setup global context
             GlobalContext.set(this)
 
+
             // ❌ REMOVED: Play Integrity check (was causing Play Protect warnings)
             // PlayIntegrityHelper.verifyIntegrity() - THIS WAS THE PROBLEM!
 
             // ✅ Set UI content
+//            setContent {
+//                App()
+//            }
             setContent {
-                App()
+                CompositionLocalProvider(
+                    LocalPlatformActivity provides this
+                ) {
+                    App()
+                }
             }
-
             Log.d("MainActivity", "✅ App initialized successfully")
         } catch (e: Exception) {
             Log.e("MainActivity", "❌ Initialization error", e)

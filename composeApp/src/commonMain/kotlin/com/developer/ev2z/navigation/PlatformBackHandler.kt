@@ -9,5 +9,5 @@ expect fun PlatformBackHandler(
     enabled: Boolean,
     onBack: () -> Unit
 )
-
-expect fun exitApp()
+// commonMain
+expect fun exitApp(activity: Any?)

@@ -71,8 +71,18 @@ fun RegistrationFlow(
         )
     }
 
+//    LaunchedEffect(otpVerified) {
+//        if (otpVerified) {
+//            currentStep = RegistrationStep.CREATE_PASSWORD
+//            authViewModel.resetOtpVerified()
+//        }
+//    }
+
     LaunchedEffect(otpVerified) {
         if (otpVerified) {
+            // 🔥 Give backend time to finalize user
+            kotlinx.coroutines.delay(800)
+
             currentStep = RegistrationStep.CREATE_PASSWORD
             authViewModel.resetOtpVerified()
         }

@@ -296,13 +296,27 @@ private fun ReferralContentScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             // Description
+//            Text(
+//                text = "refer your friends and get ₹$referralAmount off coupon\nfor each successful referral.",
+//                style = MaterialTheme.typography.bodyMedium,
+//                color = Color.Gray,
+//                fontSize = 14.sp,
+//                textAlign = TextAlign.Center,
+//                lineHeight = 20.sp
+//            )
+
+
             Text(
-                text = "refer your friends and get ₹$referralAmount off coupon\nfor each successful referral.",
+                text = if (isDisabled)
+                    "Refer your friends and get ₹$referralAmount off coupon\nfor each successful referral."
+                else
+                    "Please Purchase a device first than you will be eligible for referral",
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.Gray,
+                color = if (isDisabled) Color(0xFF6A9F50) else Color.Black,
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center,
-                lineHeight = 20.sp
+                lineHeight = 20.sp,
+                fontWeight = if (isDisabled) FontWeight.Medium else FontWeight.Medium
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -717,29 +731,37 @@ private fun NoDeviceDialog(
                     fontSize = 20.sp,
                     textAlign = TextAlign.Center
                 )
-
                 Spacer(modifier = Modifier.height(24.dp))
-
                 Text(
-                    text = "To refer friends, you must have at least 1 active device on your account.",
+                    text = "Please Purchase a device first than you will be eligible for referral.",
                     style = MaterialTheme.typography.bodyLarge,
                     color = Color.DarkGray,
-                    fontSize = 15.sp,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 22.sp
+                    fontSize = 16.sp,
+                    textAlign = TextAlign.Center
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+//                Spacer(modifier = Modifier.height(24.dp))
 
-                Text(
-                    text = "Referrals are available only after the minimum device requirement is met.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.Gray,
-                    fontSize = 14.sp,
-                    textAlign = TextAlign.Center,
-                    lineHeight = 20.sp
-                )
+//                Text(
+//                    text = "To refer friends, you must have at least 1 active device on your account.",
+//                    style = MaterialTheme.typography.bodyLarge,
+//                    color = Color.DarkGray,
+//                    fontSize = 15.sp,
+//                    textAlign = TextAlign.Center,
+//                    lineHeight = 22.sp
+//                )
 
+//                Spacer(modifier = Modifier.height(12.dp))
+//
+//                Text(
+//                    text = "Referrals are available only after the minimum device requirement is met.",
+//                    style = MaterialTheme.typography.bodyMedium,
+//                    color = Color.Gray,
+//                    fontSize = 14.sp,
+//                    textAlign = TextAlign.Center,
+//                    lineHeight = 20.sp
+//                )
+//
                 Spacer(modifier = Modifier.height(32.dp))
 
                 // Add Device Button
@@ -769,19 +791,19 @@ private fun NoDeviceDialog(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                TextButton(onClick = onAddDevice) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = "Add Device",
-                            color = Color(0xFF6A9F50),
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
+//                TextButton(onClick = onAddDevice) {
+//                    Row(
+//                        verticalAlignment = Alignment.CenterVertically,
+//                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+//                    ) {
+//                        Text(
+//                            text = "Add Device",
+//                            color = Color(0xFF6A9F50),
+//                            fontSize = 16.sp,
+//                            fontWeight = FontWeight.Medium
+//                        )
+//                    }
+//                }
             }
         }
     }

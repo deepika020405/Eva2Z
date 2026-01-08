@@ -4,6 +4,7 @@ import com.developer.ev2z.data.local.UserPrefs
 import com.developer.ev2z.request.LoginRequest
 import com.developer.ev2z.repository.AuthRepository
 import com.developer.ev2z.data.local.StorageManager
+import com.developer.ev2z.util.mapToUserError
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -78,9 +79,10 @@ class AuthViewModel(
                 _userName.value = result.user.name
 
             } catch (e: Exception) {
-                println("❌ Login error: ${e.message}")
+                println("❌ Error: ${e.message}") // 👈 keep raw error ONLY for logs
                 e.printStackTrace()
-                _error.value = e.message ?: "Login failed"
+
+                _error.value = mapToUserError(e) // 👈 SAFE message for UI
             } finally {
                 _loading.value = false
                 println("🔥 Loading set to false")
@@ -91,53 +93,6 @@ class AuthViewModel(
     // ============================================
     // CHECK IF PHONE IS REGISTERED - ✅ USING REGISTER API
     // ============================================
-//    fun checkPhoneRegistered(phone: String, onResult: (Boolean, String) -> Unit) {
-//        viewModelScope.launch {
-//            _loading.value = true
-//            try {
-//                // ✅ Use register API to check if phone exists
-//                // If phone exists, API will return error
-//                val result = repository.signUp("temp", phone, "", "temp@email.com")
-//
-//                // If we get success with OTP, phone is NOT registered
-//                if (result.success) {
-//                    println("✅ Phone not registered, can proceed")
-//                    onResult(false, "")
-//                } else {
-//                    // Check if error message indicates phone already registered
-//                    val msg = result.message.lowercase()
-//                    if (msg.contains("already registered") || msg.contains("already exists")) {
-//                        println("⚠️ Phone already registered")
-//                        onResult(true, "This phone number is already registered!")
-//                    } else {
-//                        println("✅ Phone not registered")
-//                        onResult(false, "")
-//                    }
-//                }
-//
-//            } catch (e: Exception) {
-//                val errorMsg = (e.message ?: "").lowercase()
-//
-//                when {
-//                    // Phone already registered
-//                    errorMsg.contains("already registered") ||
-//                            errorMsg.contains("already exists") ||
-//                            errorMsg.contains("phone is already") -> {
-//                        println("⚠️ Phone already registered")
-//                        onResult(true, "This phone number is already registered!")
-//                    }
-//
-//                    // Phone not registered - can proceed
-//                    else -> {
-//                        println("✅ Phone not registered, can proceed")
-//                        onResult(false, "")
-//                    }
-//                }
-//            } finally {
-//                _loading.value = false
-//            }
-//        }
-//    }
 
 
     fun checkPhoneRegistered(phone: String, onResult: (Boolean) -> Unit) {
@@ -179,7 +134,8 @@ class AuthViewModel(
             } catch (e: Exception) {
                 println("❌ SignUp error: ${e.message}")
                 e.printStackTrace()
-                _error.value = e.message ?: "SignUp failed"
+//                _error.value = e.message ?: "SignUp failed"
+                _error.value = mapToUserError(e)
             } finally {
                 _loading.value = false
             }
@@ -192,12 +148,17 @@ class AuthViewModel(
     fun savePasswordAndLogin(name: String, phone: String, password: String, email: String) {
         println("🔥 Saving password and auto-logging in...")
 
+        if (_loading.value) return
+
         viewModelScope.launch {
             _loading.value = true
             _error.value = null
 
             try {
                 // Step 1: Save password
+                // 🔥 Wait before savePassword
+                kotlinx.coroutines.delay(500)
+
                 val saveResult = repository.savePassword(phone, password)
 
                 if (saveResult.status) {
@@ -233,9 +194,21 @@ class AuthViewModel(
                 }
 
             } catch (e: Exception) {
-                println("❌ Save password error: ${e.message}")
-                e.printStackTrace()
-                _error.value = e.message ?: "Failed to save password"
+
+                val userMessage = when {
+                    e.message?.contains("Failed to connect", true) == true ||
+                            e.message?.contains("ECONNREFUSED", true) == true ->
+                        "Unable to connect. Please check your internet connection."
+
+                    e.message?.contains("timeout", true) == true ->
+                        "Request timed out. Please try again."
+
+                    else ->
+                        "Something went wrong. Please try again."
+                }
+
+                _error.value = mapToUserError(e)
+
             } finally {
                 _loading.value = false
             }
@@ -266,7 +239,7 @@ class AuthViewModel(
             } catch (e: Exception) {
                 println("❌ OTP verification error: ${e.message}")
                 e.printStackTrace()
-                _error.value = e.message ?: "OTP verification failed"
+                _error.value = mapToUserError(e)
             } finally {
                 _loading.value = false
             }
@@ -296,7 +269,7 @@ class AuthViewModel(
             } catch (e: Exception) {
                 println("❌ Resend OTP error: ${e.message}")
                 e.printStackTrace()
-                _error.value = e.message ?: "Failed to resend OTP"
+                _error.value = mapToUserError(e)
             } finally {
                 _loading.value = false
             }
@@ -326,7 +299,7 @@ class AuthViewModel(
             } catch (e: Exception) {
                 println("❌ Forgot password error: ${e.message}")
                 e.printStackTrace()
-                _error.value = e.message ?: "Failed to send OTP"
+                _error.value = mapToUserError(e)
             } finally {
                 _loading.value = false
             }
@@ -357,7 +330,7 @@ class AuthViewModel(
             } catch (e: Exception) {
                 println("❌ Forgot password OTP verification error: ${e.message}")
                 e.printStackTrace()
-                _error.value = e.message ?: "OTP verification failed"
+                _error.value = mapToUserError(e)
             } finally {
                 _loading.value = false
             }
@@ -404,17 +377,19 @@ class AuthViewModel(
                     } catch (loginError: Exception) {
                         println("❌ Auto-login failed: ${loginError.message}")
                         // Don't show error - password was reset successfully
+                        _error.value = mapToUserError(loginError)
                     }
 
                 } else {
                     println("❌ Password reset failed: ${result.message}")
-                    _error.value = result.message
+//                    _error.value = result.message
                 }
 
             } catch (e: Exception) {
                 println("❌ Password reset error: ${e.message}")
                 e.printStackTrace()
-                _error.value = e.message ?: "Failed to reset password"
+//                _error.value = e.message ?: "Failed to reset password"
+                _error.value = mapToUserError(e)
             } finally {
                 _loading.value = false
             }
