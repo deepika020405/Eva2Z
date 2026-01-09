@@ -148,6 +148,9 @@ private fun GPSDeviceCard(
     device: GPSDevice,
     onClick: () -> Unit
 ) {
+    PlatformBackHandler(true){
+        onClick()
+    }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -186,7 +189,7 @@ private fun GPSDeviceCard(
                     )
                 }
 
-                StatusChip(status = device.status)
+//                StatusChip(status = device.status)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -197,12 +200,12 @@ private fun GPSDeviceCard(
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 QuickStat(
-                    icon = Icons.Default.PowerSettingsNew,
-                    label = "Ignition",
-                    value = device.ignition.name,
-                    color = if (device.ignition == IgnitionStatus.ON)
-                        Color(0xFF4CAF50) else Color.Gray
+                    icon = Icons.Default.ElectricBike,
+                    label = "Vehicle Status",
+                    value = device.ignition.replaceFirstChar { it.uppercase() },
+                    color = statusColor(device.ignition)
                 )
+
 
                 val batteryIcon = when {
                     device.battery >= 90 -> Icons.Default.BatteryFull
@@ -216,13 +219,17 @@ private fun GPSDeviceCard(
                 QuickStat(
                     icon = batteryIcon,
                     label = "Battery",
-                    value = "${device.battery}%",
+                    value = batteryText(device),
                     color = when {
+                        device.battery == 0 && device.speed > 0 -> Color(0xFF1976D2) // blue (moving)
+                        device.battery == 0 -> Color.Gray
                         device.battery > 50 -> Color(0xFF4CAF50)
                         device.battery > 20 -> Color(0xFFFFC107)
                         else -> Color(0xFFE53935)
                     }
+
                 )
+
 
                 QuickStat(
                     icon = Icons.Default.Speed,
@@ -329,34 +336,23 @@ private fun DeviceDetailsSection(device: GPSDevice) {
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        val isOffline = device.status.lowercase() == "offline"
         // Status Banner
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(12.dp))
                 .background(
-                    if (device.status == DeviceStatus.ONLINE)
-                        Color(0xFFE8F5E9)
-                    else
-                        Color(0xFFFFEBEE)
+                    if (!isOffline) Color(0xFFE8F5E9) else Color(0xFFFFEBEE)
                 )
                 .padding(16.dp)
         ) {
             Column {
                 Text(
-                    text = "GPS Device ${if (device.status == DeviceStatus.ONLINE) "Connected" else "Disconnected"}",
+                    text =  "GPS Device Connected",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (device.status == DeviceStatus.ONLINE)
-                        Color(0xFF4CAF50)
-                    else
-                        Color(0xFFE53935)
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Status: ${device.status.name}",
-                    fontSize = 14.sp,
-                    color = Color.Gray
+                    color =  Color(0xFF4CAF50)
                 )
             }
         }
@@ -373,21 +369,33 @@ private fun DeviceStatusSection(device: GPSDevice) {
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         DetailRow(
-            label = "Ignition",
-            value = device.ignition.name,
-            valueColor = if (device.ignition == IgnitionStatus.ON)
-                Color(0xFF4CAF50) else Color.Gray
+            label = "Status",
+            value = device.status.replaceFirstChar { it.uppercase() },
+            valueColor = statusColor(device.status)
         )
 
+
+//        DetailRow(
+//            label = "Battery",
+//            value = "${device.battery}%",
+//            valueColor = when {
+//                device.battery > 50 -> Color(0xFF4CAF50)
+//                device.battery > 20 -> Color(0xFFFFC107)
+//                else -> Color(0xFFE53935)
+//            }
+//        )
         DetailRow(
             label = "Battery",
-            value = "${device.battery}%",
+            value = batteryText(device),
             valueColor = when {
-                device.battery > 50 -> Color(0xFF4CAF50)
-                device.battery > 20 -> Color(0xFFFFC107)
-                else -> Color(0xFFE53935)
+                device.battery == 0 && device.speed > 0 -> Color(0xFF1976D2) // Fetching → blue
+                device.battery == 0 -> Color.Gray
+                else -> statusColor(device.status)
             }
         )
+
+
+
 
         DetailRow(
             label = "Battery Status",
@@ -404,7 +412,7 @@ private fun GPSDataSection(device: GPSDevice) {
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        DetailRow("Distance", "${device.distance} km")
+//        DetailRow("Distance", "${device.distance} km")
         DetailRow("Speed", "${device.speed} km/h")
         DetailRow("Location", device.location, valueColor = Color(0xFF4CAF50))
         DetailRow("Latitude", device.latitude.toString())
@@ -444,41 +452,64 @@ private fun SectionCard(
 }
 
 @Composable
-private fun StatusChip(status: DeviceStatus) {
+private fun StatusChip(status: String) {
+
+    val statusLower = status.lowercase()
+
+    val (bgColor, dotColor, textColor) = when (statusLower) {
+        "moving" -> Triple(
+            Color(0xFFE3F2FD),   // light blue
+            Color(0xFF1976D2),   // blue
+            Color(0xFF1976D2)
+        )
+
+        "idle" -> Triple(
+            Color(0xFFFFF8E1),   // light yellow
+            Color(0xFFFFA000),   // amber
+            Color(0xFFFFA000)
+        )
+
+        "parked" -> Triple(
+            Color(0xFFE8F5E9),   // light green
+            Color(0xFF4CAF50),   // green
+            Color(0xFF4CAF50)
+        )
+
+        "offline" -> Triple(
+            Color(0xFFFFEBEE),   // light red
+            Color(0xFFE53935),   // red
+            Color(0xFFE53935)
+        )
+
+        else -> Triple(
+            Color(0xFFF5F5F5),   // default gray
+            Color.Gray,
+            Color.Gray
+        )
+    }
+
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(
-                if (status == DeviceStatus.ONLINE)
-                    Color(0xFFE8F5E9)
-                else
-                    Color(0xFFFFEBEE)
-            )
+            .background(bgColor)
             .padding(horizontal = 12.dp, vertical = 6.dp)
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Box(
                 modifier = Modifier
                     .size(8.dp)
                     .clip(CircleShape)
-                    .background(
-                        if (status == DeviceStatus.ONLINE)
-                            Color(0xFF4CAF50)
-                        else
-                            Color(0xFFE53935)
-                    )
+                    .background(dotColor)
             )
+
             Text(
-                text = status.name,
+                text = statusLower.replaceFirstChar { it.uppercase() },
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = if (status == DeviceStatus.ONLINE)
-                    Color(0xFF4CAF50)
-                else
-                    Color(0xFFE53935)
+                color = textColor
             )
         }
     }
@@ -573,5 +604,38 @@ private fun EmptyDevicesView(modifier: Modifier = Modifier) {
             fontSize = 14.sp,
             color = Color.Gray
         )
+    }
+}
+
+
+fun statusColor(status: String): Color =
+    when (status.lowercase()) {
+        "on", "moving" -> Color(0xFF6DBD6D)      // Green
+        "idle" -> Color(0xFFE8A93A)              // Amber
+        "off", "parked", "offline" -> Color(0xFFE35E5E) // Red
+        else -> Color.Gray
+    }
+
+
+fun batteryText(device: GPSDevice): String {
+    val status = device.status.lowercase()
+
+    return when {
+        // moving but battery not yet received
+        device.battery == 0 && device.speed > 0.0 -> {
+            "Fetching"
+        }
+
+        // not moving / offline
+        device.battery == 0 &&
+                device.speed <= 0.0 &&
+                status in listOf("offline", "parked", "idle") -> {
+            "Vehicle not moving"
+        }
+
+        // normal case
+        else -> {
+            "${device.battery}%"
+        }
     }
 }
