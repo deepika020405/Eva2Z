@@ -20,8 +20,8 @@ import kotlin.math.abs
 data class GPSDevice(
     val deviceId: String,
     val deviceName: String,
-    val status: DeviceStatus,
-    val ignition: IgnitionStatus,
+    val status: String,
+    val ignition: String,
     val battery: Int,
     val batteryStatus: BatteryStatus,
     val distance: Double,
@@ -35,8 +35,10 @@ data class GPSDevice(
 )
 
 enum class DeviceStatus { ONLINE, OFFLINE }
-enum class IgnitionStatus { ON, OFF, UNKNOWN }
-enum class BatteryStatus { CHARGING, NO_POWER, NORMAL, UNKNOWN }
+//enum class IgnitionStatus { ON, OFF, UNKNOWN }
+enum class BatteryStatus { CHARGING, NO_POWER, NORMAL, MEDUIM }
+
+
 
 data class GPSDataState(
     val isLoading: Boolean = false,
@@ -93,8 +95,9 @@ class GPSDataViewModel(
                                 GPSDevice(
                                     deviceId = device.device_id,
                                     deviceName = device.device_name,
-                                    status = parseDeviceStatus(latestLocation.status),
-                                    ignition = parseIgnitionStatus(statusResponse["status"]?.jsonPrimitive?.content ?: "unknown"),
+//                                    status = parseDeviceStatus(latestLocation.status),
+                                    status = latestLocation.status.replaceFirstChar { it.uppercase() },
+                                    ignition = latestLocation.status.replaceFirstChar { it.uppercase() },
                                     battery = parseBattery(latestLocation.batteryDisplay),
                                     batteryStatus = parseBatteryStatus(latestLocation.batteryStatus),
                                     distance = 0.0,
@@ -104,7 +107,7 @@ class GPSDataViewModel(
                                     longitude = latestLocation.longitude.toDoubleOrNull() ?: 0.0,
                                     fixTime = convertUtcToIst(latestLocation.timestamp),
                                     serverTime = convertUtcToIst(latestLocation.timestamp),
-                                    lastUpdated = getRelativeTime(latestLocation.timestamp)
+                                    lastUpdated = formatLastSeen(latestLocation.lastSeenMinutesAgo)
                                 )
                             )
                         } else {
@@ -122,15 +125,16 @@ class GPSDataViewModel(
                 _state.value = _state.value.copy(isLoading = false, error = e.message ?: "Failed")
             }
         }
+
     }
 
     private fun createOfflineDevice(device: com.developer.ev2z.response.Device) = GPSDevice(
         deviceId = device.device_id,
         deviceName = device.device_name,
-        status = DeviceStatus.OFFLINE,
-        ignition = IgnitionStatus.UNKNOWN,
+        status = "Offline",
+        ignition = "Off",
         battery = 0,
-        batteryStatus = BatteryStatus.UNKNOWN,
+        batteryStatus = BatteryStatus.MEDUIM,
         distance = 0.0,
         speed = 0.0,
         location = "No recent data",
@@ -141,15 +145,6 @@ class GPSDataViewModel(
         lastUpdated = "No data"
     )
 
-    private fun parseDeviceStatus(status: String) =
-        if (status.lowercase() in listOf("online", "active")) DeviceStatus.ONLINE else DeviceStatus.OFFLINE
-
-    private fun parseIgnitionStatus(status: String) =
-        when (status.lowercase()) {
-            "on" -> IgnitionStatus.ON
-            "off" -> IgnitionStatus.OFF
-            else -> IgnitionStatus.UNKNOWN
-        }
 
     private fun parseBattery(batteryDisplay: String?) =
         batteryDisplay?.replace("%", "")?.trim()?.toIntOrNull() ?: 0
@@ -159,7 +154,7 @@ class GPSDataViewModel(
             "charging" -> BatteryStatus.CHARGING
             "no power" -> BatteryStatus.NO_POWER
             "normal" -> BatteryStatus.NORMAL
-            else -> BatteryStatus.UNKNOWN
+            else -> BatteryStatus.MEDUIM
         }
 
 //    private fun convertUtcToIst(utcTime: String): String {
@@ -276,6 +271,18 @@ class GPSDataViewModel(
             }
         } catch (e: Exception) {
             "Unknown"
+        }
+    }
+
+
+    private fun formatLastSeen(minutes: Int?): String {
+        if (minutes == null) return "Live location"
+
+        return when {
+            minutes <= 1 -> "Live location"
+            minutes < 60 -> "$minutes mins ago"
+            minutes < 1440 -> "${minutes / 60} hours ago"
+            else -> "${minutes / 1440} days ago"
         }
     }
 
