@@ -51,6 +51,7 @@ fun LoginScreen(
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
 
+
     LaunchedEffect(Unit) {
         Analytics.logEvent(
             name = "screen_view",
@@ -60,6 +61,8 @@ fun LoginScreen(
             )
         )
     }
+
+
 
     // ✅ SIMPLE 3 CASES
 //    LaunchedEffect(error) {
@@ -137,9 +140,9 @@ fun LoginScreen(
                         if (loginAttempts >= 3)
                             "Too many failed attempts. Redirecting to reset password…"
                         else
-                            "Incorrect password (Attempt $loginAttempts/3)"
+                            "Incorrect password (Attempt $loginAttempts/5)"
 
-                    if (loginAttempts >= 3) {
+                    if (loginAttempts >= 5) {
                         delay(1500)
                         onForgetPasswordClick(phoneNumber)
                     }
@@ -190,7 +193,7 @@ fun LoginScreen(
                     phoneError = null
                     generalError = null
                     hasTriedLogin = false
-//                    loginAttempts = 0
+                    loginAttempts = 0
                 }
             },
             prefix = {
