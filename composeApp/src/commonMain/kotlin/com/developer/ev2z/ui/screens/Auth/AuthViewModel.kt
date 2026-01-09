@@ -95,18 +95,54 @@ class AuthViewModel(
     // ============================================
 
 
+//    fun checkPhoneRegistered(phone: String, onResult: (Boolean) -> Unit) {
+//        viewModelScope.launch {
+//            try {
+//                repository.login(LoginRequest(phone, "wrong_password"))
+//                // login chal gaya → user exists
+//                onResult(true)
+//            } catch (e: Exception) {
+//                // login fail → user not registered
+//                onResult(false)
+//            }
+//        }
+//    }
+
     fun checkPhoneRegistered(phone: String, onResult: (Boolean) -> Unit) {
         viewModelScope.launch {
             try {
                 repository.login(LoginRequest(phone, "wrong_password"))
-                // login chal gaya → user exists
                 onResult(true)
+
             } catch (e: Exception) {
-                // login fail → user not registered
-                onResult(false)
+                val msg = e.message?.lowercase() ?: ""
+
+                when {
+                    msg.contains("invalid password") ||
+                            msg.contains("wrong password") -> {
+                        onResult(true)
+                    }
+
+                    msg.contains("already registered") -> {
+                        _error.value = "This phone number is already registered."
+                        onResult(true)
+                    }
+
+                    msg.contains("user not registered") ||
+                            msg.contains("not registered") -> {
+                        onResult(false)
+                    }
+
+                    else -> {
+                        _error.value = mapToUserError(e)
+                        onResult(true) // ⛔ STOP OTP
+                    }
+                }
             }
         }
     }
+
+
 
 
     // ============================================
@@ -233,18 +269,26 @@ class AuthViewModel(
                     _otpVerified.value = true
                 } else {
                     println("❌ OTP verification failed: ${result.message}")
+
+                    // 🔥 MOST IMPORTANT FIX
                     _error.value = result.message
+                        ?.takeIf { it.isNotBlank() }
+                        ?: "Invalid OTP. Please try again."
                 }
 
             } catch (e: Exception) {
                 println("❌ OTP verification error: ${e.message}")
                 e.printStackTrace()
+
+                // already safe
                 _error.value = mapToUserError(e)
+
             } finally {
                 _loading.value = false
             }
         }
     }
+
 
     // ============================================
     // RESEND OTP
