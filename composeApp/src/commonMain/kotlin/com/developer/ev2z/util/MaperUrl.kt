@@ -6,39 +6,57 @@ fun mapToUserError(e: Exception): String {
 
     return when {
 
-        // ✅ API BUSINESS ERRORS (HIGH PRIORITY)
-        msg.contains("user not registered") ->
-            "User not registered."
-
-        msg.contains("invalid credentials") ||
-                msg.contains("incorrect password") ->
-            "Invalid phone number or password."
-
-        msg.contains("otp") && msg.contains("invalid") ->
-            "Invalid OTP. Please try again."
-
-        msg.contains("otp") && msg.contains("expired") ->
-            "OTP expired. Please request a new one."
-
-        msg.contains("already registered") ->
+        // ✅ PHONE ALREADY REGISTERED (🔥 VERY IMPORTANT)
+        msg.contains("phone is already registered") ||
+                msg.contains("already registered") -> {
             "This phone number is already registered."
+        }
 
-        // 🌐 NETWORK ERRORS
+        // ✅ INVALID LOGIN
+        msg.contains("incorrect password") ||
+                msg.contains("password is incorrect") ||   // 👈 ADD THIS
+                msg.contains("invalid password") ||
+                msg.contains("wrong password") ||
+                msg.contains("invalid credentials") -> {
+            "Invalid phone number or password."
+        }
+
+        // ✅ USER NOT FOUND
+        msg.contains("user not registered") ||
+                msg.contains("not registered") -> {
+            "User not registered."
+        }
+
+        // ✅ OTP ERRORS
+        // ✅ OTP ERRORS (ROBUST)
+        msg.contains("otp") && msg.contains("invalid") -> {
+            "Invalid OTP. Please try again."
+        }
+
+        msg.contains("otp") && msg.contains("expired") -> {
+            "OTP expired. Please request a new one."
+        }
+
+
+        // 🌐 NETWORK
         msg.contains("failed to connect") ||
                 msg.contains("econnrefused") ||
-                msg.contains("isconnected failed") ->
+                msg.contains("isconnected failed") -> {
             "Unable to connect. Please check your internet connection."
+        }
 
-        msg.contains("timeout") ->
+        msg.contains("timeout") -> {
             "Request timed out. Please try again."
+        }
 
         msg.contains("unknownhost") ||
-                msg.contains("no route to host") ||
-                msg.contains("host") ->
+                msg.contains("no route to host") -> {
             "No internet connection. Please try again."
+        }
 
         // 🧯 FALLBACK
-        else ->
+        else -> {
             "Something went wrong. Please try again."
+        }
     }
 }
