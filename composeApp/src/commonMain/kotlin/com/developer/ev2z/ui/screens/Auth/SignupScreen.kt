@@ -46,6 +46,8 @@ fun SignupScreen(
     val error by viewModel.error.collectAsState()
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
+    var navigateToLogin by remember { mutableStateOf(false) }
+
 
     LaunchedEffect(Unit) {
         Analytics.logEvent(
@@ -62,6 +64,14 @@ fun SignupScreen(
     LaunchedEffect(preFilledPhone) {
         if (preFilledPhone.isNotEmpty()) {
             phoneNumber = preFilledPhone
+        }
+    }
+
+    LaunchedEffect(navigateToLogin) {
+        if (navigateToLogin) {
+            delay(3000) // ⏳ 3 seconds
+            onAlreadyRegistered(phoneNumber)
+            navigateToLogin = false // reset (VERY IMPORTANT)
         }
     }
 
@@ -266,11 +276,12 @@ fun SignupScreen(
                 viewModel.checkPhoneRegistered(fullPhone) { isRegistered ->
                     if (isRegistered) {
                         phoneAlreadyRegisteredError = "This phone number is already registered!"
-                        onAlreadyRegistered(phoneNumber)
+                        navigateToLogin = true
                     } else {
                         onSendOTPClick(fullName, phoneNumber, email)
                     }
                 }
+
 
             },
             modifier = Modifier
@@ -303,15 +314,15 @@ fun SignupScreen(
             }
         }
 
-        error?.let { errorMessage ->
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = errorMessage,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-        }
+//        error?.let { errorMessage ->
+//            Spacer(modifier = Modifier.height(16.dp))
+//            Text(
+//                text = errorMessage,
+//                color = MaterialTheme.colorScheme.error,
+//                style = MaterialTheme.typography.bodyMedium,
+//                modifier = Modifier.padding(horizontal = 16.dp)
+//            )
+//        }
 
         Spacer(modifier = Modifier.height(16.dp))
 
