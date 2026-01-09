@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import com.developer.ev2z.ui.screens.social_media.initOpenUrl
 import com.developer.ev2z.util.Analytics
+import com.developer.ev2z.util.initContexts
 
 class MainApplication : Application() {
     override fun onCreate() {
@@ -14,6 +15,7 @@ class MainApplication : Application() {
             Analytics.init(this)
             initOpenUrl(this)
             initAppContext(this)
+            initContexts(this)
             // ✅ Set Activity Provider context
             Log.d("MainApplication", "✅ Application initialized")
 
