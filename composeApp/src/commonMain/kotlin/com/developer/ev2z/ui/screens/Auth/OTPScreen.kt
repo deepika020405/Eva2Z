@@ -50,6 +50,10 @@ fun OTPScreen(
     val focus5 = remember { FocusRequester() }
     val focus6 = remember { FocusRequester() }
 
+    var resendTimeLeft by remember { mutableStateOf(600) }
+    var resendEnabled by remember { mutableStateOf(false) }
+
+
     var showBackDialog by remember { mutableStateOf(false) }
     var hasSubmitted by remember { mutableStateOf(false) }
     var lastSubmittedOtp by remember { mutableStateOf<String?>(null) }
@@ -75,15 +79,13 @@ fun OTPScreen(
         if (!isOtpComplete || isLoading) return@LaunchedEffect
 
         val currentOtp = "$otp1$otp2$otp3$otp4$otp5$otp6"
-
         if (currentOtp == lastSubmittedOtp) return@LaunchedEffect
 
         lastSubmittedOtp = currentOtp
-        hasSubmitted = true
-
         delay(300)
         onOTPComplete(currentOtp)
     }
+
 
     // ✅ Allow retry only if user changes OTP
     LaunchedEffect(otp1, otp2, otp3, otp4, otp5, otp6) {
@@ -93,9 +95,26 @@ fun OTPScreen(
     // ✅ Reset submit flag on error (but keep OTP)
     LaunchedEffect(error) {
         if (error != null) {
-            hasSubmitted = false
+            lastSubmittedOtp = null
         }
     }
+
+    LaunchedEffect(resendTimeLeft) {
+        if (resendTimeLeft > 0) {
+            delay(1000)
+            resendTimeLeft--
+        } else {
+            resendEnabled = true
+        }
+    }
+
+
+    fun onOtpChanged() {
+        if (error != null) {
+            lastSubmittedOtp = null
+        }
+    }
+
 
     if (showBackDialog) {
         AlertDialog(
@@ -152,31 +171,38 @@ fun OTPScreen(
         ) {
             OTPBox(otp1, focus1, null, error) {
                 otp1 = it
+                onOtpChanged()
                 if (it.isNotEmpty()) focus2.requestFocus()
             }
 
             OTPBox(otp2, focus2, focus1, error) {
                 otp2 = it
+                onOtpChanged()
                 if (it.isNotEmpty()) focus3.requestFocus()
             }
 
             OTPBox(otp3, focus3, focus2, error) {
                 otp3 = it
+                onOtpChanged()
                 if (it.isNotEmpty()) focus4.requestFocus()
             }
 
             OTPBox(otp4, focus4, focus3, error) {
                 otp4 = it
+                onOtpChanged()
                 if (it.isNotEmpty()) focus5.requestFocus()
             }
 
             OTPBox(otp5, focus5, focus4, error) {
                 otp5 = it
+                onOtpChanged()
                 if (it.isNotEmpty()) focus6.requestFocus()
             }
 
             OTPBox(otp6, focus6, focus5, error) {
                 otp6 = it
+                onOtpChanged()
+
             }
         }
 
@@ -219,31 +245,92 @@ fun OTPScreen(
 
         Spacer(Modifier.height(16.dp))
 
+//        Row(
+//            modifier = Modifier.fillMaxWidth(),
+//            horizontalArrangement = Arrangement.Center,
+//            verticalAlignment = Alignment.CenterVertically
+//        ) {
+//            Text(
+//                text = "Didn't get OTP?",
+//                fontSize = 14.sp,
+//                color = Color(0xFF666666)
+//            )
+//
+//            Spacer(modifier = Modifier.width(4.dp))
+//
+////            TextButton(
+////                onClick = onResendOTP,
+////                contentPadding = PaddingValues(0.dp) // 🔥 no extra padding
+////            ) {
+////                Text(
+////                    text = "Resend OTP",
+////                    fontSize = 14.sp,
+////                    color = Color(0xFF6A9F50),
+////                    fontWeight = FontWeight.SemiBold
+////                )
+////            }
+//
+//            TextButton(
+//                onClick = {
+//                    resendTimeLeft = 600
+//                    resendEnabled = false
+//                    onResendOTP()
+//                },
+//                enabled = resendEnabled,
+//                contentPadding = PaddingValues(0.dp)
+//            ) {
+//                Text(
+//                    text = "Resend OTP",
+//                    fontSize = 14.sp,
+//                    color = if (resendEnabled) Color(0xFF6A9F50) else Color.Gray,
+//                    fontWeight = FontWeight.SemiBold
+//                )
+//            }
+//
+//        }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "Didn't get OTP?",
-                fontSize = 14.sp,
-                color = Color(0xFF666666)
-            )
+            if (!resendEnabled) {
+                val minutes = resendTimeLeft / 60
+                val seconds = resendTimeLeft % 60
 
-            Spacer(modifier = Modifier.width(4.dp))
-
-            TextButton(
-                onClick = onResendOTP,
-                contentPadding = PaddingValues(0.dp) // 🔥 no extra padding
-            ) {
                 Text(
-                    text = "Resend OTP",
+                    text = "Resend OTP in $minutes:${seconds.toString().padStart(2, '0')}",
                     fontSize = 14.sp,
-                    color = Color(0xFF6A9F50),
-                    fontWeight = FontWeight.SemiBold
+                    color = Color.Red,
+                    fontWeight = FontWeight.Medium
                 )
+            } else {
+                Text(
+                    text = "Didn't get OTP?",
+                    fontSize = 14.sp,
+                    color = Color(0xFF666666)
+                )
+
+                Spacer(modifier = Modifier.width(4.dp))
+
+                TextButton(
+                    onClick = {
+                        resendTimeLeft = 300
+                        resendEnabled = false
+                        onResendOTP()
+                    },
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Text(
+                        text = "Resend OTP",
+                        fontSize = 14.sp,
+                        color = Color(0xFF6A9F50),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
         }
+
     }
 
     LaunchedEffect(Unit) { focus1.requestFocus() }
@@ -291,3 +378,55 @@ private fun OTPBox(
         decorationBox = { Box(Modifier.fillMaxSize(), Alignment.Center) { it() } }
     )
 }
+
+//@Composable
+//private fun OTPBox(
+//    value: String,
+//    focusRequester: FocusRequester,
+//    previousFocusRequester: FocusRequester?,
+//    error: String?,
+//    onChange: (String) -> Unit
+//){
+//    BasicTextField(
+//        value = value,
+//        onValueChange = { newValue ->
+//            when {
+//                // ✅ Normal digit entry
+//                newValue.length == 1 && newValue.all { it.isDigit() } -> {
+//                    onChange(newValue)
+//                }
+//
+//                // ✅ BACKSPACE CASE (blank → go previous)
+//                newValue.isEmpty() && value.isNotEmpty() -> {
+//                    onChange("")
+//                }
+//
+//                newValue.isEmpty() && value.isEmpty() -> {
+//                    previousFocusRequester?.requestFocus()
+//                }
+//            }
+//        },
+//        modifier = Modifier
+//            .width(52.dp)
+//            .height(60.dp)
+//            .focusRequester(focusRequester)
+//            .border(
+//                1.5.dp,
+//                if (error != null) Color.Red else Color(0xFFE0E0E0),
+//                RoundedCornerShape(12.dp)
+//            )
+//            .background(Color.White, RoundedCornerShape(12.dp)),
+//        textStyle = TextStyle(
+//            fontSize = 22.sp,
+//            fontWeight = FontWeight.Bold,
+//            textAlign = TextAlign.Center
+//        ),
+//        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
+//        singleLine = true,
+//        decorationBox = {
+//            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+//                it()
+//            }
+//        }
+//    )
+//}
