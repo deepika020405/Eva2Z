@@ -30,6 +30,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.graphicsLayer
+import com.developer.ev2z.ui.components.FloatingContactButton
 import com.developer.ev2z.util.Analytics
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
@@ -151,6 +152,13 @@ fun HomeScreen(
                         )
                     }
                 }
+                // 🔥 FLOATING CONTACT BUTTON (COMMON)
+                FloatingContactButton(
+                    phoneNumber = "919999999999",
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 20.dp, bottom = 20.dp)
+                )
 
                 if (showOverview) {
                     ModalBottomSheet(
