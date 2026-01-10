@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.response.Device
+import com.developer.ev2z.ui.components.FloatingContactButton
 import com.developer.ev2z.ui.screens.device_Report.PlatformMapView
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
@@ -118,6 +119,12 @@ fun TrackTraceScreen(
                 devices = devices,
                 selectedDevice = selectedDevice,
                 onDeviceSelect = viewModel::selectDevice
+            )
+            FloatingContactButton(
+                phoneNumber = "919755273822",
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 20.dp, bottom = 20.dp)
             )
         }
     }

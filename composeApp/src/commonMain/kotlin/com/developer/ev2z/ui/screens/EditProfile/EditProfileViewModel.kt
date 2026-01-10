@@ -3,6 +3,7 @@ package com.developer.ev2z.ui.screens.EditProfile
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.util.compressImageBytes
+import com.developer.ev2z.util.fixAndCompressImage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,6 +17,7 @@ data class EditProfileState(
     val userEmail: String = "",
     val userPhone: String = "",
     val userImage: String? = null,
+    val userImageBytes: ByteArray? = null,
     val error: String? = null,
     val updateSuccess: Boolean = false
 )
@@ -65,14 +67,31 @@ class EditProfileViewModel(
     }
 
     // ✅ FIX 1: Just store image bytes, DON'T upload automatically
-    fun updateProfileWithImage(imageBytes: ByteArray) {
-        selectedImageBytes = imageBytes
-        println("✅ Image selected, size: ${imageBytes.size} bytes (will upload on button click)")
+//    fun updateProfileWithImage(imageBytes: ByteArray) {
+//        selectedImageBytes = imageBytes
+//        println("✅ Image selected, size: ${imageBytes.size} bytes (will upload on button click)")
+//
+//        // ✅ Just show preview, don't upload yet
+//        // Convert bytes to temporary URL for preview (optional)
+//        // For now, just store it
+//    }
 
-        // ✅ Just show preview, don't upload yet
-        // Convert bytes to temporary URL for preview (optional)
-        // For now, just store it
+    fun updateProfileWithImage(imageBytes: ByteArray) {
+        // 1️⃣ Fix rotation + compress
+        val fixedBytes = fixAndCompressImage(imageBytes, maxSizeKB = 500)
+
+        // 2️⃣ Store for upload
+        selectedImageBytes = fixedBytes
+
+        // 3️⃣ Update UI immediately
+        _state.value = _state.value.copy(
+            userImageBytes = fixedBytes   // ✅ raw bytes for UI
+        )
+
+        println("✅ Image selected, fixed rotation, preview updated (size: ${fixedBytes.size} bytes)")
     }
+
+
 
     // ✅ FIX 2: Email is optional now
 

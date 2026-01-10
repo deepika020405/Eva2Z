@@ -26,6 +26,7 @@ import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.ui.components.FloatingContactButton
 import com.developer.ev2z.ui.screens.PrivacyPolicy_TandC.PrivacyPolicy_TandCScreen
 import com.developer.ev2z.ui.screens.PrivacyPolicy_TandC.WebViewType
 import com.developer.ev2z.ui.screens.social_media.openUrl
@@ -205,7 +206,7 @@ fun ProfileScreenContent(
                     ProfileMenuCard(
                         items = listOf(
                             ProfileMenuItem("Edit Profile", Icons.Rounded.Edit, onEditProfile),
-                            ProfileMenuItem("General Settings", Icons.Rounded.Settings, onGeneralSettings),
+//                            ProfileMenuItem("General Settings", Icons.Rounded.Settings, onGeneralSettings),
                             ProfileMenuItem("Account Activity", Icons.Rounded.ManageAccounts, onAccountActivity),
                             ProfileMenuItem("Refer And Earn", Icons.Rounded.CardGiftcard, onReferAndEarn),
                             ProfileMenuItem("Change Password", Icons.Rounded.Password, onChangePassword) // ✅ WORKING NOW
@@ -285,6 +286,13 @@ fun ProfileScreenContent(
                     Spacer(modifier = Modifier.height(100.dp))
                 }
             }
+
+            FloatingContactButton(
+                phoneNumber = "919755273822",
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 20.dp, bottom = 20.dp)
+            )
 
             if (state.isLoading) {
                 CircularProgressIndicator(

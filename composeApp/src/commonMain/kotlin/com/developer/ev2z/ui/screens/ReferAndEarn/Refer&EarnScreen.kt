@@ -190,6 +190,8 @@ fun ReferAndEarnScreen(
                 }
             }
 
+
+
             // ✅ Balance Dialog (shows referral balance)
             if (showBalanceDialog) {
                 val state = uiState as? ReferralUiState.Success
