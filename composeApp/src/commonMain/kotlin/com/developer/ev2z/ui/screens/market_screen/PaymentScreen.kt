@@ -146,13 +146,13 @@ fun PaymentScreenContent() {
         Spacer(Modifier.height(12.dp))
 
         // 💳 Razorpay Option (Future)
-        PaymentMethodCard(
-            icon = "💰",
-            name = "Razorpay",
-            description = "Coming Soon",
-            onClick = { /* TODO */ },
-            enabled = false
-        )
+//        PaymentMethodCard(
+//            icon = "💰",
+//            name = "Razorpay",
+//            description = "Coming Soon",
+//            onClick = { /* TODO */ },
+//            enabled = false
+//        )
 
         Spacer(Modifier.weight(1f))
 
