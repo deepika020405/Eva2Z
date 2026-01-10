@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.navigator.LocalNavigator
 import coil3.compose.AsyncImage
+import com.developer.ev2z.ui.components.FloatingContactButton
 import com.developer.ev2z.util.Analytics
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo // apna drawable
@@ -104,6 +105,13 @@ fun ShopScreen(
                         )
                     }
                 }
+
+                FloatingContactButton(
+                    phoneNumber = "919755273822",
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 20.dp, bottom = 20.dp)
+                )
 
                 Box(
                     modifier = Modifier
