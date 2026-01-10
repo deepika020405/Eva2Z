@@ -38,3 +38,8 @@ data class StoryViewer(
     val created_at: String
 )
 
+@Serializable
+data class StoryGroup(
+    val user: Users,
+    val stories: List<Story>
+)
