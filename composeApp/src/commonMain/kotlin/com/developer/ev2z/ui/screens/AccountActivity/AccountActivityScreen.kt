@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.ui.components.FloatingContactButton
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -88,14 +89,20 @@ fun AccountActivityScreen(
         },
         contentWindowInsets = WindowInsets(0)
     ) { padding ->
-        LazyColumn(
+
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .background(Color(0xFFF5F5F5))
         ) {
-            item {
-                /*
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFFF5F5F5))
+            ) {
+                item {
+                    /*
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Account Information Section (Future Feature)
@@ -195,37 +202,47 @@ fun AccountActivityScreen(
                 Spacer(modifier = Modifier.height(16.dp))
                 */
 
-                // Danger Zone Section
-                Text(
-                    text = "Delete Account",
-                    fontSize = 14.sp,
-                    color = Color(0xFFDC3545),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 8.dp)
-                )
-
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 8.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    SettingNavigationItem(
-                        icon = Icons.Default.DeleteForever,
-                        title = "Delete Account",
-                        subtitle = "Permanently delete your account",
-                        onClick = { showDeleteDialog = true },
-                        iconTint = Color(0xFFDC3545),
-                        titleColor = Color(0xFFDC3545)
+                    // Danger Zone Section
+                    Text(
+                        text = "Delete Account",
+                        fontSize = 14.sp,
+                        color = Color(0xFFDC3545),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 8.dp)
                     )
+
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 8.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        SettingNavigationItem(
+                            icon = Icons.Default.DeleteForever,
+                            title = "Delete Account",
+                            subtitle = "Permanently delete your account",
+                            onClick = { showDeleteDialog = true },
+                            iconTint = Color(0xFFDC3545),
+                            titleColor = Color(0xFFDC3545)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(100.dp))
                 }
 
-                Spacer(modifier = Modifier.height(100.dp))
             }
+            FloatingContactButton(
+                phoneNumber = "919755273822",
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 20.dp, bottom = 40.dp)
+            )
         }
+
+
     }
 
     // First Dialog - Confirmation
