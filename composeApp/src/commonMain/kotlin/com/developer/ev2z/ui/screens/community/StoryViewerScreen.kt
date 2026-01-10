@@ -28,6 +28,100 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import coil3.compose.AsyncImage
 
+//class StoryViewerScreen : Screen {
+//
+//    @OptIn(ExperimentalMaterial3Api::class)
+//    @Composable
+//    override fun Content() {
+//
+//        val navigator = LocalNavigator.currentOrThrow
+//        val vm = CommunityViewModelProvider.viewModel
+//        val state = vm.state
+//
+//        val story = state.stories[state.storyIndex]
+//        var lastStoryTimerStarted by remember { mutableStateOf(false) }
+//
+//        LaunchedEffect(state.storyIndex) {
+//
+//            val isLastStory =
+//                state.storyIndex == state.stories.lastIndex
+//
+//            if (isLastStory && !lastStoryTimerStarted) {
+//                lastStoryTimerStarted = true
+//
+//                // ⏳ last story poora dikhane ka time
+//                kotlinx.coroutines.delay(15_000)
+//
+//                // Safety check
+//                if (state.storyIndex == state.stories.lastIndex) {
+//                    navigator.pop() // 🔥 AUTO BACK
+//                }
+//            }
+//
+//            // 🔄 Agar user prev story pe gaya
+//            if (!isLastStory) {
+//                lastStoryTimerStarted = false
+//            }
+//        }
+//
+//        Box(
+//            Modifier
+//                .fillMaxSize()
+//                .background(Color.Black)
+//                .pointerInput(Unit) {
+//                    detectTapGestures(
+//                        onPress = {
+//                            vm.pauseStory()
+//                            tryAwaitRelease()
+//                            vm.resumeStory()
+//                        },
+//                        onTap = {
+//                            if (it.x < size.width / 2) vm.prevStory()
+//                            else vm.nextStory()
+//                        }
+//                    )
+//                }
+//        ) {
+//
+//            AsyncImage(
+//                model = "https://gps.eva2z.in/storage/${story.media.first()}",
+//                contentDescription = null,
+//                modifier = Modifier.fillMaxSize(),
+//                contentScale = ContentScale.Fit
+//            )
+//
+//            LinearProgressIndicator(
+//                progress = state.storyProgress,
+//                modifier = Modifier
+//                    .fillMaxWidth()
+//                    .padding(8.dp)
+//            )
+//
+//            // 👁 OWNER ONLY
+//            if (story.user.id == state.authUserId) {
+//                Text(
+//                    text = "👁 ${story.view_count}",
+//                    color = Color.White,
+//                    modifier = Modifier
+//                        .align(Alignment.BottomCenter)
+//                        .padding(16.dp)
+//                        .clickable {
+//                            vm.loadStoryViewers(story.id)
+//                        }
+//                )
+//            }
+//        }
+//
+//        if (state.storyViewers.isNotEmpty()) {
+//            ModalBottomSheet(onDismissRequest = vm::clearStoryViewers) {
+//                state.storyViewers.forEach {
+//                    Text(it.user.name, Modifier.padding(12.dp))
+//                }
+//            }
+//        }
+//    }
+//}
+
 class StoryViewerScreen : Screen {
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -38,31 +132,16 @@ class StoryViewerScreen : Screen {
         val vm = CommunityViewModelProvider.viewModel
         val state = vm.state
 
-        val story = state.stories[state.storyIndex]
-        var lastStoryTimerStarted by remember { mutableStateOf(false) }
+        val story = vm.currentStory()
 
-        LaunchedEffect(state.storyIndex) {
-
-            val isLastStory =
-                state.storyIndex == state.stories.lastIndex
-
-            if (isLastStory && !lastStoryTimerStarted) {
-                lastStoryTimerStarted = true
-
-                // ⏳ last story poora dikhane ka time
-                kotlinx.coroutines.delay(15_000)
-
-                // Safety check
-                if (state.storyIndex == state.stories.lastIndex) {
-                    navigator.pop() // 🔥 AUTO BACK
-                }
-            }
-
-            // 🔄 Agar user prev story pe gaya
-            if (!isLastStory) {
-                lastStoryTimerStarted = false
+        // ✅ Group khatam → auto back
+        LaunchedEffect(story) {
+            if (story == null) {
+                navigator.pop()
             }
         }
+
+        if (story == null) return
 
         Box(
             Modifier
@@ -75,9 +154,11 @@ class StoryViewerScreen : Screen {
                             tryAwaitRelease()
                             vm.resumeStory()
                         },
-                        onTap = {
-                            if (it.x < size.width / 2) vm.prevStory()
-                            else vm.nextStory()
+                        onTap = { offset ->
+                            if (offset.x < size.width / 2)
+                                vm.prevStoryInGroup()
+                            else
+                                vm.nextStoryInGroup()
                         }
                     )
                 }
@@ -87,17 +168,17 @@ class StoryViewerScreen : Screen {
                 model = "https://gps.eva2z.in/storage/${story.media.first()}",
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Crop
+                contentScale = ContentScale.Fit
             )
 
             LinearProgressIndicator(
-                progress = state.storyProgress,
+                progress = vm.storyProgress,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(8.dp)
             )
 
-            // 👁 OWNER ONLY
+            // 👁️ OWNER ONLY
             if (story.user.id == state.authUserId) {
                 Text(
                     text = "👁 ${story.view_count}",

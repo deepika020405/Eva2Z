@@ -13,6 +13,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import com.developer.ev2z.response.Post
 import com.developer.ev2z.response.Story
+import com.developer.ev2z.response.StoryGroup
 import com.developer.ev2z.response.StoryViewer
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -54,6 +55,12 @@ class CommunityViewModel(
     fun observeRefreshKey(): Int = refreshKey
     private val viewedStoryIds = mutableSetOf<Int>()
     private val cachedViewedStoryIds = mutableSetOf<Int>()
+    var currentGroup: StoryGroup? = null
+    var storyIndex by mutableStateOf(0)
+    var storyProgress by mutableStateOf(0f)
+    var storyPaused by mutableStateOf(false)
+
+
 
 
 
@@ -162,9 +169,61 @@ class CommunityViewModel(
 
 
 
-    fun toggleLike(postId: Int) {
+//    fun toggleLike(postId: Int) {
+//
+//        // 🔥 Optimistic UI (instant feel)
+//        val currentPost = _state.posts.find { it.id == postId } ?: return
+//
+//        val optimisticLiked = !currentPost.liked
+//        val optimisticCount =
+//            if (optimisticLiked) currentPost.likes_count + 1
+//            else maxOf(0, currentPost.likes_count - 1)
+//
+//        _state = _state.copy(
+//            posts = _state.posts.map { post ->
+//                if (post.id == postId) {
+//                    post.copy(
+//                        liked = optimisticLiked,
+//                        likes_count = optimisticCount
+//                    )
+//                } else post
+//            }
+//        )
+//
+//        // 🔁 API call
+//        scope.launch {
+//            try {
+//                val serverLiked = repository.toggleLike(postId)
+//
+//                // 🔄 Sync with server response
+//                _state = _state.copy(
+//                    posts = _state.posts.map { post ->
+//                        if (post.id == postId) {
+//                            post.copy(
+//                                liked = serverLiked,
+//                                likes_count =
+//                                    if (serverLiked) optimisticCount
+//                                    else maxOf(0, optimisticCount - 1)
+//                            )
+//                        } else post
+//                    }
+//                )
+//
+//            } catch (e: Exception) {
+//                // ❌ Revert on error
+//                _state = _state.copy(
+//                    posts = _state.posts.map { post ->
+//                        if (post.id == postId) currentPost else post
+//                    }
+//                )
+//            }
+//        }
+//        cachedPosts = _state.posts
+//    }
 
-        // 🔥 Optimistic UI (instant feel)
+
+
+    fun toggleLike(postId: Int) {
         val currentPost = _state.posts.find { it.id == postId } ?: return
 
         val optimisticLiked = !currentPost.liked
@@ -172,36 +231,35 @@ class CommunityViewModel(
             if (optimisticLiked) currentPost.likes_count + 1
             else maxOf(0, currentPost.likes_count - 1)
 
+        // 🔹 Optimistic UI update
         _state = _state.copy(
             posts = _state.posts.map { post ->
-                if (post.id == postId) {
-                    post.copy(
-                        liked = optimisticLiked,
-                        likes_count = optimisticCount
-                    )
-                } else post
+                if (post.id == postId) post.copy(
+                    liked = optimisticLiked,
+                    likes_count = optimisticCount
+                ) else post
             }
         )
 
-        // 🔁 API call
         scope.launch {
             try {
                 val serverLiked = repository.toggleLike(postId)
 
-                // 🔄 Sync with server response
+                // 🔹 Sync with server without double decrement
                 _state = _state.copy(
                     posts = _state.posts.map { post ->
                         if (post.id == postId) {
                             post.copy(
                                 liked = serverLiked,
-                                likes_count =
-                                    if (serverLiked) optimisticCount
-                                    else maxOf(0, optimisticCount - 1)
+                                likes_count = when {
+                                    serverLiked && !currentPost.liked -> currentPost.likes_count + 1
+                                    !serverLiked && currentPost.liked -> currentPost.likes_count - 1
+                                    else -> currentPost.likes_count
+                                }
                             )
                         } else post
                     }
                 )
-
             } catch (e: Exception) {
                 // ❌ Revert on error
                 _state = _state.copy(
@@ -211,8 +269,11 @@ class CommunityViewModel(
                 )
             }
         }
+
         cachedPosts = _state.posts
     }
+
+
 
     fun load(postId: Int) {
         scope.launch {
@@ -269,6 +330,80 @@ class CommunityViewModel(
         }
     }
 
+    fun groupedStories(): List<StoryGroup> {
+        return state.stories
+            .groupBy { it.user.id }
+            .map { (_, stories) ->
+                StoryGroup(
+                    user = stories.first().user,
+                    stories = stories.sortedBy { it.created_at }
+                )
+            }
+    }
+
+    fun currentStory(): Story? {
+        val group = currentGroup ?: return null
+        return group.stories.getOrNull(storyIndex)
+    }
+
+    fun startStoryGroup(group: StoryGroup) {
+        currentGroup = group
+        storyIndex = 0
+        storyProgress = 0f
+        storyPaused = false
+
+        onStoryOpened(group.stories.first())
+        startProgress()
+    }
+
+    private fun startProgress() {
+        scope.launch {
+            storyProgress = 0f
+
+            while (storyProgress < 1f) {
+                if (!storyPaused) {
+                    kotlinx.coroutines.delay(150) // ~15 sec
+                    storyProgress += 0.01f
+                } else {
+                    kotlinx.coroutines.delay(50)
+                }
+            }
+
+            nextStoryInGroup()
+        }
+    }
+
+    fun nextStoryInGroup() {
+        val group = currentGroup ?: return
+
+        if (storyIndex < group.stories.lastIndex) {
+            storyIndex++
+            storyProgress = 0f
+            onStoryOpened(group.stories[storyIndex])
+            startProgress()
+        } else {
+            // ✅ Group finished → close viewer
+            currentGroup = null
+        }
+    }
+
+    fun isGroupViewed(group: StoryGroup): Boolean {
+        return group.stories.all { viewedStoryIds.contains(it.id) }
+    }
+
+
+    fun prevStoryInGroup() {
+        val group = currentGroup ?: return
+
+        if (storyIndex > 0) {
+            storyIndex--
+            storyProgress = 0f
+            onStoryOpened(group.stories[storyIndex])
+            startProgress()
+        }
+    }
+
+
     fun createStory(
         body: String,
         media: List<ByteArray>
@@ -287,30 +422,7 @@ class CommunityViewModel(
     }
 
 
-//    fun startStory(index: Int) {
-//        val story = _state.stories.getOrNull(index) ?: return
-//
-//        _state = _state.copy(
-//            storyIndex = index,
-//            storyProgress = 0f,
-//            storyPaused = false
-//        )
-//
-//        if (!viewedStoryIds.contains(story.id)) {
-//            viewedStoryIds.add(story.id)
-//
-//            // 🔥 cache ko sync rakho
-//            cachedViewedStoryIds.add(story.id)
-//
-//            scope.launch {
-//                repository.viewStory(story.id)
-//            }
-//        }
-//        onStoryOpened(story)
-//
-//        loadStoryViewers(story.id)
-//        runStoryTimer()
-//    }
+
 
     fun startStory(index: Int) {
         val story = _state.stories.getOrNull(index) ?: return

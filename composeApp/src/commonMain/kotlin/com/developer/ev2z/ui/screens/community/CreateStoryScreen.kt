@@ -39,6 +39,8 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import com.developer.ev2z.util.Analytics
+import com.developer.ev2z.util.compressStoryImage
+import com.developer.ev2z.util.fixAndCompressImage
 import com.developer.ev2z.util.rememberImagePicker
 
 
@@ -58,12 +60,27 @@ class CreateStoryScreen : Screen {
         var image by remember { mutableStateOf<ByteArray?>(null) }
 
         // ✅ SAME picker as EditProfile
+//        val imagePickerLauncher = rememberImagePicker { imageBytes ->
+//            if (imageBytes != null) {
+//                image = imageBytes
+//                println("✅ Story image selected: ${imageBytes.size} bytes")
+//            }
+//        }
+
         val imagePickerLauncher = rememberImagePicker { imageBytes ->
             if (imageBytes != null) {
-                image = imageBytes
-                println("✅ Story image selected: ${imageBytes.size} bytes")
+                // 🔥 Fix rotation + reduce size (no zoom, no resize)
+                val fixed = compressStoryImage(
+                    imageBytes = imageBytes,
+                    maxSizeKB = 800
+                )
+
+
+                image = fixed
+                println("✅ Story image ready: ${fixed.size / 1024} KB")
             }
         }
+
 
         // Analytics
         LaunchedEffect(Unit) {
@@ -130,64 +147,17 @@ class CreateStoryScreen : Screen {
                     }
                 }
 
-                Spacer(Modifier.height(16.dp))
+//                Spacer(Modifier.height(16.dp))
 
-                OutlinedTextField(
-                    value = body,
-                    onValueChange = { body = it },
-                    placeholder = { Text("Say something… (optional)") },
-                    modifier = Modifier.fillMaxWidth()
-                )
+//                OutlinedTextField(
+//                    value = body,
+//                    onValueChange = { body = it },
+//                    placeholder = { Text("Say something… (optional)") },
+//                    modifier = Modifier.fillMaxWidth()
+//                )
             }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SimpleImagePickerDialog(
-    onDismiss: () -> Unit,
-    onCameraClick: () -> Unit,
-    onGalleryClick: () -> Unit
-) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
 
-            Text(
-                text = "Add Story Image",
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-
-            // 📷 Camera
-            Text(
-                text = "📷 Camera",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        onCameraClick()
-                        onDismiss()
-                    }
-                    .padding(vertical = 12.dp)
-            )
-
-            // 🖼 Gallery
-            Text(
-                text = "🖼 Gallery",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        onGalleryClick()
-                        onDismiss()
-                    }
-                    .padding(vertical = 12.dp)
-            )
-        }
-    }
-}

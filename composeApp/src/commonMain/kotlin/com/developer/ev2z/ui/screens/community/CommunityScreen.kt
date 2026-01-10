@@ -67,6 +67,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
+import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import coil3.compose.AsyncImage
 import com.developer.ev2z.response.Comment
@@ -84,6 +85,7 @@ import kotlinx.datetime.*
 import kotlin.text.firstOrNull
 import kotlin.time.ExperimentalTime
 
+
 @Composable
 fun CommunityScreen(
     posts: List<Post>,
@@ -93,9 +95,9 @@ fun CommunityScreen(
     onLikeClick: (Int) -> Unit,
     viewModel: CommunityViewModel, // ✅ ADD THIS
     onCommentClick: (Int) -> Unit,
-    onAddStory: () -> Unit,
-    onStoryClick: (Story) -> Unit
+    onAddStory: () -> Unit
 ) {
+    val navigator = LocalNavigator.currentOrThrow
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -109,7 +111,7 @@ fun CommunityScreen(
                 authUserId = authUserId,
                 viewModel = viewModel ,
                 onAddStory = onAddStory,
-                onStoryClick = onStoryClick
+                navigator = navigator
             )
 
         }
@@ -149,12 +151,6 @@ fun CreatePostCard(onClick: () -> Unit) {
             modifier = Modifier.padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-//            Box(
-//                modifier = Modifier
-//                    .size(40.dp)
-//                    .clip(CircleShape)
-//                    .background(Color.LightGray)
-//            )
 
             Spacer(Modifier.width(12.dp))
 
@@ -534,7 +530,7 @@ fun PostFooter(
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.clickable {
-                onLikeClick(post.id)
+                onLikeClick(post.id) // Only call VM
             }
         ) {
             Icon(
@@ -548,10 +544,11 @@ fun PostFooter(
             Spacer(Modifier.width(6.dp))
 
             Text(
-                text = post.likes_count.toString(),
+                text = post.likes_count.toString(), // Purely from state
                 color = Color.Gray
             )
         }
+
 
         Text(
             text = "💬 ${post.comments_count} Comments",
@@ -643,9 +640,6 @@ fun CommentBottomSheet(
                         },
                         onReply = {
                             viewModel.setReply(comment)
-                        },
-                        onRemoveReplyTag = {
-                            viewModel.clearReply()
                         }
                     )
                 }
@@ -695,13 +689,7 @@ fun CommentInputBar(
             .imePadding()
     ) {
 
-//        replyTo?.let {
-//            Text(
-//                text = "Replying to ${it.user.name}",
-//                color = Color.Gray,
-//                modifier = Modifier.padding(start = 12.dp, bottom = 4.dp)
-//            )
-//        }
+
         replyTo?.let {
             Row(
                 modifier = Modifier
@@ -759,8 +747,7 @@ fun CommentItem(
     isReply: Boolean,
     replyToName: String? = null,
     onLike: () -> Unit,
-    onReply: () -> Unit,
-    onRemoveReplyTag: () -> Unit
+    onReply: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -790,11 +777,7 @@ fun CommentItem(
 
         Column(modifier = Modifier.weight(1f)) {
 
-            // 👤 NAME
-//            Text(
-//                text = comment.user.name,
-//                fontWeight = FontWeight.SemiBold
-//            )
+
             Row(
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -824,17 +807,9 @@ fun CommentItem(
 
                     Spacer(Modifier.width(6.dp))
 
-//                    Text(
-//                        text = "✕",
-//                        color = Color.Gray,
-//                        modifier = Modifier.clickable {
-//                            onRemoveReplyTag()
-//                        }
-//                    )
                 }
             }
 
-//            Text(comment.comment)
             LinkText(
                 text = comment.comment,
                 normalColor = Color.Black
@@ -937,7 +912,7 @@ fun StoriesRow(
     authUserId: Int,
     viewModel: CommunityViewModel,
     onAddStory: () -> Unit,
-    onStoryClick: (Story) -> Unit
+    navigator: Navigator   // ✅ ADD THIS
 ) {
     LazyRow(
         modifier = Modifier
@@ -950,13 +925,20 @@ fun StoriesRow(
             AddStoryItem(onClick = onAddStory)
         }
 
-        items(stories) { story ->
+
+        val grouped = viewModel.groupedStories()
+
+        items(grouped) { group ->
             StoryItem(
-                story = story,
-                isViewed = viewModel.isStoryViewed(story.id),
-                onClick = { onStoryClick(story) }
+                user = group.user,
+                isViewed = viewModel.isGroupViewed(group),
+                onClick = {
+                    viewModel.startStoryGroup(group)
+                    navigator.push(StoryViewerScreen())
+                }
             )
         }
+
     }
 }
 
@@ -1002,32 +984,18 @@ fun AddStoryItem(onClick: () -> Unit) {
 
 
 
-
 @Composable
 fun StoryItem(
-    story: Story,
+    user: Users,
     isViewed: Boolean,
     onClick: () -> Unit
 ) {
-    val ringBrush =
-        if (isViewed) {
-            // ✅ Viewed → faded ring
-            Brush.linearGradient(
-                listOf(
-                    Color.LightGray,
-                    Color.Gray
-                )
-            )
-        } else {
-            // 🔥 Unviewed → Instagram gradient
-            Brush.linearGradient(
-                listOf(
-                    Color(0xFFD62976), // pink
-                    Color(0xFFFA7E1E), // orange
-                    Color(0xFFFEDA75)  // yellow
-                )
-            )
-        }
+    val ring = if (isViewed)
+        Brush.linearGradient(listOf(Color.Gray, Color.LightGray))
+    else
+        Brush.linearGradient(
+            listOf(Color(0xFFD62976), Color(0xFFFA7E1E), Color(0xFFFEDA75))
+        )
 
     Column(
         modifier = Modifier
@@ -1040,124 +1008,88 @@ fun StoryItem(
             modifier = Modifier
                 .size(70.dp)
                 .clip(CircleShape)
-                .background(ringBrush),
+                .background(ring),
             contentAlignment = Alignment.Center
         ) {
-
             AsyncImage(
-                model = "https://gps.eva2z.in/storage/${story.user.photo}",
+                model = "https://gps.eva2z.in/storage/${user.photo}",
                 contentDescription = null,
                 modifier = Modifier
                     .size(60.dp)
-                    .clip(CircleShape)
-                    .background(Color.LightGray),
+                    .clip(CircleShape),
                 contentScale = ContentScale.Crop
             )
         }
 
         Spacer(Modifier.height(4.dp))
-
-        Text(
-            text = story.user.name,
-            maxLines = 1,
-            style = MaterialTheme.typography.labelSmall,
-            color = if (isViewed) Color.Gray else Color.Black
-        )
+        Text(user.name, maxLines = 1, fontSize = 12.sp)
     }
 }
 
-
-
-
-
-//class CommunityScreenWrapper : Screen {
-//
-//    @Composable
-//    override fun Content() {
-//
-//
-//        val viewModel = CommunityViewModelProvider.viewModel
-//        val state = viewModel.state
-//        val navigator = LocalNavigator.currentOrThrow
-//        var openCommentsPostId by remember { mutableStateOf<Int?>(null) }
-//
-//        LaunchedEffect(Unit) {
-//            Analytics.logEvent(
-//                name = "community_screen_view"
-//            )
-//        }
-//
-//        // 👇 refresh-aware API call
-//        val refreshKey = viewModel.observeRefreshKey()
-//
-//        LaunchedEffect(refreshKey) {
-//            viewModel.loadPosts()
-//        }
-//
-//        when {
-//            state.loading -> {
-//                Box(
-//                    Modifier.fillMaxSize(),
-//                    contentAlignment = Alignment.Center
-//                ) {
-//                    Text("Loading...")
-//                }
-//            }
-//
-//            state.error != null -> {
-//                Box(
-//                    Modifier.fillMaxSize(),
-//                    contentAlignment = Alignment.Center
-//                ) {
-//                    Text(state.error ?: "Error")
-//                }
-//            }
-//
-//            else -> {
-//                CommunityScreen(
-//                    posts = state.posts,
-//                    stories = state.stories,
-//                    authUserId = state.authUserId,
-//                    onCreatePostClick = {
-//                        navigator.push(CreatePostScreen())
-//                    },
-//                    onLikeClick = { postId ->
-//                        viewModel.toggleLike(postId)
-//                    },
-//                    onCommentClick = { postId ->
-//                        openCommentsPostId = postId
-//                    },
-//                    onAddStory = {
-//                        navigator.push(CreateStoryScreen())
-//                    },
-//                    onStoryClick = { story ->
-//                        val index = state.stories.indexOfFirst { it.id == story.id }
-//                        viewModel.startStory(index)
-//                        navigator.push(StoryViewerScreen())
-//                    },
-//                    viewModel = viewModel
-//
+//@Composable
+//fun StoryItem(
+//    story: Story,
+//    isViewed: Boolean,
+//    onClick: () -> Unit
+//) {
+//    val ringBrush =
+//        if (isViewed) {
+//            // ✅ Viewed → faded ring
+//            Brush.linearGradient(
+//                listOf(
+//                    Color.LightGray,
+//                    Color.Gray
 //                )
+//            )
+//        } else {
+//            // 🔥 Unviewed → Instagram gradient
+//            Brush.linearGradient(
+//                listOf(
+//                    Color(0xFFD62976), // pink
+//                    Color(0xFFFA7E1E), // orange
+//                    Color(0xFFFEDA75)  // yellow
+//                )
+//            )
+//        }
 //
-//            }
-//            // 🔥 FLOATING CONTACT BUTTON
-//            FloatingContactButton(
-//                phoneNumber = "919971917216",
+//    Column(
+//        modifier = Modifier
+//            .padding(end = 12.dp)
+//            .clickable { onClick() },
+//        horizontalAlignment = Alignment.CenterHorizontally
+//    ) {
+//
+//        Box(
+//            modifier = Modifier
+//                .size(70.dp)
+//                .clip(CircleShape)
+//                .background(ringBrush),
+//            contentAlignment = Alignment.Center
+//        ) {
+//
+//            AsyncImage(
+//                model = "https://gps.eva2z.in/storage/${story.user.photo}",
+//                contentDescription = null,
 //                modifier = Modifier
-//                    .align(Alignment.BottomStart)
-//                    .padding(start = 20.dp, bottom = 20.dp)
+//                    .size(60.dp)
+//                    .clip(CircleShape)
+//                    .background(Color.LightGray),
+//                contentScale = ContentScale.Crop
 //            )
+//        }
 //
-//        }
-//        openCommentsPostId?.let { postId ->
-//            CommentBottomSheet(
-//                postId = postId,
-//                viewModel = viewModel,
-//                onDismiss = { openCommentsPostId = null }
-//            )
-//        }
+//        Spacer(Modifier.height(4.dp))
+//
+//        Text(
+//            text = story.user.name,
+//            maxLines = 1,
+//            style = MaterialTheme.typography.labelSmall,
+//            color = if (isViewed) Color.Gray else Color.Black
+//        )
 //    }
 //}
+//
+
 
 
 class CommunityScreenWrapper : Screen {
@@ -1217,11 +1149,11 @@ class CommunityScreenWrapper : Screen {
                         onAddStory = {
                             navigator.push(CreateStoryScreen())
                         },
-                        onStoryClick = { story ->
-                            val index = state.stories.indexOfFirst { it.id == story.id }
-                            viewModel.startStory(index)
-                            navigator.push(StoryViewerScreen())
-                        },
+//                        onStoryClick = { story ->
+//                            val index = state.stories.indexOfFirst { it.id == story.id }
+//                            viewModel.startStory(index)
+//                            navigator.push(StoryViewerScreen())
+//                        },
                         viewModel = viewModel
                     )
                 }
@@ -1229,7 +1161,7 @@ class CommunityScreenWrapper : Screen {
 
             // 🔥 FLOATING CONTACT BUTTON
             FloatingContactButton(
-                phoneNumber = "919971917216",
+                phoneNumber = "919755273822",
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(end = 20.dp, bottom = 20.dp)
