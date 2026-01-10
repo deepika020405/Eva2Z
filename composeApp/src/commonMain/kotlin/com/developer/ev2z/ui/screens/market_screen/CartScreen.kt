@@ -74,6 +74,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import com.developer.ev2z.data.local.model.UpiApp
 import com.developer.ev2z.phonepe.PaymentState
 import com.developer.ev2z.phonepe.openPhonePeSdk
+import com.developer.ev2z.ui.components.FloatingContactButton
 import com.developer.ev2z.upi.UPI_APPS
 import com.developer.ev2z.upi.launchUpiPayment
 import com.developer.ev2z.util.Analytics
@@ -126,65 +127,118 @@ fun CartScreenContent() {
         }
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        // ⭐ Scrollable content
-        Column(
-            modifier = Modifier
-                .weight(1f)     // VERY IMPORTANT!
-                .verticalScroll(rememberScrollState())
-                .padding(bottom = 16.dp)
-        ) {
-            CartHeader(state.cartCount)
-            Spacer(Modifier.height(12.dp))
-
-            state.cart.forEach { item ->
-                CartItemCard(item, viewModel)
-                Spacer(Modifier.height(12.dp))
-            }
-
+//    Column(
+//        modifier = Modifier.fillMaxSize()
+//    ) {
+//        // ⭐ Scrollable content
+//        Column(
+//            modifier = Modifier
+//                .weight(1f)     // VERY IMPORTANT!
+//                .verticalScroll(rememberScrollState())
+//                .padding(bottom = 16.dp)
+//        ) {
+//            CartHeader(state.cartCount)
+//            Spacer(Modifier.height(12.dp))
+//
 //            state.cart.forEach { item ->
-//
-//                SwipeToRemove(
-//                    onRemove = {
-//                        viewModel.removeFromCart(item)
-//                    }
-//                ) {
-//                    CartItemCard(item, viewModel)
-//                }
-//
+//                CartItemCard(item, viewModel)
 //                Spacer(Modifier.height(12.dp))
 //            }
+//
+////            state.cart.forEach { item ->
+////
+////                SwipeToRemove(
+////                    onRemove = {
+////                        viewModel.removeFromCart(item)
+////                    }
+////                ) {
+////                    CartItemCard(item, viewModel)
+////                }
+////
+////                Spacer(Modifier.height(12.dp))
+////            }
+//
+//            AddressSection(
+//                selectedAddress = state.selectedAddress,
+//                addresses = state.addresses,
+//                onSelect = {
+//                    viewModel.selectAddress(it)
+//
+//                    Analytics.logEvent(
+//                        name = "select_shipping_info",
+//                        params = mapOf(
+//                            "shipping_city" to it.city,
+//                            "shipping_state" to it.state,
+//                            "shipping_pincode" to it.pincode
+//                        )
+//                    )
+//                },
+//                onAddNew = {
+//                    navigator.push(AddNewAddressScreen())
+//                },
+//                viewModel = viewModel
+//            )
+//
+//            CouponsSection(viewModel)
+//            PaymentSummarySection(viewModel)
+//        }
+//
+//        // ⭐ Fixed Bottom Bar always visible
+//        CheckoutBottomBar(viewModel)
+//    }
 
-            AddressSection(
-                selectedAddress = state.selectedAddress,
-                addresses = state.addresses,
-                onSelect = {
-                    viewModel.selectAddress(it)
+    Box(
+        modifier = Modifier.fillMaxSize()
+    ) {
 
-                    Analytics.logEvent(
-                        name = "select_shipping_info",
-                        params = mapOf(
-                            "shipping_city" to it.city,
-                            "shipping_state" to it.state,
-                            "shipping_pincode" to it.pincode
-                        )
-                    )
-                },
-                onAddNew = {
-                    navigator.push(AddNewAddressScreen())
-                },
-                viewModel = viewModel
-            )
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            // ⭐ Scrollable content
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = 16.dp)
+            ) {
+                CartHeader(state.cartCount)
+                Spacer(Modifier.height(12.dp))
 
-            CouponsSection(viewModel)
-            PaymentSummarySection(viewModel)
+                state.cart.forEach { item ->
+                    CartItemCard(item, viewModel)
+                    Spacer(Modifier.height(12.dp))
+                }
+
+                AddressSection(
+                    selectedAddress = state.selectedAddress,
+                    addresses = state.addresses,
+                    onSelect = { viewModel.selectAddress(it) },
+                    onAddNew = { navigator.push(AddNewAddressScreen()) },
+                    viewModel = viewModel
+                )
+
+                // 👇 Promo + Summary yahin condition ke saath aayega
+                if (state.cart.isNotEmpty()) {
+                    CouponsSection(viewModel)
+                }
+
+                PaymentSummarySection(viewModel)
+            }
+            if (state.cart.isNotEmpty()) {
+                CheckoutBottomBar(viewModel)
+            }
+
         }
 
-        // ⭐ Fixed Bottom Bar always visible
-        CheckoutBottomBar(viewModel)
+        // ⭐ FLOATING CONTACT BUTTON (ALWAYS VISIBLE)
+        FloatingContactButton(
+            phoneNumber = "919971917216",
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 20.dp, bottom = 20.dp)
+        )
     }
+
 }
 
 @Composable
@@ -211,16 +265,197 @@ fun CartHeader(count: Int) {
     }
 }
 
+//@Composable
+//fun CartItemCard(item: CartItemDto,viewModel: ShopViewModel) {
+//
+//    val salePrice = item.product?.sale_price?.toDoubleOrNull() ?: 0.0
+//
+//    // ⭐ Fake old price — same logic as ProductDetails
+//    val fakeOldPrice = (salePrice * 1.5).toInt()
+//
+//    // ⭐ Discount %
+//    val discountPercent = (((fakeOldPrice - salePrice) / fakeOldPrice) * 100).toInt()
+//
+//    Card(
+//        modifier = Modifier
+//            .fillMaxWidth()
+//            .padding(horizontal = 16.dp),
+//        shape = RoundedCornerShape(16.dp),
+//        colors = CardDefaults.cardColors(containerColor = Color(0xFFf2f5f0))
+//    ) {
+//        Row(
+//            Modifier.padding(12.dp),
+//            verticalAlignment = Alignment.CenterVertically
+//        ) {
+//
+//            AsyncImage(
+//                model = item.product?.image.orEmpty(),
+//                contentDescription = null,
+//                modifier = Modifier
+//                    .size(70.dp)
+//                    .clip(RoundedCornerShape(12.dp)),
+//                contentScale = ContentScale.Crop
+//            )
+//
+//            Spacer(Modifier.width(12.dp))
+//            Column(Modifier.weight(1f)) {
+//
+//                Text(item.product?.name ?: "", fontWeight = FontWeight.Bold)
+//                Spacer(Modifier.height(4.dp))
+//
+//                val planType = when (item.plan_type?.lowercase()) {
+//                    "with_recharge" -> "With Recharge"
+//                    "without_recharge" -> "Without Recharge"
+//                    else -> null
+//                }
+//
+//                val deviceType = when (item.device_type?.lowercase()) {
+//                    "android" -> "Android"
+//                    "ios" -> "iOS"
+//                    else -> null
+//                }
+//
+//                val displayText = planType ?: deviceType ?: ""
+//
+//                Text(displayText , fontWeight = FontWeight.Bold)
+//                Spacer(Modifier.height(4.dp))
+//
+//                Row(verticalAlignment = Alignment.CenterVertically) {
+//
+//                    Box(
+//                        Modifier
+//                            .background(Color(0xFF1B9F4A), RoundedCornerShape(6.dp))
+//                            .padding(horizontal = 8.dp, vertical = 4.dp)
+//                    ) {
+//                        Text("Rs. $salePrice", color = Color.White)
+//                    }
+//
+//                    Spacer(Modifier.width(8.dp))
+//
+//                    Text(
+//                        "Rs. $fakeOldPrice",
+//                        textDecoration = TextDecoration.LineThrough,
+//                        color = Color.Gray,
+//                        fontSize = 12.sp
+//                    )
+//
+//                    Spacer(Modifier.width(6.dp))
+//
+//                    Text(
+//                        "$discountPercent% OFF",
+//                        color = Color(0xFF1B9F4A),
+//                        fontWeight = FontWeight.Bold,
+//                        fontSize = 12.sp
+//                    )
+//                }
+//
+//                // ⭐⭐⭐ SHOW RECHARGE PRICE IF WITH_RECHARGE
+//                if (item.plan_type == "with_recharge") {
+//
+//                    val recharge = item.recharge_amount ?: "0"
+//
+//                    Spacer(Modifier.height(6.dp))
+//
+//                    Box(
+//                        Modifier
+//                            .background(Color(0xFF005BBB), RoundedCornerShape(6.dp))
+//                            .padding(horizontal = 8.dp, vertical = 4.dp)
+//                    ) {
+//                        Text(
+//                            text = "Recharge Included: ₹$recharge",
+//                            color = Color.White,
+//                            fontWeight = FontWeight.Bold,
+//                            fontSize = 12.sp
+//                        )
+//                    }
+//                }
+//
+//
+//            }
+//            Column(
+//                horizontalAlignment = Alignment.CenterHorizontally,
+//                verticalArrangement = Arrangement.SpaceBetween
+//            ) {
+//
+//                // 🗑 DELETE ICON
+//                Box(
+//                    modifier = Modifier
+//                        .size(28.dp)
+//                        .clip(CircleShape)
+//                        .background(Color(0xFFE53935))
+//                        .clickable {
+//                            Analytics.logEvent(
+//                                name = "remove_from_cart",
+//                                params = mapOf(
+//                                    "item_id" to item.product_id,
+//                                    "item_name" to item.product?.name,
+//                                    "item_variant" to (item.device_type ?: ""),
+//                                    "quantity" to item.quantity
+//                                )
+//                            )
+//                            viewModel.removeFromCart(item)
+//                        },
+//                    contentAlignment = Alignment.Center
+//                ) {
+//                    Text("🗑", color = Color.White, fontSize = 14.sp)
+//                }
+//
+//                Spacer(Modifier.height(8.dp))
+//
+//                // QUANTITY
+//                QuantityController(item, viewModel)
+//            }
+//
+////            QuantityController(item, viewModel )
+//        }
+//    }
+//}
+//
+//@Composable
+//fun QuantityController(item: CartItemDto,viewModel: ShopViewModel) {
+//    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+//        Button(
+//            onClick = { viewModel.updateQuantity(
+//                productId = item.product_id,
+//                newQty = item.quantity + 1,
+//                plan_type = item.plan_type,
+//                device_type = item.device_type
+//            ) },
+//            contentPadding = PaddingValues(0.dp),
+//            modifier = Modifier.size(28.dp),
+//            shape = CircleShape
+//        ) {
+//            Text("+")
+//        }
+//
+//        Text(item.quantity.toString(), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+//
+//        Button(
+//            onClick = { if (item.quantity > 1) {
+//                viewModel.updateQuantity(
+//                    productId = item.product_id,
+//                    newQty = item.quantity - 1,
+//                    plan_type = item.plan_type,
+//                    device_type = item.device_type
+//                )
+//            } },
+//            contentPadding = PaddingValues(0.dp),
+//            modifier = Modifier.size(28.dp),
+//            shape = CircleShape
+//        ) {
+//            Text("-")
+//        }
+//    }
+//}
+
+
 @Composable
-fun CartItemCard(item: CartItemDto,viewModel: ShopViewModel) {
-
+fun CartItemCard(item: CartItemDto, viewModel: ShopViewModel) {
     val salePrice = item.product?.sale_price?.toDoubleOrNull() ?: 0.0
-
-    // ⭐ Fake old price — same logic as ProductDetails
     val fakeOldPrice = (salePrice * 1.5).toInt()
-
-    // ⭐ Discount %
     val discountPercent = (((fakeOldPrice - salePrice) / fakeOldPrice) * 100).toInt()
+
+    var showRemoveDialog by remember { mutableStateOf(false) }
 
     Card(
         modifier = Modifier
@@ -233,7 +468,6 @@ fun CartItemCard(item: CartItemDto,viewModel: ShopViewModel) {
             Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-
             AsyncImage(
                 model = item.product?.image.orEmpty(),
                 contentDescription = null,
@@ -245,7 +479,6 @@ fun CartItemCard(item: CartItemDto,viewModel: ShopViewModel) {
 
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-
                 Text(item.product?.name ?: "", fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(4.dp))
 
@@ -262,12 +495,10 @@ fun CartItemCard(item: CartItemDto,viewModel: ShopViewModel) {
                 }
 
                 val displayText = planType ?: deviceType ?: ""
+                Text(displayText, fontWeight = FontWeight.Bold)
 
-                Text(displayText , fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(4.dp))
-
                 Row(verticalAlignment = Alignment.CenterVertically) {
-
                     Box(
                         Modifier
                             .background(Color(0xFF1B9F4A), RoundedCornerShape(6.dp))
@@ -277,7 +508,6 @@ fun CartItemCard(item: CartItemDto,viewModel: ShopViewModel) {
                     }
 
                     Spacer(Modifier.width(8.dp))
-
                     Text(
                         "Rs. $fakeOldPrice",
                         textDecoration = TextDecoration.LineThrough,
@@ -286,7 +516,6 @@ fun CartItemCard(item: CartItemDto,viewModel: ShopViewModel) {
                     )
 
                     Spacer(Modifier.width(6.dp))
-
                     Text(
                         "$discountPercent% OFF",
                         color = Color(0xFF1B9F4A),
@@ -295,105 +524,128 @@ fun CartItemCard(item: CartItemDto,viewModel: ShopViewModel) {
                     )
                 }
 
-                // ⭐⭐⭐ SHOW RECHARGE PRICE IF WITH_RECHARGE
                 if (item.plan_type == "with_recharge") {
-
                     val recharge = item.recharge_amount ?: "0"
-
                     Spacer(Modifier.height(6.dp))
-
                     Box(
                         Modifier
                             .background(Color(0xFF005BBB), RoundedCornerShape(6.dp))
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Text(
-                            text = "Recharge Included: ₹$recharge",
+                            "Recharge Included: ₹$recharge",
                             color = Color.White,
                             fontWeight = FontWeight.Bold,
                             fontSize = 12.sp
                         )
                     }
                 }
-
-
             }
+
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
+                // DELETE ICON TRIGGERS CONFIRMATION DIALOG
+//                Box(
+//                    modifier = Modifier
+//                        .size(28.dp)
+//                        .clip(CircleShape)
+//                        .background(Color(0xFFE53935))
+//                        .clickable { showRemoveDialog = true },
+//                    contentAlignment = Alignment.Center
+//                ) {
+//                    Text("🗑", color = Color.White, fontSize = 14.sp)
+//                }
 
-                // 🗑 DELETE ICON
-                Box(
-                    modifier = Modifier
-                        .size(28.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFE53935))
-                        .clickable {
-                            Analytics.logEvent(
-                                name = "remove_from_cart",
-                                params = mapOf(
-                                    "item_id" to item.product_id,
-                                    "item_name" to item.product?.name,
-                                    "item_variant" to (item.device_type ?: ""),
-                                    "quantity" to item.quantity
-                                )
-                            )
-                            viewModel.removeFromCart(item)
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("🗑", color = Color.White, fontSize = 14.sp)
+//                Spacer(Modifier.height(8.dp))
+
+                QuantityControllerWithRemove(item, viewModel) {
+                    // Callback when quantity becomes zero → show remove dialog
+                    showRemoveDialog = true
                 }
-
-                Spacer(Modifier.height(8.dp))
-
-                // QUANTITY
-                QuantityController(item, viewModel)
             }
-
-//            QuantityController(item, viewModel )
         }
+    }
+
+    // ✅ Remove Confirmation Dialog
+    if (showRemoveDialog) {
+        AlertDialog(
+            onDismissRequest = { showRemoveDialog = false },
+            title = { Text("Remove Item?") },
+            text = { Text("Are you sure you want to remove this item from your cart?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showRemoveDialog = false
+                        // Trigger analytics on removal
+                        Analytics.logEvent(
+                            name = "remove_from_cart",
+                            params = mapOf(
+                                "item_id" to item.product_id,
+                                "item_name" to item.product?.name,
+                                "item_variant" to (item.device_type ?: ""),
+                                "quantity" to item.quantity
+                            )
+                        )
+                        viewModel.removeFromCart(item)
+                    }
+                ) { Text("Yes", color = Color.Red) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRemoveDialog = false }) {
+                    Text("No")
+                }
+            }
+        )
     }
 }
 
+
+
 @Composable
-fun QuantityController(item: CartItemDto,viewModel: ShopViewModel) {
+fun QuantityControllerWithRemove(
+    item: CartItemDto,
+    viewModel: ShopViewModel,
+    onZeroReached: () -> Unit
+) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Button(
-            onClick = { viewModel.updateQuantity(
-                productId = item.product_id,
-                newQty = item.quantity + 1,
-                plan_type = item.plan_type,
-                device_type = item.device_type
-            ) },
+            onClick = {
+                viewModel.updateQuantity(
+                    productId = item.product_id,
+                    newQty = item.quantity + 1,
+                    plan_type = item.plan_type,
+                    device_type = item.device_type
+                )
+            },
             contentPadding = PaddingValues(0.dp),
             modifier = Modifier.size(28.dp),
             shape = CircleShape
-        ) {
-            Text("+")
-        }
+        ) { Text("+") }
 
         Text(item.quantity.toString(), fontWeight = FontWeight.Bold, fontSize = 14.sp)
 
         Button(
-            onClick = { if (item.quantity > 1) {
-                viewModel.updateQuantity(
-                    productId = item.product_id,
-                    newQty = item.quantity - 1,
-                    plan_type = item.plan_type,
-                    device_type = item.device_type
-                )
-            } },
+            onClick = {
+                if (item.quantity > 1) {
+                    viewModel.updateQuantity(
+                        productId = item.product_id,
+                        newQty = item.quantity - 1,
+                        plan_type = item.plan_type,
+                        device_type = item.device_type
+                    )
+                } else {
+                    // If quantity is 1 → trigger remove confirmation
+                    onZeroReached()
+                }
+            },
             contentPadding = PaddingValues(0.dp),
             modifier = Modifier.size(28.dp),
             shape = CircleShape
-        ) {
-            Text("-")
-        }
+        ) { Text("-") }
     }
 }
-
 
 
 
@@ -922,37 +1174,96 @@ fun CustomInput(label: String, value: String, onChange: (String) -> Unit) {
     }
 }
 
+//@Composable
+//fun PaymentSummarySection(viewModel: ShopViewModel) {
+//    val state by viewModel.state.collectAsState()
+//
+//    Column(Modifier.padding(16.dp)) {
+//
+//        Text("Payment Summary", fontWeight = FontWeight.SemiBold)
+//        Spacer(Modifier.height(8.dp))
+//
+//        // ORIGINAL CART TOTAL (FROM SERVER BEFORE PROMO)
+//        SummaryRow("Cart Total", "₹${state.originalAmount ?: state.totalPrice ?: "0"}")
+//
+//        // ONLY IF PROMO APPLIED
+//        if (state.promoApplied) {
+//
+//            SummaryRow(
+//                "Promo Discount",
+//                "-₹${state.discountApplied ?: 0.0}"
+//            )
+//        }
+//
+//        SummaryRow("Shipping", "Free")
+//
+//        Divider(Modifier.padding(vertical = 12.dp))
+//
+//        // FINAL AMOUNT (AFTER PROMO)
+//        SummaryRow(
+//            "Total Payable",
+//            "₹${state.finalAmount ?: state.totalPrice ?: "0"}",
+//            isBold = true
+//        )
+//    }
+//}
 @Composable
 fun PaymentSummarySection(viewModel: ShopViewModel) {
     val state by viewModel.state.collectAsState()
+
+    // Check if any item in cart is with_recharge
+    val hasRecharge = state.cart.any { it.plan_type == "with_recharge" }
 
     Column(Modifier.padding(16.dp)) {
 
         Text("Payment Summary", fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(8.dp))
 
-        // ORIGINAL CART TOTAL (FROM SERVER BEFORE PROMO)
-        SummaryRow("Cart Total", "₹${state.originalAmount ?: state.totalPrice ?: "0"}")
+        if (hasRecharge) {
+            // 1️⃣ Show Recharge Items
+            state.cart.filter { it.plan_type == "with_recharge" }.forEach { item ->
+                SummaryRow(
+                    label = "${item.product?.name} \n(Recharge Included)",
+                    value = "₹${item.recharge_amount ?: "0"}"
+                )
+            }
 
-        // ONLY IF PROMO APPLIED
-        if (state.promoApplied) {
+            Spacer(Modifier.height(8.dp))
+
+            // 2️⃣ Show Product Base Prices
+            state.cart.forEach { item ->
+                val salePrice = item.product?.sale_price ?: 0
+                SummaryRow(
+                    label = "${item.product?.name} \nBase Price",
+                    value = "₹$salePrice"
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            // 3️⃣ Cart Total
+            SummaryRow("Cart Total", "₹${state.finalAmount ?: state.totalPrice ?: "0"}", isBold = true)
+
+        } else {
+            // Existing summary for normal products
+            SummaryRow("Cart Total", "₹${state.originalAmount ?: state.totalPrice ?: "0"}")
+
+            if (state.promoApplied) {
+                SummaryRow(
+                    "Promo Discount",
+                    "-₹${state.discountApplied ?: 0.0}"
+                )
+            }
+
+            SummaryRow("Shipping", "Free")
+            Divider(Modifier.padding(vertical = 12.dp))
 
             SummaryRow(
-                "Promo Discount",
-                "-₹${state.discountApplied ?: 0.0}"
+                "Total Payable",
+                "₹${state.finalAmount ?: state.totalPrice ?: "0"}",
+                isBold = true
             )
         }
-
-        SummaryRow("Shipping", "Free")
-
-        Divider(Modifier.padding(vertical = 12.dp))
-
-        // FINAL AMOUNT (AFTER PROMO)
-        SummaryRow(
-            "Total Payable",
-            "₹${state.finalAmount ?: state.totalPrice ?: "0"}",
-            isBold = true
-        )
     }
 }
 
