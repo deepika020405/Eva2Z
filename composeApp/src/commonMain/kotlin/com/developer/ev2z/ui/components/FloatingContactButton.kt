@@ -3,6 +3,7 @@ package com.developer.ev2z.ui.components
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -16,9 +17,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.developer.ev2z.util.openCall
 import com.developer.ev2z.util.openWhatsApp
+import eva2z_connect_multiplatform.composeapp.generated.resources.Res
+import eva2z_connect_multiplatform.composeapp.generated.resources.ic_whatsapp
+import org.jetbrains.compose.resources.painterResource
 
 @Composable
 fun FloatingContactButton(
@@ -51,14 +57,14 @@ fun FloatingContactButton(
                         icon = Icons.Default.Call,
                         color = Color(0xFF4CAF50)
                     ) {
-                        openCall(phoneNumber)
+                        openCall("+$phoneNumber")
                         expanded = false
                     }
 
                     // 💬 WhatsApp Button
                     MiniFab(
-                        icon = Icons.Default.Chat,
-                        color = Color(0xFF25D366)
+                        painter = painterResource(Res.drawable.ic_whatsapp),
+                        color = Color(0xFFA2F1AD)
                     ) {
                         openWhatsApp(
                             phoneNumber = phoneNumber,
@@ -85,9 +91,32 @@ fun FloatingContactButton(
     }
 }
 
+//@Composable
+//private fun MiniFab(
+//    icon: androidx.compose.ui.graphics.vector.ImageVector,
+//    color: Color,
+//    onClick: () -> Unit
+//) {
+//    Box(
+//        modifier = Modifier
+//            .size(48.dp)
+//            .background(color, CircleShape)
+//            .clickable { onClick() },
+//        contentAlignment = Alignment.Center
+//    ) {
+//        Icon(
+//            imageVector = icon,
+//            contentDescription = null,
+//            tint = Color.White
+//        )
+//    }
+//}
+
+
 @Composable
 private fun MiniFab(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector? = null,
+    painter: Painter? = null,
     color: Color,
     onClick: () -> Unit
 ) {
@@ -98,10 +127,21 @@ private fun MiniFab(
             .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = Color.White
-        )
+        when {
+            icon != null -> {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = Color.White
+                )
+            }
+            painter != null -> {
+                Image(
+                    painter = painter,
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
     }
 }

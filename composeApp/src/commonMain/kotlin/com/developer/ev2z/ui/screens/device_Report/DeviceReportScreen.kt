@@ -35,6 +35,7 @@ import com.developer.ev2z.BackPressHandler
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
 import com.developer.ev2z.response.Device
 import com.developer.ev2z.response.DeviceAnalyticsData
+import com.developer.ev2z.ui.components.FloatingContactButton
 import com.developer.ev2z.util.Analytics
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
@@ -174,6 +175,8 @@ fun DeviceReportContent(
                 onDismiss = { isDropdownOpen = false }
             )
         }
+
+
 
         // BOTTOM SHEET
         if (selectedDevice != null) {

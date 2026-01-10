@@ -21,6 +21,10 @@ fun mapToUserError(e: Exception): String {
             "Invalid phone number or password."
         }
 
+        // ✅ OTP NOT VERIFIED (🔥 FIXED)
+        msg.contains("otp not verified") -> {
+            "OTP not verified"
+        }
         // ✅ USER NOT FOUND
         msg.contains("user not registered") ||
                 msg.contains("not registered") -> {

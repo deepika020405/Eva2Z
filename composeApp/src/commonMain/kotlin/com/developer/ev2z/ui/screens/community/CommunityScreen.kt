@@ -71,6 +71,7 @@ import com.developer.ev2z.response.Post
 import com.developer.ev2z.response.Story
 import com.developer.ev2z.response.StoryViewer
 import com.developer.ev2z.response.Users
+import com.developer.ev2z.ui.components.FloatingContactButton
 import com.developer.ev2z.ui.screens.Profile.ProfileImageZoomDialog
 import com.developer.ev2z.util.Analytics
 import io.ktor.util.date.getTimeMillis
@@ -121,6 +122,8 @@ fun CommunityScreen(
             )
         }
     }
+
+
 }
 
 
@@ -457,33 +460,55 @@ fun PostHeader(
 @OptIn(ExperimentalTime::class)
 fun formatPostDateCmp(apiDate: String): String {
     return try {
-        val postDate = LocalDate.parse(apiDate.take(10))
+        val instant = Instant.parse(apiDate)
 
-        val now = Instant.fromEpochMilliseconds(
-            getTimeMillis()
-        )
+        val postDateTime =
+            instant.toLocalDateTime(TimeZone.currentSystemDefault())
 
+        val postDate = postDateTime.date
+        val postTime = postDateTime.time
 
-        val today = now
+        // ✅ YOUR APPROACH
+        val today = Instant.fromEpochMilliseconds(getTimeMillis())
             .toLocalDateTime(TimeZone.currentSystemDefault())
             .date
 
         val yesterday = today.minus(1, DateTimeUnit.DAY)
 
+        // ⏰ Time format (12-hour)
+        val hour24 = postTime.hour
+        val minute = postTime.minute.toString().padStart(2, '0')
+
+        val amPm = if (hour24 < 12) "AM" else "PM"
+        val hour12 = when {
+            hour24 == 0 -> 12
+            hour24 > 12 -> hour24 - 12
+            else -> hour24
+        }
+
+        val formattedTime = "$hour12:$minute $amPm"
+
+        // 📅 Date format
+        val day = postDate.dayOfMonth.toString().padStart(2, '0')
+        val month = postDate.monthNumber.toString().padStart(2, '0')
+        val year = postDate.year
+        val formattedDate = "$day-$month-$year"
+
         when {
-            postDate == today -> "Today"
-            postDate == yesterday -> "Yesterday"
-            else -> {
-                val day = postDate.dayOfMonth.toString().padStart(2, '0')
-                val month = postDate.monthNumber.toString().padStart(2, '0')
-                val year = postDate.year
-                "$day-$month-$year"
-            }
+            postDate == today ->
+                "Today, $formattedTime"
+
+            postDate == yesterday ->
+                "Yesterday, $formattedTime"
+
+            else ->
+                "$formattedDate, $formattedTime"
         }
     } catch (e: Exception) {
         apiDate.take(10)
     }
 }
+
 
 
 
@@ -1197,78 +1222,173 @@ fun StoryViewersBar(
 
 
 
+//class CommunityScreenWrapper : Screen {
+//
+//    @Composable
+//    override fun Content() {
+//
+//
+//        val viewModel = CommunityViewModelProvider.viewModel
+//        val state = viewModel.state
+//        val navigator = LocalNavigator.currentOrThrow
+//        var openCommentsPostId by remember { mutableStateOf<Int?>(null) }
+//
+//        LaunchedEffect(Unit) {
+//            Analytics.logEvent(
+//                name = "community_screen_view"
+//            )
+//        }
+//
+//        // 👇 refresh-aware API call
+//        val refreshKey = viewModel.observeRefreshKey()
+//
+//        LaunchedEffect(refreshKey) {
+//            viewModel.loadPosts()
+//        }
+//
+//        when {
+//            state.loading -> {
+//                Box(
+//                    Modifier.fillMaxSize(),
+//                    contentAlignment = Alignment.Center
+//                ) {
+//                    Text("Loading...")
+//                }
+//            }
+//
+//            state.error != null -> {
+//                Box(
+//                    Modifier.fillMaxSize(),
+//                    contentAlignment = Alignment.Center
+//                ) {
+//                    Text(state.error ?: "Error")
+//                }
+//            }
+//
+//            else -> {
+//                CommunityScreen(
+//                    posts = state.posts,
+//                    stories = state.stories,
+//                    authUserId = state.authUserId,
+//                    onCreatePostClick = {
+//                        navigator.push(CreatePostScreen())
+//                    },
+//                    onLikeClick = { postId ->
+//                        viewModel.toggleLike(postId)
+//                    },
+//                    onCommentClick = { postId ->
+//                        openCommentsPostId = postId
+//                    },
+//                    onAddStory = {
+//                        navigator.push(CreateStoryScreen())
+//                    },
+//                    onStoryClick = { story ->
+//                        val index = state.stories.indexOfFirst { it.id == story.id }
+//                        viewModel.startStory(index)
+//                        navigator.push(StoryViewerScreen())
+//                    },
+//                    viewModel = viewModel
+//
+//                )
+//
+//            }
+//            // 🔥 FLOATING CONTACT BUTTON
+//            FloatingContactButton(
+//                phoneNumber = "919971917216",
+//                modifier = Modifier
+//                    .align(Alignment.BottomStart)
+//                    .padding(start = 20.dp, bottom = 20.dp)
+//            )
+//
+//        }
+//        openCommentsPostId?.let { postId ->
+//            CommentBottomSheet(
+//                postId = postId,
+//                viewModel = viewModel,
+//                onDismiss = { openCommentsPostId = null }
+//            )
+//        }
+//    }
+//}
+
+
 class CommunityScreenWrapper : Screen {
 
     @Composable
     override fun Content() {
-
 
         val viewModel = CommunityViewModelProvider.viewModel
         val state = viewModel.state
         val navigator = LocalNavigator.currentOrThrow
         var openCommentsPostId by remember { mutableStateOf<Int?>(null) }
 
-        LaunchedEffect(Unit) {
-            Analytics.logEvent(
-                name = "community_screen_view"
-            )
-        }
-
-        // 👇 refresh-aware API call
+        // ✅ THIS WAS MISSING
         val refreshKey = viewModel.observeRefreshKey()
 
         LaunchedEffect(refreshKey) {
             viewModel.loadPosts()
         }
 
-        when {
-            state.loading -> {
-                Box(
-                    Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("Loading...")
+
+        Box(modifier = Modifier.fillMaxSize()) {
+
+            // 🔹 MAIN COMMUNITY UI
+            when {
+                state.loading -> {
+                    Box(
+                        Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("Loading...")
+                    }
+                }
+
+                state.error != null -> {
+                    Box(
+                        Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(state.error ?: "Error")
+                    }
+                }
+
+                else -> {
+                    CommunityScreen(
+                        posts = state.posts,
+                        stories = state.stories,
+                        authUserId = state.authUserId,
+                        onCreatePostClick = {
+                            navigator.push(CreatePostScreen())
+                        },
+                        onLikeClick = { postId ->
+                            viewModel.toggleLike(postId)
+                        },
+                        onCommentClick = { postId ->
+                            openCommentsPostId = postId
+                        },
+                        onAddStory = {
+                            navigator.push(CreateStoryScreen())
+                        },
+                        onStoryClick = { story ->
+                            val index = state.stories.indexOfFirst { it.id == story.id }
+                            viewModel.startStory(index)
+                            navigator.push(StoryViewerScreen())
+                        },
+                        viewModel = viewModel
+                    )
                 }
             }
 
-            state.error != null -> {
-                Box(
-                    Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(state.error ?: "Error")
-                }
-            }
-
-            else -> {
-                CommunityScreen(
-                    posts = state.posts,
-                    stories = state.stories,
-                    authUserId = state.authUserId,
-                    onCreatePostClick = {
-                        navigator.push(CreatePostScreen())
-                    },
-                    onLikeClick = { postId ->
-                        viewModel.toggleLike(postId)
-                    },
-                    onCommentClick = { postId ->
-                        openCommentsPostId = postId
-                    },
-                    onAddStory = {
-                        navigator.push(CreateStoryScreen())
-                    },
-                    onStoryClick = { story ->
-                        val index = state.stories.indexOfFirst { it.id == story.id }
-                        viewModel.startStory(index)
-                        navigator.push(StoryViewerScreen())
-                    },
-                    viewModel = viewModel
-
-                )
-
-            }
-
+            // 🔥 FLOATING CONTACT BUTTON
+            FloatingContactButton(
+                phoneNumber = "919971917216",
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 20.dp, bottom = 20.dp)
+            )
         }
+
+        // 🔹 COMMENT BOTTOM SHEET
         openCommentsPostId?.let { postId ->
             CommentBottomSheet(
                 postId = postId,
