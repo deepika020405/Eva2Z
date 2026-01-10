@@ -30,6 +30,7 @@ import coil3.compose.AsyncImage
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.ui.components.FloatingContactButton
 import com.developer.ev2z.util.rememberImagePicker
 import kotlinx.coroutines.delay
 
@@ -202,6 +203,8 @@ fun EditProfileScreenContent(
                     modifier = Modifier.size(120.dp),
                     contentAlignment = Alignment.BottomEnd
                 ) {
+
+
                     Box(
                         modifier = Modifier
                             .size(120.dp)
@@ -211,22 +214,31 @@ fun EditProfileScreenContent(
                             .clickable { onImageClick() },
                         contentAlignment = Alignment.Center
                     ) {
-                        if (!state.userImage.isNullOrEmpty()) {
-                            AsyncImage(
-                                model = state.userImage,
-                                contentDescription = "Profile Picture",
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .clip(CircleShape),
-                                contentScale = ContentScale.Crop
-                            )
-                        } else {
-                            Text(
-                                text = state.userName.firstOrNull()?.uppercase() ?: "U",
-                                fontSize = 48.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.Gray
-                            )
+                        when {
+                            state.userImageBytes != null -> {
+                                AsyncImage(
+                                    model = state.userImageBytes,
+                                    contentDescription = "Profile Picture",
+                                    modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                            !state.userImage.isNullOrEmpty() -> {
+                                AsyncImage(
+                                    model = state.userImage,
+                                    contentDescription = "Profile Picture",
+                                    modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                            else -> {
+                                Text(
+                                    text = state.userName.firstOrNull()?.uppercase() ?: "U",
+                                    fontSize = 48.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Gray
+                                )
+                            }
                         }
                     }
 
@@ -335,6 +347,12 @@ fun EditProfileScreenContent(
                 Spacer(modifier = Modifier.height(32.dp))
             }
 
+            FloatingContactButton(
+                phoneNumber = "919755273822",
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 20.dp, bottom = 20.dp)
+            )
             // Loading Overlay
             if (state.isLoading) {
                 Box(
