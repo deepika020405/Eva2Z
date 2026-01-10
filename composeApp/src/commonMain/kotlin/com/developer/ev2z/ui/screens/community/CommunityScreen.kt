@@ -58,7 +58,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -73,10 +76,12 @@ import com.developer.ev2z.response.StoryViewer
 import com.developer.ev2z.response.Users
 import com.developer.ev2z.ui.components.FloatingContactButton
 import com.developer.ev2z.ui.screens.Profile.ProfileImageZoomDialog
+import com.developer.ev2z.ui.screens.social_media.openUrl
 import com.developer.ev2z.util.Analytics
 import io.ktor.util.date.getTimeMillis
 import kotlinx.coroutines.delay
 import kotlinx.datetime.*
+import kotlin.text.firstOrNull
 import kotlin.time.ExperimentalTime
 
 @Composable
@@ -513,49 +518,7 @@ fun formatPostDateCmp(apiDate: String): String {
 
 
 
-@Composable
-fun FullScreenImage(
-    imageUrl: String,
-    onDismiss: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-    ) {
 
-        // 🔹 Close on background tap
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .clickable(
-                    indication = null,
-                    interactionSource = remember { MutableInteractionSource() }
-                ) { onDismiss() }
-        )
-
-        // 🔹 Image (center, well-fitted)
-        NetworkImage(
-            url = imageUrl,
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.Center)
-                .padding(16.dp)
-        )
-
-        // 🔹 Cross button (top-right)
-        Icon(
-            imageVector = Icons.Default.Close,
-            contentDescription = "Close",
-            tint = Color.White,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(16.dp)
-                .size(28.dp)
-                .clickable { onDismiss() }
-        )
-    }
-}
 @Composable
 fun PostFooter(
     post: Post,
@@ -601,155 +564,7 @@ fun PostFooter(
 }
 
 
-//@OptIn(ExperimentalMaterial3Api::class)
-//@Composable
-//fun CommentBottomSheet(
-//    postId: Int,
-//    viewModel: CommunityViewModel,
-//    onDismiss: () -> Unit
-//) {
-//
-//    val state = viewModel.state
-//    var input by remember { mutableStateOf("") }
-//
-//    LaunchedEffect(postId) {
-//        viewModel.load(postId)
-//    }
-//
-//
-////    ModalBottomSheet(
-////        onDismissRequest = onDismiss
-////    ) {
-////        Column(
-////            modifier = Modifier
-////                .fillMaxHeight(0.95f)
-////                .imePadding()          // 👈 🔥 KEY LINE
-////        ) {
-////
-////            // 🔹 TOP BAR
-////            Text(
-////                "Comments",
-////                fontWeight = FontWeight.Bold,
-////                modifier = Modifier
-////                    .align(Alignment.CenterHorizontally)
-////                    .padding(vertical = 12.dp)
-////            )
-////
-////            Divider()
-////
-////            LazyColumn(
-////                modifier = Modifier.weight(1f)
-////            ) {
-////                items(state.comments) { comment ->
-////                    CommentItem(
-////                        comment = comment,
-////                        isReply = comment.parent_id != null,
-////                        onLike = {
-////                            viewModel.like(comment.id, postId)
-////                        },
-////                        onReply = {
-////                            viewModel.setReply(comment)
-////                        },
-////                        onRemoveReplyTag = {
-////                            viewModel.clearReply()
-////                        }
-////                    )
-////                }
-////            }
-////
-////            // Reply indicator
-////            state.replyTo?.let {
-////                Text(
-////                    "Replying to ${it.user.name}",
-////                    color = Color.Gray,
-////                    modifier = Modifier.padding(8.dp)
-////                )
-////            }
-////
-////            // 👇 INPUT ALWAYS AT BOTTOM
-////            Row(
-////                Modifier
-////                    .fillMaxWidth()
-////                    .padding(8.dp),
-////                verticalAlignment = Alignment.CenterVertically
-////            ) {
-////                OutlinedTextField(
-////                    value = input,
-////                    onValueChange = { input = it },
-////                    modifier = Modifier.weight(1f),
-////                    placeholder = { Text("Add a comment…") }
-////                )
-////
-////                TextButton(
-////                    enabled = input.isNotBlank(),
-////                    onClick = {
-////                        viewModel.sendComment(postId, input)
-////                        input = ""
-////                    }
-////                ) {
-////                    Text("Post")
-////                }
-////            }
-////        }
-//
-//    ModalBottomSheet(
-//        onDismissRequest = onDismiss
-//    ) {
-//        Column(
-//            modifier = Modifier
-//                .fillMaxHeight(0.95f)
-//                .imePadding() // 🔥 keyboard safe
-//        ) {
-//
-//            // 🔹 TOP BAR
-//            Text(
-//                "Comments",
-//                fontWeight = FontWeight.Bold,
-//                modifier = Modifier
-//                    .align(Alignment.CenterHorizontally)
-//                    .padding(vertical = 12.dp)
-//            )
-//
-//            Divider()
-//
-//            // 🔹 COMMENTS LIST
-//            LazyColumn(
-//                modifier = Modifier
-//                    .weight(1f)
-//                    .fillMaxWidth()
-//            ) {
-//                items(state.comments) { comment ->
-//                    CommentItem(
-//                        comment = comment,
-//                        isReply = comment.parent_id != null,
-//                        onLike = {
-//                            viewModel.like(comment.id, postId)
-//                        },
-//                        onReply = {
-//                            viewModel.setReply(comment)
-//                        },
-//                        onRemoveReplyTag = {
-//                            viewModel.clearReply()
-//                        }
-//                    )
-//                }
-//            }
-//
-//            // 🔹 INPUT FIXED AT BOTTOM
-//            CommentInputBar(
-//                replyTo = state.replyTo,
-//                input = input,
-//                onInputChange = { input = it },
-//                onSend = {
-//                    viewModel.sendComment(postId, input)
-//                    input = ""
-//                }
-//            )
-//        }
-//    }
-//
-//
-//}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -789,16 +604,40 @@ fun CommentBottomSheet(
 
             Divider()
 
+            val orderedComments = remember(state.comments) {
+                val parents = state.comments.filter { it.parent_id == null }
+                val repliesMap = state.comments
+                    .filter { it.parent_id != null }
+                    .groupBy { it.parent_id }
+
+                buildList {
+                    parents.forEach { parent ->
+                        add(parent)
+                        repliesMap[parent.id]?.let { replies ->
+                            addAll(replies)
+                        }
+                    }
+                }
+            }
+
+
             // 🔹 COMMENTS LIST
             LazyColumn(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
             ) {
-                items(state.comments) { comment ->
+                items(orderedComments) { comment ->
+
+                    val parentUserName = state.comments
+                        .firstOrNull { it.id == comment.parent_id }
+                        ?.user
+                        ?.name
+
                     CommentItem(
                         comment = comment,
                         isReply = comment.parent_id != null,
+                        replyToName = parentUserName,
                         onLike = {
                             viewModel.like(comment.id, postId)
                         },
@@ -810,6 +649,7 @@ fun CommentBottomSheet(
                         }
                     )
                 }
+
             }
 
             // 🔥 INPUT BAR — handles keyboard safely
@@ -820,7 +660,8 @@ fun CommentBottomSheet(
                 onSend = {
                     viewModel.sendComment(postId, input)
                     input = ""
-                }
+                },
+                onCancelReply = {viewModel.clearReply()}
             )
         }
     }
@@ -833,7 +674,8 @@ fun CommentInputBar(
     replyTo: Comment?,
     input: String,
     onInputChange: (String) -> Unit,
-    onSend: () -> Unit
+    onSend: () -> Unit,
+    onCancelReply: () -> Unit
 ) {
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -853,13 +695,38 @@ fun CommentInputBar(
             .imePadding()
     ) {
 
+//        replyTo?.let {
+//            Text(
+//                text = "Replying to ${it.user.name}",
+//                color = Color.Gray,
+//                modifier = Modifier.padding(start = 12.dp, bottom = 4.dp)
+//            )
+//        }
         replyTo?.let {
-            Text(
-                text = "Replying to ${it.user.name}",
-                color = Color.Gray,
-                modifier = Modifier.padding(start = 12.dp, bottom = 4.dp)
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 12.dp, end = 12.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Replying to ${it.user.name}",
+                    color = Color.Gray,
+                    fontSize = 13.sp
+                )
+
+                Text(
+                    text = "✕",
+                    fontSize = 16.sp,
+                    color = Color.Gray,
+                    modifier = Modifier
+                        .clickable { onCancelReply() }
+                        .padding(4.dp)
+                )
+            }
         }
+
 
         Row(
             modifier = Modifier.padding(8.dp),
@@ -917,15 +784,34 @@ fun CommentItem(
             contentScale = ContentScale.Crop
         )
 
+
+
         Spacer(Modifier.width(10.dp))
 
         Column(modifier = Modifier.weight(1f)) {
 
             // 👤 NAME
-            Text(
-                text = comment.user.name,
-                fontWeight = FontWeight.SemiBold
-            )
+//            Text(
+//                text = comment.user.name,
+//                fontWeight = FontWeight.SemiBold
+//            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = comment.user.name,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Spacer(Modifier.width(8.dp))
+
+                Text(
+                    text = formatPostDateCmp(comment.created_at),
+                    fontSize = 11.sp,
+                    color = Color.Gray
+                )
+            }
+
 
             // 🔁 REPLY TO TAG INSIDE COMMENT
             if (replyToName != null) {
@@ -938,17 +824,22 @@ fun CommentItem(
 
                     Spacer(Modifier.width(6.dp))
 
-                    Text(
-                        text = "✕",
-                        color = Color.Gray,
-                        modifier = Modifier.clickable {
-                            onRemoveReplyTag()
-                        }
-                    )
+//                    Text(
+//                        text = "✕",
+//                        color = Color.Gray,
+//                        modifier = Modifier.clickable {
+//                            onRemoveReplyTag()
+//                        }
+//                    )
                 }
             }
 
-            Text(comment.comment)
+//            Text(comment.comment)
+            LinkText(
+                text = comment.comment,
+                normalColor = Color.Black
+            )
+
 
             Spacer(Modifier.height(4.dp))
 
@@ -971,35 +862,74 @@ fun CommentItem(
     }
 }
 
-//@Composable
-//fun StoriesRow(
-//    stories: List<Story>,
-//    authUserId: Int,
-//    onAddStory: () -> Unit,
-//    onStoryClick: (Story) -> Unit
-//) {
-//    LazyRow(
-//        modifier = Modifier
-//            .fillMaxWidth()
-//            .padding(vertical = 8.dp),
-//        contentPadding = PaddingValues(horizontal = 12.dp)
-//    ) {
-//
-//        // 🔹 YOUR STORY (FIRST)
-//        item {
-//            AddStoryItem(onClick = onAddStory)
-//        }
-//
-//        // 🔹 OTHER STORIES
-//        items(stories) { story ->
-//            StoryItem(
-//                story = story,
-//                isMine = story.user.id == authUserId,
-//                onClick = { onStoryClick(story) }
-//            )
-//        }
-//    }
-//}
+@Composable
+fun LinkText(
+    text: String,
+    normalColor: Color = Color.Black
+) {
+    val annotatedString = remember(text) {
+        buildAnnotatedString {
+            var lastIndex = 0
+
+            urlRegex.findAll(text).forEach { match ->
+                val start = match.range.first
+                val end = match.range.last + 1
+
+                // Normal text before link
+                if (start > lastIndex) {
+                    withStyle(style = SpanStyle(color = normalColor)) {
+                        append(text.substring(lastIndex, start))
+                    }
+                }
+
+                val url = match.value
+                val finalUrl =
+                    if (url.startsWith("http")) url else "https://$url"
+
+                // 🔗 Link text
+                pushStringAnnotation(
+                    tag = "URL",
+                    annotation = finalUrl
+                )
+                withStyle(
+                    style = SpanStyle(
+                        color = Color(0xFF0066FF),
+                        fontWeight = FontWeight.Medium
+                    )
+                ) {
+                    append(url)
+                }
+                pop()
+
+                lastIndex = end
+            }
+
+            // Remaining normal text
+            if (lastIndex < text.length) {
+                withStyle(style = SpanStyle(color = normalColor)) {
+                    append(text.substring(lastIndex))
+                }
+            }
+        }
+    }
+
+    androidx.compose.foundation.text.ClickableText(
+        text = annotatedString,
+        onClick = { offset ->
+            annotatedString
+                .getStringAnnotations("URL", offset, offset)
+                .firstOrNull()
+                ?.let {
+                    openUrl(it.item)
+                }
+        }
+    )
+}
+
+
+private val urlRegex =
+    "(https?:\\/\\/)?(www\\.)?(youtube\\.com|youtu\\.be|[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})(\\/\\S*)?"
+        .toRegex(RegexOption.IGNORE_CASE)
 
 @Composable
 fun StoriesRow(
@@ -1071,51 +1001,6 @@ fun AddStoryItem(onClick: () -> Unit) {
 }
 
 
-//@Composable
-//fun StoryItem(
-//    story: Story,
-//    isMine: Boolean,
-//    onClick: () -> Unit
-//) {
-//    Column(
-//        modifier = Modifier
-//            .padding(end = 12.dp)
-//            .clickable { onClick() },
-//        horizontalAlignment = Alignment.CenterHorizontally
-//    ) {
-//
-//        Box(
-//            modifier = Modifier
-//                .size(68.dp)
-//                .clip(CircleShape)
-//                .background(
-//                    Brush.linearGradient(
-//                        listOf(Color.Magenta, Color.Red, Color.Yellow)
-//                    )
-//                ),
-//            contentAlignment = Alignment.Center
-//        ) {
-//
-//            AsyncImage(
-//                model = "https://gps.eva2z.in/storage/${story.user.photo}",
-//                contentDescription = null,
-//                modifier = Modifier
-//                    .size(60.dp)
-//                    .clip(CircleShape)
-//                    .background(Color.LightGray),
-//                contentScale = ContentScale.Crop
-//            )
-//        }
-//
-//        Spacer(Modifier.height(4.dp))
-//        Text(
-//            text = story.user.name,
-//            maxLines = 1,
-//            style = MaterialTheme.typography.labelSmall
-//        )
-//    }
-//}
-
 
 
 @Composable
@@ -1181,44 +1066,7 @@ fun StoryItem(
     }
 }
 
-@Composable
-fun StoryViewersBar(
-    viewers: List<StoryViewer>
-) {
-    if (viewers.isEmpty()) return
 
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.Black.copy(alpha = 0.4f))
-            .padding(12.dp)
-    ) {
-
-        Text(
-            text = "👁️ ${viewers.size} views",
-            color = Color.White,
-            fontWeight = FontWeight.SemiBold
-        )
-
-        Spacer(Modifier.height(8.dp))
-
-        viewers.take(5).forEach { viewer ->
-            Text(
-                text = viewer.user.name,
-                color = Color.White,
-                fontSize = 12.sp
-            )
-        }
-
-        if (viewers.size > 5) {
-            Text(
-                text = "+${viewers.size - 5} more",
-                color = Color.LightGray,
-                fontSize = 12.sp
-            )
-        }
-    }
-}
 
 
 
