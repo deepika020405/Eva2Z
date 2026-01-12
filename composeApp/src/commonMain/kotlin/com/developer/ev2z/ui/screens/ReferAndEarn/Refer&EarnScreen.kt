@@ -432,46 +432,46 @@ private fun ReferralContentScreen(
                 }
 
                 // ✅ Show referral balance - Opens balance dialog
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .background(
-                            if (isDisabled) Color(0xFFEEEEEE) else Color(0xFFF5F5F5),
-                            RoundedCornerShape(12.dp)
-                        )
-                        .clickable(
-                            enabled = !isDisabled,
-                            onClick = onShowBalance
-                        )
-                        .padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = "Show referral\nbalance",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (isDisabled) Color.Gray else Color.Black,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium,
-                            lineHeight = 18.sp,
-                            modifier = Modifier.weight(1f)
-                        )
-                        Icon(
-                            Icons.Default.NavigateNext,
-                            contentDescription = null,
-                            tint = if (isDisabled) Color.Gray else Color.Black,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text("💸", fontSize = 60.sp)
-                }
+//                Column(
+//                    modifier = Modifier
+//                        .weight(1f)
+//                        .background(
+//                            if (isDisabled) Color(0xFFEEEEEE) else Color(0xFFF5F5F5),
+//                            RoundedCornerShape(12.dp)
+//                        )
+//                        .clickable(
+//                            enabled = !isDisabled,
+//                            onClick = onShowBalance
+//                        )
+//                        .padding(16.dp),
+//                    horizontalAlignment = Alignment.CenterHorizontally
+//                ) {
+//                    Row(
+//                        modifier = Modifier.fillMaxWidth(),
+//                        verticalAlignment = Alignment.CenterVertically,
+//                        horizontalArrangement = Arrangement.SpaceBetween
+//                    ) {
+//                        Text(
+//                            text = "Show referral\nbalance",
+//                            style = MaterialTheme.typography.bodySmall,
+//                            color = if (isDisabled) Color.Gray else Color.Black,
+//                            fontSize = 13.sp,
+//                            fontWeight = FontWeight.Medium,
+//                            lineHeight = 18.sp,
+//                            modifier = Modifier.weight(1f)
+//                        )
+//                        Icon(
+//                            Icons.Default.NavigateNext,
+//                            contentDescription = null,
+//                            tint = if (isDisabled) Color.Gray else Color.Black,
+//                            modifier = Modifier.size(20.dp)
+//                        )
+//                    }
+//
+//                    Spacer(modifier = Modifier.height(16.dp))
+//
+//                    Text("💸", fontSize = 60.sp)
+//                }
             }
 
             Spacer(modifier = Modifier.height(32.dp))
