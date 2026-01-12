@@ -111,7 +111,7 @@ fun ProfileScreen(
     if (showImageZoom && !state.userImage.isNullOrEmpty()) {
         ProfileImageZoomDialog(
             imageUrl = state.userImage!!,
-            userName = state.userName,
+            userName = "",
             onDismiss = { showImageZoom = false }
         )
     }
@@ -429,6 +429,7 @@ fun ProfileImageZoomDialog(
         }
     }
 }
+
 
 data class ProfileMenuItem(
     val title: String,
