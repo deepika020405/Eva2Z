@@ -29,26 +29,33 @@ import com.developer.ev2z.navigation.PlatformBackHandler
 fun GPSDataScreen(
     apiService: ApiService,
     storageManager: StorageManager,
-    onBackPressed: () -> Unit = {} // ✅ Changed from onBackClick
+    onBackPressed: () -> Unit = {}
 ) {
     val viewModel = remember { GPSDataViewModel(apiService, storageManager) }
     val state by viewModel.state.collectAsState()
 
     PlatformBackHandler(enabled = true) {
-        onBackPressed()
+        if (state.selectedDevice != null) {
+            // 👈 SAME behaviour as toolbar back
+            viewModel.deselectDevice()
+        } else {
+            onBackPressed()
+        }
     }
 
     if (state.selectedDevice != null) {
         DeviceDetailFullScreen(
             device = state.selectedDevice!!,
             onBackClick = { viewModel.deselectDevice() },
-            onRefresh = { viewModel.refreshDeviceData(state.selectedDevice!!.deviceId) }
+            onRefresh = {
+                viewModel.refreshDeviceData(state.selectedDevice!!.deviceId)
+            }
         )
     } else {
         DeviceListScreen(
             state = state,
             onDeviceClick = { device -> viewModel.selectDevice(device) },
-            onBackClick = onBackPressed, // ✅ Use onBackPressed
+            onBackClick = onBackPressed,
             onRefresh = { viewModel.loadDevices() },
             onDismissError = { viewModel.clearError() }
         )
@@ -148,9 +155,7 @@ private fun GPSDeviceCard(
     device: GPSDevice,
     onClick: () -> Unit
 ) {
-    PlatformBackHandler(true){
-        onClick()
-    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
