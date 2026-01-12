@@ -52,6 +52,8 @@ class CommunityViewModel(
     private var lastLoadedAt: Long = 0L
     private var storyGroups: List<StoryGroup> = emptyList()
     private var currentGroupIndex by mutableStateOf(0)
+    private var storyJob: kotlinx.coroutines.Job? = null
+
 
 
 
@@ -286,21 +288,23 @@ class CommunityViewModel(
 
 
     private fun startProgress() {
-        scope.launch {
+        storyJob?.cancel() // ✅ cancel old timer
+
+        storyJob = scope.launch {
             storyProgress = 0f
 
             while (storyProgress < 1f) {
                 if (!storyPaused) {
-                    kotlinx.coroutines.delay(150) // ~15 sec
+                    kotlinx.coroutines.delay(150)
                     storyProgress += 0.01f
                 } else {
                     kotlinx.coroutines.delay(50)
                 }
             }
-
             nextStoryInGroup()
         }
     }
+
 
     fun nextStoryInGroup() {
         val group = currentGroup ?: return
@@ -376,36 +380,6 @@ class CommunityViewModel(
 
 
 
-    fun startStory(index: Int) {
-        val story = _state.stories.getOrNull(index) ?: return
-
-        _state = _state.copy(
-            storyIndex = index,
-            storyProgress = 0f,
-            storyPaused = false
-        )
-
-        onStoryOpened(story)      // ✅ SINGLE SOURCE
-        loadStoryViewers(story.id)
-        runStoryTimer()
-    }
-    private fun runStoryTimer() {
-        scope.launch {
-            while (_state.storyProgress < 1f) {
-                if (!_state.storyPaused) {
-                    kotlinx.coroutines.delay(150) // ~15 sec
-                    _state = _state.copy(
-                        storyProgress = _state.storyProgress + 0.01f
-                    )
-                } else {
-                    kotlinx.coroutines.delay(50)
-                }
-            }
-
-            nextStory()
-        }
-    }
-
     fun pauseStory() {
         _state = _state.copy(storyPaused = true)
     }
@@ -414,19 +388,6 @@ class CommunityViewModel(
         _state = _state.copy(storyPaused = false)
     }
 
-    fun nextStory() {
-        val next = _state.storyIndex + 1
-        if (next < _state.stories.size) {
-            startStory(next)
-        }
-    }
-
-    fun prevStory() {
-        val prev = _state.storyIndex - 1
-        if (prev >= 0) {
-            startStory(prev)
-        }
-    }
 
     fun loadStoryViewers(storyId: Int) {
         scope.launch {
