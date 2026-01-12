@@ -33,6 +33,7 @@ import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.ui.components.FloatingContactButton
 import com.developer.ev2z.util.rememberImagePicker
 import kotlinx.coroutines.delay
+private const val BASE_IMAGE_URL = "https://gps.eva2z.in/storage/"
 
 @Composable
 fun EditProfileScreen(
@@ -92,48 +93,26 @@ fun EditProfileScreen(
     )
 
     // ✅ Image Zoom Dialog
-    if (showImageZoom && !state.userImage.isNullOrEmpty()) {
-        ProfileImageZoomDialog(
-            imageUrl = state.userImage!!,
-            onDismiss = { showImageZoom = false }
-        )
+    if (showImageZoom) {
+        when {
+            state.userImageBytes != null -> {
+                ProfileImageZoomDialog(
+                    imageBytes = state.userImageBytes!!,
+                    onDismiss = { showImageZoom = false }
+                )
+            }
+
+            !state.userImage.isNullOrEmpty() -> {
+                ProfileImageZoomDialog(
+                    imageUrl = BASE_IMAGE_URL + state.userImage!!,
+                    onDismiss = { showImageZoom = false }
+                )
+
+            }
+        }
     }
 
-    // ✅ Success Dialog
-//    if (showSuccessDialog) {
-//        Box(
-//            modifier = Modifier
-//                .fillMaxSize()
-//                .background(Color.Black.copy(alpha = 0.5f)),
-//            contentAlignment = Alignment.Center
-//        ) {
-//            Card(
-//                modifier = Modifier.padding(32.dp),
-//                colors = CardDefaults.cardColors(
-//                    containerColor = Color.White
-//                ),
-//                shape = RoundedCornerShape(16.dp)
-//            ) {
-//                Column(
-//                    modifier = Modifier.padding(24.dp),
-//                    horizontalAlignment = Alignment.CenterHorizontally
-//                ) {
-//                    Text(
-//                        text = "✓ Success",
-//                        fontSize = 24.sp,
-//                        fontWeight = FontWeight.Bold,
-//                        color = Color(0xFF4CAF50)
-//                    )
-//                    Spacer(modifier = Modifier.height(8.dp))
-//                    Text(
-//                        text = "Profile updated successfully",
-//                        fontSize = 14.sp,
-//                        color = Color.Gray
-//                    )
-//                }
-//            }
-//        }
-//    }
+
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -225,11 +204,12 @@ fun EditProfileScreenContent(
                             }
                             !state.userImage.isNullOrEmpty() -> {
                                 AsyncImage(
-                                    model = state.userImage,
+                                    model = BASE_IMAGE_URL + state.userImage,
                                     contentDescription = "Profile Picture",
                                     modifier = Modifier.fillMaxSize().clip(CircleShape),
                                     contentScale = ContentScale.Crop
                                 )
+
                             }
                             else -> {
                                 Text(
@@ -281,14 +261,7 @@ fun EditProfileScreenContent(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                // Email Field (Optional)
-//                ProfileInputField(
-//                    label = "Email (Optional)",
-//                    value = state.userEmail,
-//                    onValueChange = onEmailChange,
-//                    placeholder = "Enter your email (optional)",
-//                    keyboardType = KeyboardType.Email
-//                )
+
 
                 ProfileInputField(
                     label = "Email *",
@@ -401,7 +374,8 @@ fun EditProfileScreenContent(
 
 @Composable
 fun ProfileImageZoomDialog(
-    imageUrl: String,
+    imageUrl: String? = null,
+    imageBytes: ByteArray? = null,
     onDismiss: () -> Unit
 ) {
     Dialog(
@@ -419,32 +393,36 @@ fun ProfileImageZoomDialog(
                 .clickable { onDismiss() },
             contentAlignment = Alignment.Center
         ) {
-            AsyncImage(
-                model = imageUrl,
-                contentDescription = "Profile Picture Zoomed",
-                modifier = Modifier
-                    .fillMaxWidth(0.9f)
-                    .aspectRatio(1f)
-                    .clip(RoundedCornerShape(16.dp)),
-                contentScale = ContentScale.Crop
-            )
 
-//            IconButton(
-//                onClick = onDismiss,
-//                modifier = Modifier
-//                    .align(Alignment.TopEnd)
-//                    .padding(16.dp)
-//            ) {
-//                Icon(
-//                    imageVector = Icons.Default.Close,
-//                    contentDescription = "Close",
-//                    tint = Color.White,
-//                    modifier = Modifier.size(32.dp)
-//                )
-//            }
+            when {
+                imageBytes != null -> {
+                    AsyncImage(
+                        model = imageBytes,
+                        contentDescription = "Profile Picture Zoomed",
+                        modifier = Modifier
+                            .fillMaxWidth(0.9f)
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(16.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+
+                imageUrl != null -> {
+                    AsyncImage(
+                        model = imageUrl,
+                        contentDescription = "Profile Picture Zoomed",
+                        modifier = Modifier
+                            .fillMaxWidth(0.9f)
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(16.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+            }
         }
     }
 }
+
 
 
 @Composable
