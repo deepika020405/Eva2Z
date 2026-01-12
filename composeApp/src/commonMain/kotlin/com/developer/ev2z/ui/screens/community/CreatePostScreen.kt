@@ -151,17 +151,35 @@ class CreatePostScreen : Screen {
 
                 Spacer(Modifier.height(16.dp))
 
+//                OutlinedButton(
+//                    enabled = images.size < 5,
+//                    onClick = {
+//                        imagePickerLauncher.launch()   // 🔥 DIRECT CAMERA / GALLERY
+//                    },
+//                    modifier = Modifier.fillMaxWidth()
+//                ) {
+//                    Icon(Icons.Default.Image, null)
+//                    Spacer(Modifier.width(8.dp))
+//                    Text("Attach images (${images.size}/5)")
+//                }
+
+                val buttonText = if (images.isEmpty())
+                    "Attach images"
+                else
+                    "Add more images"
+
                 OutlinedButton(
                     enabled = images.size < 5,
                     onClick = {
-                        imagePickerLauncher.launch()   // 🔥 DIRECT CAMERA / GALLERY
+                        imagePickerLauncher.launch()
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Default.Image, null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Attach images (${images.size}/5)")
+                    Text("$buttonText (${images.size})")
                 }
+
             }
         }
 
