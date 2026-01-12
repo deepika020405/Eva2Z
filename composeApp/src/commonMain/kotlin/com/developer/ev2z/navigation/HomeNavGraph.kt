@@ -46,6 +46,7 @@ import com.developer.ev2z.ui.screens.GPSData.GPSDataScreen
 //import com.developer.ev2z.ui.screens.GPSData.GPSDataScreen
 import com.developer.ev2z.ui.screens.Profile.AboutAppScreen
 import com.developer.ev2z.ui.screens.ReferAndEarn.ReferAndEarnScreen
+import com.developer.ev2z.util.BottomBarController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -579,15 +580,26 @@ fun HomeNavGraphContent(
     Scaffold(
         containerColor = Color.White,
         bottomBar = {
-            CustomBottomNavBar(
-                tabs = tabs,
-                selectedIndex = pagerState.currentPage,
-                onTabSelected = { index ->
-                    coroutineScope.launch {
-                        pagerState.animateScrollToPage(index)
+//            CustomBottomNavBar(
+//                tabs = tabs,
+//                selectedIndex = pagerState.currentPage,
+//                onTabSelected = { index ->
+//                    coroutineScope.launch {
+//                        pagerState.animateScrollToPage(index)
+//                    }
+//                }
+//            )
+            if (BottomBarController.visible) {
+                CustomBottomNavBar(
+                    tabs = tabs,
+                    selectedIndex = pagerState.currentPage,
+                    onTabSelected = { index ->
+                        coroutineScope.launch {
+                            pagerState.animateScrollToPage(index)
+                        }
                     }
-                }
-            )
+                )
+            }
         }
     ) { padding ->
         HorizontalPager(
