@@ -1026,69 +1026,7 @@ fun StoryItem(
     }
 }
 
-//@Composable
-//fun StoryItem(
-//    story: Story,
-//    isViewed: Boolean,
-//    onClick: () -> Unit
-//) {
-//    val ringBrush =
-//        if (isViewed) {
-//            // ✅ Viewed → faded ring
-//            Brush.linearGradient(
-//                listOf(
-//                    Color.LightGray,
-//                    Color.Gray
-//                )
-//            )
-//        } else {
-//            // 🔥 Unviewed → Instagram gradient
-//            Brush.linearGradient(
-//                listOf(
-//                    Color(0xFFD62976), // pink
-//                    Color(0xFFFA7E1E), // orange
-//                    Color(0xFFFEDA75)  // yellow
-//                )
-//            )
-//        }
-//
-//    Column(
-//        modifier = Modifier
-//            .padding(end = 12.dp)
-//            .clickable { onClick() },
-//        horizontalAlignment = Alignment.CenterHorizontally
-//    ) {
-//
-//        Box(
-//            modifier = Modifier
-//                .size(70.dp)
-//                .clip(CircleShape)
-//                .background(ringBrush),
-//            contentAlignment = Alignment.Center
-//        ) {
-//
-//            AsyncImage(
-//                model = "https://gps.eva2z.in/storage/${story.user.photo}",
-//                contentDescription = null,
-//                modifier = Modifier
-//                    .size(60.dp)
-//                    .clip(CircleShape)
-//                    .background(Color.LightGray),
-//                contentScale = ContentScale.Crop
-//            )
-//        }
-//
-//        Spacer(Modifier.height(4.dp))
-//
-//        Text(
-//            text = story.user.name,
-//            maxLines = 1,
-//            style = MaterialTheme.typography.labelSmall,
-//            color = if (isViewed) Color.Gray else Color.Black
-//        )
-//    }
-//}
-//
+
 
 
 

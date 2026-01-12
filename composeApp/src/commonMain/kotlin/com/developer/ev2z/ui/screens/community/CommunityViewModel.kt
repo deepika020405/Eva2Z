@@ -50,6 +50,9 @@ class CommunityViewModel(
     private var cachedStories: List<Story>? = null
     private var cachedAuthUserId: Int = 0
     private var lastLoadedAt: Long = 0L
+    private var storyGroups: List<StoryGroup> = emptyList()
+    private var currentGroupIndex by mutableStateOf(0)
+
 
 
     fun observeRefreshKey(): Int = refreshKey
@@ -60,36 +63,6 @@ class CommunityViewModel(
     var storyProgress by mutableStateOf(0f)
     var storyPaused by mutableStateOf(false)
 
-
-
-
-
-
-
-//    fun loadPosts() {
-//        if (_state.loading) return
-//
-//        _state = _state.copy(loading = true)
-//
-//        scope.launch {
-//            try {
-//                val posts = repository.fetchPosts()
-//                val storiesRes = repository.fetchStories()
-//
-//                _state = _state.copy(
-//                    loading = false,
-//                    posts = posts,
-//                    stories = storiesRes.stories,
-//                    authUserId = storiesRes.auth_user_id
-//                )
-//            } catch (e: Exception) {
-//                _state = _state.copy(
-//                    loading = false,
-//                    error = e.message
-//                )
-//            }
-//        }
-//    }
 
     @OptIn(ExperimentalTime::class)
     fun loadPosts(forceRefresh: Boolean = false) {
@@ -166,60 +139,6 @@ class CommunityViewModel(
             }
         }
     }
-
-
-
-//    fun toggleLike(postId: Int) {
-//
-//        // 🔥 Optimistic UI (instant feel)
-//        val currentPost = _state.posts.find { it.id == postId } ?: return
-//
-//        val optimisticLiked = !currentPost.liked
-//        val optimisticCount =
-//            if (optimisticLiked) currentPost.likes_count + 1
-//            else maxOf(0, currentPost.likes_count - 1)
-//
-//        _state = _state.copy(
-//            posts = _state.posts.map { post ->
-//                if (post.id == postId) {
-//                    post.copy(
-//                        liked = optimisticLiked,
-//                        likes_count = optimisticCount
-//                    )
-//                } else post
-//            }
-//        )
-//
-//        // 🔁 API call
-//        scope.launch {
-//            try {
-//                val serverLiked = repository.toggleLike(postId)
-//
-//                // 🔄 Sync with server response
-//                _state = _state.copy(
-//                    posts = _state.posts.map { post ->
-//                        if (post.id == postId) {
-//                            post.copy(
-//                                liked = serverLiked,
-//                                likes_count =
-//                                    if (serverLiked) optimisticCount
-//                                    else maxOf(0, optimisticCount - 1)
-//                            )
-//                        } else post
-//                    }
-//                )
-//
-//            } catch (e: Exception) {
-//                // ❌ Revert on error
-//                _state = _state.copy(
-//                    posts = _state.posts.map { post ->
-//                        if (post.id == postId) currentPost else post
-//                    }
-//                )
-//            }
-//        }
-//        cachedPosts = _state.posts
-//    }
 
 
 
@@ -331,7 +250,7 @@ class CommunityViewModel(
     }
 
     fun groupedStories(): List<StoryGroup> {
-        return state.stories
+        val groups = state.stories
             .groupBy { it.user.id }
             .map { (_, stories) ->
                 StoryGroup(
@@ -339,14 +258,23 @@ class CommunityViewModel(
                     stories = stories.sortedBy { it.created_at }
                 )
             }
+
+        storyGroups = groups
+        return groups
     }
+
 
     fun currentStory(): Story? {
         val group = currentGroup ?: return null
         return group.stories.getOrNull(storyIndex)
     }
 
+
     fun startStoryGroup(group: StoryGroup) {
+        storyGroups = groupedStories()
+        currentGroupIndex = storyGroups.indexOfFirst { it.user.id == group.user.id }
+            .coerceAtLeast(0)
+
         currentGroup = group
         storyIndex = 0
         storyProgress = 0f
@@ -355,6 +283,7 @@ class CommunityViewModel(
         onStoryOpened(group.stories.first())
         startProgress()
     }
+
 
     private fun startProgress() {
         scope.launch {
@@ -377,15 +306,31 @@ class CommunityViewModel(
         val group = currentGroup ?: return
 
         if (storyIndex < group.stories.lastIndex) {
+            // 👉 Same user, next story
             storyIndex++
             storyProgress = 0f
             onStoryOpened(group.stories[storyIndex])
             startProgress()
         } else {
-            // ✅ Group finished → close viewer
-            currentGroup = null
+            // 👉 Group finished → NEXT GROUP
+            if (currentGroupIndex < storyGroups.lastIndex) {
+                currentGroupIndex++
+                val nextGroup = storyGroups[currentGroupIndex]
+
+                currentGroup = nextGroup
+                storyIndex = 0
+                storyProgress = 0f
+                storyPaused = false
+
+                onStoryOpened(nextGroup.stories.first())
+                startProgress()
+            } else {
+                // 👉 ALL STORIES FINISHED
+                currentGroup = null
+            }
         }
     }
+
 
     fun isGroupViewed(group: StoryGroup): Boolean {
         return group.stories.all { viewedStoryIds.contains(it.id) }
@@ -397,11 +342,18 @@ class CommunityViewModel(
 
         if (storyIndex > 0) {
             storyIndex--
-            storyProgress = 0f
-            onStoryOpened(group.stories[storyIndex])
-            startProgress()
+        } else if (currentGroupIndex > 0) {
+            currentGroupIndex--
+            val prevGroup = storyGroups[currentGroupIndex]
+            currentGroup = prevGroup
+            storyIndex = prevGroup.stories.lastIndex
         }
+
+        storyProgress = 0f
+        onStoryOpened(currentStory()!!)
+        startProgress()
     }
+
 
 
     fun createStory(
