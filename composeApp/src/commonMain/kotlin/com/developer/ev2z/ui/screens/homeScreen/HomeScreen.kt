@@ -52,6 +52,7 @@ fun HomeScreen(
     val showOverview by viewModel.showOverview.collectAsState()
     val showDeviceDropdown by viewModel.showDeviceDropdown.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
+    var autoNavigated by remember { mutableStateOf(false) }
 
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
@@ -100,6 +101,14 @@ fun HomeScreen(
             val response = state.deviceResponse
             val devices = response.data ?: emptyList()
             val showDropdownAllowed = devices.size > 1
+            val deviceCount = devices.size
+
+//            LaunchedEffect(devices.size) {
+//                if (devices.size == 1 && !autoNavigated) {
+//                    autoNavigated = true
+//                    onNavigateToDeviceReport()
+//                }
+//            }
 
 
             Box(modifier = Modifier.fillMaxSize()) {
@@ -130,7 +139,19 @@ fun HomeScreen(
                             }
                         },
                         onLocationClick = {
-                            viewModel.showOverviewSheet()
+                            when (deviceCount) {
+                                0 -> {
+                                    // ❌ Do nothing (disabled)
+                                }
+                                1 -> {
+                                    // ✅ Direct navigation
+                                    onNavigateToDeviceReport()
+                                }
+                                else -> {
+                                    // ✅ Open bottom sheet
+                                    viewModel.showOverviewSheet()
+                                }
+                            }
                         },
                         showDropdown = showDropdownAllowed
                     )
@@ -441,11 +462,11 @@ fun OverviewBottomSheet(
                     }
                 )
 
-                Icon(
-                    imageVector = Icons.Default.Download,
-                    contentDescription = "Download",
-                    modifier = Modifier.size(24.dp)
-                )
+//                Icon(
+//                    imageVector = Icons.Default.Download,
+//                    contentDescription = "Download",
+//                    modifier = Modifier.size(24.dp)
+//                )
                 Icon(
                     imageVector = Icons.Default.Close,
                     contentDescription = "Close",
@@ -458,15 +479,15 @@ fun OverviewBottomSheet(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            StatItem("Average Speed", "${avgSpeed.toInt()} km")
-            StatItem("Total Distance", "${totalDistance}km")
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
+//        Row(
+//            modifier = Modifier.fillMaxWidth(),
+//            horizontalArrangement = Arrangement.SpaceEvenly
+//        ) {
+//            StatItem("Average Speed", "${avgSpeed.toInt()} km")
+//            StatItem("Total Distance", "${totalDistance}km")
+//        }
+//
+//        Spacer(modifier = Modifier.height(24.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
