@@ -1232,7 +1232,7 @@ class ApiService {
     suspend fun getGeoFences(): GeoFenceResponse {
         val token = AppTokenProvider.getToken()
 
-        return client.post("${baseUrl}get-geofences") {
+        return client.get("${baseUrl}get-geofences") {
             header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
         }.body()
