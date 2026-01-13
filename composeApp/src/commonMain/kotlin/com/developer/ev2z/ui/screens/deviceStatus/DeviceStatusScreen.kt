@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.sp
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.response.MyDevicesResponse
 import com.developer.ev2z.response.StatusSession
+import com.developer.ev2z.util.formatToIST
+import com.developer.ev2z.util.formatUtcToISTSafe
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
 import org.jetbrains.compose.resources.InternalResourceApi
@@ -145,8 +147,7 @@ fun DeviceStatusScreen(onBack: () -> Unit) {
 
                 else -> {
                     LazyColumn {
-                        items(sessions) { session ->
-
+                        items(sessions.asReversed()) { session ->
                             val lat = session.latitude.toDouble()
                             val lng = session.longitude.toDouble()
                             val key = "$lat,$lng"
@@ -303,6 +304,14 @@ fun StatusSessionCard(
     address: String? = null
 ) {
     val (statusText, statusColor) = statusUi(session.status)
+    // ✅ Convert to IST
+    val startTimeIST = remember(session.start_time) {
+        formatUtcToISTSafe(session.start_time)
+    }
+
+    val endTimeIST = remember(session.end_time) {
+        formatUtcToISTSafe(session.end_time)
+    }
 
     Card(
         modifier = Modifier
@@ -351,13 +360,13 @@ fun StatusSessionCard(
             ) {
                 TimeChip(
                     label = "Start",
-                    value = session.start_time,
+                    value = startTimeIST,
                     color = Color(0xFF4CAF50)
                 )
 
                 TimeChip(
                     label = "End",
-                    value = session.end_time,
+                    value = endTimeIST,
                     color = Color(0xFFF44336)
                 )
             }
