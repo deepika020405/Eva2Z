@@ -377,18 +377,18 @@ fun DeviceSelectorPanelWithData(
 
                 Spacer(Modifier.height(20.dp))
 
-                Button(
-                    onClick = onAddDevice,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp),
-                    shape = RoundedCornerShape(50),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3EBB3E))
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null, tint = Color.White)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Add Device", color = Color.White)
-                }
+//                Button(
+//                    onClick = onAddDevice,
+//                    modifier = Modifier
+//                        .fillMaxWidth()
+//                        .height(48.dp),
+//                    shape = RoundedCornerShape(50),
+//                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3EBB3E))
+//                ) {
+//                    Icon(Icons.Default.Add, contentDescription = null, tint = Color.White)
+//                    Spacer(Modifier.width(8.dp))
+//                    Text("Add Device", color = Color.White)
+//                }
 
                 Spacer(Modifier.height(8.dp))
             }
