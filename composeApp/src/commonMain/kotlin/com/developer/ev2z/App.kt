@@ -88,6 +88,8 @@ fun App() {
     var showAddDeviceSuccess by remember { mutableStateOf(false) }
     var showDeviceStatus by remember { mutableStateOf(false) }
     var showTrackTrace by remember { mutableStateOf(false) }
+    var deviceStatusSource by remember { mutableStateOf(OpenSource.HOME) }
+    var trackTraceSource by remember { mutableStateOf(OpenSource.HOME) }
 
 
     // Authentication flow states
@@ -279,6 +281,16 @@ fun App() {
                     viewModel = deviceReportViewModel,
                     token = authToken,
                     username = username,
+                    onTrackTrace = {
+                        trackTraceSource = OpenSource.DEVICE_REPORT   // ✅ FIX
+                        showDeviceReport = false
+                        showTrackTrace = true
+                    },
+                    onTodayReport = {
+                        deviceStatusSource = OpenSource.DEVICE_REPORT
+                        showDeviceReport = false
+                        showDeviceStatus = true
+                    },
                     onBack = {
                         println("🔙 Back from Device Report to Home")
                         showDeviceReport = false
@@ -292,6 +304,10 @@ fun App() {
                 DeviceStatusScreen(
                     onBack = {
                         showDeviceStatus = false
+
+                        if (deviceStatusSource == OpenSource.DEVICE_REPORT) {
+                            showDeviceReport = true
+                        }
                     }
                 )
             }
@@ -300,6 +316,10 @@ fun App() {
                 TrackTraceScreen  (
                     onBack = {
                         showTrackTrace = false
+
+                        if (trackTraceSource == OpenSource.DEVICE_REPORT) {
+                            showDeviceReport = true
+                        }
                     }
                 )
             }
@@ -326,9 +346,11 @@ fun App() {
                         showChangePassword = true
                     },
                     onOpenDeviceStatus = {
+                        deviceStatusSource = OpenSource.HOME
                         showDeviceStatus = true
                     },
                     onOpenTrackTrace = {
+                        trackTraceSource = OpenSource.HOME   // ✅ CORRECT
                         showTrackTrace = true
                     },
                     onLogout = {
@@ -515,4 +537,9 @@ fun SplashScreen() {
 //            )
         }
     }
+}
+
+enum class OpenSource {
+    HOME,
+    DEVICE_REPORT
 }
