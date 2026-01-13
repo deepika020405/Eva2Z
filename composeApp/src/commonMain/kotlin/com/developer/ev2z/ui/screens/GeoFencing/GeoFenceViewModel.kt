@@ -238,10 +238,36 @@ class GeoFenceViewModel(
 
 
 
+//    fun updateGeoFence(
+//        geoFence: GeoFenceDto,
+//        name: String,
+//        radius: Int
+//    ) {
+//        viewModelScope.launch {
+//            _saveState.value = SaveGeoFenceState.Loading
+//
+//            repository.updateGeoFence(
+//                geoFence = geoFence,
+//                name = name,
+//                radius = radius,
+//                lat = geoFence.latitude,
+//                lng = geoFence.longitude
+//            ).onSuccess {
+//                _saveState.value = SaveGeoFenceState.Success
+//                loadGeoFences()
+//            }.onFailure {
+//                _saveState.value =
+//                    SaveGeoFenceState.Error(it.message ?: "Update failed")
+//            }
+//        }
+//    }
+
     fun updateGeoFence(
         geoFence: GeoFenceDto,
         name: String,
-        radius: Int
+        radius: Int,
+        lat: String,
+        lng: String
     ) {
         viewModelScope.launch {
             _saveState.value = SaveGeoFenceState.Loading
@@ -250,8 +276,8 @@ class GeoFenceViewModel(
                 geoFence = geoFence,
                 name = name,
                 radius = radius,
-                lat = geoFence.latitude,
-                lng = geoFence.longitude
+                lat = lat,          // ✅ NEW
+                lng = lng           // ✅ NEW
             ).onSuccess {
                 _saveState.value = SaveGeoFenceState.Success
                 loadGeoFences()
@@ -261,6 +287,7 @@ class GeoFenceViewModel(
             }
         }
     }
+
 
     fun setEditLocation(lat: String, lng: String) {
         _polygon.value = createCirclePolygon(
@@ -272,6 +299,14 @@ class GeoFenceViewModel(
 
     fun resetSaveState() {
         _saveState.value = SaveGeoFenceState.Idle
+    }
+
+
+    fun getDeviceById(deviceId: String): Device? {
+        val state = deviceState.value
+        return if (state is DeviceUiState.Success) {
+            state.list.find { it.device_id == deviceId }
+        } else null
     }
 
 }
