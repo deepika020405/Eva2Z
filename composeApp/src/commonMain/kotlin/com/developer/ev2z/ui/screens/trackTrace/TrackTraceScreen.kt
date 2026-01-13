@@ -123,8 +123,8 @@ fun TrackTraceScreen(
             FloatingContactButton(
                 phoneNumber = "919755273822",
                 modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 20.dp, bottom = 20.dp)
+                    .align(Alignment.BottomStart)
+                    .padding(start = 20.dp, bottom = 20.dp)
             )
         }
     }
