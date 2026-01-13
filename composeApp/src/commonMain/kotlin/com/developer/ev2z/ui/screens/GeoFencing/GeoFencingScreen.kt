@@ -33,6 +33,8 @@ import com.developer.ev2z.data.local.model.GeoFencePolygon
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.response.Device
 import com.developer.ev2z.response.GeoFenceDto
+import com.developer.ev2z.util.formatToIST
+import com.developer.ev2z.util.getAddressFromLatLng
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -107,16 +109,16 @@ fun EmptyGeoFenceView(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
 
-        Box(
-            modifier = Modifier
-                .size(180.dp)
-                .background(Color.LightGray, RoundedCornerShape(12.dp))
-        )
-
-        Spacer(Modifier.height(16.dp))
+//        Box(
+//            modifier = Modifier
+//                .size(180.dp)
+//                .background(Color.LightGray, RoundedCornerShape(12.dp))
+//        )
+//
+//        Spacer(Modifier.height(16.dp))
 
         Text(
-            text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.",
+            text = "Please Select GeoFence",
             textAlign = TextAlign.Center,
             color = Color.Gray,
             modifier = Modifier.padding(horizontal = 32.dp)
@@ -148,22 +150,43 @@ fun GeoFenceList(list: List<GeoFenceDto>, onDelete: (GeoFenceDto) -> Unit, onEdi
 }
 
 
+
+
+
 @Composable
-fun GeoFenceCard(item: GeoFenceDto, onDelete: (GeoFenceDto) -> Unit,onEdit: (GeoFenceDto) -> Unit) {
+fun GeoFenceCard(
+    item: GeoFenceDto,
+    onDelete: (GeoFenceDto) -> Unit,
+    onEdit: (GeoFenceDto) -> Unit
+) {
     var showDeleteDialog by remember { mutableStateOf(false) }
 
+    val radiusKm = (item.radius.toFloatOrNull() ?: 0f) / 1000f
+    val createdAt = formatToIST(item.created_at)
+    val updatedAt = formatToIST(item.updated_at)
+
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
+        elevation = CardDefaults.cardElevation(4.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(Modifier.padding(16.dp)) {
 
+            // 🔝 Title + Delete
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = item.name,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = item.name,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Device ID: ${item.device_id}",
+                        fontSize = 12.sp,
+                        color = Color.Black
+                    )
+                }
 
                 Icon(
                     imageVector = Icons.Default.Delete,
@@ -171,69 +194,75 @@ fun GeoFenceCard(item: GeoFenceDto, onDelete: (GeoFenceDto) -> Unit,onEdit: (Geo
                     tint = Color.Red,
                     modifier = Modifier
                         .size(22.dp)
-                        .clickable {
-                            showDeleteDialog = true   // 👈 open dialog
-                        }
+                        .clickable { showDeleteDialog = true }
                 )
             }
 
-            Spacer(Modifier.height(6.dp))
-//            Text(
-//                text = "Device Name: ${item.name}",
-//                color = Color.Gray,
-//                fontSize = 12.sp
-//            )
+            Spacer(Modifier.height(12.dp))
 
-            Text(
-                text = "Device ID: ${item.device_id}",
-                color = Color.Gray,
-                fontSize = 12.sp
-            )
-
-            Spacer(Modifier.height(6.dp))
-
-            Text(
-                text = "Radius: ${item.radius} meter",
-                fontSize = 12.sp
-            )
+            // 📍 Radius Chip
+            Surface(
+                color = Color(0xFFE8F5E9),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(
+                    text = "Radius: ${radiusKm.toInt()} km",
+                    fontSize = 12.sp,
+                    color = Color(0xFF2E7D32),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                )
+            }
 
             Spacer(Modifier.height(12.dp))
 
-            Row(horizontalArrangement = Arrangement.SpaceBetween) {
-//                TextButton(onClick = { /* Disable */ }) {
-//                    Text("Disable", color = Color.Red)
-//                }
-                TextButton(onClick = { println("CLICKED")
-                    onEdit(item) }) {
+            // ⏰ Time Info
+            Column {
+                Text(
+                    text = "Created: $createdAt",
+                    fontSize = 11.sp,
+                    color = Color.Black
+                )
+                Text(
+                    text = "Updated: $updatedAt",
+                    fontSize = 11.sp,
+                    color = Color.Black
+                )
+            }
+
+            Spacer(Modifier.height(10.dp))
+            Divider()
+            Spacer(Modifier.height(6.dp))
+
+            // ✏️ Edit
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TextButton(onClick = { onEdit(item) }) {
                     Text("Edit")
                 }
             }
         }
     }
 
+    // 🗑 Delete Dialog
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = {
-                Text("Delete GeoFence")
-            },
-            text = {
-                Text("Are you sure you want to delete \"${item.name}\"?")
-            },
+            title = { Text("Delete GeoFence") },
+            text = { Text("Are you sure you want to delete \"${item.name}\"?") },
             confirmButton = {
                 TextButton(
                     onClick = {
                         showDeleteDialog = false
-                        onDelete(item)   // 🔥 ACTUAL DELETE CALL
+                        onDelete(item)
                     }
                 ) {
                     Text("Delete", color = Color.Red)
                 }
             },
             dismissButton = {
-                TextButton(
-                    onClick = { showDeleteDialog = false }
-                ) {
+                TextButton(onClick = { showDeleteDialog = false }) {
                     Text("Cancel")
                 }
             }
@@ -279,12 +308,20 @@ fun AddEditGeoFenceScreen(
     }
 
     // 🔁 PREFILL FOR EDIT
-    LaunchedEffect(editingGeoFence) {
+    LaunchedEffect(editingGeoFence, deviceState) {
         editingGeoFence?.let { geo ->
+
+            // 📍 Location
+            val lat = geo.latitude.toDouble()
+            val lng = geo.longitude.toDouble()
+
+            // 📍 Convert lat/lng → address
+            val address = getAddressFromLatLng(lat, lng)
+
             selectedLocation = LocationResult(
-                name = geo.name,
-                lat = geo.latitude.toDouble(),
-                lng = geo.longitude.toDouble()
+                name = address,     // 🔥 ADDRESS AB DIKHEGA
+                lat = lat,
+                lng = lng
             )
 
             viewModel.setEditLocation(
@@ -292,8 +329,19 @@ fun AddEditGeoFenceScreen(
                 lng = geo.longitude
             )
 
+            // 📟 Device (ID → NAME)
+            val device = viewModel.getDeviceById(geo.device_id)
+            selectedDevice = device ?: Device(
+                id = 0,
+                device_id = geo.device_id,
+                device_name = geo.device_id, // fallback
+                status = "1",
+                engine_status = "0",
+                created_at = ""
+            )
         }
     }
+
 
 
     Scaffold(
@@ -311,7 +359,13 @@ fun AddEditGeoFenceScreen(
             )
         }
     ) { padding ->
-
+        var radiusKm by remember {
+            mutableStateOf(
+                if (editingGeoFence != null)
+                    (editingGeoFence.radius.toFloat() / 1000f).toInt().toString()
+                else ""
+            )
+        }
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -339,15 +393,27 @@ fun AddEditGeoFenceScreen(
                     onValueChange = {},
                     placeholder = { Text("Select Device") },
                     trailingIcon = {
-                        TextButton(onClick = {
-                            showDeviceSheet = true
-                            viewModel.loadDevices()
-                        }) {
-                            Text("Select", color = Color(0xFF4CAF50))
+
+                        if (editingGeoFence == null) {
+                            // ➕ ADD MODE → allow select
+                            TextButton(onClick = {
+                                showDeviceSheet = true
+                                viewModel.loadDevices()
+                            }) {
+                                Text("Select", color = Color(0xFF4CAF50))
+                            }
+                        } else {
+                            // ✏️ EDIT MODE → locked
+                            Text(
+                                "Locked",
+                                color = Color.Gray,
+                                fontSize = 12.sp
+                            )
                         }
                     },
                     modifier = Modifier.fillMaxWidth()
                 )
+
             }
 
             // LOCATION
@@ -369,20 +435,20 @@ fun AddEditGeoFenceScreen(
             // RADIUS
             item {
                 OutlinedTextField(
-                    value = radius,
+                    value = radiusKm,
                     onValueChange = { input ->
-                        // ✅ Allow only digits
                         if (input.all { it.isDigit() }) {
-                            radius = input
+                            radiusKm = input
+                            // ✅ pass as-is, backend will multiply by 1000
                         }
                     },
-                    placeholder = { Text("Radius (meter)") },
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Number
-                    ),
+                    placeholder = { Text("Radius (KM)") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
+
+
 
             item {
                 Button(
@@ -392,6 +458,10 @@ fun AddEditGeoFenceScreen(
                             radius.isNotBlank() &&
                             selectedLocation != null
                         ) {
+
+                            val lat = selectedLocation!!.lat.toString()
+                            val lng = selectedLocation!!.lng.toString()
+
                             if (editingGeoFence == null) {
                                 // ➕ ADD
                                 viewModel.saveGeoFence(
@@ -400,11 +470,13 @@ fun AddEditGeoFenceScreen(
                                     radiusMeters = radius.toInt()
                                 )
                             } else {
-                                // ✏️ UPDATE
+                                // ✏️ UPDATE (🔥 FIX)
                                 viewModel.updateGeoFence(
                                     geoFence = editingGeoFence,
                                     name = geoFenceName,
-                                    radius = radius.toInt()
+                                    radius = radiusKm.toInt(),
+                                    lat = lat,
+                                    lng = lng
                                 )
                             }
                         }
@@ -423,8 +495,8 @@ fun AddEditGeoFenceScreen(
         }
     }
 
-    // DEVICE SHEET
-    if (showDeviceSheet) {
+
+    if (editingGeoFence == null && showDeviceSheet) {
         DevicePickerBottomSheet(
             deviceState = deviceState,
             selectedDeviceId = selectedDevice?.device_id,
@@ -435,6 +507,16 @@ fun AddEditGeoFenceScreen(
             onDismiss = { showDeviceSheet = false }
         )
     }
+//    if (editingGeoFence != null) {
+//        Text(
+//            "Device cannot be changed after GeoFence creation",
+//            fontSize = 11.sp,
+//            color = Color.Gray
+//        )
+//        )
+//    }
+
+
 
     // LOCATION DIALOG
     if (showLocationPicker) {
@@ -614,7 +696,7 @@ fun LocationPickerDialog(
                             viewModel.searchLocation(it)
                         }
                     },
-                    placeholder = { Text("Search area, city (e.g. Noida)") },
+                    placeholder = { Text("Search area, city") },
                     modifier = Modifier.fillMaxWidth()
                 )
 
