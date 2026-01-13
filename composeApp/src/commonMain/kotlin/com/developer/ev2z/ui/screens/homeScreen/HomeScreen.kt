@@ -134,44 +134,46 @@ fun HomeScreen(
                         deviceCount = response.totalDevices ?: 0,
                         selectedDevice = selectedDevice,
                         onDropdownClick = {
-                            if (showDropdownAllowed) {
+//                            if (showDropdownAllowed) {
                                 viewModel.toggleDeviceDropdown()
-                            }
+//                            }
                         },
                         onLocationClick = {
                             when (deviceCount) {
                                 0 -> {
                                     // ❌ Do nothing (disabled)
                                 }
+
                                 1 -> {
                                     // ✅ Direct navigation
                                     onNavigateToDeviceReport()
                                 }
+
                                 else -> {
                                     // ✅ Open bottom sheet
                                     viewModel.showOverviewSheet()
                                 }
                             }
                         },
-                        showDropdown = showDropdownAllowed
+//                        showDropdown = showDropdownAllowed
                     )
 
                     if (showDeviceDropdown) {
-                        DeviceDropdownSheet(
-                            devices = response.data ?: emptyList(),
-                            onDeviceSelect = {
-                                viewModel.selectDevice(it)
+                    DeviceDropdownSheet(
+                        devices = response.data ?: emptyList(),
+                        onDeviceSelect = {
+                            viewModel.selectDevice(it)
 //                                viewModel.toggleDeviceDropdown()
-                                onNavigateToDeviceReport()
-                            },
-                            onAddDevice = {
-                                println("➕ Add Device clicked from dropdown")
-                                viewModel.toggleDeviceDropdown()
-                                onNavigateToAddDevice()
-                            },
-                            onDismiss = { viewModel.toggleDeviceDropdown() }
-                        )
-                    }
+                            onNavigateToDeviceReport()
+                        },
+                        onAddDevice = {
+                            println("➕ Add Device clicked from dropdown")
+                            viewModel.toggleDeviceDropdown()
+                            onNavigateToAddDevice()
+                        },
+                        onDismiss = { viewModel.toggleDeviceDropdown() }
+                    )
+                }
                 }
                 // 🔥 FLOATING CONTACT BUTTON (COMMON)
                 FloatingContactButton(
@@ -227,7 +229,7 @@ fun TopDeviceCard(
     selectedDevice: Device?,
     onDropdownClick: () -> Unit,
     onLocationClick: () -> Unit,
-    showDropdown: Boolean
+//    showDropdown: Boolean
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -267,7 +269,7 @@ fun TopDeviceCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            if (showDropdown) {
+//            if (showDropdown) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -305,7 +307,7 @@ fun TopDeviceCard(
                         )
                     }
                 }
-            }
+//            }
         }
     }
 }
