@@ -62,6 +62,8 @@ fun DeviceReportScreen(
     viewModel: DeviceReportViewModel,
     token: String,
     username: String,
+    onTodayReport: () -> Unit,
+    onTrackTrace: () -> Unit,
     onBack: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -111,6 +113,8 @@ fun DeviceReportScreen(
                 onDeviceSelected = { device -> viewModel.selectDevice(device, token) },
                 onBack = onBack,
                 username = username,
+                onTodayReport = onTodayReport,
+                onTrackTrace = onTrackTrace,
                 token = token,
                 viewModel = viewModel// 👈 NEW
             )
@@ -127,6 +131,8 @@ fun DeviceReportContent(
     totalDevices: Int,
     onDeviceSelected: (Device) -> Unit,
     onBack: () -> Unit,
+    onTodayReport: () -> Unit,
+    onTrackTrace: () -> Unit,
     username: String,
     token: String,
     viewModel: DeviceReportViewModel
@@ -186,6 +192,8 @@ fun DeviceReportContent(
                 isExpanded = isExpanded,
                 token = token,
                 onExpandToggle = { isExpanded = !isExpanded },
+                onTodayReport = onTodayReport,
+                onTrackTrace = onTrackTrace,
                 viewModel = viewModel
             )
         }
@@ -395,6 +403,8 @@ fun BoxScope.DeviceReportBottomSheetWithData(
     isExpanded: Boolean,
     token : String,
     onExpandToggle: () -> Unit,
+    onTodayReport: () -> Unit,
+    onTrackTrace: () -> Unit,
     viewModel: DeviceReportViewModel
 ) {
     val sheetHeight = if (isExpanded) 0.90f else 0.40f
@@ -424,6 +434,45 @@ fun BoxScope.DeviceReportBottomSheetWithData(
                 device = device,
                 viewModel = viewModel
             )
+            Spacer(Modifier.height(16.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+
+                // 🔹 Secondary
+                Button(
+                    onClick = { onTodayReport() },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = "Today's Report",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+
+                // 🔹 Primary
+                Button(
+                    onClick = { onTrackTrace() },
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(52.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text(
+                        text = "Track & Trace",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
 
             Spacer(Modifier.height(8.dp))
 
@@ -576,12 +625,12 @@ fun DeviceBasicInfoWithData(
         }
     } else activeTime
 
-    Text(
-        "Active from: $displayTime",
-        color = Color.Gray,
-        fontSize = 12.sp,
-        modifier = Modifier.padding(horizontal = 18.dp)
-    )
+//    Text(
+//        "Active from: $displayTime",
+//        color = Color.Gray,
+//        fontSize = 12.sp,
+//        modifier = Modifier.padding(horizontal = 18.dp)
+//    )
 
     // --------- DIALOG HANDLING ----------
     val dialogData by viewModel.showConfirmationDialog.collectAsState()
