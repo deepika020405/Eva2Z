@@ -75,5 +75,6 @@ private fun formatReadableIST(dt: LocalDateTime): String {
     val minute = dt.minute.toString().padStart(2, '0')
     val amPm = if (dt.hour < 12) "AM" else "PM"
 
-    return "$day $month $year, $hour12:$minute $amPm"
+//    return "$day $month $year, $hour12:$minute $amPm"
+    return "$day $month, $hour12:$minute $amPm"
 }

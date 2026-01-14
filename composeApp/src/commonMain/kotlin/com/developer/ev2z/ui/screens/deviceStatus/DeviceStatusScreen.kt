@@ -34,11 +34,9 @@ import androidx.compose.ui.unit.sp
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.response.MyDevicesResponse
 import com.developer.ev2z.response.StatusSession
-import com.developer.ev2z.util.formatToIST
 import com.developer.ev2z.util.formatUtcToISTSafe
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
-import org.jetbrains.compose.resources.InternalResourceApi
 import org.jetbrains.compose.resources.painterResource
 
 
