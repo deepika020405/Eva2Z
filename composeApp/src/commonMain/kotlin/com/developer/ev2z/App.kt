@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.ui.screens.deviceStatus.DeviceStatusScreen
 import com.developer.ev2z.ui.screens.trackTrace.TrackTraceScreen
+import com.developer.ev2z.util.FcmRegistrar
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
 import org.jetbrains.compose.resources.painterResource
@@ -158,8 +159,30 @@ fun App() {
                 // ✅ Now reset after state is updated
                 authViewModel.resetLoginSuccess()
             }
+
+
         }
     }
+
+    /* ---------------------------------------
+      2️⃣ POST-LOGIN SIDE EFFECT → FCM REGISTER
+   ---------------------------------------- */
+    LaunchedEffect(isLoggedIn, authToken) {
+        if (isLoggedIn && authToken.isNotEmpty()) {
+
+            println("🔔 Registering FCM Bridge (user logged in)")
+
+            FcmBridge.register { fcmToken ->
+                println("📤 Sending FCM token to server: $fcmToken")
+
+                FcmRegistrar.registerFcmToServer(
+                    authTokenNullable = "Bearer $authToken",
+                    fcmToken = fcmToken
+                )
+            }
+        }
+    }
+
     // AddDevice result handler
     LaunchedEffect(addDeviceResult) {
         when (val result = addDeviceResult) {
@@ -373,6 +396,7 @@ fun App() {
                         AppTokenProvider.getToken = { "" }
 
                         println("✅ Logout complete - redirecting to login")
+                        FcmBridge.clear()
                     }
                 )
             }
