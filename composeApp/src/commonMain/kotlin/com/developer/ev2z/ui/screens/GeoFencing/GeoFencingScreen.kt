@@ -288,6 +288,14 @@ fun AddEditGeoFenceScreen(
         mutableStateOf(editingGeoFence?.name ?: "")
     }
 
+    var radiusKm by remember {
+        mutableStateOf(
+            if (editingGeoFence != null)
+                (editingGeoFence.radius.toFloat() / 1000f).toInt().toString()
+            else ""
+        )
+    }
+
     var radius by remember {
         mutableStateOf(editingGeoFence?.radius?.toString() ?: "")
     }
@@ -302,6 +310,18 @@ fun AddEditGeoFenceScreen(
 
     var showDeviceSheet by remember { mutableStateOf(false) }
     var showLocationPicker by remember { mutableStateOf(false) }
+    val isFormValid = remember(
+        geoFenceName,
+        radiusKm,
+        selectedDevice,
+        selectedLocation
+    ) {
+        geoFenceName.isNotBlank() &&
+                radiusKm.isNotBlank() &&
+                selectedLocation != null &&
+                selectedDevice != null
+    }
+
 
     PlatformBackHandler(enabled = true) {
         onBack()
@@ -359,13 +379,13 @@ fun AddEditGeoFenceScreen(
             )
         }
     ) { padding ->
-        var radiusKm by remember {
-            mutableStateOf(
-                if (editingGeoFence != null)
-                    (editingGeoFence.radius.toFloat() / 1000f).toInt().toString()
-                else ""
-            )
-        }
+//        var radiusKm by remember {
+//            mutableStateOf(
+//                if (editingGeoFence != null)
+//                    (editingGeoFence.radius.toFloat() / 1000f).toInt().toString()
+//                else ""
+//            )
+//        }
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -380,7 +400,7 @@ fun AddEditGeoFenceScreen(
                 OutlinedTextField(
                     value = geoFenceName,
                     onValueChange = { geoFenceName = it },
-                    placeholder = { Text("GeoFence Name") },
+                    placeholder = { Text("Enter your GeoFence Name") },
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -451,6 +471,7 @@ fun AddEditGeoFenceScreen(
 
 
             item {
+                val isLoading = saveState is SaveGeoFenceState.Loading
                 Button(
                     onClick = {
                         if (
@@ -484,15 +505,25 @@ fun AddEditGeoFenceScreen(
                             }
                         }
                     },
+                    enabled = isFormValid && !isLoading,   // 🔥 KEY LINE
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
                     shape = RoundedCornerShape(26.dp)
                 ) {
-                    Text(
-                        if (editingGeoFence == null) "Save" else "Update",
-                        color = Color.White
-                    )
+
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            color = Color.White,
+                            strokeWidth = 2.dp,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    } else {
+                        Text(
+                            if (editingGeoFence == null) "Save" else "Update",
+                            color = Color.White
+                        )
+                    }
                 }
             }
         }
