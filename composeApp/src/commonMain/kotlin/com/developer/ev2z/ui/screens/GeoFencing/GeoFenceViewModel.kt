@@ -195,7 +195,9 @@ class GeoFenceViewModel(
     fun saveGeoFence(
         name: String,
         device: Device,
-        radiusMeters: Int
+        radiusMeters: Int,
+        lat: String,
+        lng: String
     ) {
         val location = selected.value ?: return
 
@@ -206,8 +208,8 @@ class GeoFenceViewModel(
                 token = token,
                 deviceId = device.device_id,
                 name = name,
-                latitude = location.lat,
-                longitude = location.lng,
+                latitude = lat.toDouble(),
+                longitude = lng.toDouble(),
                 radius = radiusMeters
             ).onSuccess {
                 _saveState.value = SaveGeoFenceState.Success
