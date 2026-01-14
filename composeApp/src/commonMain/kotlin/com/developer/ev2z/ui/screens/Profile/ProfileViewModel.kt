@@ -121,11 +121,11 @@ class ProfileViewModel(
     }
 
     fun openPlayStore() {
-        openUrl("market://details?id=com.developer.ev2z")
+        openUrl("https://play.google.com/store/apps/details?id=com.developer.ev2z")
     }
 
     fun openFeedback() {
-        openUrl("market://details?id=com.developer.ev2z")
+        openUrl("https://play.google.com/store/apps/details?id=com.developer.ev2z")
     }
 
     fun openWhatsApp() {
