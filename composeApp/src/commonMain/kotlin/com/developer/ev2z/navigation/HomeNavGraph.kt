@@ -46,6 +46,7 @@ import com.developer.ev2z.ui.screens.GPSData.GPSDataScreen
 //import com.developer.ev2z.ui.screens.GPSData.GPSDataScreen
 import com.developer.ev2z.ui.screens.Profile.AboutAppScreen
 import com.developer.ev2z.ui.screens.ReferAndEarn.ReferAndEarnScreen
+import com.developer.ev2z.ui.screens.documents.DocumentsScreen
 import com.developer.ev2z.util.BottomBarController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -130,6 +131,7 @@ class ProfileTab(
     private val onNavigateToAccountActivity: () -> Unit,
     private val onNavigateToReferAndEarn: () -> Unit,
     private val onNavigateToAboutApp: () -> Unit = {},
+    private val onNavigateToDocuments: () -> Unit,
     private val onLogout: () -> Unit
 ) : Tab {
     @Composable
@@ -152,8 +154,9 @@ class ProfileTab(
             onAccountActivity = onNavigateToAccountActivity,
             onReferAndEarn = onNavigateToReferAndEarn,
             onAboutApp = onNavigateToAboutApp,
-            onLogout = onLogout
-        )
+            onLogout = onLogout,
+            onOpenDocumentsVault = onNavigateToDocuments,
+            )
     }
 
     override val options: TabOptions
@@ -204,6 +207,7 @@ fun HomeNavGraph(
     var showAboutApp by remember { mutableStateOf(false) }
     var showChangePassword by remember { mutableStateOf(false) }
     var showAddDevice by remember { mutableStateOf(false) }
+    var showDocuments by remember { mutableStateOf(false) }
 
 
 
@@ -245,6 +249,9 @@ fun HomeNavGraph(
             onNavigateToAccountActivity = { showAccountActivity = true },
             onNavigateToReferAndEarn = { showReferAndEarn = true },
             onNavigateToAboutApp = { showAboutApp = true },
+            onNavigateToDocuments = {
+                showDocuments = true   // ✅ NOW CORRECT
+            },
             onLogout = onLogout
         )
         val addDeviceViewModel = remember {
@@ -288,6 +295,16 @@ fun HomeNavGraph(
                 onBackPressed = {
                     showEditProfile = false
                     profileRefresh++
+                }
+            )
+        }
+
+        if (showDocuments) {
+            DocumentsScreen(
+                apiService = apiService,
+                storageManager = storageManager,
+                onBack = {
+                    showDocuments = false
                 }
             )
         }
@@ -537,6 +554,7 @@ fun HomeNavGraphContent(
     onNavigateToAccountActivity: () -> Unit = {},
     onNavigateToReferAndEarn: () -> Unit = {},
     onNavigateToAboutApp: () -> Unit = {},
+    onNavigateToDocuments: () -> Unit,
     onLogout: () -> Unit
 ) {
     val productRepository = remember { ProductRepository(apiService) }
@@ -568,7 +586,9 @@ fun HomeNavGraphContent(
             onNavigateToAccountActivity,
             onNavigateToReferAndEarn,
             onNavigateToAboutApp,
-            onLogout
+            onNavigateToDocuments,
+            onLogout,
+
         )
     }
 
@@ -611,6 +631,8 @@ fun HomeNavGraphContent(
             tabs[page].Content()
         }
     }
+
+
 }
 
 @Composable

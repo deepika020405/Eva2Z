@@ -1,5 +1,6 @@
 package com.developer.ev2z.ui.screens.Profile
 
+import com.developer.ev2z.data.local.StorageKeys
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.network.ApiService
 import kotlinx.coroutines.CoroutineScope
@@ -7,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class ProfileState(
@@ -143,6 +145,36 @@ class ProfileViewModel(
 
     fun openUrl(url: String) {
         platformOpenUrl(url)
+    }
+
+    fun unlockDocumentsVault(
+        password: String,
+        onSuccess: () -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.unlockVault(
+                    mapOf("password" to password)
+                )
+
+                // ✅ SAVE TOKEN
+                storageManager.saveString(
+                    StorageKeys.VAULT_TOKEN,
+                    response.vault_token
+                )
+
+                storageManager.saveString(
+                    StorageKeys.VAULT_EXPIRES_AT,
+                    response.expires_at
+                )
+
+                onSuccess()
+            } catch (e: Exception) {
+                _state.update {
+                    it.copy(error = "Invalid password")
+                }
+            }
+        }
     }
 }
 

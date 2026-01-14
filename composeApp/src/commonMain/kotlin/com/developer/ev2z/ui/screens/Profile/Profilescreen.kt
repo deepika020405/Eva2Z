@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
+import com.developer.ev2z.data.local.StorageKeys
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.ui.components.FloatingContactButton
@@ -38,6 +39,8 @@ import eva2z_connect_multiplatform.composeapp.generated.resources.ic_twitter
 import eva2z_connect_multiplatform.composeapp.generated.resources.ic_youtube
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 @Composable
 fun ProfileScreen(
@@ -58,7 +61,8 @@ fun ProfileScreen(
     onAccountActivity: () -> Unit = {},
     onReferAndEarn: () -> Unit = {},
     onAboutApp: () -> Unit = {},
-    onLogout: () -> Unit = {}
+    onLogout: () -> Unit = {},
+    onOpenDocumentsVault: () -> Unit = {},
 ) {
     val viewModel = remember { ProfileViewModel(apiService, storageManager) }
     val state by viewModel.state.collectAsState()
@@ -104,7 +108,17 @@ fun ProfileScreen(
         onFacebook = { webViewType = WebViewType.FACEBOOK },
         onInstagram = { webViewType = WebViewType.INSTAGRAM },
         onLinkedIn = { webViewType = WebViewType.LINKEDIN },
-        onYouTube = { webViewType = WebViewType.YOUTUBE }
+        onYouTube = { webViewType = WebViewType.YOUTUBE },
+        onUnlockDocuments = { password ->
+            viewModel.unlockDocumentsVault(
+                password = password,
+                onSuccess = onOpenDocumentsVault
+            )
+        },
+        onOpenDocumentsVault = {
+            onOpenDocumentsVault() // navigation
+        },
+        storageManager = storageManager
     )
 
     // Image Zoom Dialog
@@ -151,9 +165,20 @@ fun ProfileScreenContent(
     onFacebook: () -> Unit,
     onInstagram: () -> Unit,
     onLinkedIn: () -> Unit,
-    onYouTube: () -> Unit
+    onYouTube: () -> Unit,
+    onUnlockDocuments: (String) -> Unit,
+    onOpenDocumentsVault: () -> Unit,
+    storageManager: StorageManager, // ✅ ADD THIS
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
+    var showVaultPasswordDialog by remember { mutableStateOf(false) }
+    var passwordError by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(state.error) {
+        if (state.error == "Invalid password") {
+            passwordError = state.error
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -209,7 +234,17 @@ fun ProfileScreenContent(
 //                            ProfileMenuItem("General Settings", Icons.Rounded.Settings, onGeneralSettings),
                             ProfileMenuItem("Account Activity", Icons.Rounded.ManageAccounts, onAccountActivity),
                             ProfileMenuItem("Refer And Earn", Icons.Rounded.CardGiftcard, onReferAndEarn),
-                            ProfileMenuItem("Change Password", Icons.Rounded.Password, onChangePassword) // ✅ WORKING NOW
+                            ProfileMenuItem("Change Password", Icons.Rounded.Password, onChangePassword), // ✅ WORKING NOW
+                            ProfileMenuItem(
+                                title = "Documents",
+                                icon = Icons.Rounded.Folder,
+                                onClick = {
+                                    if (isVaultSessionValid(storageManager)) {
+                                        onOpenDocumentsVault() // 🔓 Direct open
+                                    } else {
+                                        showVaultPasswordDialog = true // 🔐 Ask password
+                                    }
+                                }                            )
                         )
                     )
                 }
@@ -329,9 +364,89 @@ fun ProfileScreenContent(
         )
     }
 
+    if (showVaultPasswordDialog) {
+        VaultPasswordDialog(
+            errorMessage = passwordError,
+            onSubmit = { password ->
+                passwordError = null
+
+                onUnlockDocuments(password)
+
+                // 🔥 CLOSE DIALOG IMMEDIATELY
+                showVaultPasswordDialog = false
+            },
+            onDismiss = {
+                showVaultPasswordDialog = false
+                passwordError = null
+            }
+        )
+    }
+
 
 }
 
+@Composable
+fun VaultPasswordDialog(
+    errorMessage: String?,
+    onSubmit: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var password by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Enter Password") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = {
+                        password = it
+                    },
+                    placeholder = { Text("Password") },
+                    singleLine = true,
+                    isError = errorMessage != null,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                if (errorMessage != null) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = errorMessage,
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                onSubmit(password)
+            }) {
+                Text("Unlock")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalTime::class)
+fun isVaultSessionValid(storageManager: StorageManager): Boolean {
+    val expiry = storageManager.getString(StorageKeys.VAULT_EXPIRES_AT, "")
+    if (expiry.isEmpty()) return false
+
+    return try {
+        val expiryInstant = kotlinx.datetime.Instant.parse(expiry)
+        val now = Clock.System.now()
+        now < expiryInstant
+    } catch (e: Exception) {
+        false
+    }
+}
 @Composable
 fun ProfileHeader(
     userName: String,

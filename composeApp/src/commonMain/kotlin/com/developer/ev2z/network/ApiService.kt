@@ -14,6 +14,7 @@ import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
@@ -1430,5 +1431,74 @@ class ApiService {
     }
 
 
+
+    // ---------------- VAULT UNLOCK ----------------
+    suspend fun unlockVault(
+        body: Map<String, String>
+    ): VaultResponse {
+
+        val token = AppTokenProvider.getToken() // 🔑 USER LOGIN TOKEN
+        val url = "${baseUrl}vault/unlock"
+
+        println("🌐 API: Unlocking Vault")
+
+        val response = client.post(url) {
+            header(HttpHeaders.Authorization, "Bearer $token") // ✅ FIX
+            contentType(ContentType.Application.Json)
+            setBody(body)
+        }
+
+        println("✔️ Vault Unlock Status: ${response.status}")
+
+        // ❌ 401 / 403 handle separately
+        if (response.status != HttpStatusCode.OK) {
+            val errorBody = response.bodyAsText()
+            println("❌ Vault Unlock Failed Body: $errorBody")
+            throw Exception("Invalid password")
+        }
+
+        return response.body()
+    }
+
+
+    // ---------------- VAULT DOCUMENTS ----------------
+    suspend fun getVaultDocuments(
+        vaultToken: String,
+        authToken: String
+    ): List<VaultDocumentDto> {
+
+        val url = "${baseUrl}vault/documents"
+
+        println("🌐 API: Fetching Vault Documents")
+        println("🔑 Vault Token: $vaultToken")
+
+        return try {
+            val response = client.get(url) {
+                header("X-Vault-Token", vaultToken)
+                header(HttpHeaders.Authorization, "Bearer $authToken")
+                header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+            }
+
+            val raw = response.bodyAsText()
+            println("📥 Vault Documents RAW = $raw")
+            println("📡 Status = ${response.status}")
+
+            if (response.status != HttpStatusCode.OK) {
+                throw Exception("Failed to fetch documents")
+            }
+
+            // ✅ Deserialize list
+            kotlinx.serialization.json.Json {
+                ignoreUnknownKeys = true
+            }.decodeFromString(
+                ListSerializer(VaultDocumentDto.serializer()),
+                raw
+            )
+
+        } catch (e: Exception) {
+            println("❌ Vault Documents Error: ${e.message}")
+            emptyList()
+        }
+    }
 }
 
