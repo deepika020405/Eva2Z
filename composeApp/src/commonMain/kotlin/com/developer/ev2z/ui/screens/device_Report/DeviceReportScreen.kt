@@ -412,7 +412,12 @@ fun BoxScope.DeviceReportBottomSheetWithData(
     Surface(
         modifier = Modifier
             .align(Alignment.BottomCenter)
-            .padding(horizontal = 12.dp, vertical = 12.dp)
+            .padding(horizontal = 12.dp)
+            .padding(
+                bottom = WindowInsets.navigationBars
+                    .asPaddingValues()
+                    .calculateBottomPadding()
+            )
             .fillMaxWidth()
             .fillMaxHeight(sheetHeight)
             .animateContentSize(),
