@@ -455,8 +455,9 @@ fun AddEditGeoFenceScreen(
                     onClick = {
                         if (
                             geoFenceName.isNotBlank() &&
-                            radius.isNotBlank() &&
-                            selectedLocation != null
+                            radiusKm.isNotBlank() &&
+                            selectedLocation != null &&
+                            selectedDevice != null
                         ) {
 
                             val lat = selectedLocation!!.lat.toString()
@@ -467,7 +468,9 @@ fun AddEditGeoFenceScreen(
                                 viewModel.saveGeoFence(
                                     name = geoFenceName,
                                     device = selectedDevice!!,
-                                    radiusMeters = radius.toInt()
+                                    radiusMeters = radiusKm.toInt(),
+                                    lat = lat,
+                                    lng = lng
                                 )
                             } else {
                                 // ✏️ UPDATE (🔥 FIX)
