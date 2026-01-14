@@ -21,6 +21,11 @@ class MainActivity : ComponentActivity() {
         Log.d("MainActivity", "🚀 EVA2Z Connect v5.0.0 starting")
 
         try {
+            NotificationPermissionHelper(this) {
+                // permission granted
+                FcmManager.fetchAndRegisterToken()
+            }.checkAndRequest()
+
             // ✅ Initialize storage
             initStorageManager(this)
 
