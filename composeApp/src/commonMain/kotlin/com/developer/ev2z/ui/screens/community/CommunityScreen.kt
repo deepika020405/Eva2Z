@@ -752,7 +752,7 @@ fun CommentItem(
     Row(
         modifier = Modifier
             .padding(
-                start = if (isReply) 32.dp else 16.dp,
+                start = if (isReply) 48.dp else 16.dp,
                 end = 16.dp,
                 top = 10.dp
             )

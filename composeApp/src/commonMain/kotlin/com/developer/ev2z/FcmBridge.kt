@@ -10,6 +10,7 @@ object FcmBridge {
     }
 
     fun onToken(token: String) {
+        if (token == lastToken) return
         lastToken = token
         callback?.invoke(token)
     }
@@ -20,3 +21,5 @@ object FcmBridge {
     }
 
 }
+
+
