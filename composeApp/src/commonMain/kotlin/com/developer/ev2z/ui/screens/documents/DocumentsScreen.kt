@@ -99,7 +99,23 @@ fun DocumentsScreen(
                         items(documents) { doc ->
                             DocumentItem(
                                 fileName = doc.fileName,
-                                fileType = doc.fileType
+                                fileType = doc.fileType,
+                                onClick = {
+                                    viewModel.openDocument(
+                                        documentId = doc.id,
+                                        onResult = { decryptedBytes ->
+                                            // ✅ YAHAN FILE OPEN KAROGE
+                                            println("✅ Document decrypted, size = ${decryptedBytes.size}")
+
+                                            // Android:
+                                            // 1. temp file banao
+                                            // 2. PDF/Image viewer se open karo
+
+                                            // iOS:
+                                            // UIDocumentInteractionController
+                                        }
+                                    )
+                                }
                             )
                         }
                     }
@@ -109,18 +125,61 @@ fun DocumentsScreen(
     }
 }
 
+//@Composable
+//private fun DocumentItem(
+//    fileName: String,
+//    fileType: String
+//) {
+//    Card(
+//        modifier = Modifier
+//            .fillMaxWidth()
+//            .padding(bottom = 12.dp)
+//            .clickable {
+//                // 🔜 TODO: Open / Download document
+//            },
+//        elevation = CardDefaults.cardElevation(2.dp)
+//    ) {
+//        Row(
+//            modifier = Modifier
+//                .fillMaxWidth()
+//                .padding(16.dp),
+//            verticalAlignment = Alignment.CenterVertically
+//        ) {
+//            Icon(
+//                imageVector = Icons.Default.Description,
+//                contentDescription = null,
+//                modifier = Modifier.size(28.dp)
+//            )
+//
+//            Spacer(modifier = Modifier.width(12.dp))
+//
+//            Column {
+//                Text(
+//                    text = fileName,
+//                    fontSize = 16.sp,
+//                    fontWeight = FontWeight.Medium
+//                )
+//                Text(
+//                    text = fileType,
+//                    fontSize = 12.sp,
+//                    color = MaterialTheme.colorScheme.onSurfaceVariant
+//                )
+//            }
+//        }
+//    }
+//}
+
 @Composable
 private fun DocumentItem(
     fileName: String,
-    fileType: String
+    fileType: String,
+    onClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 12.dp)
-            .clickable {
-                // 🔜 TODO: Open / Download document
-            },
+            .clickable { onClick() },
         elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Row(

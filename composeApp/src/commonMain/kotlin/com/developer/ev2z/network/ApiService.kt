@@ -1500,5 +1500,28 @@ class ApiService {
             emptyList()
         }
     }
+
+
+    suspend fun getVaultDocumentFile(
+        documentId: String,
+        vaultToken: String,
+        authToken: String
+    ): ByteArray {
+
+        val url = "${baseUrl}vault/$documentId"
+
+        println("🌐 API: Fetching encrypted document")
+
+        val response = client.get(url) {
+            header("X-Vault-Token", vaultToken)
+            header(HttpHeaders.Authorization, "Bearer $authToken")
+        }
+
+        if (response.status != HttpStatusCode.OK) {
+            throw Exception("Failed to fetch document")
+        }
+
+        return response.body()
+    }
 }
 

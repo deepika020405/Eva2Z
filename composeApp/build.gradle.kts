@@ -35,7 +35,11 @@ kotlin {
             baseName = "ComposeApp"
             isStatic = true
 
-            linkerOpts("-framework", "Network")
+//            linkerOpts("-framework", "Network")
+            linkerOpts(
+                "-framework", "Security",
+                "-framework", "Network"
+            )
         }
     }
 
