@@ -1253,6 +1253,14 @@ class ApiService {
 
         println("🌐 API: Saving GeoFence")
 
+        println("🧪 SAVE GEOFENCE PAYLOAD")
+        println("➡️ device_id=$deviceId")
+        println("➡️ name=$name")
+        println("➡️ lat=$latitude")
+        println("➡️ lng=$longitude")
+        println("➡️ radius=$radius")
+        println("➡️ token=$token")
+
         return client.submitForm(
             url = url,
             formParameters = Parameters.build {
@@ -1266,6 +1274,9 @@ class ApiService {
             header(HttpHeaders.Authorization, "Bearer $token")
             header(HttpHeaders.Accept, ContentType.Application.Json.toString())
         }.body()
+
+
+
     }
 
 
@@ -1395,6 +1406,29 @@ class ApiService {
             header(HttpHeaders.Authorization, "Bearer $token")
         }.body()
     }
+
+
+
+    suspend fun registerFcmToken(
+        authHeader: String,
+        fcmToken: String
+    ) {
+        val response = client.post("${baseUrl}fcm/register") {
+            headers {
+                append("Authorization", authHeader)
+                append("Content-Type", "application/json")
+            }
+            setBody(
+                mapOf(
+                    "fcm_token" to fcmToken
+                )
+            )
+        }
+
+        println("📡 FCM API STATUS: ${response.status}")
+        println("📡 FCM API BODY: ${response.bodyAsText()}")
+    }
+
 
 }
 
