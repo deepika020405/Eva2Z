@@ -21,6 +21,14 @@ class UserPrefs(private val storage: StorageManager) {  // ✅ Storage → Stora
     fun getPhone() = storage.getString("phone", "")
     fun getEmail() = storage.getString("email", "")
     fun getPhoto() = storage.getString("photo", "")
+    fun getLastFcmToken(): String? =
+        storage.getString("last_fcm_token", "")
+
+    fun saveLastFcmToken(token: String) {
+        storage.saveString("last_fcm_token", token)
+    }
+
+
 
     fun isLoggedIn() = getToken()?.isNotEmpty()
 

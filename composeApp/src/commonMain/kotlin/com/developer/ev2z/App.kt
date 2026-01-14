@@ -173,15 +173,27 @@ fun App() {
             println("🔔 Registering FCM Bridge (user logged in)")
 
             FcmBridge.register { fcmToken ->
-                println("📤 Sending FCM token to server: $fcmToken")
+
+                val lastSent = userPrefs.getLastFcmToken()
+
+                if (lastSent == fcmToken) {
+                    println("🟡 FCM token unchanged, skipping server call")
+                    return@register
+                }
+
+                println("📤 Sending NEW FCM token to server: $fcmToken")
 
                 FcmRegistrar.registerFcmToServer(
                     authTokenNullable = "Bearer $authToken",
                     fcmToken = fcmToken
                 )
+
+                // ✅ persist after sending
+                userPrefs.saveLastFcmToken(fcmToken)
             }
         }
     }
+
 
     // AddDevice result handler
     LaunchedEffect(addDeviceResult) {
