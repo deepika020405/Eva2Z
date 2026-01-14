@@ -549,7 +549,7 @@ fun AboutSection(
                 color = Color(0xFFE0E0E0)
             )
 
-            AboutMenuItem("Feedback", Icons.Rounded.Feedback, onFeedback)
+//            AboutMenuItem("Feedback", Icons.Rounded.Feedback, onFeedback)
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp),
                 color = Color(0xFFE0E0E0)
