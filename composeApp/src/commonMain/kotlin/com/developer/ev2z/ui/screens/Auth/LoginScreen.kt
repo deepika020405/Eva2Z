@@ -188,14 +188,28 @@ fun LoginScreen(
 
         OutlinedTextField(
             value = phoneNumber,
-            onValueChange = {
-                if (it.length <= 10 && it.all { char -> char.isDigit() }) {
-                    phoneNumber = it
-                    phoneError = null
-                    generalError = null
-                    hasTriedLogin = false
-                    loginAttempts = 0
+            onValueChange = { input ->
+
+                // 1️⃣ sirf digits nikalo
+                val digitsOnly = input.filter { it.isDigit() }
+
+                // 2️⃣ HARD STOP for manual typing beyond 10
+                if (digitsOnly.length > 10 && input.length > phoneNumber.length) {
+                    return@OutlinedTextField
                 }
+
+                // 3️⃣ Autofill / paste case (+91, spaces, etc.)
+                val finalNumber =
+                    if (digitsOnly.length <= 10)
+                        digitsOnly
+                    else
+                        digitsOnly.takeLast(10)
+
+                phoneNumber = finalNumber
+                phoneError = null
+                generalError = null
+                hasTriedLogin = false
+                loginAttempts = 0
             },
             prefix = {
                 Text(
@@ -210,10 +224,18 @@ fun LoginScreen(
                 .height(56.dp),
             shape = RoundedCornerShape(120.dp),
             colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent,
+                disabledContainerColor = Color.Transparent,
                 unfocusedBorderColor = Color.LightGray,
                 focusedBorderColor = Color(0xFF6A9F50)
+            )
+            ,
+//            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Phone,
+                autoCorrect = false      // ❌ disable suggestions
             ),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
             singleLine = true,
             isError = phoneNumber.isNotEmpty() && phoneNumber.length < 10
         )
@@ -264,9 +286,13 @@ fun LoginScreen(
                 .height(56.dp),
             shape = RoundedCornerShape(120.dp),
             colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent,
+                disabledContainerColor = Color.Transparent,
                 unfocusedBorderColor = Color.LightGray,
                 focusedBorderColor = Color(0xFF6A9F50)
-            ),
+            )
+            ,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             singleLine = true,
             isError = password.isNotEmpty() && password.length < 6,
