@@ -36,7 +36,13 @@ kotlin {
             isStatic = true
 
 //            linkerOpts("-framework", "Network")
+//            linkerOpts(
+//                "-framework", "Security",
+//                "-framework", "Network"
+//            )
             linkerOpts(
+                "-framework", "UIKit",
+                "-framework", "Foundation",
                 "-framework", "Security",
                 "-framework", "Network"
             )

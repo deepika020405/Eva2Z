@@ -9,7 +9,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -21,7 +20,6 @@ import cafe.adriel.voyager.navigator.tab.*
 import com.developer.ev2z.LocalPlatformActivity
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.getAppContext
-import com.developer.ev2z.getPlatformContext
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.repository.ProductRepository
 import com.developer.ev2z.ui.screens.EditProfile.EditProfileScreen
@@ -46,8 +44,10 @@ import com.developer.ev2z.ui.screens.GPSData.GPSDataScreen
 //import com.developer.ev2z.ui.screens.GPSData.GPSDataScreen
 import com.developer.ev2z.ui.screens.Profile.AboutAppScreen
 import com.developer.ev2z.ui.screens.ReferAndEarn.ReferAndEarnScreen
+import com.developer.ev2z.ui.screens.documents.DocumentViewerScreen
 import com.developer.ev2z.ui.screens.documents.DocumentsScreen
 import com.developer.ev2z.util.BottomBarController
+import com.developer.ev2z.util.platformDownloadFile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -208,6 +208,9 @@ fun HomeNavGraph(
     var showChangePassword by remember { mutableStateOf(false) }
     var showAddDevice by remember { mutableStateOf(false) }
     var showDocuments by remember { mutableStateOf(false) }
+    var showDocumentViewer by remember { mutableStateOf(false) }
+    var viewerBytes by remember { mutableStateOf<ByteArray?>(null) }
+    var viewerFileName by remember { mutableStateOf("") }
 
 
 
@@ -299,12 +302,46 @@ fun HomeNavGraph(
             )
         }
 
+//        if (showDocuments) {
+//            DocumentsScreen(
+//                apiService = apiService,
+//                storageManager = storageManager,
+//                onBack = {
+//                    showDocuments = false
+//                }
+//            )
+//        }
         if (showDocuments) {
             DocumentsScreen(
                 apiService = apiService,
                 storageManager = storageManager,
-                onBack = {
+                onBack = { showDocuments = false },
+                onOpenViewer = { bytes, fileName ->
+                    viewerBytes = bytes
+                    viewerFileName = fileName
                     showDocuments = false
+                    showDocumentViewer = true
+                }
+            )
+        }
+
+        if (showDocumentViewer && viewerBytes != null) {
+
+            val androidContext = getAppContext()  // ✅ REAL Context
+
+            DocumentViewerScreen(
+                fileName = viewerFileName,
+                bytes = viewerBytes!!,
+                onBack = {
+                    showDocumentViewer = false
+                    showDocuments = true
+                },
+                onDownload = {
+                    platformDownloadFile(
+                        context = androidContext,   // ✅ FIXED
+                        bytes = viewerBytes!!,
+                        fileName = viewerFileName
+                    )
                 }
             )
         }
