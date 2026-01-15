@@ -51,6 +51,12 @@ fun EditProfileScreen(
         mutableStateOf(!isValidEmail(state.userEmail))
     }
 
+    val hasChanges = remember(state) {
+        state.userName.trim() != state.originalName ||
+                state.userEmail.trim() != state.originalEmail ||
+                state.userImageBytes != null
+    }
+
     // ✅ Reload data when screen is opened
     LaunchedEffect(Unit) {
         viewModel.loadUserData()
@@ -81,6 +87,7 @@ fun EditProfileScreen(
         state = state,
         emailError = emailError,
         onBackPressed = onBackPressed,
+        hasChanges = hasChanges,
         onNameChange = { viewModel.updateName(it) },
         onEmailChange = {
             viewModel.updateEmail(it)
@@ -103,8 +110,14 @@ fun EditProfileScreen(
             }
 
             !state.userImage.isNullOrEmpty() -> {
+                val image = if (state.userImage!!.startsWith("https")) {
+                    state.userImage
+                } else {
+                    BASE_IMAGE_URL + state.userImage
+                }
+
                 ProfileImageZoomDialog(
-                    imageUrl = BASE_IMAGE_URL + state.userImage!!,
+                    imageUrl = image,
                     onDismiss = { showImageZoom = false }
                 )
 
@@ -120,6 +133,7 @@ fun EditProfileScreen(
 fun EditProfileScreenContent(
     state: EditProfileState,
     emailError: Boolean,
+    hasChanges: Boolean,
     onBackPressed: () -> Unit = {},
     onNameChange: (String) -> Unit = {},
     onEmailChange: (String) -> Unit = {},
@@ -195,6 +209,7 @@ fun EditProfileScreenContent(
                     ) {
                         when {
                             state.userImageBytes != null -> {
+//                                val = state.userIma
                                 AsyncImage(
                                     model = state.userImageBytes,
                                     contentDescription = "Profile Picture",
@@ -203,12 +218,20 @@ fun EditProfileScreenContent(
                                 )
                             }
                             !state.userImage.isNullOrEmpty() -> {
+                                val image = if (state.userImage.startsWith("https")) {
+                                    state.userImage
+                                } else {
+                                    BASE_IMAGE_URL + state.userImage
+                                }
                                 AsyncImage(
-                                    model = BASE_IMAGE_URL + state.userImage,
+                                    model = image,
                                     contentDescription = "Profile Picture",
                                     modifier = Modifier.fillMaxSize().clip(CircleShape),
                                     contentScale = ContentScale.Crop
                                 )
+                                println("User ki pehle se Image : " + state.userImage)
+                                println("User ki recent se Image size: ${state.userImageBytes?.size} bytes")
+                                println("User ki recent se Image :" +BASE_IMAGE_URL +state.userImageBytes)
 
                             }
                             else -> {
@@ -299,9 +322,10 @@ fun EditProfileScreenContent(
 //                            state.userName.isNotEmpty() &&
 //                            !emailError
                     enabled = !state.isLoading &&
+                            hasChanges &&
                             state.userName.isNotBlank() &&
-                            state.userEmail.isNotBlank() &&
                             !emailError
+
                 ) {
                     if (state.isLoading) {
                         CircularProgressIndicator(
@@ -309,11 +333,17 @@ fun EditProfileScreenContent(
                             modifier = Modifier.size(24.dp)
                         )
                     } else {
+//                        Text(
+//                            text = "Update Profile",
+//                            fontSize = 16.sp,
+//                            fontWeight = FontWeight.SemiBold
+//                        )
                         Text(
-                            text = "Update Profile",
+                            text = if (hasChanges) "Update Profile" else "No Changes",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.SemiBold
                         )
+
                     }
                 }
 
