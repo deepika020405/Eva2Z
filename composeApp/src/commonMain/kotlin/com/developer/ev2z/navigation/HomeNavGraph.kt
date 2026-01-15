@@ -46,6 +46,7 @@ import com.developer.ev2z.ui.screens.Profile.AboutAppScreen
 import com.developer.ev2z.ui.screens.ReferAndEarn.ReferAndEarnScreen
 import com.developer.ev2z.ui.screens.documents.DocumentViewerScreen
 import com.developer.ev2z.ui.screens.documents.DocumentsScreen
+import com.developer.ev2z.ui.screens.documents.UploadDocumentScreen
 import com.developer.ev2z.util.BottomBarController
 import com.developer.ev2z.util.platformDownloadFile
 import kotlinx.coroutines.CoroutineScope
@@ -211,6 +212,8 @@ fun HomeNavGraph(
     var showDocumentViewer by remember { mutableStateOf(false) }
     var viewerBytes by remember { mutableStateOf<ByteArray?>(null) }
     var viewerFileName by remember { mutableStateOf("") }
+    var showUploadDocument by remember { mutableStateOf(false) } // 🔹 add state
+
 
 
 
@@ -321,6 +324,21 @@ fun HomeNavGraph(
                     viewerFileName = fileName
                     showDocuments = false
                     showDocumentViewer = true
+                },
+                onOpenUpload = {
+                    showDocuments = false
+                    showUploadDocument = true
+                }
+            )
+        }
+
+        if (showUploadDocument) {
+            UploadDocumentScreen(
+                apiService = apiService,
+                storageManager = storageManager,
+                onBack = {
+                    showUploadDocument = false
+                    showDocuments = true
                 }
             )
         }

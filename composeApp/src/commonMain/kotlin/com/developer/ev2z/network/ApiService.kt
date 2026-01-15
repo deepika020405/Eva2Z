@@ -1523,5 +1523,41 @@ class ApiService {
 
         return response.body()
     }
+
+    suspend fun uploadVaultDocument(
+        vaultToken: String,
+        authToken: String,
+        encryptedFile: ByteArray,
+        fileName: String,
+        fileType: String,
+        salt: String,
+        iv: String,
+        authTag: String,
+        checksum: String
+    ) {
+        client.submitFormWithBinaryData(
+            url = "https://gps.eva2z.in/api/vault/upload",
+            formData = formData {
+                append("encrypted_file", encryptedFile, Headers.build {
+                    append(HttpHeaders.ContentType, "image/png")
+                    append(
+                        HttpHeaders.ContentDisposition,
+                        "filename=\"$fileName.png\""
+                    )
+                })
+                append("file_name", fileName)
+                append("file_type", fileType)
+                append("salt", salt)
+                append("iv", iv)
+                append("auth_tag", authTag)
+                append("checksum", checksum)
+            }
+        ) {
+            headers {
+                append("X-Vault-Token", vaultToken)
+                append("Authorization", "Bearer $authToken")
+            }
+        }
+    }
 }
 

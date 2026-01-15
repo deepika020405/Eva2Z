@@ -9,6 +9,8 @@ import com.developer.ev2z.response.VaultDocumentDto
 import com.developer.ev2z.util.Base64Util
 import com.developer.ev2z.util.crypto.AesDecryptor
 import com.developer.ev2z.util.crypto.KeyDeriver
+import com.developer.ev2z.util.crypto.randomHex
+import com.developer.ev2z.util.crypto.sha256
 import io.ktor.utils.io.core.toByteArray
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -215,5 +217,35 @@ fun openDocument(documentId: String, onResult: (ByteArray) -> Unit) {
             e.printStackTrace()
         }
     }
+
+
 }
+
+
+
+
+    suspend fun uploadDocument(
+        fileName: String,
+        imageBytes: ByteArray
+    ) {
+        val vaultToken = storageManager.getString(StorageKeys.VAULT_TOKEN, "")
+        val authToken = storageManager.getString("token", "")
+
+        val salt = randomHex(16)
+        val iv = randomHex(16)
+        val authTag = randomHex(16)
+        val checksum = sha256(imageBytes)
+
+        apiService.uploadVaultDocument(
+            vaultToken = vaultToken,
+            authToken = authToken,
+            encryptedFile = imageBytes,
+            fileName = fileName,
+            fileType = fileName,
+            salt = salt,
+            iv = iv,
+            authTag = authTag,
+            checksum = checksum
+        )
+    }
 }

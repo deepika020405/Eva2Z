@@ -1,11 +1,15 @@
 package com.developer.ev2z.ui.screens.documents
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
@@ -13,6 +17,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -20,6 +26,8 @@ import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.util.PlatformDocumentViewer
+import com.developer.ev2z.util.compressStoryImage
+import com.developer.ev2z.util.rememberImagePicker
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -28,7 +36,8 @@ fun DocumentsScreen(
     apiService: ApiService,
     storageManager: StorageManager,
     onBack: () -> Unit,
-    onOpenViewer: (ByteArray, String) -> Unit // 👈 ADD THIS
+    onOpenViewer: (ByteArray, String) -> Unit, // 👈 ADD THIS
+    onOpenUpload: () -> Unit
 ) {
     // 🔙 System back handling
     PlatformBackHandler(enabled = true) {
@@ -61,6 +70,14 @@ fun DocumentsScreen(
                             imageVector = Icons.Default.ArrowBack,
                             contentDescription = "Back"
                         )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = {
+                        // open upload screen
+                        onOpenUpload()
+                    }) {
+                        Icon(Icons.Default.Add, contentDescription = "Add Document")
                     }
                 }
             )
@@ -144,6 +161,10 @@ fun DocumentViewerScreen(
     onBack: () -> Unit,
     onDownload: () -> Unit
 ) {
+    // ✅ SYSTEM BACK HANDLING
+    PlatformBackHandler(enabled = true) {
+        onBack()
+    }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -236,7 +257,98 @@ private fun DocumentItem(
     }
 }
 
-object DocumentViewerStore {
-    var bytes: ByteArray? = null
-    var fileName: String = ""
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun UploadDocumentScreen(
+    apiService: ApiService,
+    storageManager: StorageManager,
+    onBack: () -> Unit
+) {
+    // ✅ SYSTEM BACK HANDLING
+    PlatformBackHandler(enabled = true) {
+        onBack()
+    }
+
+    val viewModel = remember {
+        DocumentsViewModel(
+            apiService = apiService,
+            storageManager = storageManager
+        )
+    }
+
+    var fileName by remember { mutableStateOf("") }
+    var imageBytes by remember { mutableStateOf<ByteArray?>(null) }
+    val scope = rememberCoroutineScope()
+
+    val imagePickerLauncher = rememberImagePicker { bytes ->
+        if (bytes != null) {
+            imageBytes = compressStoryImage(
+                imageBytes = bytes,
+                maxSizeKB = 800
+            )
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Add Document") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
+                    }
+                },
+                actions = {
+                    TextButton(
+                        enabled = fileName.isNotBlank() && imageBytes != null,
+                        onClick = {
+                            scope.launch {
+                                viewModel.uploadDocument(
+                                    fileName = fileName,
+                                    imageBytes = imageBytes!!
+                                )
+                                onBack()
+                            }
+                        }
+                    ) {
+                        Text("Upload")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .padding(16.dp)
+                .fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+
+            OutlinedTextField(
+                value = fileName,
+                onValueChange = { fileName = it },
+                label = { Text("File name") },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(220.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xFFE0E0E0))
+                    .clickable { imagePickerLauncher.launch() },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    if (imageBytes == null)
+                        "Tap to select image"
+                    else
+                        "Image selected ✅"
+                )
+            }
+        }
+    }
 }
