@@ -124,7 +124,7 @@ fun BottomSheetCommon(
                     }
                 }
             },
-            sheetPeekHeight = 82.dp,
+            sheetPeekHeight = 105.dp,
             sheetContent = {
                 Box(modifier = Modifier.height(1.dp))
             }

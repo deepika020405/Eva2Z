@@ -138,9 +138,10 @@ fun LoginScreen(
 
                     passwordError =
                         if (loginAttempts >= 3)
-                            "Too many failed attempts. Redirecting to reset password…"
+                            "Too many failed attempts. Please reset your password…"
                         else
-                            "Incorrect password (Attempt $loginAttempts/5)"
+//                            "Incorrect password (Attempt $loginAttempts/5)"
+                            "Incorrect password "
 
                     if (loginAttempts >= 5) {
                         delay(1500)

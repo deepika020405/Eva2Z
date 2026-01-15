@@ -50,7 +50,7 @@ fun OTPScreen(
     val focus5 = remember { FocusRequester() }
     val focus6 = remember { FocusRequester() }
 
-    var resendTimeLeft by remember { mutableStateOf(600) }
+    var resendTimeLeft by remember { mutableStateOf(60) }
     var resendEnabled by remember { mutableStateOf(false) }
 
 
@@ -315,7 +315,7 @@ fun OTPScreen(
 
                 TextButton(
                     onClick = {
-                        resendTimeLeft = 300
+                        resendTimeLeft = 60
                         resendEnabled = false
                         onResendOTP()
                     },

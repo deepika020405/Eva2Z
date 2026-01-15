@@ -161,7 +161,11 @@ fun SignupScreen(
                 unfocusedBorderColor = Color.LightGray,
                 focusedBorderColor = Color(0xFF6A9F50)
             ),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+//            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Phone,
+                autoCorrect = false      // ❌ disable suggestions
+            ),
             singleLine = true,
             isError = submitAttempted && (
                     phoneNumber.length < 10 || phoneAlreadyRegisteredError != null
