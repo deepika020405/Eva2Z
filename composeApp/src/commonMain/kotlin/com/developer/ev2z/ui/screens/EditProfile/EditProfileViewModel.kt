@@ -53,9 +53,9 @@ class EditProfileViewModel(
     // ✅ Store selected image bytes temporarily - DON'T auto-upload
     private var selectedImageBytes: ByteArray? = null
 
-    init {
-        loadUserData()
-    }
+//    init {
+//        loadUserData()
+//    }
 
 //    fun loadUserData() {
 //        val name = storageManager.getString("name", "")
