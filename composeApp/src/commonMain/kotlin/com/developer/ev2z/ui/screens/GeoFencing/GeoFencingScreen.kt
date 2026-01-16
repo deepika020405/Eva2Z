@@ -50,6 +50,10 @@ fun GeoFencingScreen(
         onBackPressed()
     }
 
+    LaunchedEffect(Unit) {
+        viewModel.loadGeoFencesSafely()
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -73,9 +77,38 @@ fun GeoFencingScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
+//            when (state) {
+//                GeoFenceUiState.Loading ->
+//                    CircularProgressIndicator(Modifier.align(Alignment.Center))
+//
+//                GeoFenceUiState.Empty ->
+//                    EmptyGeoFenceView(onAddGeoFence)
+//
+//                is GeoFenceUiState.Success -> {
+//                    GeoFenceList(
+//                        list = (state as GeoFenceUiState.Success).list,
+//                        onDelete = { viewModel.deleteGeoFence(it) },
+//                        onEdit = { onEditGeoFence(it) } // ✅
+//                    )
+//                }
+//
+//                is GeoFenceUiState.Error ->
+//                    Text(
+//                        text = (state as GeoFenceUiState.Error).message,
+//                        modifier = Modifier.align(Alignment.Center)
+//                    )
+//            }
             when (state) {
+
                 GeoFenceUiState.Loading ->
                     CircularProgressIndicator(Modifier.align(Alignment.Center))
+
+                GeoFenceUiState.NoDevice ->
+                    NoDeviceView(
+                        onAddDevice = {
+                            // 👉 yahan navigate to Add Device screen
+                        }
+                    )
 
                 GeoFenceUiState.Empty ->
                     EmptyGeoFenceView(onAddGeoFence)
@@ -84,7 +117,7 @@ fun GeoFencingScreen(
                     GeoFenceList(
                         list = (state as GeoFenceUiState.Success).list,
                         onDelete = { viewModel.deleteGeoFence(it) },
-                        onEdit = { onEditGeoFence(it) } // ✅
+                        onEdit = { onEditGeoFence(it) }
                     )
                 }
 
@@ -98,7 +131,46 @@ fun GeoFencingScreen(
     }
 }
 
+@Composable
+fun NoDeviceView(
+    onAddDevice: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
 
+        Text("📡", fontSize = 64.sp)
+        Text(
+            text = "No Devices Found",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color.Gray
+        )
+        Text(
+            text = "Please add a device to create GeoFence",
+            fontSize = 14.sp,
+            color = Color.Gray
+        )
+//        Spacer(Modifier.height(8.dp))
+//
+//        Text(
+//            text = "Please add a device to create GeoFence",
+//            fontSize = 13.sp,
+//            color = Color.Gray
+//        )
+//
+//        Spacer(Modifier.height(20.dp))
+
+//        Button(
+//            onClick = onAddDevice,
+//            shape = RoundedCornerShape(20.dp)
+//        ) {
+//            Text("Add Device")
+//        }
+    }
+}
 @Composable
 fun EmptyGeoFenceView(
     onAddGeoFence: () -> Unit

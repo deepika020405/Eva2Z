@@ -24,6 +24,8 @@ import kotlin.math.sin
 sealed class GeoFenceUiState {
     object Loading : GeoFenceUiState()
     object Empty : GeoFenceUiState()
+    object NoDevice : GeoFenceUiState()   // 🔥 NEW
+
     data class Success(val list: List<GeoFenceDto>) : GeoFenceUiState()
     data class Error(val message: String) : GeoFenceUiState()
 }
@@ -74,9 +76,9 @@ class GeoFenceViewModel(
     private val _selected = MutableStateFlow<LocationResult?>(null)
     val selected: StateFlow<LocationResult?> = _selected
     val deviceState: StateFlow<DeviceUiState> = _deviceState
-    init {
-        loadGeoFences()
-    }
+//    init {
+//        loadGeoFences()
+//    }
     private var searchJob: Job? = null
     val _isSearching = MutableStateFlow(false)
     private val _polygon =
@@ -110,6 +112,40 @@ class GeoFenceViewModel(
                 .onFailure {
                     _uiState.value =
                         GeoFenceUiState.Error(it.message ?: "Something went wrong")
+                }
+        }
+    }
+
+    fun loadGeoFencesSafely() {
+        viewModelScope.launch {
+            _uiState.value = GeoFenceUiState.Loading
+
+            // 1️⃣ First check devices
+            repository.fetchMyDevices(token)
+                .onSuccess { devices ->
+
+                    if (devices.isEmpty()) {
+                        _uiState.value = GeoFenceUiState.NoDevice
+                        return@launch   // ⛔ STOP HERE
+                    }
+
+                    // 2️⃣ Devices exist → load geofences
+                    repository.fetchGeoFences()
+                        .onSuccess { list ->
+                            _uiState.value =
+                                if (list.isEmpty())
+                                    GeoFenceUiState.Empty
+                                else
+                                    GeoFenceUiState.Success(list)
+                        }
+                        .onFailure {
+                            _uiState.value =
+                                GeoFenceUiState.Error(it.message ?: "GeoFence load failed")
+                        }
+                }
+                .onFailure {
+                    _uiState.value =
+                        GeoFenceUiState.Error(it.message ?: "Device load failed")
                 }
         }
     }
