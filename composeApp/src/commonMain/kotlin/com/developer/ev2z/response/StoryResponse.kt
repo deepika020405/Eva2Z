@@ -4,27 +4,28 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class StoryResponse(
-    val auth_user_id: Int,
+    val success: Boolean,
+    val total_users: Int,
+    val data: List<StoryGroupResponse>
+)
+
+@Serializable
+data class StoryGroupResponse(
+    val user: Users,
+    val is_own_story: Boolean,
     val stories: List<Story>
 )
 
 @Serializable
 data class Story(
     val id: Int,
-    val user_id: Int,
-    val title: String? = null,
-    val body: String? = null,
-    val media: List<String>,
-    val created_at: String,
-    val expires_at: String,
+    val media_urls: List<String>,
     val view_count: Int,
-    val user: Users
+    val created_at: String,
+    val expires_at: String
 )
 
-@Serializable
-data class AddStoryResponse(
-    val story: Story
-)
+
 @Serializable
 data class StoryViewersResponse(
     val story_id: Int= 0,
@@ -41,5 +42,6 @@ data class StoryViewer(
 @Serializable
 data class StoryGroup(
     val user: Users,
-    val stories: List<Story>
+    val stories: List<Story>,
+    val isOwnStory: Boolean
 )
