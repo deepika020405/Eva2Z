@@ -123,7 +123,8 @@ fun GeoFencingScreen(
 
                 is GeoFenceUiState.Error ->
                     Text(
-                        text = (state as GeoFenceUiState.Error).message,
+//                        text = (state as GeoFenceUiState.Error).message,
+                        text = "Error: No Device Id Found",
                         modifier = Modifier.align(Alignment.Center)
                     )
             }

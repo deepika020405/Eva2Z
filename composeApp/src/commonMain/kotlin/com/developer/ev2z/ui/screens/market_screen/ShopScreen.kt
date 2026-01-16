@@ -95,7 +95,10 @@ fun ShopScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(
+                        bottom = 100.dp   // 👈 enough space for cart bar + comfort scroll
+                    )
                 ) {
                     items(products) { product ->
                         ProductCard(
