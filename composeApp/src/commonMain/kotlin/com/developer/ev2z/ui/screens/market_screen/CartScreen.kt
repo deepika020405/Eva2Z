@@ -160,9 +160,9 @@ fun CartScreenContent() {
                 // 👇 Promo + Summary yahin condition ke saath aayega
                 if (state.cart.isNotEmpty()) {
                     CouponsSection(viewModel)
+                    PaymentSummarySection(viewModel)
                 }
 
-                PaymentSummarySection(viewModel)
             }
             if (state.cart.isNotEmpty()) {
                 CheckoutBottomBar(viewModel)
