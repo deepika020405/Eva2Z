@@ -72,7 +72,7 @@ class CreatePostScreen : Screen {
                             enabled = body.isNotBlank(),
                             onClick = {
                                 viewModel.createPost(title, body, images)
-                                viewModel.refreshPosts()
+//                                viewModel.refreshPosts()
                                 navigator.pop()
                             }
                         ) {

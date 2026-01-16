@@ -22,8 +22,8 @@ class CommunityRepository(
         title: String,
         body: String,
         images: List<ByteArray>
-    ) {
-        apiService.createCommunityPost(title, body, images)
+    ): JsonObject {
+        return apiService.createCommunityPost(title, body, images)
     }
 
 

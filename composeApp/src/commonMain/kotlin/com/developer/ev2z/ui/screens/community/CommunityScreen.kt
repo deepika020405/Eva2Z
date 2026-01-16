@@ -73,6 +73,7 @@ import coil3.compose.AsyncImage
 import com.developer.ev2z.response.Comment
 import com.developer.ev2z.response.Post
 import com.developer.ev2z.response.Story
+import com.developer.ev2z.response.StoryGroup
 import com.developer.ev2z.response.StoryViewer
 import com.developer.ev2z.response.Users
 import com.developer.ev2z.ui.components.FloatingContactButton
@@ -106,11 +107,19 @@ fun CommunityScreen(
          val BASE_IMAGE_URL = "https://gps.eva2z.in"
 
         item {
+//            StoriesRow(
+//                stories = stories,
+//                authUserId = authUserId,
+//                viewModel = viewModel ,
+//                onAddStory = onAddStory,
+//                navigator = navigator
+//            )
             StoriesRow(
-                stories = stories,
-                authUserId = authUserId,
-                viewModel = viewModel ,
-                onAddStory = onAddStory,
+                groups = viewModel.storyGroups,
+                viewModel = viewModel,
+                onAddStory = {
+                    navigator.push(CreateStoryScreen())
+                },
                 navigator = navigator
             )
 
@@ -906,13 +915,58 @@ private val urlRegex =
     "(https?:\\/\\/)?(www\\.)?(youtube\\.com|youtu\\.be|[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,})(\\/\\S*)?"
         .toRegex(RegexOption.IGNORE_CASE)
 
+//@Composable
+//fun StoriesRow(
+//    stories: List<Story>,
+//    authUserId: Int,
+//    viewModel: CommunityViewModel,
+//    onAddStory: () -> Unit,
+//    navigator: Navigator
+//) {
+//    val grouped = remember(stories, authUserId) {
+//        stories
+//            .groupBy { story ->
+//                story.user.id.takeIf { it != 0 } ?: authUserId
+//            }
+//            .map { (_, stories) ->
+//                StoryGroup(
+//                    user = stories.first().user,
+//                    stories = stories.sortedBy { it.created_at }
+//                )
+//            }
+//            .sortedByDescending { it.user.id == authUserId }
+//    }
+//
+//    LazyRow(
+//        modifier = Modifier
+//            .fillMaxWidth()
+//            .padding(vertical = 8.dp),
+//        contentPadding = PaddingValues(horizontal = 12.dp)
+//    ) {
+//
+//        item {
+//            AddStoryItem(onClick = onAddStory)
+//        }
+//
+//        items(grouped) { group ->
+//            StoryItem(
+//                user = group.user,
+//                isViewed = viewModel.isGroupViewed(group),
+//                onClick = {
+//                    viewModel.startStoryGroup(group)
+//                    navigator.push(StoryViewerScreen())
+//                }
+//            )
+//        }
+//    }
+//}
+
 @Composable
 fun StoriesRow(
-    stories: List<Story>,
-    authUserId: Int,
+    groups: List<StoryGroup>,
     viewModel: CommunityViewModel,
     onAddStory: () -> Unit,
-    navigator: Navigator   // ✅ ADD THIS
+    navigator: Navigator
 ) {
     LazyRow(
         modifier = Modifier
@@ -925,10 +979,10 @@ fun StoriesRow(
             AddStoryItem(onClick = onAddStory)
         }
 
-
-        val grouped = viewModel.groupedStories()
-
-        items(grouped) { group ->
+        items(
+            items = groups,
+            key = { it.user.id } // 🔥 stable key
+        ) { group ->
             StoryItem(
                 user = group.user,
                 isViewed = viewModel.isGroupViewed(group),
@@ -938,10 +992,8 @@ fun StoriesRow(
                 }
             )
         }
-
     }
 }
-
 
 @Composable
 fun AddStoryItem(onClick: () -> Unit) {
@@ -1041,12 +1093,17 @@ class CommunityScreenWrapper : Screen {
         var openCommentsPostId by remember { mutableStateOf<Int?>(null) }
 
         // ✅ THIS WAS MISSING
-        val refreshKey = viewModel.observeRefreshKey()
+//        val refreshKey = viewModel.observeRefreshKey()
+//
+//        LaunchedEffect(refreshKey) {
+//            viewModel.loadPosts()
+//        }
 
-        LaunchedEffect(refreshKey) {
-            viewModel.loadPosts()
+        LaunchedEffect(Unit) {
+            if (viewModel.state.posts.isEmpty()) {
+                viewModel.loadPosts()
+            }
         }
-
 
         Box(modifier = Modifier.fillMaxSize()) {
 
@@ -1061,12 +1118,13 @@ class CommunityScreenWrapper : Screen {
                     }
                 }
 
-                state.error != null -> {
+                state.error != null && state.posts.isEmpty() -> {
                     Box(
                         Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(state.error ?: "Error")
+//                        Text(state.error ?: " Server Error")
+                        Text( " Server Error")
                     }
                 }
 
