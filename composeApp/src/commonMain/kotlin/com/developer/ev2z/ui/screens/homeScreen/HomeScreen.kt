@@ -85,7 +85,8 @@ fun HomeScreen(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "Error: ${state.message}",
+//                        text = "Server Error: ${state.message}",
+                        text = "  Server Error ",
                         color = Color.Red,
                         fontSize = 16.sp
                     )

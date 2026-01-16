@@ -96,12 +96,12 @@ class StoryViewerScreen : Screen {
                     )
                 }
         ) {
-
+            val group = vm.currentGroup!!
             // 1️⃣ TOP BAR (FIXED)
             StoryTopBar(
-                userName = story.user.name,
-                userProfile = "https://gps.eva2z.in/storage/${story.user.photo}",
-                isMyStatus = story.user.id == state.authUserId, // ✅ CHECK
+                userName = group.user.name,
+                userProfile = "https://gps.eva2z.in/storage/${group.user.photo}",
+                isMyStatus = group.user.id == state.authUserId, // ✅ CHECK
                 onBack = { navigator.pop() }
             )
 
@@ -143,14 +143,15 @@ class StoryViewerScreen : Screen {
                     .fillMaxSize()
             ) {
                 AsyncImage(
-                    model = "https://gps.eva2z.in/storage/${story.media.first()}",
+                    model = "https://gps.eva2z.in${story.media_urls.first()}",
                     contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Fit
                 )
 
+
                 // 4️⃣ VIEW COUNT (IMAGE KE ANDAR, BOTTOM)
-                if (story.user.id == state.authUserId) {
+                if (group.isOwnStory) {
                     Text(
                         text = "👁 ${story.view_count}",
                         color = Color.White,
@@ -245,52 +246,6 @@ class StoryViewerScreen : Screen {
     }
 }
 
-//@Composable
-//private fun StoryTopBar(
-//    userName: String,
-//    userProfile: String?,
-//    onBack: () -> Unit
-//) {
-//    Box(
-//        modifier = Modifier
-//            .fillMaxWidth()
-//            .padding(top = 12.dp, start = 12.dp, end = 12.dp)
-//    ) {
-//
-//        Row(
-//            verticalAlignment = Alignment.CenterVertically
-//        ) {
-//            // Back
-//            Text(
-//                text = "←",
-//                color = Color.White,
-//                fontSize = 26.sp,
-//                modifier = Modifier
-//                    .padding(end = 12.dp)
-//                    .clickable { onBack() }
-//            )
-//
-//            // Profile Image (Perfect Circle)
-//            AsyncImage(
-//                model = userProfile,
-//                contentDescription = null,
-//                modifier = Modifier
-//                    .size(38.dp)
-//                    .background(Color.DarkGray, CircleShape)
-//                    .clip(CircleShape),
-//                contentScale = ContentScale.Crop
-//            )
-//
-//            // Username
-//            Text(
-//                text = userName,
-//                color = Color.White,
-//                fontSize = 14.sp,
-//                modifier = Modifier.padding(start = 8.dp)
-//            )
-//        }
-//    }
-//}
 
 
 @Composable

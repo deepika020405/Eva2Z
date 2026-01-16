@@ -132,20 +132,20 @@ private fun DeviceListScreen(
             }
 
             // Error Snackbar
-            state.error?.let { error ->
-                Snackbar(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(16.dp),
-                    action = {
-                        TextButton(onClick = onDismissError) {
-                            Text("Dismiss")
-                        }
-                    }
-                ) {
-                    Text(error)
-                }
-            }
+//            state.error?.let { error ->
+//                Snackbar(
+//                    modifier = Modifier
+//                        .align(Alignment.BottomCenter)
+//                        .padding(16.dp),
+//                    action = {
+//                        TextButton(onClick = onDismissError) {
+//                            Text("Dismiss")
+//                        }
+//                    }
+//                ) {
+//                    Text(error)
+//                }
+//            }
         }
     }
 }

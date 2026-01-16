@@ -109,6 +109,9 @@ fun SignupScreen(
                 .height(56.dp),
             shape = RoundedCornerShape(120.dp),
             colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent,
+                disabledContainerColor = Color.Transparent,
                 unfocusedBorderColor = Color.LightGray,
                 focusedBorderColor = Color(0xFF6A9F50)
             ),
@@ -139,11 +142,23 @@ fun SignupScreen(
 
         OutlinedTextField(
             value = phoneNumber,
-            onValueChange = {
-                if (it.length <= 10 && it.all { char -> char.isDigit() }) {
-                    phoneNumber = it
-                    phoneAlreadyRegisteredError = null
+            onValueChange = { input ->
+
+                // 1️⃣ Sirf digits nikaalo
+                val digitsOnly = input.filter { it.isDigit() }
+
+                // 2️⃣ Agar 10 se zyada ho gaye → HARD STOP
+                if (digitsOnly.length > 10) {
+                    // agar autofill hai ( +91 / spaces ), to last 10 set karo
+                    if (input.contains("+") || input.contains(" ")) {
+                        phoneNumber = digitsOnly.takeLast(10)
+                    }
+                    return@OutlinedTextField
                 }
+
+                // 3️⃣ Normal typing (<=10)
+                phoneNumber = digitsOnly
+                phoneAlreadyRegisteredError = null
             },
             prefix = {
                 Text(
@@ -158,6 +173,9 @@ fun SignupScreen(
                 .height(56.dp),
             shape = RoundedCornerShape(120.dp),
             colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent,
+                disabledContainerColor = Color.Transparent,
                 unfocusedBorderColor = Color.LightGray,
                 focusedBorderColor = Color(0xFF6A9F50)
             ),
@@ -215,6 +233,9 @@ fun SignupScreen(
                 .height(56.dp),
             shape = RoundedCornerShape(120.dp),
             colors = OutlinedTextFieldDefaults.colors(
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent,
+                disabledContainerColor = Color.Transparent,
                 unfocusedBorderColor = Color.LightGray,
                 focusedBorderColor = Color(0xFF6A9F50)
             ),

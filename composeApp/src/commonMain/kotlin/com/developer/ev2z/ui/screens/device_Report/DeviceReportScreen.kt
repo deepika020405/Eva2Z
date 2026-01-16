@@ -734,11 +734,11 @@ fun HeadingGraphCardWithData(
             ) {
                 Text("Total Activity :", color = Color.Gray)
                 Spacer(Modifier.weight(1f))
-                Text(
-                    analytics?.totalActivityFormatted ?: "0 hr",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+//                Text(
+//                    analytics?.totalActivityFormatted ?: "0 hr",
+//                    fontSize = 16.sp,
+//                    fontWeight = FontWeight.SemiBold
+//                )
             }
 
             Spacer(Modifier.height(12.dp))

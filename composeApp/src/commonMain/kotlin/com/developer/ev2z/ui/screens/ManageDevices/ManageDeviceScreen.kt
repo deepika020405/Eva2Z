@@ -97,7 +97,8 @@ fun ManageDeviceScreen(
                         modifier = Modifier.padding(16.dp)
                     ) {
                         Text(
-                            text = "Error: ${uiState.error}",
+//                            text = "Error: ${uiState.error}",
+                            text = "Error: No Device Id Found",
                             color = Color.Red,
                             style = MaterialTheme.typography.bodyLarge
                         )

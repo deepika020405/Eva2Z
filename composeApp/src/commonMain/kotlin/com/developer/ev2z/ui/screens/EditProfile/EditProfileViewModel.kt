@@ -11,16 +11,35 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
+//data class EditProfileState(
+//    val isLoading: Boolean = false,
+//    val userName: String = "",
+//    val userEmail: String = "",
+//    val userPhone: String = "",
+//    val userImage: String? = null,
+//    val userImageBytes: ByteArray? = null,
+//    val error: String? = null,
+//    val updateSuccess: Boolean = false
+//)
+
 data class EditProfileState(
-    val isLoading: Boolean = false,
+    // ORIGINAL SNAPSHOT
+    val originalName: String = "",
+    val originalEmail: String = "",
+    val originalImage: String? = null,
+
+    // EDITABLE
     val userName: String = "",
     val userEmail: String = "",
     val userPhone: String = "",
     val userImage: String? = null,
     val userImageBytes: ByteArray? = null,
-    val error: String? = null,
-    val updateSuccess: Boolean = false
+
+    val isLoading: Boolean = false,
+    val updateSuccess: Boolean = false,
+    val error: String? = null
 )
+
 
 class EditProfileViewModel(
     private val apiService: ApiService,
@@ -34,29 +53,46 @@ class EditProfileViewModel(
     // ✅ Store selected image bytes temporarily - DON'T auto-upload
     private var selectedImageBytes: ByteArray? = null
 
-    init {
-        loadUserData()
-    }
+//    init {
+//        loadUserData()
+//    }
 
-    fun loadUserData() {
-        val name = storageManager.getString("name", "")
-        val email = storageManager.getString("email", "")
-        val phone = storageManager.getString("phone", "")
-        val image = storageManager.getString("photo", "")
+//    fun loadUserData() {
+//        val name = storageManager.getString("name", "")
+//        val email = storageManager.getString("email", "")
+//        val phone = storageManager.getString("phone", "")
+//        val image = storageManager.getString("photo", "")
+//
+//        println("📱 Loading user data from storage:")
+//        println("   Name: $name")
+//        println("   Email: $email")
+//        println("   Phone: $phone")
+//        println("   Photo: $image")
+//
+//        _state.value = _state.value.copy(
+//            userName = name,
+//            userEmail = email,
+//            userPhone = phone,
+//            userImage = image.ifEmpty { null }
+//        )
+//    }
+fun loadUserData() {
+    val name = storageManager.getString("name", "")
+    val email = storageManager.getString("email", "")
+    val phone = storageManager.getString("phone", "")
+    val image = storageManager.getString("photo", "").ifEmpty { null }
 
-        println("📱 Loading user data from storage:")
-        println("   Name: $name")
-        println("   Email: $email")
-        println("   Phone: $phone")
-        println("   Photo: $image")
+    _state.value = EditProfileState(
+        originalName = name,
+        originalEmail = email,
+        originalImage = image,
 
-        _state.value = _state.value.copy(
-            userName = name,
-            userEmail = email,
-            userPhone = phone,
-            userImage = image.ifEmpty { null }
-        )
-    }
+        userName = name,
+        userEmail = email,
+        userPhone = phone,
+        userImage = image
+    )
+}
 
     fun updateName(name: String) {
         _state.value = _state.value.copy(userName = name)
@@ -95,125 +131,197 @@ class EditProfileViewModel(
 
     // ✅ FIX 2: Email is optional now
 
-    fun updateProfile() {
-        viewModelScope.launch {
+//    fun updateProfile() {
+//        viewModelScope.launch {
+//
+//            val name = _state.value.userName.trim()
+//            val email = _state.value.userEmail.trim()
+//
+//            // 🔴 VALIDATION: Name required
+//            if (name.isEmpty()) {
+//                _state.value = _state.value.copy(
+//                    error = "Name is required"
+//                )
+//                return@launch
+//            }
+//
+//            // 🔴 VALIDATION: Email required
+//            if (email.isEmpty()) {
+//                _state.value = _state.value.copy(
+//                    error = "Email is required"
+//                )
+//                return@launch
+//            }
+//
+//            // 🔴 VALIDATION: Email format
+//            if (!isValidEmail(email)) {
+//                _state.value = _state.value.copy(
+//                    error = "Please enter a valid email address"
+//                )
+//                return@launch
+//            }
+//
+//            // ✅ All validations passed
+//            _state.value = _state.value.copy(
+//                isLoading = true,
+//                error = null
+//            )
+//
+//            try {
+//                val token = storageManager.getString("token", "")
+//                if (token.isEmpty()) {
+//                    _state.value = _state.value.copy(
+//                        isLoading = false,
+//                        error = "Token not found. Please login again."
+//                    )
+//                    return@launch
+//                }
+//
+//                println("🌐 Updating profile...")
+//                println("   Name: $name")
+//                println("   Email: $email")
+//                println("   Has Image: ${selectedImageBytes != null}")
+//                println("   Image size: ${selectedImageBytes?.size ?: 0} bytes")
+//
+//                val compressedImage = selectedImageBytes?.let {
+//                    compressImageBytes(it, maxSizeKB = 500)
+//                }
+//
+//                val response = apiService.(
+//                    token = "Bearer $token",
+//                    name = name,
+//                    email = email, // 🔥 Email now required
+//                    photo = compressedImage
+//                )
+//
+//                val userObject = response["user"] as? Map<*, *>
+//                val photoUrl = response["photo_url"]?.toString()?.trim('"')
+//
+//                if (userObject == null) {
+//                    _state.value = _state.value.copy(
+//                        isLoading = false,
+//                        error = "Invalid response from server"
+//                    )
+//                    return@launch
+//                }
+//
+//                val newName = userObject["name"]?.toString()?.trim('"') ?: name
+//                val newEmail = userObject["email"]?.toString()?.trim('"') ?: email
+//                val newPhone = userObject["phone"]?.toString()?.trim('"') ?: _state.value.userPhone
+//                val newPhoto = userObject["photo"]?.toString()?.trim('"')
+//
+//                val fullPhotoUrl = when {
+//                    photoUrl != null && photoUrl.startsWith("http") -> photoUrl
+//                    photoUrl != null -> "https://gps.eva2z.in$photoUrl"
+//                    newPhoto != null && newPhoto.startsWith("http") -> newPhoto
+//                    newPhoto != null -> "https://gps.eva2z.in/storage/$newPhoto"
+//                    else -> _state.value.userImage
+//                }
+//
+//                // ✅ Save locally
+//                storageManager.saveString("name", newName)
+//                storageManager.saveString("email", newEmail)
+//                storageManager.saveString("phone", newPhone)
+//                fullPhotoUrl?.let { storageManager.saveString("photo", it) }
+//
+//                // ✅ Update UI state
+//                _state.value = _state.value.copy(
+//                    isLoading = false,
+//                    userName = newName,
+//                    userEmail = newEmail,
+//                    userPhone = newPhone,
+//                    userImage = fullPhotoUrl,
+//                    error = null,
+//                    updateSuccess = true
+//                )
+//
+//                // Clear image after success
+//                selectedImageBytes = null
+//
+//                println("✅ Profile updated successfully")
+//
+//            } catch (e: Exception) {
+//                println("❌ Profile update error: ${e.message}")
+//                _state.value = _state.value.copy(
+//                    isLoading = false,
+//                    error = e.message ?: "Failed to update profile"
+//                )
+//            }
+//        }
+//    }
 
-            val name = _state.value.userName.trim()
-            val email = _state.value.userEmail.trim()
+    fun updateProfile() = viewModelScope.launch {
+        val s = _state.value
 
-            // 🔴 VALIDATION: Name required
-            if (name.isEmpty()) {
-                _state.value = _state.value.copy(
-                    error = "Name is required"
+        // 🧠 Detect changes
+        val isNameChanged = s.userName != s.originalName
+        val isEmailChanged = s.userEmail != s.originalEmail
+        val isImageChanged = s.userImageBytes != null
+
+        if (!isNameChanged && !isEmailChanged && !isImageChanged) {
+            return@launch // 👈 nothing to update
+        }
+
+        _state.value = s.copy(isLoading = true, error = null)
+
+        try {
+            val token = storageManager.getString("token", "")
+            if (token.isEmpty()) {
+                _state.value = s.copy(
+                    isLoading = false,
+                    error = "Token not found. Please login again."
                 )
                 return@launch
             }
 
-            // 🔴 VALIDATION: Email required
-            if (email.isEmpty()) {
-                _state.value = _state.value.copy(
-                    error = "Email is required"
-                )
-                return@launch
-            }
-
-            // 🔴 VALIDATION: Email format
-            if (!isValidEmail(email)) {
-                _state.value = _state.value.copy(
-                    error = "Please enter a valid email address"
-                )
-                return@launch
-            }
-
-            // ✅ All validations passed
-            _state.value = _state.value.copy(
-                isLoading = true,
-                error = null
+            val response = apiService.updateProfile(
+                token = "Bearer $token",
+                name = if (isNameChanged) s.userName.trim() else s.originalName,
+                email = if (isEmailChanged) s.userEmail.trim() else s.originalEmail,
+                photo = s.userImageBytes?.let {
+                    compressImageBytes(it, 500)
+                }
             )
 
-            try {
-                val token = storageManager.getString("token", "")
-                if (token.isEmpty()) {
-                    _state.value = _state.value.copy(
-                        isLoading = false,
-                        error = "Token not found. Please login again."
-                    )
-                    return@launch
-                }
+            val userObject = response["user"] as? Map<*, *>
+            val photoUrl = response["photo_url"]?.toString()?.trim('"')
 
-                println("🌐 Updating profile...")
-                println("   Name: $name")
-                println("   Email: $email")
-                println("   Has Image: ${selectedImageBytes != null}")
-                println("   Image size: ${selectedImageBytes?.size ?: 0} bytes")
+            val newName = userObject?.get("name")?.toString()?.trim('"') ?: s.userName
+            val newEmail = userObject?.get("email")?.toString()?.trim('"') ?: s.userEmail
 
-                val compressedImage = selectedImageBytes?.let {
-                    compressImageBytes(it, maxSizeKB = 500)
-                }
-
-                val response = apiService.updateProfile(
-                    token = "Bearer $token",
-                    name = name,
-                    email = email, // 🔥 Email now required
-                    photo = compressedImage
-                )
-
-                val userObject = response["user"] as? Map<*, *>
-                val photoUrl = response["photo_url"]?.toString()?.trim('"')
-
-                if (userObject == null) {
-                    _state.value = _state.value.copy(
-                        isLoading = false,
-                        error = "Invalid response from server"
-                    )
-                    return@launch
-                }
-
-                val newName = userObject["name"]?.toString()?.trim('"') ?: name
-                val newEmail = userObject["email"]?.toString()?.trim('"') ?: email
-                val newPhone = userObject["phone"]?.toString()?.trim('"') ?: _state.value.userPhone
-                val newPhoto = userObject["photo"]?.toString()?.trim('"')
-
-                val fullPhotoUrl = when {
-                    photoUrl != null && photoUrl.startsWith("http") -> photoUrl
-                    photoUrl != null -> "https://gps.eva2z.in$photoUrl"
-                    newPhoto != null && newPhoto.startsWith("http") -> newPhoto
-                    newPhoto != null -> "https://gps.eva2z.in/storage/$newPhoto"
-                    else -> _state.value.userImage
-                }
-
-                // ✅ Save locally
-                storageManager.saveString("name", newName)
-                storageManager.saveString("email", newEmail)
-                storageManager.saveString("phone", newPhone)
-                fullPhotoUrl?.let { storageManager.saveString("photo", it) }
-
-                // ✅ Update UI state
-                _state.value = _state.value.copy(
-                    isLoading = false,
-                    userName = newName,
-                    userEmail = newEmail,
-                    userPhone = newPhone,
-                    userImage = fullPhotoUrl,
-                    error = null,
-                    updateSuccess = true
-                )
-
-                // Clear image after success
-                selectedImageBytes = null
-
-                println("✅ Profile updated successfully")
-
-            } catch (e: Exception) {
-                println("❌ Profile update error: ${e.message}")
-                _state.value = _state.value.copy(
-                    isLoading = false,
-                    error = e.message ?: "Failed to update profile"
-                )
+            val finalPhotoUrl = when {
+                photoUrl?.startsWith("http") == true -> photoUrl
+                photoUrl != null -> "https://gps.eva2z.in$photoUrl"
+                else -> s.userImage
             }
+
+            // ✅ Save locally
+            storageManager.saveString("name", newName)
+            storageManager.saveString("email", newEmail)
+            finalPhotoUrl?.let { storageManager.saveString("photo", it) }
+
+            // ✅ Update state + reset originals
+            _state.value = s.copy(
+                originalName = newName,
+                originalEmail = newEmail,
+                originalImage = finalPhotoUrl,
+                userName = newName,
+                userEmail = newEmail,
+                userImage = finalPhotoUrl,
+                userImageBytes = null,
+                isLoading = false,
+                updateSuccess = true
+            )
+
+            selectedImageBytes = null
+
+        } catch (e: Exception) {
+            _state.value = s.copy(
+                isLoading = false,
+                error = e.message ?: "Failed to update profile"
+            )
         }
     }
-
 
 
     fun isValidEmail(email: String): Boolean {
