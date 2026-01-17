@@ -63,132 +63,6 @@ class DocumentsViewModel(
     }
 
 
-//    fun openDocument(documentId: String, onResult: (ByteArray) -> Unit) {
-//        CoroutineScope(Dispatchers.IO).launch {
-//            try {
-//                val vaultToken = storageManager.getString(StorageKeys.VAULT_TOKEN, "")
-//                val authToken = storageManager.getString("token", "")
-//
-//                val encryptedBytes = apiService.getVaultDocumentFile(
-//                    documentId = documentId,
-//                    vaultToken = vaultToken,
-//                    authToken = authToken
-//                )
-//
-//                // 🔑 Example key/iv (backend se confirm karo)
-//                val key = vaultToken.take(16).toByteArray()
-//                val iv = ByteArray(16) { 0 }
-//
-//                val decrypted = AesDecryptor.decrypt(
-//                    encrypted = encryptedBytes,
-//                    secretKey = key,
-//                    iv = iv
-//                )
-//
-//                onResult(decrypted)
-//
-//            } catch (e: Exception) {
-//                println("❌ Decryption failed: ${e.message}")
-//            }
-//        }
-//    }
-
-//    fun openDocument(documentId: String, onResult: (ByteArray) -> Unit) {
-//        CoroutineScope(Dispatchers.IO).launch {
-//            try {
-//                val vaultToken = storageManager.getString(StorageKeys.VAULT_TOKEN, "")
-//                val authToken = storageManager.getString("token", "")
-//
-//                val encryptedBytes = apiService.getVaultDocumentFile(
-//                    documentId = documentId,
-//                    vaultToken = vaultToken,
-//                    authToken = authToken
-//                )
-//
-//                if (encryptedBytes.size <= 16) {
-//                    throw Exception("Invalid encrypted file")
-//                }
-//
-//                val iv = encryptedBytes.copyOfRange(0, 16)
-//                val cipherText = encryptedBytes.copyOfRange(16, encryptedBytes.size)
-//
-//                val key = KeyDeriver.deriveAesKeyFromVaultToken(vaultToken)
-//
-//                val decrypted = AesDecryptor.decrypt(
-//                    encrypted = cipherText,
-//                    secretKey = key,
-//                    iv = iv
-//                )
-//
-//                onResult(decrypted)
-//
-//            } catch (e: Exception) {
-//                println("❌ Decryption failed: ${e.message}")
-//            }
-//        }
-//    }
-
-//    fun openDocument(documentId: String, onResult: (ByteArray) -> Unit) {
-//        CoroutineScope(Dispatchers.IO).launch {
-//            try {
-//                val vaultToken = storageManager.getString(StorageKeys.VAULT_TOKEN, "")
-//                val authToken = storageManager.getString("token", "")
-//
-//                println("🧪 VaultToken length = ${vaultToken.length}")
-//
-//                val encryptedBytes = apiService.getVaultDocumentFile(
-//                    documentId = documentId,
-//                    vaultToken = vaultToken,
-//                    authToken = authToken
-//                )
-//
-//                println("📦 Encrypted size = ${encryptedBytes.size}")
-//
-//                // 🔍 Detect Base64
-//                val decodedBytes = Base64Util.decode(encryptedBytes)
-//                    ?.also { println("✅ Base64 decoded size = ${it.size}") }
-//                    ?: run {
-//                        println("ℹ️ Not Base64, using raw bytes")
-//                        encryptedBytes
-//                    }
-//
-//                if (decodedBytes.size <= 16) {
-//                    error("Invalid encrypted payload")
-//                }
-//
-//                // ⚠️ IMPORTANT TEST
-//                // 🔴 Comment this IV split ONCE to test
-//                val iv = decodedBytes.copyOfRange(0, 16)
-//                val cipherText = decodedBytes.copyOfRange(16, decodedBytes.size)
-//
-//                println(
-//                    "🧪 IV hex = ${
-//                        iv.joinToString(" ") {
-//                            it.toInt().and(0xFF).toString(16).padStart(2, '0')
-//                        }
-//                    }"
-//                )
-//                println("🧪 Cipher size = ${cipherText.size}")
-//
-//                val key = KeyDeriver.deriveAesKeyFromVaultToken(vaultToken)
-//
-//                println("🔑 Key length = ${key.size}")
-//
-//                val decrypted = AesDecryptor.decrypt(
-//                    encrypted = cipherText,
-//                    secretKey = key,
-//                    iv = iv
-//                )
-//
-//                println("✅ Decryption SUCCESS")
-//                onResult(decrypted)
-//
-//            } catch (e: Exception) {
-//                println("❌ Decryption failed: ${e.message}")
-//                e.printStackTrace()
-//            }
-//        }
-//    }
 fun openDocument(documentId: String, onResult: (ByteArray) -> Unit) {
     CoroutineScope(Dispatchers.IO).launch {
         try {
@@ -217,10 +91,32 @@ fun openDocument(documentId: String, onResult: (ByteArray) -> Unit) {
             e.printStackTrace()
         }
     }
-
-
 }
 
+
+    fun deleteDocument(documentId: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val vaultToken =
+                    storageManager.getString(StorageKeys.VAULT_TOKEN, "")
+                val authToken =
+                    storageManager.getString("token", "")
+
+                apiService.deleteVaultDocument(
+                    documentId = documentId,
+                    vaultToken = vaultToken,
+                    authToken = authToken
+                )
+
+                // ✅ refresh list after delete
+                loadDocuments()
+
+            } catch (e: Exception) {
+                println("❌ Delete failed")
+                e.printStackTrace()
+            }
+        }
+    }
 
 
 
