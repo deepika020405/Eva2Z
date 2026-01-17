@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.*
@@ -54,6 +55,8 @@ fun DocumentsScreen(
     val documents by viewModel.documents
     val loading by viewModel.loading
     val error by viewModel.error
+    var deleteDocId by remember { mutableStateOf<String?>(null) }
+
 
     // 🚀 Load documents once
     LaunchedEffect(Unit) {
@@ -123,32 +126,43 @@ fun DocumentsScreen(
                                 fileName = doc.fileName,
                                 fileType = doc.fileType,
                                 onClick = {
-//                                    viewModel.openDocument(
-//                                        documentId = doc.id,
-//                                        onResult = { decryptedBytes ->
-//                                            // ✅ YAHAN FILE OPEN KAROGE
-////                                            println("✅ Document decrypted, size = ${decryptedBytes.size}")
-//
-//                                            // Android:
-//                                            // 1. temp file banao
-//                                            // 2. PDF/Image viewer se open karo
-//
-//                                            // iOS:
-//                                            // UIDocumentInteractionController
-//                                        }
-//                                    )
                                     viewModel.openDocument(
                                         documentId = doc.id,
                                         onResult = { bytes ->
                                             onOpenViewer(bytes, doc.fileName)
                                         }
                                     )
-                                }
+                                },
+                                onDelete = {deleteDocId = doc.id}
                             )
                         }
                     }
                 }
+
             }
+            if (deleteDocId != null) {
+                AlertDialog(
+                    onDismissRequest = { deleteDocId = null },
+                    title = { Text("Delete Document") },
+                    text = { Text("Are you sure you want to delete this document?") },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                viewModel.deleteDocument(deleteDocId!!)
+                                deleteDocId = null
+                            }
+                        ) {
+                            Text("Yes", color = Color.Red)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { deleteDocId = null }) {
+                            Text("Cancel")
+                        }
+                    }
+                )
+            }
+
         }
     }
 }
@@ -218,7 +232,8 @@ fun DocumentViewerScreen(
 private fun DocumentItem(
     fileName: String,
     fileType: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onDelete: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -233,29 +248,35 @@ private fun DocumentItem(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+
             Icon(
                 imageVector = Icons.Default.Description,
                 contentDescription = null,
                 modifier = Modifier.size(28.dp)
             )
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(Modifier.width(12.dp))
 
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(fileName, fontSize = 16.sp, fontWeight = FontWeight.Medium)
                 Text(
-                    text = fileName,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    text = fileType,
+                    fileType,
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            IconButton(onClick = onDelete) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete",
+                    tint = Color.Red
                 )
             }
         }
     }
 }
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
