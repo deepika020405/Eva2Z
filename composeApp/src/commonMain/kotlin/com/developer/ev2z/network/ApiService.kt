@@ -1524,6 +1524,24 @@ class ApiService {
         return response.body()
     }
 
+    suspend fun deleteVaultDocument(
+        documentId: String,
+        vaultToken: String,
+        authToken: String
+    ) {
+        val url = "${baseUrl}vault/$documentId"
+
+        val response = client.delete(url) {
+            header("X-Vault-Token", vaultToken)
+            header(HttpHeaders.Authorization, "Bearer $authToken")
+        }
+
+        if (response.status != HttpStatusCode.OK) {
+            throw Exception("Failed to delete document")
+        }
+    }
+
+
     suspend fun uploadVaultDocument(
         vaultToken: String,
         authToken: String,
