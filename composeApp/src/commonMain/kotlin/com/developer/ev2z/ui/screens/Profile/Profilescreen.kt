@@ -244,7 +244,8 @@ fun ProfileScreenContent(
                                     } else {
                                         showVaultPasswordDialog = true // 🔐 Ask password
                                     }
-                                }                            )
+                                }
+                            )
                         )
                     )
                 }
@@ -395,7 +396,7 @@ fun VaultPasswordDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Enter Password") },
+        title = { Text("Enter Your Login Password") },
         text = {
             Column {
                 OutlinedTextField(
