@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -825,6 +826,105 @@ private fun LegendRow(
     }
 }
 
+//@Composable
+//fun DonutChart(
+//    runningPercent: Int,
+//    stoppedPercent: Int,
+//    parkedPercent: Int,
+//    modifier: Modifier = Modifier
+//) {
+//    val total = (runningPercent + stoppedPercent + parkedPercent)
+//        .takeIf { it > 0 } ?: 1
+//
+//    val runningSweep = 360f * runningPercent / total
+//    val stoppedSweep = 360f * stoppedPercent / total
+//    val parkedSweep = 360f * parkedPercent / total
+//
+//    Box(
+//        modifier = modifier,
+//        contentAlignment = Alignment.Center
+//    ) {
+//        Canvas(Modifier.fillMaxSize()) {
+//            val strokeWidth = size.minDimension * 0.18f
+//            val radius = min(size.width, size.height) / 2f - strokeWidth / 2f
+//
+//            val topLeft = Offset(
+//                x = center.x - radius,
+//                y = center.y - radius
+//            )
+//            val arcSize = Size(radius * 2, radius * 2)
+//
+//            // background ring
+//            drawArc(
+//                color = Color(0xFFE0E0E0),
+//                startAngle = 0f,
+//                sweepAngle = 360f,
+//                useCenter = false,
+//                style = Stroke(width = strokeWidth)
+//            )
+//
+//            var startAngle = -90f
+//
+//            // Running (green)
+//            drawArc(
+//                color = Color(0xFF4CAF50),
+//                startAngle = startAngle,
+//                sweepAngle = runningSweep,
+//                useCenter = false,
+//                style = Stroke(width = strokeWidth),
+//                topLeft = topLeft,
+//                size = arcSize
+//            )
+//            startAngle += runningSweep
+//
+//            // Stopped (red)
+//            drawArc(
+//                color = Color(0xFFF44336),
+//                startAngle = startAngle,
+//                sweepAngle = stoppedSweep,
+//                useCenter = false,
+//                style = Stroke(width = strokeWidth),
+//                topLeft = topLeft,
+//                size = arcSize
+//            )
+//            startAngle += stoppedSweep
+//
+//            // Parked (yellow)
+//            drawArc(
+//                color = Color(0xFFFFC107),
+//                startAngle = startAngle,
+//                sweepAngle = parkedSweep,
+//                useCenter = false,
+//                style = Stroke(width = strokeWidth),
+//                topLeft = topLeft,
+//                size = arcSize
+//            )
+//        }
+//
+//        // Percentage labels around chart (approx positions)
+//        Box(Modifier.fillMaxSize()) {
+//            androidx.compose.material3.Text(
+//                "${parkedPercent}%",
+//                modifier = Modifier.align(Alignment.TopCenter),
+//                fontSize = 12.sp
+//            )
+//            androidx.compose.material3.Text(
+//                "${runningPercent}%",
+//                modifier = Modifier.align(Alignment.CenterStart),
+//                fontSize = 12.sp
+//            )
+//            androidx.compose.material3.Text(
+//                "${stoppedPercent}%",
+//                modifier = Modifier.align(Alignment.CenterEnd),
+//                fontSize = 12.sp
+//            )
+//        }
+//    }
+//}
+
+
+
+
 @Composable
 fun DonutChart(
     runningPercent: Int,
@@ -843,87 +943,57 @@ fun DonutChart(
         modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
+
         Canvas(Modifier.fillMaxSize()) {
-            val strokeWidth = size.minDimension * 0.18f
-            val radius = min(size.width, size.height) / 2f - strokeWidth / 2f
+            val strokeWidth = size.minDimension * 0.16f
+            val radius = size.minDimension / 2f - strokeWidth / 2f
 
-            val topLeft = Offset(
-                x = center.x - radius,
-                y = center.y - radius
-            )
-            val arcSize = Size(radius * 2, radius * 2)
+            var startAngle = -90f
 
-            // background ring
+            fun drawSlice(color: Color, sweep: Float) {
+                if (sweep <= 0f) return
+                drawArc(
+                    color = color,
+                    startAngle = startAngle,
+                    sweepAngle = sweep,
+                    useCenter = false,
+                    style = Stroke(
+                        width = strokeWidth,
+                        cap = StrokeCap.Round
+                    )
+                )
+                startAngle += sweep
+            }
+
+            // Background ring
             drawArc(
-                color = Color(0xFFE0E0E0),
+                color = Color(0xFFE6E6E6),
                 startAngle = 0f,
                 sweepAngle = 360f,
                 useCenter = false,
                 style = Stroke(width = strokeWidth)
             )
 
-            var startAngle = -90f
-
-            // Running (green)
-            drawArc(
-                color = Color(0xFF4CAF50),
-                startAngle = startAngle,
-                sweepAngle = runningSweep,
-                useCenter = false,
-                style = Stroke(width = strokeWidth),
-                topLeft = topLeft,
-                size = arcSize
-            )
-            startAngle += runningSweep
-
-            // Stopped (red)
-            drawArc(
-                color = Color(0xFFF44336),
-                startAngle = startAngle,
-                sweepAngle = stoppedSweep,
-                useCenter = false,
-                style = Stroke(width = strokeWidth),
-                topLeft = topLeft,
-                size = arcSize
-            )
-            startAngle += stoppedSweep
-
-            // Parked (yellow)
-            drawArc(
-                color = Color(0xFFFFC107),
-                startAngle = startAngle,
-                sweepAngle = parkedSweep,
-                useCenter = false,
-                style = Stroke(width = strokeWidth),
-                topLeft = topLeft,
-                size = arcSize
-            )
+            drawSlice(Color(0xFF4CAF50), runningSweep) // Running
+            drawSlice(Color(0xFFF44336), stoppedSweep) // Stopped
+            drawSlice(Color(0xFFFFC107), parkedSweep)  // Parked
         }
 
-        // Percentage labels around chart (approx positions)
-        Box(Modifier.fillMaxSize()) {
-            androidx.compose.material3.Text(
-                "${parkedPercent}%",
-                modifier = Modifier.align(Alignment.TopCenter),
-                fontSize = 12.sp
+        // 🎯 CENTER TEXT
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "${runningPercent + parkedPercent}%",
+                fontSize = 22.sp,
+                fontWeight = FontWeight.SemiBold
             )
-            androidx.compose.material3.Text(
-                "${runningPercent}%",
-                modifier = Modifier.align(Alignment.CenterStart),
-                fontSize = 12.sp
-            )
-            androidx.compose.material3.Text(
-                "${stoppedPercent}%",
-                modifier = Modifier.align(Alignment.CenterEnd),
-                fontSize = 12.sp
+            Text(
+                text = "Active",
+                fontSize = 12.sp,
+                color = Color.Gray
             )
         }
     }
 }
-
-
-
-
 
 @Composable
 fun FilterChipsBar(
