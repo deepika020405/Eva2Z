@@ -1,4 +1,10 @@
 PODS:
+  - FBAEMKit (18.0.2):
+    - FBSDKCoreKit_Basics (= 18.0.2)
+  - FBSDKCoreKit (18.0.2):
+    - FBAEMKit (= 18.0.2)
+    - FBSDKCoreKit_Basics (= 18.0.2)
+  - FBSDKCoreKit_Basics (18.0.2)
   - Firebase/Analytics (11.15.0):
     - Firebase/Core
   - Firebase/Core (11.15.0):
@@ -112,6 +118,7 @@ PODS:
   - PromisesObjC (2.4.0)
 
 DEPENDENCIES:
+  - FBSDKCoreKit
   - Firebase/Analytics
   - Firebase/Core
   - Firebase/Messaging
@@ -119,6 +126,9 @@ DEPENDENCIES:
 
 SPEC REPOS:
   trunk:
+    - FBAEMKit
+    - FBSDKCoreKit
+    - FBSDKCoreKit_Basics
     - Firebase
     - FirebaseAnalytics
     - FirebaseCore
@@ -134,6 +144,9 @@ SPEC REPOS:
     - PromisesObjC
 
 SPEC CHECKSUMS:
+  FBAEMKit: 56a4f5a9607957b547b6458b17a98c5bb2736367
+  FBSDKCoreKit: 54f1240567e16862ab71c53c33dc347db5c524c5
+  FBSDKCoreKit_Basics: eb530cd6a79030dbb11df460aafb2767bcad9028
   Firebase: d99ac19b909cd2c548339c2241ecd0d1599ab02e
   FirebaseAnalytics: 6433dfd311ba78084fc93bdfc145e8cb75740eae
   FirebaseCore: efb3893e5b94f32b86e331e3bd6dadf18b66568e
@@ -148,6 +161,6 @@ SPEC CHECKSUMS:
   PhonePePayment: 9516849183e00c77a2d64bb85e2c9942a5e618b7
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
 
-PODFILE CHECKSUM: 1020f2b3955eadbe122b5ae913e3fb90ff1e3d79
+PODFILE CHECKSUM: 17459a1888f33a71e0eedbcebd1aadaa13b7cda0
 
 COCOAPODS: 1.16.2

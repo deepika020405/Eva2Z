@@ -11,6 +11,9 @@ target 'iosApp' do
 
   # ✅ PhonePe Payment SDK
   pod 'PhonePePayment'
+
+  # Meta
+  pod 'FBSDKCoreKit'
 end
 
 post_install do |installer|
