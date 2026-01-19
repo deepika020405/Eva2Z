@@ -65,6 +65,7 @@ fun ProfileScreen(
     onOpenDocumentsVault: () -> Unit = {},
 ) {
     val viewModel = remember { ProfileViewModel(apiService, storageManager) }
+    var showVaultPasswordDialog by remember { mutableStateOf(false) } // ✅ MOVE HERE
     val state by viewModel.state.collectAsState()
     var showImageZoom by remember { mutableStateOf(false) }
     var webViewType by remember { mutableStateOf<WebViewType?>(null) }
@@ -112,13 +113,18 @@ fun ProfileScreen(
         onUnlockDocuments = { password ->
             viewModel.unlockDocumentsVault(
                 password = password,
-                onSuccess = onOpenDocumentsVault
+                onSuccess = {
+                    showVaultPasswordDialog = false   // ✅ close dialog
+                    onOpenDocumentsVault()            // ➡️ next screen
+                }
             )
         },
         onOpenDocumentsVault = {
             onOpenDocumentsVault() // navigation
         },
-        storageManager = storageManager
+        storageManager = storageManager,
+        showVaultPasswordDialog = showVaultPasswordDialog,
+        onShowVaultPasswordDialog = { showVaultPasswordDialog = it },
     )
 
     // Image Zoom Dialog
@@ -168,10 +174,11 @@ fun ProfileScreenContent(
     onYouTube: () -> Unit,
     onUnlockDocuments: (String) -> Unit,
     onOpenDocumentsVault: () -> Unit,
+    showVaultPasswordDialog: Boolean,              // ✅ ADD
+    onShowVaultPasswordDialog: (Boolean) -> Unit,
     storageManager: StorageManager, // ✅ ADD THIS
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
-    var showVaultPasswordDialog by remember { mutableStateOf(false) }
     var passwordError by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(state.error) {
@@ -242,7 +249,8 @@ fun ProfileScreenContent(
                                     if (isVaultSessionValid(storageManager)) {
                                         onOpenDocumentsVault() // 🔓 Direct open
                                     } else {
-                                        showVaultPasswordDialog = true // 🔐 Ask password
+                                        onShowVaultPasswordDialog(true)
+                                        // 🔐 Ask password
                                     }
                                 }
                             )
@@ -374,10 +382,11 @@ fun ProfileScreenContent(
                 onUnlockDocuments(password)
 
                 // 🔥 CLOSE DIALOG IMMEDIATELY
-                showVaultPasswordDialog = false
+//                showVaultPasswordDialog = false
             },
             onDismiss = {
-                showVaultPasswordDialog = false
+                onShowVaultPasswordDialog(false)
+
                 passwordError = null
             }
         )
