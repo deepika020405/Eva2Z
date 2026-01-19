@@ -108,13 +108,57 @@ fun DocumentsScreen(
                     )
                 }
 
+//                documents.isEmpty() -> {
+//                    Text(
+//                        text = "No documents found",
+//                        fontSize = 16.sp,
+//                        modifier = Modifier.align(Alignment.Center)
+//                    )
+//                }
                 documents.isEmpty() -> {
-                    Text(
-                        text = "No documents found",
-                        fontSize = 16.sp,
-                        modifier = Modifier.align(Alignment.Center)
-                    )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(24.dp),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+
+                        Icon(
+                            imageVector = Icons.Default.Description,
+                            contentDescription = null,
+                            modifier = Modifier.size(64.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Text(
+                            text = "No documents found",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Text(
+                            text = "Add your first document to get started",
+                            fontSize = 14.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        Button(
+                            onClick = { onOpenUpload() }
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Add Document")
+                        }
+                    }
                 }
+
 
                 else -> {
                     LazyColumn(
@@ -300,6 +344,11 @@ fun UploadDocumentScreen(
     var fileName by remember { mutableStateOf("") }
     var imageBytes by remember { mutableStateOf<ByteArray?>(null) }
     val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    var isUploading by remember { mutableStateOf(false) }
+    var fileNameError by remember { mutableStateOf(false) }
+
+
 
     val imagePickerLauncher = rememberImagePicker { bytes ->
         if (bytes != null) {
@@ -311,6 +360,9 @@ fun UploadDocumentScreen(
     }
 
     Scaffold(
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState)
+        },
         topBar = {
             TopAppBar(
                 title = { Text("Add Document") },
@@ -320,20 +372,73 @@ fun UploadDocumentScreen(
                     }
                 },
                 actions = {
+//                    TextButton(
+//                        enabled = fileName.isNotBlank() && imageBytes != null,
+//                        onClick = {
+//                            scope.launch {
+//                                viewModel.uploadDocument(
+//                                    fileName = fileName,
+//                                    imageBytes = imageBytes!!
+//                                )
+//                                onBack()
+//                            }
+//                        }
+//                    ) {
+//                        Text("Upload")
+//                    }
                     TextButton(
-                        enabled = fileName.isNotBlank() && imageBytes != null,
+                        enabled = !isUploading && fileName.isNotBlank() && imageBytes != null,
                         onClick = {
                             scope.launch {
-                                viewModel.uploadDocument(
-                                    fileName = fileName,
-                                    imageBytes = imageBytes!!
-                                )
-                                onBack()
+
+                                // validation
+                                if (fileName.isBlank()) {
+                                    fileNameError = true
+                                    return@launch
+                                }
+
+                                if (imageBytes == null) {
+                                    snackbarHostState.showSnackbar("Please select an image")
+                                    return@launch
+                                }
+
+                                try {
+                                    isUploading = true   // 🔒 disable button
+
+                                    viewModel.uploadDocument(
+                                        fileName = fileName,
+                                        imageBytes = imageBytes!!
+                                    )
+
+                                    snackbarHostState.showSnackbar(
+                                        message = "Document uploaded successfully ✅",
+                                        duration = SnackbarDuration.Short
+                                    )
+
+                                    onBack() // success → exit screen
+
+                                } catch (e: Exception) {
+
+                                    snackbarHostState.showSnackbar(
+                                        message = "Upload failed. Please try again",
+                                        duration = SnackbarDuration.Short
+                                    )
+
+                                    isUploading = false // 🔓 enable again on failure
+                                }
                             }
                         }
                     ) {
-                        Text("Upload")
+                        if (isUploading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text("Upload")
+                        }
                     }
+
                 }
             )
         }
@@ -347,12 +452,36 @@ fun UploadDocumentScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
 
+//            OutlinedTextField(
+//                value = fileName,
+//                onValueChange = { fileName = it },
+//                label = { Text("File name") },
+//                modifier = Modifier.fillMaxWidth()
+//            )
+            var fileNameError by remember { mutableStateOf(false) }
+
             OutlinedTextField(
                 value = fileName,
-                onValueChange = { fileName = it },
-                label = { Text("File name") },
-                modifier = Modifier.fillMaxWidth()
+                onValueChange = {
+                    fileName = it
+                    if (it.isNotBlank()) fileNameError = false
+                },
+                modifier = Modifier.fillMaxWidth(),
+                label = {
+                    Text("File Name *")
+                },
+                isError = fileNameError,
+                supportingText = {
+                    if (fileNameError) {
+                        Text(
+                            text = "File name is required",
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                },
+                singleLine = true
             )
+
 
             Box(
                 modifier = Modifier

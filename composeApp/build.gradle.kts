@@ -74,6 +74,8 @@ kotlin {
             implementation(libs.firebase.analytics)
             implementation(libs.firebase.crashlytics)
             implementation("com.google.firebase:firebase-messaging:24.0.0")
+            implementation("com.facebook.android:facebook-android-sdk:17.0.2")
+
 
 
             // ❌ REMOVED: Play Integrity API (causes Play Protect warnings)
@@ -134,7 +136,7 @@ android {
         applicationId = "com.developer.ev2z"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 75  // ✅ INCREMENTED
+        versionCode = 76  // ✅ INCREMENTED
         versionName = "5.0.0"  // ✅ NEW MAJOR VERSION (Play Protect fixed)
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

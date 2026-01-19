@@ -5,6 +5,8 @@ import android.util.Log
 import com.developer.ev2z.ui.screens.social_media.initOpenUrl
 import com.developer.ev2z.util.Analytics
 import com.developer.ev2z.util.initContexts
+import com.facebook.FacebookSdk
+import com.facebook.appevents.AppEventsLogger
 
 class MainApplication : Application() {
     override fun onCreate() {
@@ -12,12 +14,18 @@ class MainApplication : Application() {
 
 
         try {
+            // Meta SDK
+            FacebookSdk.sdkInitialize(this)
+            AppEventsLogger.activateApp(this)
+
             Analytics.init(this)
             initOpenUrl(this)
             initAppContext(this)
             initContexts(this)
+
             // ✅ Set Activity Provider context
             Log.d("MainApplication", "✅ Application initialized")
+            Log.d("MainApplication", "✅ Meta SDK initialized")
 
             // ✅ You can add more initialization here if needed
 

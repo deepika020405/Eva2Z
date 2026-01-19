@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">EVA2Z Connect</string>
+
+    <!-- META -->
+    <string name="facebook_app_id">904528742747351</string>
+    <string name="facebook_client_token">97617580c70d19600529c603676857c2</string>
 </resources>

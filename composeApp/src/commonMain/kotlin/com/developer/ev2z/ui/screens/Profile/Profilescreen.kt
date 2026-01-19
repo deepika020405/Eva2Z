@@ -246,12 +246,13 @@ fun ProfileScreenContent(
                                 title = "Documents",
                                 icon = Icons.Rounded.Folder,
                                 onClick = {
-                                    if (isVaultSessionValid(storageManager)) {
-                                        onOpenDocumentsVault() // 🔓 Direct open
-                                    } else {
-                                        onShowVaultPasswordDialog(true)
-                                        // 🔐 Ask password
-                                    }
+//                                    if (isVaultSessionValid(storageManager)) {
+//                                        onOpenDocumentsVault() // 🔓 Direct open
+//                                    } else {
+//                                        onShowVaultPasswordDialog(true)
+//                                        // 🔐 Ask password
+//                                    }
+                                    onShowVaultPasswordDialog(true)
                                 }
                             )
                         )
@@ -433,7 +434,7 @@ fun VaultPasswordDialog(
             TextButton(onClick = {
                 onSubmit(password)
             }) {
-                Text("Unlock")
+                Text("Continue")
             }
         },
         dismissButton = {

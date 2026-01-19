@@ -367,12 +367,12 @@ fun DeviceSelectorPanelWithData(
                             )
                         }
 
-                        Text(
-                            device.engine_status ?: "Unknown",
-                            color = statusColor(device.status ?: "Stopped"),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium
-                        )
+//                        Text(
+//                            device.engine_status ?: "Unknown",
+//                            color = statusColor(device.status ?: "Stopped"),
+//                            fontSize = 14.sp,
+//                            fontWeight = FontWeight.Medium
+//                        )
                     }
                 }
 
@@ -536,7 +536,7 @@ fun DeviceBasicInfoWithData(
     viewModel: DeviceReportViewModel
 ) {
     val latest = liveLocation?.data?.latestLocation
-    val currentStatus = latest?.status ?: device.status
+    val currentStatus = latest?.status ?: ""
 
     // jab bhi location change ho, address fetch karo
     LaunchedEffect(latest?.latitude, latest?.longitude) {

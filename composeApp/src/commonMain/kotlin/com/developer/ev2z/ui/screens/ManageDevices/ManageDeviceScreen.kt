@@ -260,11 +260,11 @@ private fun DeviceListItem(
     var showTurnOffDialog by remember { mutableStateOf(false) }
     var showTurnOnDialog by remember { mutableStateOf(false) }
 
-    val dotColor = when (device.status) {
-        "Active" -> Color(0xFF4CAF50)
-        "In progress" -> Color(0xFFFF9800)
-        else -> Color(0xFFF44336)
-    }
+//    val dotColor = when (device.status) {
+//        "Active" -> Color(0xFF4CAF50)
+//        "In progress" -> Color(0xFFFF9800)
+//        else -> Color(0xFFF44336)
+//    }
 
     val isEngineOn = device.engine_status == "on"
     val isEngineOff = device.engine_status == "off"
@@ -291,9 +291,9 @@ private fun DeviceListItem(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Canvas(modifier = Modifier.size(8.dp)) {
-                    drawCircle(color = dotColor)
-                }
+//                Canvas(modifier = Modifier.size(8.dp)) {
+//                    drawCircle(color = dotColor)
+//                }
                 Text(
                     text = device.device_name.ifEmpty { "Unnamed Device" },
                     style = MaterialTheme.typography.bodyLarge,

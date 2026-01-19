@@ -64,7 +64,7 @@ data class Device(
     val device_type: String? = null,
     @SerialName("engine_status")
     val engine_status: String,
-    val status: String,
+    val status: String? = null,
     @SerialName("created_at")
     val created_at: String
 )
