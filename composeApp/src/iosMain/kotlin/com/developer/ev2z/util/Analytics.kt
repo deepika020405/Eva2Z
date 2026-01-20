@@ -21,3 +21,16 @@ actual object Analytics {
 //        )
     }
 }
+
+actual object MetaAnalytics {
+
+    actual fun logEvent(
+        name: String,
+        params: Map<String, Any?>
+    ) {
+//        AppEvents.shared.logEvent(
+//            name = name,
+//            parameters = params
+//        )
+    }
+}

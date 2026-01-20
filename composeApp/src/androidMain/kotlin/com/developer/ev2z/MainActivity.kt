@@ -10,7 +10,10 @@ import androidx.compose.runtime.CompositionLocalProvider
 import com.developer.ev2z.data.local.initStorageManager
 import com.developer.ev2z.phonepe.PaymentBus
 import com.developer.ev2z.ui.screens.Profile.GlobalContext
+import com.developer.ev2z.util.Analytics
+import com.developer.ev2z.util.MetaAnalytics
 import com.developer.ev2z.util.initGeocoder
+import com.facebook.appevents.AppEventsConstants
 
 //import com.developer.ev2z.util.AppSignatureHelper
 
@@ -40,6 +43,8 @@ class MainActivity : ComponentActivity() {
             GlobalContext.set(this)
 
 
+
+
             // ❌ REMOVED: Play Integrity check (was causing Play Protect warnings)
             // PlayIntegrityHelper.verifyIntegrity() - THIS WAS THE PROBLEM!
 
@@ -55,6 +60,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
             Log.d("MainActivity", "✅ App initialized successfully")
+            MetaAnalytics.logEvent(
+                AppEventsConstants.EVENT_NAME_ACTIVATED_APP,
+                mapOf(
+                    "login_method" to "password"
+                )
+            )
         } catch (e: Exception) {
             Log.e("MainActivity", "❌ Initialization error", e)
         }

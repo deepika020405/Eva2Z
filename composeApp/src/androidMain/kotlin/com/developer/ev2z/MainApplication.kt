@@ -4,6 +4,7 @@ import android.app.Application
 import android.util.Log
 import com.developer.ev2z.ui.screens.social_media.initOpenUrl
 import com.developer.ev2z.util.Analytics
+import com.developer.ev2z.util.MetaAnalytics
 import com.developer.ev2z.util.initContexts
 import com.facebook.FacebookSdk
 import com.facebook.appevents.AppEventsLogger
@@ -15,10 +16,18 @@ class MainApplication : Application() {
 
         try {
             // Meta SDK
-            FacebookSdk.sdkInitialize(this)
-            AppEventsLogger.activateApp(this)
+//            FacebookSdk.sdkInitialize(this)
+//            AppEventsLogger.activateApp(this)
 
+//            FacebookSdk.sdkInitialize(this)
+            FacebookSdk.setApplicationId(getString(R.string.facebook_app_id))
+            FacebookSdk.sdkInitialize(this)
+            FacebookSdk.setAutoInitEnabled(true)
+            FacebookSdk.fullyInitialize()
+
+// activateApp REMOVE
             Analytics.init(this)
+            MetaAnalytics.init(this)
             initOpenUrl(this)
             initAppContext(this)
             initContexts(this)

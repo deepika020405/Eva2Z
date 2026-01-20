@@ -183,40 +183,41 @@ fun HomeScreen(
                         .align(Alignment.BottomStart)
                         .padding(start = 20.dp, bottom = 20.dp)
                 )
+                //BottomSheet Logic
 
-                if (showOverview) {
-                    ModalBottomSheet(
-                        onDismissRequest = { viewModel.hideOverviewSheet() },
-                        sheetState = sheetState,
-                        containerColor = Color.White,
-                        dragHandle = {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 12.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .width(40.dp)
-                                        .height(4.dp)
-                                        .background(Color.LightGray, RoundedCornerShape(2.dp))
-                                )
-                            }
-                        }
-                    ) {
-                        OverviewBottomSheet(
-                            response = response,
-                            onClose = { viewModel.hideOverviewSheet() },
-                            onNavigateToDeviceReport = onNavigateToDeviceReport,
-                            onOpenDeviceStatus = onOpenDeviceStatus,
-                            onOpenTrackTrace = onOpenTrackTrace,
-                            token = token,
-                            viewModel = viewModel,
-                            isRefreshing = isRefreshing
-                        )
-                    }
-                }
+//                if (showOverview) {
+//                    ModalBottomSheet(
+//                        onDismissRequest = { viewModel.hideOverviewSheet() },
+//                        sheetState = sheetState,
+//                        containerColor = Color.White,
+//                        dragHandle = {
+//                            Box(
+//                                modifier = Modifier
+//                                    .fillMaxWidth()
+//                                    .padding(vertical = 12.dp),
+//                                contentAlignment = Alignment.Center
+//                            ) {
+//                                Box(
+//                                    modifier = Modifier
+//                                        .width(40.dp)
+//                                        .height(4.dp)
+//                                        .background(Color.LightGray, RoundedCornerShape(2.dp))
+//                                )
+//                            }
+//                        }
+//                    ) {
+////                        OverviewBottomSheet(
+////                            response = response,
+////                            onClose = { viewModel.hideOverviewSheet() },
+////                            onNavigateToDeviceReport = onNavigateToDeviceReport,
+////                            onOpenDeviceStatus = onOpenDeviceStatus,
+////                            onOpenTrackTrace = onOpenTrackTrace,
+////                            token = token,
+////                            viewModel = viewModel,
+////                            isRefreshing = isRefreshing
+////                        )
+//                    }
+//                }
             }
         }
     }

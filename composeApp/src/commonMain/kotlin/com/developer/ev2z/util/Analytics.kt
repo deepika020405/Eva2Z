@@ -6,3 +6,12 @@ expect object Analytics {
         params: Map<String, Any?> = emptyMap()
     )
 }
+
+
+// commonMain
+expect object MetaAnalytics {
+    fun logEvent(
+        name: String,
+        params: Map<String, Any?> = emptyMap()
+    )
+}
