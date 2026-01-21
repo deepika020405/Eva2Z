@@ -243,7 +243,14 @@ fun TopDeviceBoxWithData(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 35.dp, start = 16.dp, end = 16.dp, bottom = 16.dp),
+            .padding(
+                top = WindowInsets.statusBars
+                    .asPaddingValues()
+                    .calculateTopPadding() + 12.dp, // 🔥 SAFE
+                start = 16.dp,
+                end = 16.dp,
+                bottom = 16.dp
+            ),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
@@ -259,7 +266,11 @@ fun TopDeviceBoxWithData(
                 )
                 Spacer(Modifier.width(10.dp))
 
-                Text("Hello, $userName", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                val firstName = remember(userName) {
+                    extractFirstName(userName)
+                }
+
+                Text("Hello, $firstName", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
 
                 Spacer(Modifier.weight(1f))
 
@@ -304,6 +315,15 @@ fun TopDeviceBoxWithData(
             }
         }
     }
+}
+fun extractFirstName(fullName: String): String {
+    return fullName
+        .trim()
+        .substringBefore("(")   // remove bracket part
+        .trim()
+        .split(" ")             // split by space
+        .firstOrNull()
+        ?: fullName
 }
 
 @Composable
