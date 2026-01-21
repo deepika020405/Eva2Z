@@ -1,14 +1,16 @@
+@file:Suppress(
+    "MISSING_DEPENDENCY_SUPERCLASS_WARNING",
+    "MISSING_DEPENDENCY_SUPERCLASS_IN_TYPE_ARGUMENT"
+)
+
 package com.developer.ev2z.util
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.UIKitView
-import kotlinx.cinterop.COpaquePointer
-import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.refTo
+import com.developer.ev2z.util.crypto.toNSData
 import platform.Foundation.*
 import platform.UIKit.*
-import platform.darwin.NSObject
 
 @Composable
 actual fun PlatformDocumentViewer(
@@ -21,6 +23,7 @@ actual fun PlatformDocumentViewer(
             val image = UIImage(data = bytes.toNSData())
             UIImageView(image).apply {
                 contentMode = UIViewContentMode.UIViewContentModeScaleAspectFit
+                clipsToBounds = true
             }
         }
     )
@@ -33,26 +36,18 @@ actual fun platformDownloadFile(
     bytes: ByteArray,
     fileName: String
 ) {
-    val viewController = context as UIViewController
+    val vc = context as? UIViewController ?: return
 
-    val path = NSTemporaryDirectory() + fileName
-    val url = NSURL.fileURLWithPath(path)
+    val url = NSURL.fileURLWithPath(
+        NSTemporaryDirectory() + fileName
+    )
 
     bytes.toNSData().writeToURL(url, atomically = true)
 
     val controller = UIDocumentInteractionController()
     controller.URL = url
 
-    controller.delegate =
-        object : NSObject(), UIDocumentInteractionControllerDelegateProtocol {
-            override fun documentInteractionControllerViewControllerForPreview(
-                controller: UIDocumentInteractionController
-            ): UIViewController = viewController
-        }
-
-    documentController = controller   // 🔥 CRITICAL
+    // ❌ delegate REMOVED (important)
+    documentController = controller
     controller.presentPreviewAnimated(true)
 }
-
-
-

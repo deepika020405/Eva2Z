@@ -6,12 +6,8 @@ import com.developer.ev2z.data.local.StorageKeys
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.response.VaultDocumentDto
-import com.developer.ev2z.util.Base64Util
-import com.developer.ev2z.util.crypto.AesDecryptor
-import com.developer.ev2z.util.crypto.KeyDeriver
 import com.developer.ev2z.util.crypto.randomHex
 import com.developer.ev2z.util.crypto.sha256
-import io.ktor.utils.io.core.toByteArray
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
