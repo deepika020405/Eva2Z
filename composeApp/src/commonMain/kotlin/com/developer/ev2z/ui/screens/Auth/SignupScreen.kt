@@ -9,6 +9,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -47,6 +48,8 @@ fun SignupScreen(
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
     var navigateToLogin by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+
 
 
     LaunchedEffect(Unit) {
@@ -257,6 +260,7 @@ fun SignupScreen(
 
         Button(
             onClick = {
+                focusManager.clearFocus()
                 submitAttempted = true
                 phoneAlreadyRegisteredError = null
 

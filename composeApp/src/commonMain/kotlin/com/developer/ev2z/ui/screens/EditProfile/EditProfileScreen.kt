@@ -3,6 +3,7 @@ package com.developer.ev2z.ui.screens.EditProfile
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -20,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -55,6 +57,15 @@ fun EditProfileScreen(
         state.userName.trim() != state.originalName ||
                 state.userEmail.trim() != state.originalEmail ||
                 state.userImageBytes != null
+    }
+
+    val scrollState = rememberScrollState()
+    val focusManager = LocalFocusManager.current
+
+    LaunchedEffect(scrollState.isScrollInProgress) {
+        if (scrollState.isScrollInProgress) {
+            focusManager.clearFocus()
+        }
     }
 
     // ✅ Reload data when screen is opened
@@ -176,16 +187,35 @@ fun EditProfileScreenContent(
         contentWindowInsets = WindowInsets(0) // 🔥 IMPORTANT
 
     ) { paddingValues ->
+//        Box(
+//            modifier = Modifier
+//                .fillMaxSize()
+//                .padding(paddingValues)
+        val scrollState = rememberScrollState()
+        val focusManager = LocalFocusManager.current
+
+        LaunchedEffect(scrollState.isScrollInProgress) {
+            if (scrollState.isScrollInProgress) {
+                focusManager.clearFocus()
+            }
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() }
+                ) {
+                    focusManager.clearFocus() // 👈 KEYBOARD CLOSE
+                }
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.White)
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(scrollState)
                     .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {

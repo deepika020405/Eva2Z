@@ -1,5 +1,7 @@
 package com.developer.ev2z.ui.screens.Auth
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -13,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -50,6 +53,8 @@ fun LoginScreen(
     val error by viewModel.error.collectAsState()
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
+
 
 
     LaunchedEffect(Unit) {
@@ -168,89 +173,180 @@ fun LoginScreen(
 //        )
 //    }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .imePadding()
-            .verticalScroll(scrollState)
-            .padding(horizontal = 12.dp, vertical = 24.dp)
-    ) {
-        Spacer(modifier = Modifier.height(16.dp))
+    Box(modifier = Modifier.fillMaxSize()) {
 
-        Text(
-            text = "Phone Number*",
-            fontSize = 14.sp,
-            color = Color(0xFF666666),
+        // 🔹 OUTSIDE AREA (tap here → keyboard close)
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 4.dp, bottom = 8.dp)
-        )
-
-        OutlinedTextField(
-            value = phoneNumber,
-            onValueChange = { input ->
-
-                // 1️⃣ sirf digits nikalo
-                val digitsOnly = input.filter { it.isDigit() }
-
-                // 2️⃣ HARD STOP for manual typing beyond 10
-                if (digitsOnly.length > 10 && input.length > phoneNumber.length) {
-                    return@OutlinedTextField
+                .fillMaxSize()
+                .padding(top = 1.dp) // 👈 important: makes it non-input layer
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { MutableInteractionSource() }
+                ) {
+                    focusManager.clearFocus()
                 }
-
-                // 3️⃣ Autofill / paste case (+91, spaces, etc.)
-                val finalNumber =
-                    if (digitsOnly.length <= 10)
-                        digitsOnly
-                    else
-                        digitsOnly.takeLast(10)
-
-                phoneNumber = finalNumber
-                phoneError = null
-                generalError = null
-                hasTriedLogin = false
-                loginAttempts = 0
-            },
-            prefix = {
-                Text(
-                    text = "🇮🇳 +91 ",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color.Black
-                )
-            },
-            placeholder = { Text("Enter Your Registered Number") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            shape = RoundedCornerShape(120.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-                disabledContainerColor = Color.Transparent,
-                unfocusedBorderColor = Color.LightGray,
-                focusedBorderColor = Color(0xFF6A9F50)
-            )
-            ,
-//            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Phone,
-                autoCorrect = false      // ❌ disable suggestions
-            ),
-            singleLine = true,
-            isError = phoneNumber.isNotEmpty() && phoneNumber.length < 10
         )
 
-        if (phoneNumber.isNotEmpty() && phoneNumber.length < 10) {
-            Text(
-                text = "Phone number must be 10 digits",
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-            )
-        }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .imePadding()
+                .verticalScroll(scrollState)
+                .padding(horizontal = 12.dp, vertical = 24.dp)
+        ) {
+            Spacer(modifier = Modifier.height(16.dp))
 
-        if(hasTriedLogin){
-            phoneError?.let {
+            Text(
+                text = "Phone Number*",
+                fontSize = 14.sp,
+                color = Color(0xFF666666),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 4.dp, bottom = 8.dp)
+            )
+
+            OutlinedTextField(
+                value = phoneNumber,
+                onValueChange = { input ->
+
+                    // 1️⃣ sirf digits nikalo
+                    val digitsOnly = input.filter { it.isDigit() }
+
+                    // 2️⃣ HARD STOP for manual typing beyond 10
+                    if (digitsOnly.length > 10 && input.length > phoneNumber.length) {
+                        return@OutlinedTextField
+                    }
+
+                    // 3️⃣ Autofill / paste case (+91, spaces, etc.)
+                    val finalNumber =
+                        if (digitsOnly.length <= 10)
+                            digitsOnly
+                        else
+                            digitsOnly.takeLast(10)
+
+                    phoneNumber = finalNumber
+                    phoneError = null
+                    generalError = null
+                    hasTriedLogin = false
+                    loginAttempts = 0
+                },
+                prefix = {
+                    Text(
+                        text = "🇮🇳 +91 ",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Black
+                    )
+                },
+                placeholder = { Text("Enter Your Registered Number") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(120.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    disabledContainerColor = Color.Transparent,
+                    unfocusedBorderColor = Color.LightGray,
+                    focusedBorderColor = Color(0xFF6A9F50)
+                ),
+//            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Phone,
+                    autoCorrect = false      // ❌ disable suggestions
+                ),
+                singleLine = true,
+                isError = phoneNumber.isNotEmpty() && phoneNumber.length < 10
+            )
+
+            if (phoneNumber.isNotEmpty() && phoneNumber.length < 10) {
+                Text(
+                    text = "Phone number must be 10 digits",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                )
+            }
+
+            if (hasTriedLogin) {
+                phoneError?.let {
+                    Text(
+                        text = it,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                    )
+                }
+            }
+
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text(
+                text = "Password*",
+                fontSize = 14.sp,
+                color = Color(0xFF666666),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(start = 4.dp, bottom = 8.dp)
+            )
+
+            OutlinedTextField(
+                value = password,
+                onValueChange = {
+                    password = it
+                    passwordError = null
+                    generalError = null
+                    hasTriedLogin = false
+                },
+                placeholder = { Text("Enter Your Password") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                shape = RoundedCornerShape(120.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
+                    disabledContainerColor = Color.Transparent,
+                    unfocusedBorderColor = Color.LightGray,
+                    focusedBorderColor = Color(0xFF6A9F50)
+                ),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                singleLine = true,
+                isError = password.isNotEmpty() && password.length < 6,
+
+                // 👇 PASSWORD SHOW / HIDE LOGIC
+                visualTransformation =
+                    if (passwordVisible) VisualTransformation.None
+                    else PasswordVisualTransformation(),
+
+                trailingIcon = {
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(
+                            imageVector = if (passwordVisible)
+                                Icons.Filled.VisibilityOff
+                            else
+                                Icons.Filled.Visibility,
+                            contentDescription = if (passwordVisible)
+                                "Hide password"
+                            else
+                                "Show password",
+                            tint = Color.Gray
+                        )
+                    }
+                }
+            )
+
+            if (password.isNotEmpty() && password.length < 6) {
+                Text(
+                    text = "Password must be at least 6 characters",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                )
+            }
+
+            passwordError?.let {
                 Text(
                     text = it,
                     color = MaterialTheme.colorScheme.error,
@@ -258,159 +354,82 @@ fun LoginScreen(
                     modifier = Modifier.padding(start = 16.dp, top = 4.dp)
                 )
             }
-        }
 
 
-        Spacer(modifier = Modifier.height(16.dp))
 
-        Text(
-            text = "Password*",
-            fontSize = 14.sp,
-            color = Color(0xFF666666),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = 4.dp, bottom = 8.dp)
-        )
+            Spacer(modifier = Modifier.height(8.dp))
 
-        OutlinedTextField(
-            value = password,
-            onValueChange = {
-                password = it
-                passwordError = null
-                generalError = null
-                hasTriedLogin = false
-            },
-            placeholder = { Text("Enter Your Password") },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp),
-            shape = RoundedCornerShape(120.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-                disabledContainerColor = Color.Transparent,
-                unfocusedBorderColor = Color.LightGray,
-                focusedBorderColor = Color(0xFF6A9F50)
-            )
-            ,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-            singleLine = true,
-            isError = password.isNotEmpty() && password.length < 6,
-
-            // 👇 PASSWORD SHOW / HIDE LOGIC
-            visualTransformation =
-                if (passwordVisible) VisualTransformation.None
-                else PasswordVisualTransformation(),
-
-            trailingIcon = {
-                IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                    Icon(
-                        imageVector = if (passwordVisible)
-                            Icons.Filled.VisibilityOff
-                        else
-                            Icons.Filled.Visibility,
-                        contentDescription = if (passwordVisible)
-                            "Hide password"
-                        else
-                            "Show password",
-                        tint = Color.Gray
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.CenterEnd
+            ) {
+                TextButton(onClick = {
+                    onForgetPasswordClick(phoneNumber)
+                }) {
+                    Text(
+                        text = "Forgot Password?",
+                        fontSize = 14.sp,
+                        color = Color(0xFF666666)
                     )
                 }
             }
-        )
 
-        if (password.isNotEmpty() && password.length < 6) {
-            Text(
-                text = "Password must be at least 6 characters",
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-            )
-        }
+            Spacer(modifier = Modifier.height(24.dp))
 
-        passwordError?.let {
-            Text(
-                text = it,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(start = 16.dp, top = 4.dp)
-            )
-        }
-
-
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Box(
-            modifier = Modifier.fillMaxWidth(),
-            contentAlignment = Alignment.CenterEnd
-        ) {
-            TextButton(onClick = {
-                onForgetPasswordClick(phoneNumber)
-            }) {
-                Text(
-                    text = "Forgot Password?",
-                    fontSize = 14.sp,
-                    color = Color(0xFF666666)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Button(
-            onClick = {
-                hasTriedLogin = true
-                phoneError = null
-                passwordError = null
-                generalError = null
-                val fullPhone = "+91$phoneNumber"
-                viewModel.login(LoginRequest(fullPhone, password))
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(50.dp),
-            shape = RoundedCornerShape(30.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFF6A9F50),
-                contentColor = Color.White
-            ),
-            enabled = !isLoading && phoneNumber.length == 10 && password.length >= 6
-        ) {
-            if (isLoading) {
-                CircularProgressIndicator(
-                    color = Color.White,
-                    modifier = Modifier.size(24.dp),
-                    strokeWidth = 2.dp
-                )
-            } else {
-                Text(
-                    text = "Login",
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        }
-        generalError?.let {
-            Spacer(Modifier.height(12.dp))
-            Surface(
-                color = MaterialTheme.colorScheme.errorContainer,
-                shape = RoundedCornerShape(12.dp),
-                modifier = Modifier.fillMaxWidth()
+            Button(
+                onClick = {
+                    focusManager.clearFocus()
+                    hasTriedLogin = true
+                    phoneError = null
+                    passwordError = null
+                    generalError = null
+                    val fullPhone = "+91$phoneNumber"
+                    viewModel.login(LoginRequest(fullPhone, password))
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                shape = RoundedCornerShape(30.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF6A9F50),
+                    contentColor = Color.White
+                ),
+                enabled = !isLoading && phoneNumber.length == 10 && password.length >= 6
             ) {
-                Text(
-                    text = it,
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(12.dp),
-                    textAlign = TextAlign.Start
-                )
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        color = Color.White,
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Text(
+                        text = "Login",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
-        }
+            generalError?.let {
+                Spacer(Modifier.height(12.dp))
+                Surface(
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = it,
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(12.dp),
+                        textAlign = TextAlign.Start
+                    )
+                }
+            }
 
-        Spacer(modifier = Modifier.height(32.dp))
-    }
+            Spacer(modifier = Modifier.height(32.dp))
+        }
 
 //    LaunchedEffect(loginSuccess) {
 //        if (loginSuccess) {
@@ -418,21 +437,22 @@ fun LoginScreen(
 //            viewModel.resetLoginSuccess()
 //        }
 //    }
-    LaunchedEffect(loginSuccess) {
-        if (loginSuccess) {
+        LaunchedEffect(loginSuccess) {
+            if (loginSuccess) {
 
-            Analytics.logEvent(
-                name = "login_success",
-                params = mapOf(
-                    "login_method" to "password",
-                    "country_code" to "IN",
-                    "phone_masked" to maskPhone(phoneNumber),
-                    "user_name" to viewModel.userName, // ya first name
+                Analytics.logEvent(
+                    name = "login_success",
+                    params = mapOf(
+                        "login_method" to "password",
+                        "country_code" to "IN",
+                        "phone_masked" to maskPhone(phoneNumber),
+                        "user_name" to viewModel.userName, // ya first name
+                    )
                 )
-            )
 
-            onLoginSuccess()
+                onLoginSuccess()
 //            viewModel.resetLoginSuccess()
+            }
         }
     }
 

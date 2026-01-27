@@ -2,10 +2,13 @@ package com.developer.ev2z.ui.screens.GeoFencing
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -23,7 +26,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -356,6 +361,8 @@ fun AddEditGeoFenceScreen(
     val polygon by viewModel.polygon.collectAsState()
     val saveState by viewModel.saveState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    val focusManager = LocalFocusManager.current
+    val listState = rememberLazyListState()
 
     var geoFenceName by remember {
         mutableStateOf(editingGeoFence?.name ?: "")
@@ -436,6 +443,13 @@ fun AddEditGeoFenceScreen(
     }
 
 
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress) {
+            focusManager.clearFocus()
+        }
+    }
+
+
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -459,13 +473,31 @@ fun AddEditGeoFenceScreen(
 //                else ""
 //            )
 //        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
+
+            // ✅ OUTSIDE TAP (keyboard close)
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .clickable(
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() }
+                    ) {
+                        focusManager.clearFocus()
+                    }
+            )
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
+        )
+        {
 
             item { GeoFenceMapPreview(polygon) }
 
@@ -553,6 +585,7 @@ fun AddEditGeoFenceScreen(
                             selectedLocation != null &&
                             selectedDevice != null
                         ) {
+                            focusManager.clearFocus()
 
                             val lat = selectedLocation!!.lat.toString()
                             val lng = selectedLocation!!.lng.toString()
@@ -600,6 +633,8 @@ fun AddEditGeoFenceScreen(
                 }
             }
         }
+    }
+
     }
 
 
@@ -759,6 +794,7 @@ fun LocationPickerDialog(
     val isSearching by viewModel._isSearching.collectAsState()
 
     var query by remember { mutableStateOf("") }
+    val focusManager = LocalFocusManager.current
 
     Dialog(onDismissRequest = onDismiss) {
 
@@ -804,6 +840,13 @@ fun LocationPickerDialog(
                         }
                     },
                     placeholder = { Text("Search area, city") },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Text,
+                        imeAction = ImeAction.Done
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onDone = { focusManager.clearFocus() }
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
 

@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -57,6 +58,8 @@ fun OTPScreen(
     var showBackDialog by remember { mutableStateOf(false) }
     var hasSubmitted by remember { mutableStateOf(false) }
     var lastSubmittedOtp by remember { mutableStateOf<String?>(null) }
+    val focusManager = LocalFocusManager.current
+
 
     BackPressHandler { showBackDialog = true }
 
@@ -69,6 +72,7 @@ fun OTPScreen(
             otp4 = received[3].toString()
             otp5 = received[4].toString()
             otp6 = received[5].toString()
+            focusManager.clearFocus()
         }
     }
 
@@ -92,10 +96,24 @@ fun OTPScreen(
         hasSubmitted = false
     }
 
-    // ✅ Reset submit flag on error (but keep OTP)
+    // Reset submit flag on error (but keep OTP)
     LaunchedEffect(error) {
         if (error != null) {
+            // 🔹 Clear OTP
+            otp1 = ""
+            otp2 = ""
+            otp3 = ""
+            otp4 = ""
+            otp5 = ""
+            otp6 = ""
+
+            // 🔹 Reset submit tracking
             lastSubmittedOtp = null
+            hasSubmitted = false
+
+            // 🔹 Bring focus back to first box
+            delay(100)
+            focus1.requestFocus()
         }
     }
 
@@ -221,6 +239,7 @@ fun OTPScreen(
 
         Button(
             onClick = {
+                focusManager.clearFocus()
                 val otp = "$otp1$otp2$otp3$otp4$otp5$otp6"
                 if (isOtpComplete && otp != lastSubmittedOtp) {
                     lastSubmittedOtp = otp
@@ -245,49 +264,7 @@ fun OTPScreen(
 
         Spacer(Modifier.height(16.dp))
 
-//        Row(
-//            modifier = Modifier.fillMaxWidth(),
-//            horizontalArrangement = Arrangement.Center,
-//            verticalAlignment = Alignment.CenterVertically
-//        ) {
-//            Text(
-//                text = "Didn't get OTP?",
-//                fontSize = 14.sp,
-//                color = Color(0xFF666666)
-//            )
-//
-//            Spacer(modifier = Modifier.width(4.dp))
-//
-////            TextButton(
-////                onClick = onResendOTP,
-////                contentPadding = PaddingValues(0.dp) // 🔥 no extra padding
-////            ) {
-////                Text(
-////                    text = "Resend OTP",
-////                    fontSize = 14.sp,
-////                    color = Color(0xFF6A9F50),
-////                    fontWeight = FontWeight.SemiBold
-////                )
-////            }
-//
-//            TextButton(
-//                onClick = {
-//                    resendTimeLeft = 600
-//                    resendEnabled = false
-//                    onResendOTP()
-//                },
-//                enabled = resendEnabled,
-//                contentPadding = PaddingValues(0.dp)
-//            ) {
-//                Text(
-//                    text = "Resend OTP",
-//                    fontSize = 14.sp,
-//                    color = if (resendEnabled) Color(0xFF6A9F50) else Color.Gray,
-//                    fontWeight = FontWeight.SemiBold
-//                )
-//            }
-//
-//        }
+
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -379,54 +356,3 @@ private fun OTPBox(
     )
 }
 
-//@Composable
-//private fun OTPBox(
-//    value: String,
-//    focusRequester: FocusRequester,
-//    previousFocusRequester: FocusRequester?,
-//    error: String?,
-//    onChange: (String) -> Unit
-//){
-//    BasicTextField(
-//        value = value,
-//        onValueChange = { newValue ->
-//            when {
-//                // ✅ Normal digit entry
-//                newValue.length == 1 && newValue.all { it.isDigit() } -> {
-//                    onChange(newValue)
-//                }
-//
-//                // ✅ BACKSPACE CASE (blank → go previous)
-//                newValue.isEmpty() && value.isNotEmpty() -> {
-//                    onChange("")
-//                }
-//
-//                newValue.isEmpty() && value.isEmpty() -> {
-//                    previousFocusRequester?.requestFocus()
-//                }
-//            }
-//        },
-//        modifier = Modifier
-//            .width(52.dp)
-//            .height(60.dp)
-//            .focusRequester(focusRequester)
-//            .border(
-//                1.5.dp,
-//                if (error != null) Color.Red else Color(0xFFE0E0E0),
-//                RoundedCornerShape(12.dp)
-//            )
-//            .background(Color.White, RoundedCornerShape(12.dp)),
-//        textStyle = TextStyle(
-//            fontSize = 22.sp,
-//            fontWeight = FontWeight.Bold,
-//            textAlign = TextAlign.Center
-//        ),
-//        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
-//        singleLine = true,
-//        decorationBox = {
-//            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-//                it()
-//            }
-//        }
-//    )
-//}
