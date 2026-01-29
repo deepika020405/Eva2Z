@@ -1577,5 +1577,44 @@ class ApiService {
             }
         }
     }
+
+
+    suspend fun updateVaultDocument(
+        documentId: String,
+        vaultToken: String,
+        authToken: String,
+        encryptedFile: ByteArray?, // 👈 optional
+        fileName: String,
+        fileType: String,
+        salt: String,
+        iv: String,
+        authTag: String,
+        checksum: String
+    ) {
+        client.submitFormWithBinaryData(
+            url = "${baseUrl}vault/update/$documentId",
+            formData = formData {
+
+                encryptedFile?.let {
+                    append("encrypted_file", it, Headers.build {
+                        append(HttpHeaders.ContentType, "image/png")
+                        append(HttpHeaders.ContentDisposition, "filename=\"$fileName.png\"")
+                    })
+                }
+
+                append("file_name", fileName)
+                append("file_type", fileType)
+                append("salt", salt)
+                append("iv", iv)
+                append("auth_tag", authTag)
+                append("checksum", checksum)
+            }
+        ) {
+            headers {
+                append("X-Vault-Token", vaultToken)
+                append("Authorization", "Bearer $authToken")
+            }
+        }
+    }
 }
 

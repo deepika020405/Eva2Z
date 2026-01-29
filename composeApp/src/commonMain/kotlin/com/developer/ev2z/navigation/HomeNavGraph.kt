@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -67,6 +68,7 @@ class HomeTab(
     private val onOpenDeviceStatus: () -> Unit,
     private val onNavigateToDeviceReport: () -> Unit,
     private val onOpenTrackTrace: () -> Unit,
+    private val onOpenCommunity: () -> Unit
 ) : Tab {
     @Composable
     override fun Content() = HomeScreen(
@@ -75,7 +77,8 @@ class HomeTab(
         onNavigateToAddDevice = onNavigateToAddDevice,
         onNavigateToDeviceReport = onNavigateToDeviceReport,
         onOpenDeviceStatus = onOpenDeviceStatus,
-        onOpenTrackTrace = onOpenTrackTrace
+        onOpenTrackTrace = onOpenTrackTrace,
+        onOpenCommunity = onOpenCommunity
     )
 
     override val options: TabOptions
@@ -87,17 +90,61 @@ class HomeTab(
 }
 
 
+//class DocumentsTab(
+//    private val onRequestDocuments: () -> Unit
+//) : Tab {
+//
+//    @Composable
+//    override fun Content() {
+//        LaunchedEffect(Unit) {
+//            onRequestDocuments()   // 🔐 password flow trigger
+//        }
+//        Box(modifier = Modifier.fillMaxSize())
+//    }
+//
+//    override val options: TabOptions
+//        @Composable get() = TabOptions(
+//            index = 1u,
+//            title = "E-Vault",
+//            icon = rememberVectorPainter(Icons.Default.Folder)
+//        )
+//}
+
 class DocumentsTab(
-    private val onRequestDocuments: () -> Unit
+    private val documentsGateState: DocumentsGateState,
+    private val onUnlock: () -> Unit
 ) : Tab {
 
-    @Composable
-    override fun Content() {
-        LaunchedEffect(Unit) {
-            onRequestDocuments()   // 🔐 password flow trigger
+//    @Composable
+//    override fun Content() {
+//        when (documentsGateState) {
+//            DocumentsGateState.LOCKED -> {
+//                LockedDocumentsPlaceholder(
+//                    onUnlockClick = onUnlock
+//                )
+//            }
+//            DocumentsGateState.UNLOCKED -> {
+//                // Actual documents screen trigger
+//                LaunchedEffect(Unit) {
+//                    onUnlock()
+//                }
+//            }
+//            else -> Unit
+//        }
+//    }
+@Composable
+override fun Content() {
+    when (documentsGateState) {
+        DocumentsGateState.LOCKED -> {
+            LockedDocumentsPlaceholder(
+                onUnlockClick = onUnlock
+            )
         }
-        Box(modifier = Modifier.fillMaxSize())
+        else -> {
+            Box(modifier = Modifier.fillMaxSize())
+        }
     }
+}
 
     override val options: TabOptions
         @Composable get() = TabOptions(
@@ -258,6 +305,7 @@ fun HomeNavGraph(
             coroutineScope = coroutineScope, // ✅ PASS HERE
             onNavigateToAddDevice = onNavigateToAddDevice,
             onNavigateToDeviceReport = onNavigateToDeviceReport,
+            documentsGateState = documentsGateState,   // ✅ PASS HERE
             onOpenDeviceStatus = onOpenDeviceStatus,
             onOpenTrackTrace = onOpenTrackTrace,
             onNavigateToEditProfile = { showEditProfile = true },
@@ -285,6 +333,7 @@ fun HomeNavGraph(
                 documentsGateState = DocumentsGateState.LOCKED
                 showVaultPasswordDialog = true
             },
+            onOpenCommunity = { showCommunity = true }, // ✅ HERE
             onLogout = onLogout
         )
         val addDeviceViewModel = remember {
@@ -585,18 +634,18 @@ fun HomeNavGraph(
         }
 
 
-        if (
-            documentsGateState == DocumentsGateState.LOCKED &&
-            pagerState.currentPage == 1 &&   // Documents tab
-            !showDocuments &&
-            !showVaultPasswordDialog
-        ) {
-            LockedDocumentsPlaceholder(
-                onUnlockClick = {
-                    showVaultPasswordDialog = true
-                }
-            )
-        }
+//        if (
+//            documentsGateState == DocumentsGateState.LOCKED &&
+//            pagerState.currentPage == 1 &&   // Documents tab
+//            !showDocuments &&
+//            !showVaultPasswordDialog
+//        ) {
+//            LockedDocumentsPlaceholder(
+//                onUnlockClick = {
+//                    showVaultPasswordDialog = true
+//                }
+//            )
+//        }
 
         if (showAddDevice) {
 
@@ -664,43 +713,88 @@ fun LockedDocumentsPlaceholder(
     onUnlockClick: () -> Unit
 ) {
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp),
         contentAlignment = Alignment.Center
     ) {
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(6.dp)
-        ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+        Box {
+            // 🔘 Card
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color(0xFFF3F3F3)
+                )
             ) {
-                Icon(
-                    imageVector = Icons.Default.Lock,
-                    contentDescription = null,
-                    tint = Color.Gray,
-                    modifier = Modifier.size(40.dp)
-                )
+                Column(
+                    modifier = Modifier
+                        .padding(
+                            top = 40.dp,
+                            bottom = 24.dp,
+                            start = 24.dp,
+                            end = 24.dp
+                        ),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
 
-                Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "Documents are locked",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color.Black
+                    )
 
-                Text(
-                    text = "Documents are locked",
-                    fontWeight = FontWeight.SemiBold
-                )
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = "Enter Password to access your documents",
+                        fontSize = 13.sp,
+                        color = Color.Gray
+                    )
 
-                Text(
-                    text = "Enter password to access your documents",
-                    color = Color.Gray,
-                    fontSize = 13.sp
-                )
+                    Spacer(modifier = Modifier.height(20.dp))
 
-                Spacer(Modifier.height(16.dp))
+                    Button(
+                        onClick = onUnlockClick,
+                        shape = RoundedCornerShape(50),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF7B61FF)
+                        ),
+                        modifier = Modifier
+                            .height(44.dp)
+                            .fillMaxWidth(0.8f)
+                    ) {
+                        Text(
+                            text = "Unlock Documents",
+                            color = Color.White,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+            }
 
-                Button(onClick = onUnlockClick) {
-                    Text("Unlock Documents")
+            // 🔐 Floating lock icon
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .align(Alignment.TopCenter)
+                    .offset(y = (-28).dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = Color(0xFF7B61FF),
+                    shadowElevation = 6.dp
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier
+                            .padding(14.dp)
+                            .size(24.dp)
+                    )
                 }
             }
         }
@@ -726,6 +820,7 @@ fun HomeNavGraphContent(
     onOpenTrackTrace: () -> Unit,
     onNavigateToPrivacyPolicy: () -> Unit,
     onNavigateToTermsConditions: () -> Unit,
+    documentsGateState: DocumentsGateState,   // ✅ ADD THIS
     onNavigateToRefundPolicy: () -> Unit,
     onNavigateToShippingPolicy: () -> Unit,
     onNavigateToChangePassword: () -> Unit = {},
@@ -738,6 +833,7 @@ fun HomeNavGraphContent(
     onNavigateToDocuments: () -> Unit,
     onRequestDocumentsWithPassword: () -> Unit,
     onDocumentsTabSelected: () -> Unit,   // ✅ ADD
+    onOpenCommunity: () -> Unit,
     onLogout: () -> Unit
 ) {
     val productRepository = remember { ProductRepository(apiService) }
@@ -748,7 +844,7 @@ fun HomeNavGraphContent(
         ShopViewModel(repo = productRepository, tokenProvider = tokenProvider)
     }
 
-    val homeTab = remember { HomeTab(viewModel, token, onNavigateToAddDevice, onOpenDeviceStatus ,onNavigateToDeviceReport,onOpenTrackTrace) }
+    val homeTab = remember { HomeTab(viewModel, token, onNavigateToAddDevice, onOpenDeviceStatus ,onNavigateToDeviceReport,onOpenTrackTrace,onOpenCommunity ) }
 
     val profileTab = remember(profileRefreshTrigger) {
         ProfileTab(
@@ -776,9 +872,11 @@ fun HomeNavGraphContent(
     }
 
     val ordersTab = remember { OrdersTab() }
-    val documentsTab = remember {
+    val documentsTab = remember(documentsGateState) {
         DocumentsTab(
-            onRequestDocuments = {
+            documentsGateState = documentsGateState,
+            onUnlock = {
+                // 🔐 password dialog sirf yahin se trigger hoga
                 onDocumentsTabSelected()
             }
         )
@@ -791,11 +889,26 @@ fun HomeNavGraphContent(
         containerColor = Color.White,
         bottomBar = {
             if (BottomBarController.visible) {
+//                CustomBottomNavBar(
+//                    tabs = tabs,
+//                    selectedIndex = pagerState.currentPage,
+//                    onTabSelected = { index ->
+//                        coroutineScope.launch {
+//                            pagerState.animateScrollToPage(index)
+//                        }
+//                    }
+//                )
                 CustomBottomNavBar(
                     tabs = tabs,
                     selectedIndex = pagerState.currentPage,
                     onTabSelected = { index ->
                         coroutineScope.launch {
+
+                            // ✅ DOCUMENTS TAB CLICK
+                            if (index == 1 && pagerState.currentPage != 1) {
+                                onDocumentsTabSelected()   // 🔐 LOCK + dialog trigger
+                            }
+
                             pagerState.animateScrollToPage(index)
                         }
                     }

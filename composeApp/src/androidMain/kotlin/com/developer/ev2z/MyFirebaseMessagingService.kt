@@ -1,6 +1,9 @@
 package com.developer.ev2z
 
 
+import android.Manifest
+import androidx.annotation.RequiresPermission
+import com.developer.ev2z.util.NotificationUtil
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 
@@ -14,18 +17,41 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         FcmBridge.onToken(token)
     }
 
+//    override fun onMessageReceived(message: RemoteMessage) {
+//        super.onMessageReceived(message)
+//
+//        val data = message.data
+//        val title = message.notification?.title
+//        val body = message.notification?.body
+//
+//        println("📩 ANDROID FCM MSG")
+//        println("Title: $title")
+//        println("Body: $body")
+//        println("Data: $data")
+//
+//        // yahin se navigation / logic trigger kar sakte ho
+//    }
+
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
 
-        val data = message.data
-        val title = message.notification?.title
-        val body = message.notification?.body
+        val title =
+            message.notification?.title ?: message.data["title"]
+
+        val body =
+            message.notification?.body ?: message.data["body"]
 
         println("📩 ANDROID FCM MSG")
         println("Title: $title")
         println("Body: $body")
-        println("Data: $data")
+        println("Data: ${message.data}")
 
-        // yahin se navigation / logic trigger kar sakte ho
+        // ✅ SHOW NOTIFICATION EVEN WHEN APP IS OPEN
+        NotificationUtil.show(
+            context = applicationContext,
+            title = title,
+            body = body
+        )
     }
 }

@@ -45,7 +45,8 @@ fun HomeScreen(
     onNavigateToAddDevice: () -> Unit,
     onNavigateToDeviceReport: () -> Unit,
     onOpenDeviceStatus: () -> Unit,
-    onOpenTrackTrace: () -> Unit
+    onOpenTrackTrace: () -> Unit,
+    onOpenCommunity: () -> Unit   // ✅ ADD
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val selectedDevice by viewModel.selectedDevice.collectAsState()
@@ -158,6 +159,14 @@ fun HomeScreen(
                         },
 //                        showDropdown = showDropdownAllowed
                     )
+                    Spacer(Modifier.height(4.dp))
+                    // ✅ COMMUNITY CARD
+                    CommunityEntryCard(
+                        onClick = {
+                            onOpenCommunity()   // 🔥 navigation trigger
+                        }
+                    )
+
 
                     if (showDeviceDropdown) {
                     DeviceDropdownSheet(
@@ -692,6 +701,66 @@ fun RefreshIcon(
             },
         tint = if (isRefreshing) Color.Gray else Color.Black
     )
+}
+
+@Composable
+fun CommunityEntryCard(
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(14.dp),
+        elevation = CardDefaults.cardElevation(6.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+
+            // 🟣 Icon
+            Surface(
+                shape = CircleShape,
+                color = Color(0xFF7B61FF).copy(alpha = 0.15f),
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Groups,
+                    contentDescription = "Community",
+                    tint = Color(0xFF7B61FF),
+                    modifier = Modifier.padding(8.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // 📝 Text
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Community",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    text = "Connect with other EVA2Z users",
+                    fontSize = 12.sp,
+                    color = Color.Gray
+                )
+            }
+
+            Icon(
+                imageVector = Icons.Default.ArrowForwardIos,
+                contentDescription = null,
+                tint = Color.Gray,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+    }
 }
 
 @Composable

@@ -8,6 +8,7 @@ import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.response.VaultDocumentDto
 import com.developer.ev2z.util.crypto.randomHex
 import com.developer.ev2z.util.crypto.sha256
+import io.ktor.utils.io.core.toByteArray
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -148,6 +149,35 @@ class DocumentsViewModel(
                 vaultToken = vaultToken,
                 authToken = authToken,
                 encryptedFile = imageBytes,
+                fileName = fileName,
+                fileType = fileName,
+                salt = salt,
+                iv = iv,
+                authTag = authTag,
+                checksum = checksum
+            )
+        }
+    }
+
+    suspend fun updateDocument(
+        documentId: String,
+        fileName: String,
+        imageBytes: ByteArray?
+    ) {
+        val vaultToken = storageManager.getString(StorageKeys.VAULT_TOKEN, "")
+        val authToken = storageManager.getString("token", "")
+
+        val salt = randomHex(16)
+        val iv = randomHex(16)
+        val authTag = randomHex(16)
+        val checksum = sha256(imageBytes ?: fileName.toByteArray())
+
+        withContext(Dispatchers.IO) {
+            apiService.updateVaultDocument(
+                documentId = documentId,
+                vaultToken = vaultToken,
+                authToken = authToken,
+                encryptedFile = imageBytes,   // 👈 nullable
                 fileName = fileName,
                 fileType = fileName,
                 salt = salt,

@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.rounded.*
@@ -414,69 +415,142 @@ fun VaultPasswordDialog(
     onDismiss: () -> Unit
 ) {
     var password by remember { mutableStateOf("") }
-    var passwordVisible by remember { mutableStateOf(false) } // 👁️ toggle state
+    var passwordVisible by remember { mutableStateOf(false) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Enter Your Login Password\nAccess your E-Vault Documents") },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    placeholder = { Text("Password") },
-                    singleLine = true,
-                    isError = errorMessage != null,
-                    modifier = Modifier.fillMaxWidth(),
+    Dialog(onDismissRequest = onDismiss) {
+        Box(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+            Box {
+                // 🧾 Card
+                Card(
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = Color(0xFFF3F3F3)
+                    ),
+                    elevation = CardDefaults.cardElevation(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .padding(
+                                top = 40.dp,
+                                start = 24.dp,
+                                end = 24.dp,
+                                bottom = 16.dp
+                            )
+                    ) {
 
-                    // 🔒 / 👁️ password visibility
-                    visualTransformation = if (passwordVisible)
-                        VisualTransformation.None
-                    else
-                        PasswordVisualTransformation(),
+                        Text(
+                            text = "Enter Your Login Password",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.Black
+                        )
 
-                    trailingIcon = {
-                        IconButton(
-                            onClick = { passwordVisible = !passwordVisible }
-                        ) {
-                            Icon(
-                                imageVector = if (passwordVisible)
-                                    Icons.Default.Visibility
-                                else
-                                    Icons.Default.VisibilityOff,
-                                contentDescription = if (passwordVisible)
-                                    "Hide password"
-                                else
-                                    "Show password"
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Text(
+                            text = "Access Your E-Vault Documents",
+                            fontSize = 13.sp,
+                            color = Color.Gray
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        OutlinedTextField(
+                            value = password,
+                            onValueChange = { password = it },
+                            placeholder = { Text("Password") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            isError = errorMessage != null,
+                            shape = RoundedCornerShape(8.dp),
+                            visualTransformation = if (passwordVisible)
+                                VisualTransformation.None
+                            else
+                                PasswordVisualTransformation(),
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = { passwordVisible = !passwordVisible }
+                                ) {
+                                    Icon(
+                                        imageVector = if (passwordVisible)
+                                            Icons.Default.Visibility
+                                        else
+                                            Icons.Default.VisibilityOff,
+                                        contentDescription = null
+                                    )
+                                }
+                            }
+                        )
+
+                        if (errorMessage != null) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = errorMessage,
+                                color = MaterialTheme.colorScheme.error,
+                                fontSize = 12.sp
                             )
                         }
-                    }
-                )
 
-                if (errorMessage != null) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = errorMessage,
-                        color = MaterialTheme.colorScheme.error,
-                        fontSize = 12.sp
-                    )
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        // 🔘 Bottom actions
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            TextButton(onClick = onDismiss) {
+                                Text(
+                                    text = "Cancel",
+                                    color = Color(0xFF7B61FF)
+                                )
+                            }
+
+                            TextButton(
+                                onClick = { onSubmit(password) },
+                                enabled = password.isNotBlank()
+                            ) {
+                                Text(
+                                    text = "Continue",
+                                    color = if (password.isNotBlank())
+                                        Color(0xFF7B61FF)
+                                    else
+                                        Color.Gray
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // 🔐 Floating lock icon
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .align(Alignment.TopCenter)
+                        .offset(y = (-26).dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Surface(
+                        shape = CircleShape,
+                        color = Color(0xFF7B61FF),
+                        shadowElevation = 6.dp
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier
+                                .padding(14.dp)
+                                .size(22.dp)
+                        )
+                    }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(
-                enabled = password.isNotBlank(), // ✅ optional safety
-                onClick = { onSubmit(password) }
-            ) {
-                Text("Continue")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
         }
-    )
+    }
 }
 
 @OptIn(ExperimentalTime::class)

@@ -12,6 +12,7 @@ import com.developer.ev2z.phonepe.PaymentBus
 import com.developer.ev2z.ui.screens.Profile.GlobalContext
 import com.developer.ev2z.util.Analytics
 import com.developer.ev2z.util.MetaAnalytics
+import com.developer.ev2z.util.NotificationUtil
 import com.developer.ev2z.util.initGeocoder
 import com.facebook.appevents.AppEventsConstants
 
@@ -29,6 +30,7 @@ class MainActivity : ComponentActivity() {
                 FcmManager.fetchAndRegisterToken()
             }.checkAndRequest()
 
+            NotificationUtil.createChannel(this)
             // ✅ Initialize storage
             initStorageManager(this)
 

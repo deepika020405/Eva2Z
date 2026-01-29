@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,10 +27,15 @@ import androidx.compose.ui.unit.sp
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.response.VaultDocumentDto
 import com.developer.ev2z.util.PlatformDocumentViewer
 import com.developer.ev2z.util.compressStoryImage
 import com.developer.ev2z.util.rememberImagePicker
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.ExperimentalTime
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,7 +62,7 @@ fun DocumentsScreen(
     val loading by viewModel.loading
     val error by viewModel.error
     var deleteDocId by remember { mutableStateOf<String?>(null) }
-
+    var editDocument by remember { mutableStateOf<VaultDocumentDto?>(null) }
 
     // 🚀 Load documents once
     LaunchedEffect(Unit) {
@@ -161,8 +167,8 @@ fun DocumentsScreen(
                         items(documents) { doc ->
                             DocumentItem(
                                 fileName = doc.fileName,
-                                fileType = doc.fileType,
-                                onClick = {
+                                fileType = "Added on ${formatIsoDateToReadable(doc.createdAt)}",
+                                onView = {
                                     viewModel.openDocument(
                                         documentId = doc.id,
                                         onResult = { bytes ->
@@ -170,7 +176,12 @@ fun DocumentsScreen(
                                         }
                                     )
                                 },
-                                onDelete = {deleteDocId = doc.id}
+                                onDelete = {
+                                    deleteDocId = doc.id
+                                },
+                                onRename = {
+                                    editDocument = doc   // 👈 EDIT MODE
+                                }
                             )
                         }
                     }
@@ -201,6 +212,50 @@ fun DocumentsScreen(
             }
 
         }
+    }
+
+    if (editDocument != null) {
+        UploadDocumentScreen(
+            apiService = apiService,
+            storageManager = storageManager,
+            editDocument = editDocument,   // 👈 PASS DOC
+            onBack = {
+                editDocument = null
+                viewModel.loadDocuments()
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalTime::class)
+fun formatIsoDateToReadable(dateString: String?): String {
+    if (dateString.isNullOrBlank()) return ""
+
+    return try {
+        val instant = Instant.parse(dateString)
+        val date = instant
+            .toLocalDateTime(TimeZone.currentSystemDefault())
+            .date
+
+        val month = when (date.monthNumber) {
+            1 -> "Jan"
+            2 -> "Feb"
+            3 -> "Mar"
+            4 -> "Apr"
+            5 -> "May"
+            6 -> "Jun"
+            7 -> "Jul"
+            8 -> "Aug"
+            9 -> "Sep"
+            10 -> "Oct"
+            11 -> "Nov"
+            12 -> "Dec"
+            else -> ""
+        }
+
+        "${date.dayOfMonth}-$month-${date.year}"
+    } catch (e: Exception) {
+        ""
     }
 }
 
@@ -269,49 +324,118 @@ fun DocumentViewerScreen(
 private fun DocumentItem(
     fileName: String,
     fileType: String,
-    onClick: () -> Unit,
-    onDelete: () -> Unit
+    onView: () -> Unit,
+    onDelete: () -> Unit,
+    onRename: () -> Unit = {}
 ) {
+    var menuExpanded by remember { mutableStateOf(false) }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 12.dp)
-            .clickable { onClick() },
-        elevation = CardDefaults.cardElevation(2.dp)
+            .padding(bottom = 10.dp) // ⬅ spacing thoda kam
+            .clickable { onView() },
+        elevation = CardDefaults.cardElevation(2.dp),
+        shape = RoundedCornerShape(12.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(horizontal = 14.dp, vertical = 12.dp), // ⬅ compact
             verticalAlignment = Alignment.CenterVertically
         ) {
 
             Icon(
                 imageVector = Icons.Default.Description,
                 contentDescription = null,
-                modifier = Modifier.size(28.dp)
+                modifier = Modifier.size(26.dp)
             )
 
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(10.dp))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(fileName, fontSize = 16.sp, fontWeight = FontWeight.Medium)
                 Text(
-                    fileType,
-                    fontSize = 12.sp,
+                    text = fileName,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = fileType,
+                    fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
-            IconButton(onClick = onDelete) {
-                Icon(
-                    imageVector = Icons.Default.Delete,
-                    contentDescription = "Delete",
-                    tint = Color.Red
-                )
+            // 🔘 3 DOT MENU
+            Box {
+                IconButton(
+                    onClick = { menuExpanded = true },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "More options",
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false },
+                    shape = RoundedCornerShape(14.dp), // ✅ CURVE
+                    modifier = Modifier
+                        .background(Color.White)
+                ) {
+
+                    CompactMenuItem(
+                        text = "View",
+                        onClick = {
+                            menuExpanded = false
+                            onView()
+                        }
+                    )
+
+                    CompactMenuItem(
+                        text = "Edit",
+                        onClick = {
+                            menuExpanded = false
+                            onRename()
+                        }
+                    )
+
+                    CompactMenuItem(
+                        text = "Delete",
+                        textColor = Color(0xFFD32F2F),
+                        onClick = {
+                            menuExpanded = false
+                            onDelete()
+                        }
+                    )
+                }
             }
         }
     }
+}
+@Composable
+private fun CompactMenuItem(
+    text: String,
+    textColor: Color = Color.Black,
+    onClick: () -> Unit
+) {
+    DropdownMenuItem(
+        text = {
+            Text(
+                text = text,
+                fontSize = 14.sp,
+                color = textColor
+            )
+        },
+        onClick = onClick,
+        contentPadding = PaddingValues(
+            horizontal = 16.dp,
+            vertical = 4.dp // ⬅ spacing kam
+        )
+    )
 }
 
 
@@ -320,6 +444,7 @@ private fun DocumentItem(
 fun UploadDocumentScreen(
     apiService: ApiService,
     storageManager: StorageManager,
+    editDocument: VaultDocumentDto? = null,
     onBack: () -> Unit
 ) {
     // ✅ SYSTEM BACK HANDLING
@@ -334,12 +459,19 @@ fun UploadDocumentScreen(
         )
     }
 
-    var fileName by remember { mutableStateOf("") }
-    var imageBytes by remember { mutableStateOf<ByteArray?>(null) }
+//    var fileName by remember { mutableStateOf("") }
+//    var imageBytes by remember { mutableStateOf<ByteArray?>(null) }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     var isUploading by remember { mutableStateOf(false) }
     var fileNameError by remember { mutableStateOf(false) }
+    val isEditMode = editDocument != null
+
+    var fileName by remember {
+        mutableStateOf(editDocument?.fileName ?: "")
+    }
+
+    var imageBytes by remember { mutableStateOf<ByteArray?>(null) }
 
 
 
@@ -358,7 +490,14 @@ fun UploadDocumentScreen(
         },
         topBar = {
             TopAppBar(
-                title = { Text("Add E-Vault Document") },
+                title = {
+                    Text(
+                        if (isEditMode)
+                            "Edit E-Vault Document"
+                        else
+                            "Add E-Vault Document"
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
@@ -366,44 +505,55 @@ fun UploadDocumentScreen(
                 },
                 actions = {
                     TextButton(
-                        enabled = !isUploading && fileName.isNotBlank() && imageBytes != null,
+                        enabled = !isUploading && fileName.isNotBlank(),
                         onClick = {
                             scope.launch {
 
-                                // validation
+                                // 🔎 validation
                                 if (fileName.isBlank()) {
                                     fileNameError = true
                                     return@launch
                                 }
 
-                                if (imageBytes == null) {
+                                // ❗ ADD mode me image compulsory, EDIT me optional
+                                if (!isEditMode && imageBytes == null) {
                                     snackbarHostState.showSnackbar("Please select an image")
                                     return@launch
                                 }
 
                                 try {
-                                    isUploading = true   // 🔒 disable button
+                                    isUploading = true
 
-                                    viewModel.uploadDocument(
-                                        fileName = fileName,
-                                        imageBytes = imageBytes!!
-                                    )
+                                    if (isEditMode) {
+                                        // 🔁 UPDATE FLOW
+                                        viewModel.updateDocument(
+                                            documentId = editDocument!!.id,
+                                            fileName = fileName,
+                                            imageBytes = imageBytes // nullable
+                                        )
 
-                                    snackbarHostState.showSnackbar(
-                                        message = "E-Vault Document uploaded successfully ✅",
-                                        duration = SnackbarDuration.Short
-                                    )
+                                        snackbarHostState.showSnackbar(
+                                            "E-Vault Document updated successfully ✅"
+                                        )
+                                    } else {
+                                        // ➕ ADD FLOW
+                                        viewModel.uploadDocument(
+                                            fileName = fileName,
+                                            imageBytes = imageBytes!!
+                                        )
+
+                                        snackbarHostState.showSnackbar(
+                                            "E-Vault Document uploaded successfully ✅"
+                                        )
+                                    }
 
                                     onBack() // success → exit screen
 
                                 } catch (e: Exception) {
-
                                     snackbarHostState.showSnackbar(
-                                        message = "Upload failed. Please try again",
-                                        duration = SnackbarDuration.Short
+                                        "Operation failed. Please try again"
                                     )
-
-                                    isUploading = false // 🔓 enable again on failure
+                                    isUploading = false
                                 }
                             }
                         }
@@ -414,10 +564,9 @@ fun UploadDocumentScreen(
                                 strokeWidth = 2.dp
                             )
                         } else {
-                            Text("Upload")
+                            Text(if (isEditMode) "Update" else "Upload")
                         }
                     }
-
                 }
             )
         }
