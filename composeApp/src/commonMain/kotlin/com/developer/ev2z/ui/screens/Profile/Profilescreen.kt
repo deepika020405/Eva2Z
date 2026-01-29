@@ -9,6 +9,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,6 +21,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -242,17 +246,24 @@ fun ProfileScreenContent(
                             ProfileMenuItem("Account Activity", Icons.Rounded.ManageAccounts, onAccountActivity),
                             ProfileMenuItem("Refer And Earn", Icons.Rounded.CardGiftcard, onReferAndEarn),
                             ProfileMenuItem("Change Password", Icons.Rounded.Password, onChangePassword), // ✅ WORKING NOW
+//                            ProfileMenuItem(
+//                                title = "Documents",
+//                                icon = Icons.Rounded.Folder,
+//                                onClick = {
+////                                    if (isVaultSessionValid(storageManager)) {
+////                                        onOpenDocumentsVault() // 🔓 Direct open
+////                                    } else {
+////                                        onShowVaultPasswordDialog(true)
+////                                        // 🔐 Ask password
+////                                    }
+//                                    onShowVaultPasswordDialog(true)
+//                                }
+//                            )
                             ProfileMenuItem(
-                                title = "Documents",
-                                icon = Icons.Rounded.Folder,
+                                title = "Community",
+                                icon = Icons.Rounded.Group,
                                 onClick = {
-//                                    if (isVaultSessionValid(storageManager)) {
-//                                        onOpenDocumentsVault() // 🔓 Direct open
-//                                    } else {
-//                                        onShowVaultPasswordDialog(true)
-//                                        // 🔐 Ask password
-//                                    }
-                                    onShowVaultPasswordDialog(true)
+                                    onOpenDocumentsVault() // 🔥 actually opens Community
                                 }
                             )
                         )
@@ -403,21 +414,43 @@ fun VaultPasswordDialog(
     onDismiss: () -> Unit
 ) {
     var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) } // 👁️ toggle state
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Enter Your Login Password") },
+        title = { Text("Enter Your Login Password\nAccess your E-Vault Documents") },
         text = {
             Column {
                 OutlinedTextField(
                     value = password,
-                    onValueChange = {
-                        password = it
-                    },
+                    onValueChange = { password = it },
                     placeholder = { Text("Password") },
                     singleLine = true,
                     isError = errorMessage != null,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+
+                    // 🔒 / 👁️ password visibility
+                    visualTransformation = if (passwordVisible)
+                        VisualTransformation.None
+                    else
+                        PasswordVisualTransformation(),
+
+                    trailingIcon = {
+                        IconButton(
+                            onClick = { passwordVisible = !passwordVisible }
+                        ) {
+                            Icon(
+                                imageVector = if (passwordVisible)
+                                    Icons.Default.Visibility
+                                else
+                                    Icons.Default.VisibilityOff,
+                                contentDescription = if (passwordVisible)
+                                    "Hide password"
+                                else
+                                    "Show password"
+                            )
+                        }
+                    }
                 )
 
                 if (errorMessage != null) {
@@ -431,9 +464,10 @@ fun VaultPasswordDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = {
-                onSubmit(password)
-            }) {
+            TextButton(
+                enabled = password.isNotBlank(), // ✅ optional safety
+                onClick = { onSubmit(password) }
+            ) {
                 Text("Continue")
             }
         },

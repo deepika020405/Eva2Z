@@ -66,7 +66,7 @@ fun DocumentsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Documents") },
+                title = { Text("E-Vault Documents") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -108,13 +108,6 @@ fun DocumentsScreen(
                     )
                 }
 
-//                documents.isEmpty() -> {
-//                    Text(
-//                        text = "No documents found",
-//                        fontSize = 16.sp,
-//                        modifier = Modifier.align(Alignment.Center)
-//                    )
-//                }
                 documents.isEmpty() -> {
                     Column(
                         modifier = Modifier
@@ -134,7 +127,7 @@ fun DocumentsScreen(
                         Spacer(modifier = Modifier.height(12.dp))
 
                         Text(
-                            text = "No documents found",
+                            text = "No E-Vault documents found",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Medium
                         )
@@ -142,7 +135,7 @@ fun DocumentsScreen(
                         Spacer(modifier = Modifier.height(6.dp))
 
                         Text(
-                            text = "Add your first document to get started",
+                            text = "Add your first E-Vault document to get started",
                             fontSize = 14.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -154,7 +147,7 @@ fun DocumentsScreen(
                         ) {
                             Icon(Icons.Default.Add, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
-                            Text("Add Document")
+                            Text("Add E-Vault Document")
                         }
                     }
                 }
@@ -187,8 +180,8 @@ fun DocumentsScreen(
             if (deleteDocId != null) {
                 AlertDialog(
                     onDismissRequest = { deleteDocId = null },
-                    title = { Text("Delete Document") },
-                    text = { Text("Are you sure you want to delete this document?") },
+                    title = { Text("Delete E-Vault Document") },
+                    text = { Text("Are you sure you want to delete this E-Vault document?") },
                     confirmButton = {
                         TextButton(
                             onClick = {
@@ -365,27 +358,13 @@ fun UploadDocumentScreen(
         },
         topBar = {
             TopAppBar(
-                title = { Text("Add Document") },
+                title = { Text("Add E-Vault Document") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
                     }
                 },
                 actions = {
-//                    TextButton(
-//                        enabled = fileName.isNotBlank() && imageBytes != null,
-//                        onClick = {
-//                            scope.launch {
-//                                viewModel.uploadDocument(
-//                                    fileName = fileName,
-//                                    imageBytes = imageBytes!!
-//                                )
-//                                onBack()
-//                            }
-//                        }
-//                    ) {
-//                        Text("Upload")
-//                    }
                     TextButton(
                         enabled = !isUploading && fileName.isNotBlank() && imageBytes != null,
                         onClick = {
@@ -411,7 +390,7 @@ fun UploadDocumentScreen(
                                     )
 
                                     snackbarHostState.showSnackbar(
-                                        message = "Document uploaded successfully ✅",
+                                        message = "E-Vault Document uploaded successfully ✅",
                                         duration = SnackbarDuration.Short
                                     )
 
@@ -452,12 +431,6 @@ fun UploadDocumentScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
 
-//            OutlinedTextField(
-//                value = fileName,
-//                onValueChange = { fileName = it },
-//                label = { Text("File name") },
-//                modifier = Modifier.fillMaxWidth()
-//            )
             var fileNameError by remember { mutableStateOf(false) }
 
             OutlinedTextField(

@@ -5,15 +5,19 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.navigator.tab.*
@@ -43,6 +47,8 @@ import com.developer.ev2z.ui.screens.ChangePassword.ChangePasswordScreen
 import com.developer.ev2z.ui.screens.GPSData.GPSDataScreen
 //import com.developer.ev2z.ui.screens.GPSData.GPSDataScreen
 import com.developer.ev2z.ui.screens.Profile.AboutAppScreen
+import com.developer.ev2z.ui.screens.Profile.ProfileViewModel
+import com.developer.ev2z.ui.screens.Profile.VaultPasswordDialog
 import com.developer.ev2z.ui.screens.ReferAndEarn.ReferAndEarnScreen
 import com.developer.ev2z.ui.screens.documents.DocumentViewerScreen
 import com.developer.ev2z.ui.screens.documents.DocumentsScreen
@@ -80,16 +86,24 @@ class HomeTab(
         )
 }
 
-object CommunityTab : Tab {
+
+class DocumentsTab(
+    private val onRequestDocuments: () -> Unit
+) : Tab {
+
     @Composable
     override fun Content() {
-        Navigator(CommunityScreenWrapper())
+        LaunchedEffect(Unit) {
+            onRequestDocuments()   // 🔐 password flow trigger
+        }
+        Box(modifier = Modifier.fillMaxSize())
     }
+
     override val options: TabOptions
         @Composable get() = TabOptions(
             index = 1u,
-            title = "Community",
-            icon = rememberVectorPainter(Icons.Default.GridView)
+            title = "E-Vault",
+            icon = rememberVectorPainter(Icons.Default.Folder)
         )
 }
 
@@ -213,6 +227,11 @@ fun HomeNavGraph(
     var viewerBytes by remember { mutableStateOf<ByteArray?>(null) }
     var viewerFileName by remember { mutableStateOf("") }
     var showUploadDocument by remember { mutableStateOf(false) } // 🔹 add state
+    var showVaultPasswordDialog by remember { mutableStateOf(false) }
+    var showCommunity by remember { mutableStateOf(false) }
+    var documentsGateState by remember {
+        mutableStateOf(DocumentsGateState.NONE)
+    }
 
 
 
@@ -256,7 +275,15 @@ fun HomeNavGraph(
             onNavigateToReferAndEarn = { showReferAndEarn = true },
             onNavigateToAboutApp = { showAboutApp = true },
             onNavigateToDocuments = {
-                showDocuments = true   // ✅ NOW CORRECT
+                showCommunity = true   // ✅ NOW CORRECT
+            },
+            onRequestDocumentsWithPassword = {
+                showVaultPasswordDialog = true
+            },
+
+            onDocumentsTabSelected = {              // ✅ ADD THIS
+                documentsGateState = DocumentsGateState.LOCKED
+                showVaultPasswordDialog = true
             },
             onLogout = onLogout
         )
@@ -305,26 +332,35 @@ fun HomeNavGraph(
             )
         }
 
-//        if (showDocuments) {
-//            DocumentsScreen(
-//                apiService = apiService,
-//                storageManager = storageManager,
-//                onBack = {
-//                    showDocuments = false
-//                }
-//            )
-//        }
+        if (showCommunity) {
+            Box(modifier = Modifier.fillMaxSize()) {
+
+                Navigator(
+                    CommunityScreenWrapper(
+                        onBack = {
+                            showCommunity = false   // 🔥 REAL BACK
+                        }
+                    )
+                )
+            }
+        }
         if (showDocuments) {
             DocumentsScreen(
                 apiService = apiService,
                 storageManager = storageManager,
-                onBack = { showDocuments = false },
+
+                onBack = {
+                    showDocuments = false
+                    documentsGateState = DocumentsGateState.LOCKED
+                },
+
                 onOpenViewer = { bytes, fileName ->
                     viewerBytes = bytes
                     viewerFileName = fileName
                     showDocuments = false
                     showDocumentViewer = true
                 },
+
                 onOpenUpload = {
                     showDocuments = false
                     showUploadDocument = true
@@ -511,17 +547,54 @@ fun HomeNavGraph(
                         println("✅ Shop tab navigation complete")
                     }
                 },
-//                onNavigateToAddDevice = {
-//                    println("➕ Navigating to Add Device...")
-//                    showReferAndEarn = false
-//                    // ✅ Open actual add device flow
-//                    onNavigateToAddDevice()
-//                }
                 onNavigateToAddDevice = {
                     showReferAndEarn = false
                     showAddDevice = true
                 }
 
+            )
+        }
+
+        var vaultError by remember { mutableStateOf<String?>(null) }
+        val profileViewModel = remember {
+            ProfileViewModel(apiService, storageManager)
+        }
+        val profileState by profileViewModel.state.collectAsState()
+
+
+        if (showVaultPasswordDialog) {
+            VaultPasswordDialog(
+                errorMessage = profileState.error,
+
+                onSubmit = { password ->
+                    profileViewModel.unlockDocumentsVault(
+                        password = password,
+                        onSuccess = {
+                            documentsGateState = DocumentsGateState.UNLOCKED
+                            showVaultPasswordDialog = false
+                            showDocuments = true
+                        }
+                    )
+                },
+
+                onDismiss = {
+                    showVaultPasswordDialog = false
+                    documentsGateState = DocumentsGateState.LOCKED
+                }
+            )
+        }
+
+
+        if (
+            documentsGateState == DocumentsGateState.LOCKED &&
+            pagerState.currentPage == 1 &&   // Documents tab
+            !showDocuments &&
+            !showVaultPasswordDialog
+        ) {
+            LockedDocumentsPlaceholder(
+                onUnlockClick = {
+                    showVaultPasswordDialog = true
+                }
             )
         }
 
@@ -545,6 +618,11 @@ fun HomeNavGraph(
         }
 
 
+        LaunchedEffect(showVaultPasswordDialog) {
+            if (showVaultPasswordDialog) {
+                profileViewModel.clearError()
+            }
+        }
 
         // About App
         if (showAboutApp) {
@@ -581,6 +659,54 @@ fun HomeNavGraph(
     }
 }
 
+@Composable
+fun LockedDocumentsPlaceholder(
+    onUnlockClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(6.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = null,
+                    tint = Color.Gray,
+                    modifier = Modifier.size(40.dp)
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                Text(
+                    text = "Documents are locked",
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Spacer(Modifier.height(6.dp))
+
+                Text(
+                    text = "Enter password to access your documents",
+                    color = Color.Gray,
+                    fontSize = 13.sp
+                )
+
+                Spacer(Modifier.height(16.dp))
+
+                Button(onClick = onUnlockClick) {
+                    Text("Unlock Documents")
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeNavGraphContent(
@@ -610,6 +736,8 @@ fun HomeNavGraphContent(
     onNavigateToReferAndEarn: () -> Unit = {},
     onNavigateToAboutApp: () -> Unit = {},
     onNavigateToDocuments: () -> Unit,
+    onRequestDocumentsWithPassword: () -> Unit,
+    onDocumentsTabSelected: () -> Unit,   // ✅ ADD
     onLogout: () -> Unit
 ) {
     val productRepository = remember { ProductRepository(apiService) }
@@ -648,22 +776,20 @@ fun HomeNavGraphContent(
     }
 
     val ordersTab = remember { OrdersTab() }
-    val tabs = listOf(homeTab, CommunityTab, ordersTab, profileTab)
+    val documentsTab = remember {
+        DocumentsTab(
+            onRequestDocuments = {
+                onDocumentsTabSelected()
+            }
+        )
+    }
+    val tabs = listOf(homeTab, documentsTab, ordersTab, profileTab)
 
     // ✅ DON'T CREATE pagerState here - use the passed one
 
     Scaffold(
         containerColor = Color.White,
         bottomBar = {
-//            CustomBottomNavBar(
-//                tabs = tabs,
-//                selectedIndex = pagerState.currentPage,
-//                onTabSelected = { index ->
-//                    coroutineScope.launch {
-//                        pagerState.animateScrollToPage(index)
-//                    }
-//                }
-//            )
             if (BottomBarController.visible) {
                 CustomBottomNavBar(
                     tabs = tabs,
@@ -731,6 +857,12 @@ fun CustomBottomNavBar(
             )
         }
     }
+}
+
+enum class DocumentsGateState {
+    NONE,
+    LOCKED,
+    UNLOCKED
 }
 
 @Composable

@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -28,6 +29,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -36,11 +38,15 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -70,6 +76,7 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import coil3.compose.AsyncImage
+import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.response.Comment
 import com.developer.ev2z.response.Post
 import com.developer.ev2z.response.Story
@@ -89,6 +96,7 @@ import kotlin.time.ExperimentalTime
 
 @Composable
 fun CommunityScreen(
+    navigator: Navigator,
     posts: List<Post>,
     stories: List<Story>,
     authUserId: Int,
@@ -98,11 +106,14 @@ fun CommunityScreen(
     onCommentClick: (Int) -> Unit,
     onAddStory: () -> Unit
 ) {
-    val navigator = LocalNavigator.currentOrThrow
+//    val navigator = LocalNavigator.currentOrThrow
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFf2f5f0))
+            .background(Color(0xFFf2f5f0)),
+        contentPadding = PaddingValues(
+            bottom = 96.dp // 🔥 enough space for nav bar + FAB
+        )
     ) {
          val BASE_IMAGE_URL = "https://gps.eva2z.in"
 
@@ -1081,90 +1092,94 @@ fun StoryItem(
 
 
 
+class CommunityScreenWrapper(
+    private val onBack: () -> Unit   // 🔥 ADD THIS
+) : Screen {
 
-class CommunityScreenWrapper : Screen {
 
+    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
 
+        val navigator = LocalNavigator.currentOrThrow // ✅ SIMPLE & CORRECT
         val viewModel = CommunityViewModelProvider.viewModel
         val state = viewModel.state
-        val navigator = LocalNavigator.currentOrThrow
         var openCommentsPostId by remember { mutableStateOf<Int?>(null) }
 
-        // ✅ THIS WAS MISSING
-//        val refreshKey = viewModel.observeRefreshKey()
-//
-//        LaunchedEffect(refreshKey) {
-//            viewModel.loadPosts()
-//        }
+        // 🔙 SYSTEM BACK
+        PlatformBackHandler(enabled = true) {
+            onBack()   // 🔥 CLOSE COMMUNITY
+        }
 
         LaunchedEffect(Unit) {
-            if (viewModel.state.posts.isEmpty()) {
+            if (state.posts.isEmpty()) {
                 viewModel.loadPosts()
             }
         }
 
-        Box(modifier = Modifier.fillMaxSize()) {
-
-            // 🔹 MAIN COMMUNITY UI
-            when {
-                state.loading -> {
-                    Box(
-                        Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("Loading...")
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.White
+                    ),
+                    title = {
+                        Text(
+                            text = "Community",
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(
+                            onClick = {
+                                onBack() // 🔥 NOW WORKS
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "Back"
+                            )
+                        }
                     }
-                }
+                )
+            },
+            contentWindowInsets = WindowInsets(0)
+        ) { paddingValues ->
 
-                state.error != null && state.posts.isEmpty() -> {
-                    Box(
-                        Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-//                        Text(state.error ?: " Server Error")
-                        Text( " Server Error")
-                    }
-                }
-
-                else -> {
-                    CommunityScreen(
-                        posts = state.posts,
-                        stories = state.stories,
-                        authUserId = state.authUserId,
-                        onCreatePostClick = {
-                            navigator.push(CreatePostScreen())
-                        },
-                        onLikeClick = { postId ->
-                            viewModel.toggleLike(postId)
-                        },
-                        onCommentClick = { postId ->
-                            openCommentsPostId = postId
-                        },
-                        onAddStory = {
-                            navigator.push(CreateStoryScreen())
-                        },
-//                        onStoryClick = { story ->
-//                            val index = state.stories.indexOfFirst { it.id == story.id }
-//                            viewModel.startStory(index)
-//                            navigator.push(StoryViewerScreen())
-//                        },
-                        viewModel = viewModel
-                    )
-                }
-            }
-
-            // 🔥 FLOATING CONTACT BUTTON
-            FloatingContactButton(
-                phoneNumber = "919755273822",
+            Box(
                 modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 20.dp, bottom = 20.dp)
-            )
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
+                CommunityScreen(
+                    navigator = navigator,
+                    posts = state.posts,
+                    stories = state.stories,
+                    authUserId = state.authUserId,
+                    onCreatePostClick = {
+                        navigator.push(CreatePostScreen())
+                    },
+                    onLikeClick = { postId ->
+                        viewModel.toggleLike(postId)
+                    },
+                    onCommentClick = { postId ->
+                        openCommentsPostId = postId
+                    },
+                    onAddStory = {
+                        navigator.push(CreateStoryScreen())
+                    },
+                    viewModel = viewModel
+                )
+
+                FloatingContactButton(
+                    phoneNumber = "919755273822",
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 20.dp, bottom = 60.dp)
+                )
+            }
         }
 
-        // 🔹 COMMENT BOTTOM SHEET
         openCommentsPostId?.let { postId ->
             CommentBottomSheet(
                 postId = postId,
@@ -1174,5 +1189,98 @@ class CommunityScreenWrapper : Screen {
         }
     }
 }
+
+//class CommunityScreenWrapper : Screen {
+//
+//    @Composable
+//    override fun Content() {
+//
+//        val viewModel = CommunityViewModelProvider.viewModel
+//        val state = viewModel.state
+//        val navigator = LocalNavigator.currentOrThrow
+//        var openCommentsPostId by remember { mutableStateOf<Int?>(null) }
+//
+//        // ✅ THIS WAS MISSING
+////        val refreshKey = viewModel.observeRefreshKey()
+////
+////        LaunchedEffect(refreshKey) {
+////            viewModel.loadPosts()
+////        }
+//
+//        LaunchedEffect(Unit) {
+//            if (viewModel.state.posts.isEmpty()) {
+//                viewModel.loadPosts()
+//            }
+//        }
+//
+//        Box(modifier = Modifier.fillMaxSize()) {
+//
+//            // 🔹 MAIN COMMUNITY UI
+//            when {
+//                state.loading -> {
+//                    Box(
+//                        Modifier.fillMaxSize(),
+//                        contentAlignment = Alignment.Center
+//                    ) {
+//                        Text("Loading...")
+//                    }
+//                }
+//
+//                state.error != null && state.posts.isEmpty() -> {
+//                    Box(
+//                        Modifier.fillMaxSize(),
+//                        contentAlignment = Alignment.Center
+//                    ) {
+////                        Text(state.error ?: " Server Error")
+//                        Text( " Server Error")
+//                    }
+//                }
+//
+//                else -> {
+//                    CommunityScreen(
+//                        posts = state.posts,
+//                        stories = state.stories,
+//                        authUserId = state.authUserId,
+//                        onCreatePostClick = {
+//                            navigator.push(CreatePostScreen())
+//                        },
+//                        onLikeClick = { postId ->
+//                            viewModel.toggleLike(postId)
+//                        },
+//                        onCommentClick = { postId ->
+//                            openCommentsPostId = postId
+//                        },
+//                        onAddStory = {
+//                            navigator.push(CreateStoryScreen())
+//                        },
+////                        onStoryClick = { story ->
+////                            val index = state.stories.indexOfFirst { it.id == story.id }
+////                            viewModel.startStory(index)
+////                            navigator.push(StoryViewerScreen())
+////                        },
+//                        viewModel = viewModel
+//                    )
+//                }
+//            }
+//
+//            // 🔥 FLOATING CONTACT BUTTON
+//            FloatingContactButton(
+//                phoneNumber = "919755273822",
+//                modifier = Modifier
+//                    .align(Alignment.BottomEnd)
+//                    .padding(end = 20.dp, bottom = 20.dp)
+//            )
+//        }
+//
+//        // 🔹 COMMENT BOTTOM SHEET
+//        openCommentsPostId?.let { postId ->
+//            CommentBottomSheet(
+//                postId = postId,
+//                viewModel = viewModel,
+//                onDismiss = { openCommentsPostId = null }
+//            )
+//        }
+//    }
+//}
 
 
