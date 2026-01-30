@@ -38,7 +38,6 @@ import com.developer.ev2z.ui.screens.ManageDevices.EditDeviceNameScreen
 import com.developer.ev2z.ui.screens.market_screen.ShopScreenHost
 import com.developer.ev2z.ui.screens.PrivacyPolicy_TandC.PrivacyPolicy_TandCScreen
 import com.developer.ev2z.ui.screens.PrivacyPolicy_TandC.WebViewType
-import com.developer.ev2z.ui.screens.community.CommunityScreenWrapper
 import com.developer.ev2z.ui.screens.market_screen.ShopViewModel
 import com.developer.ev2z.ui.screens.GeneralSettings.GeneralSettingsScreen
 import com.developer.ev2z.ui.screens.AccountActivity.AccountActivityScreen
@@ -51,6 +50,10 @@ import com.developer.ev2z.ui.screens.Profile.AboutAppScreen
 import com.developer.ev2z.ui.screens.Profile.ProfileViewModel
 import com.developer.ev2z.ui.screens.Profile.VaultPasswordDialog
 import com.developer.ev2z.ui.screens.ReferAndEarn.ReferAndEarnScreen
+import com.developer.ev2z.ui.screens.community.CommunityScreenRoot
+import com.developer.ev2z.ui.screens.community.CreatePostScreen
+import com.developer.ev2z.ui.screens.community.CreateStoryScreen
+import com.developer.ev2z.ui.screens.community.StoryViewerScreen
 import com.developer.ev2z.ui.screens.documents.DocumentViewerScreen
 import com.developer.ev2z.ui.screens.documents.DocumentsScreen
 import com.developer.ev2z.ui.screens.documents.UploadDocumentScreen
@@ -276,6 +279,9 @@ fun HomeNavGraph(
     var showUploadDocument by remember { mutableStateOf(false) } // 🔹 add state
     var showVaultPasswordDialog by remember { mutableStateOf(false) }
     var showCommunity by remember { mutableStateOf(false) }
+    var showCreatePost by remember { mutableStateOf(false) }
+    var showCreateStory by remember { mutableStateOf(false) }
+    var showStoryViewer by remember { mutableStateOf(false) }
     var documentsGateState by remember {
         mutableStateOf(DocumentsGateState.NONE)
     }
@@ -381,17 +387,58 @@ fun HomeNavGraph(
             )
         }
 
+//        if (showCommunity) {
+//            Box(modifier = Modifier.fillMaxSize()) {
+//
+//                Navigator(
+//                    CommunityScreenWrapper(
+//                        onBack = {
+//                            showCommunity = false   // 🔥 REAL BACK
+//                        }
+//                    )
+//                )
+//            }
+//        }
         if (showCommunity) {
-            Box(modifier = Modifier.fillMaxSize()) {
+            CommunityScreenRoot(
+                onBack = { showCommunity = false },
 
-                Navigator(
-                    CommunityScreenWrapper(
-                        onBack = {
-                            showCommunity = false   // 🔥 REAL BACK
-                        }
-                    )
-                )
-            }
+                onOpenCreatePost = {
+                    showCreatePost = true
+                },
+
+                onOpenCreateStory = {
+                    showCreateStory = true
+                },
+
+                onOpenStoryViewer = {
+                    showStoryViewer = true
+                }
+            )
+        }
+
+        if (showCreatePost) {
+           CreatePostScreen  (
+               onBack = {
+                   showCreatePost = false
+               }
+           )
+        }
+
+        if (showCreateStory) {
+            CreateStoryScreen(
+                onBack = {
+                    showCreateStory = false
+                }
+            )
+        }
+
+        if (showStoryViewer) {
+            StoryViewerScreen(
+                onBack = {
+                    showStoryViewer = false   // 🔥 THIS IS THE KEY
+                }
+            )
         }
         if (showDocuments) {
             DocumentsScreen(

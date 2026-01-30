@@ -215,6 +215,12 @@ class CommunityViewModel(
             startProgress()
 
         } else {
+            currentStory()?.let { story ->
+                if (viewedStoryIds.add(story.id)) {
+                    scope.launch { repository.viewStory(story.id) }
+                }
+            }
+
             currentGroup = null
         }
     }
@@ -391,4 +397,20 @@ class CommunityViewModel(
             }
         )
     }
+
+    fun resetStoryViewer() {
+        storyJob?.cancel()
+        storyJob = null
+
+        currentGroup = null
+        currentGroupIndex = 0
+
+        storyIndex = 0
+        storyProgress = 0f
+        storyPaused = false
+    }
+
+
+
+
 }

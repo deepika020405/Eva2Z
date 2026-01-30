@@ -257,14 +257,14 @@ fun PaymentResultContent(
                     Spacer(Modifier.height(12.dp))
 
                     // Message
-                    Text(
-                        text = reason ?: "Something went wrong. Please try again.",
-                        fontSize = 14.sp,
-                        color = Color.Gray,
-                        textAlign = TextAlign.Center
-                    )
-
-                    Spacer(Modifier.height(24.dp))
+//                    Text(
+//                        text = reason ?: "Something went wrong. Please try again.",
+//                        fontSize = 14.sp,
+//                        color = Color.Gray,
+//                        textAlign = TextAlign.Center
+//                    )
+//
+//                    Spacer(Modifier.height(24.dp))
 
                     // Failed Details Card
                     Card(
@@ -272,16 +272,18 @@ fun PaymentResultContent(
                         shape = RoundedCornerShape(12.dp),
                         colors = CardDefaults.cardColors(Color(0xFFFFEBEE))
                     ) {
-                        Column(
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp)
+                                .padding(16.dp),
+                            contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "❌ ${reason ?: "Payment cancelled or failed"}",
+                                text = reason ?: "Payment cancelled or failed",
                                 color = Color(0xFFE53935),
                                 fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium
+                                fontWeight = FontWeight.Medium,
+                                textAlign = TextAlign.Center
                             )
                         }
                     }

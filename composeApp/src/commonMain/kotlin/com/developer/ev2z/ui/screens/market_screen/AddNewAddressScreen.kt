@@ -166,7 +166,6 @@ fun AddAddressUI(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
-            .imePadding()
             .verticalScroll(rememberScrollState())
     ) {
 

@@ -2,35 +2,31 @@ package com.developer.ev2z.ui.screens.community
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.Card
@@ -46,7 +42,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -70,23 +65,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.Navigator
-import cafe.adriel.voyager.navigator.currentOrThrow
 import coil3.compose.AsyncImage
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.response.Comment
 import com.developer.ev2z.response.Post
 import com.developer.ev2z.response.Story
 import com.developer.ev2z.response.StoryGroup
-import com.developer.ev2z.response.StoryViewer
 import com.developer.ev2z.response.Users
-import com.developer.ev2z.ui.components.FloatingContactButton
 import com.developer.ev2z.ui.screens.Profile.ProfileImageZoomDialog
 import com.developer.ev2z.ui.screens.social_media.openUrl
-import com.developer.ev2z.util.Analytics
 import io.ktor.util.date.getTimeMillis
 import kotlinx.coroutines.delay
 import kotlinx.datetime.*
@@ -96,7 +84,6 @@ import kotlin.time.ExperimentalTime
 
 @Composable
 fun CommunityScreen(
-    navigator: Navigator,
     posts: List<Post>,
     stories: List<Story>,
     authUserId: Int,
@@ -104,7 +91,8 @@ fun CommunityScreen(
     onLikeClick: (Int) -> Unit,
     viewModel: CommunityViewModel, // ✅ ADD THIS
     onCommentClick: (Int) -> Unit,
-    onAddStory: () -> Unit
+    onAddStory: () -> Unit,
+    onStoryClick: () -> Unit
 ) {
 //    val navigator = LocalNavigator.currentOrThrow
     LazyColumn(
@@ -128,10 +116,8 @@ fun CommunityScreen(
             StoriesRow(
                 groups = viewModel.storyGroups,
                 viewModel = viewModel,
-                onAddStory = {
-                    navigator.push(CreateStoryScreen())
-                },
-                navigator = navigator
+                onAddStory = onAddStory,
+                onStoryClick = onStoryClick
             )
 
         }
@@ -908,7 +894,7 @@ fun LinkText(
         }
     }
 
-    androidx.compose.foundation.text.ClickableText(
+    ClickableText(
         text = annotatedString,
         onClick = { offset ->
             annotatedString
@@ -977,7 +963,7 @@ fun StoriesRow(
     groups: List<StoryGroup>,
     viewModel: CommunityViewModel,
     onAddStory: () -> Unit,
-    navigator: Navigator
+    onStoryClick: () -> Unit
 ) {
     LazyRow(
         modifier = Modifier
@@ -999,7 +985,7 @@ fun StoriesRow(
                 isViewed = viewModel.isGroupViewed(group),
                 onClick = {
                     viewModel.startStoryGroup(group)
-                    navigator.push(StoryViewerScreen())
+                    onStoryClick()
                 }
             )
         }
@@ -1090,105 +1076,169 @@ fun StoryItem(
 }
 
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CommunityScreenRoot(
+    onBack: () -> Unit,
+    onOpenCreatePost:  () -> Unit,
+    onOpenCreateStory:  () -> Unit,
+    onOpenStoryViewer:  () -> Unit
+) {
+    val viewModel = CommunityViewModelProvider.viewModel
+    val state = viewModel.state
 
+    var openCommentsPostId by remember { mutableStateOf<Int?>(null) }
 
-class CommunityScreenWrapper(
-    private val onBack: () -> Unit   // 🔥 ADD THIS
-) : Screen {
+    PlatformBackHandler(enabled = true) {
+        onBack()
+    }
 
-
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
-    override fun Content() {
-
-        val navigator = LocalNavigator.currentOrThrow // ✅ SIMPLE & CORRECT
-        val viewModel = CommunityViewModelProvider.viewModel
-        val state = viewModel.state
-        var openCommentsPostId by remember { mutableStateOf<Int?>(null) }
-
-        // 🔙 SYSTEM BACK
-        PlatformBackHandler(enabled = true) {
-            onBack()   // 🔥 CLOSE COMMUNITY
+    LaunchedEffect(Unit) {
+        if (state.posts.isEmpty()) {
+            viewModel.loadPosts()
         }
+    }
 
-        LaunchedEffect(Unit) {
-            if (state.posts.isEmpty()) {
-                viewModel.loadPosts()
-            }
-        }
-
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.White
-                    ),
-                    title = {
-                        Text(
-                            text = "Community",
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(
-                            onClick = {
-                                onBack() // 🔥 NOW WORKS
-                            }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ArrowBack,
-                                contentDescription = "Back"
-                            )
-                        }
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Community", fontWeight = FontWeight.SemiBold) },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = null)
                     }
-                )
-            },
-            contentWindowInsets = WindowInsets(0)
-        ) { paddingValues ->
+                }
+            )
+        },
+        contentWindowInsets = WindowInsets(0)
+    ) { padding ->
 
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-            ) {
-                CommunityScreen(
-                    navigator = navigator,
-                    posts = state.posts,
-                    stories = state.stories,
-                    authUserId = state.authUserId,
-                    onCreatePostClick = {
-                        navigator.push(CreatePostScreen())
-                    },
-                    onLikeClick = { postId ->
-                        viewModel.toggleLike(postId)
-                    },
-                    onCommentClick = { postId ->
-                        openCommentsPostId = postId
-                    },
-                    onAddStory = {
-                        navigator.push(CreateStoryScreen())
-                    },
-                    viewModel = viewModel
-                )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+        ) {
 
-                FloatingContactButton(
-                    phoneNumber = "919755273822",
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 20.dp, bottom = 60.dp)
-                )
-            }
-        }
-
-        openCommentsPostId?.let { postId ->
-            CommentBottomSheet(
-                postId = postId,
+            CommunityScreen(
+                posts = state.posts,
+                stories = state.stories,
+                authUserId = state.authUserId,
                 viewModel = viewModel,
-                onDismiss = { openCommentsPostId = null }
+                onCreatePostClick = onOpenCreatePost,
+                onAddStory = onOpenCreateStory,
+                onStoryClick = onOpenStoryViewer,
+                onLikeClick = viewModel::toggleLike,
+                onCommentClick = { openCommentsPostId = it }
             )
         }
     }
+
+    openCommentsPostId?.let {
+        CommentBottomSheet(
+            postId = it,
+            viewModel = viewModel,
+            onDismiss = { openCommentsPostId = null }
+        )
+    }
 }
+
+//class CommunityScreenWrapper(
+//    private val onBack: () -> Unit   // 🔥 ADD THIS
+//) : Screen {
+//
+//
+//    @OptIn(ExperimentalMaterial3Api::class)
+//    @Composable
+//    override fun Content() {
+//
+//        val navigator = LocalNavigator.currentOrThrow // ✅ SIMPLE & CORRECT
+//        val viewModel = CommunityViewModelProvider.viewModel
+//        val state = viewModel.state
+//        var openCommentsPostId by remember { mutableStateOf<Int?>(null) }
+//
+//        // 🔙 SYSTEM BACK
+//        PlatformBackHandler(enabled = true) {
+//            onBack()   // 🔥 CLOSE COMMUNITY
+//        }
+//
+//        LaunchedEffect(Unit) {
+//            if (state.posts.isEmpty()) {
+//                viewModel.loadPosts()
+//            }
+//        }
+//
+//        Scaffold(
+//            topBar = {
+//                TopAppBar(
+//                    colors = TopAppBarDefaults.topAppBarColors(
+//                        containerColor = Color.White
+//                    ),
+//                    title = {
+//                        Text(
+//                            text = "Community",
+//                            fontWeight = FontWeight.SemiBold
+//                        )
+//                    },
+//                    navigationIcon = {
+//                        IconButton(
+//                            onClick = {
+//                                onBack() // 🔥 NOW WORKS
+//                            }
+//                        ) {
+//                            Icon(
+//                                imageVector = Icons.Default.ArrowBack,
+//                                contentDescription = "Back"
+//                            )
+//                        }
+//                    }
+//                )
+//            },
+//            contentWindowInsets = WindowInsets(0)
+//        ) { paddingValues ->
+//
+//            Box(
+//                modifier = Modifier
+//                    .fillMaxSize()
+//                    .padding(paddingValues)
+//            ) {
+//                CommunityScreen(
+//                    navigator = navigator,
+//                    posts = state.posts,
+//                    stories = state.stories,
+//                    authUserId = state.authUserId,
+//                    onCreatePostClick = {
+//                        navigator.push(CreatePostScreen())
+//                    },
+//                    onLikeClick = { postId ->
+//                        viewModel.toggleLike(postId)
+//                    },
+//                    onCommentClick = { postId ->
+//                        openCommentsPostId = postId
+//                    },
+//                    onAddStory = {
+//                        navigator.push(CreateStoryScreen())
+//                    },
+//                    viewModel = viewModel
+//                )
+//
+//                FloatingContactButton(
+//                    phoneNumber = "919755273822",
+//                    modifier = Modifier
+//                        .align(Alignment.BottomEnd)
+//                        .padding(end = 20.dp, bottom = 60.dp)
+//                )
+//            }
+//        }
+//
+//        openCommentsPostId?.let { postId ->
+//            CommentBottomSheet(
+//                postId = postId,
+//                viewModel = viewModel,
+//                onDismiss = { openCommentsPostId = null }
+//            )
+//        }
+//    }
+//}
 
 //class CommunityScreenWrapper : Screen {
 //

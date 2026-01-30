@@ -13,12 +13,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -38,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
+import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.util.Analytics
 import com.developer.ev2z.util.compressStoryImage
 import com.developer.ev2z.util.fixAndCompressImage
@@ -46,96 +50,107 @@ import com.developer.ev2z.util.rememberImagePicker
 
 
 
-class CreateStoryScreen : Screen {
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CreateStoryScreen(
+    onBack: () -> Unit
+) {
+    val viewModel = CommunityViewModelProvider.viewModel
 
+    var body by remember { mutableStateOf("") }
+    var image by remember { mutableStateOf<ByteArray?>(null) }
+    var isUploading by remember { mutableStateOf(false) }
 
-    @OptIn(ExperimentalMaterial3Api::class)
-    @Composable
-    override fun Content() {
+    val snackbarHostState = remember { SnackbarHostState() }
+    var uploadSuccess by remember { mutableStateOf(false) }
 
-        val navigator = LocalNavigator.currentOrThrow
-        val viewModel = CommunityViewModelProvider.viewModel
-
-        var body by remember { mutableStateOf("") }
-        var image by remember { mutableStateOf<ByteArray?>(null) }
-
-        // ✅ SAME picker as EditProfile
-//        val imagePickerLauncher = rememberImagePicker { imageBytes ->
-//            if (imageBytes != null) {
-//                image = imageBytes
-//                println("✅ Story image selected: ${imageBytes.size} bytes")
-//            }
-//        }
-
-        val imagePickerLauncher = rememberImagePicker { imageBytes ->
-            if (imageBytes != null) {
-                // 🔥 Fix rotation + reduce size (no zoom, no resize)
-                val fixed = compressStoryImage(
-                    imageBytes = imageBytes,
-                    maxSizeKB = 800
-                )
-
-
-                image = fixed
-                println("✅ Story image ready: ${fixed.size / 1024} KB")
-            }
+    val imagePickerLauncher = rememberImagePicker { imageBytes ->
+        if (imageBytes != null) {
+            val fixed = compressStoryImage(
+                imageBytes = imageBytes,
+                maxSizeKB = 800
+            )
+            image = fixed
         }
+    }
 
+    PlatformBackHandler(true){
+        onBack()
+    }
 
-        // Analytics
-        LaunchedEffect(Unit) {
-            Analytics.logEvent(name = "Create_story_screen_view")
+    LaunchedEffect(Unit) {
+        Analytics.logEvent(name = "Create_story_screen_view")
+    }
+
+    LaunchedEffect(uploadSuccess) {
+        if (uploadSuccess) {
+            snackbarHostState.showSnackbar(
+                message = "Story uploaded successfully ✅"
+            )
+            kotlinx.coroutines.delay(800)
+            onBack()
         }
+    }
 
-        Scaffold(
-            topBar = {
-                TopAppBar(
-                    title = { Text("Add Story", fontWeight = FontWeight.SemiBold) },
-                    navigationIcon = {
-                        IconButton(onClick = { navigator.pop() }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Add Story", fontWeight = FontWeight.SemiBold) },
+                navigationIcon = {
+                    IconButton(
+                        enabled = !isUploading,
+                        onClick = onBack
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
+                    }
+                },
+                actions = {
+                    TextButton(
+                        enabled = image != null && !isUploading,
+                        onClick = {
+                            isUploading = true
+
+                            viewModel.createStory(
+                                body = body,
+                                media = listOfNotNull(image)
+                            )
+
+                            uploadSuccess = true   // ✅ trigger effect
                         }
-                    },
-                    actions = {
-                        TextButton(
-                            enabled = image != null,
-                            onClick = {
-                                viewModel.createStory(
-                                    body = body,
-                                    media = listOfNotNull(image)
-                                )
-                                navigator.pop()
-                            }
-                        ) {
-                            Text("Create")
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.White
-                    )
+                    ) {
+                        Text("Create")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.White
                 )
-            },
-            contentWindowInsets = WindowInsets(0)
-        ) { padding ->
+            )
+        },
+        contentWindowInsets = WindowInsets(0)
+    ) { padding ->
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(Color(0xFFf2f5f0))
+        ) {
 
             Column(
                 modifier = Modifier
-                    .padding(padding)
                     .fillMaxSize()
-                    .background(Color(0xFFf2f5f0))
                     .padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
 
-                // 🖼 DIRECT PICKER (NO BOTTOM SHEET)
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(320.dp)
                         .clip(RoundedCornerShape(16.dp))
                         .background(Color(0xFFE0E0E0))
-                        .clickable {
-                            // 🚀 DIRECT OPEN CAMERA / GALLERY
+                        .clickable(enabled = !isUploading) {
                             imagePickerLauncher.launch()
                         },
                     contentAlignment = Alignment.Center
@@ -146,18 +161,19 @@ class CreateStoryScreen : Screen {
                         Text("Image selected ✅")
                     }
                 }
+            }
 
-//                Spacer(Modifier.height(16.dp))
-
-//                OutlinedTextField(
-//                    value = body,
-//                    onValueChange = { body = it },
-//                    placeholder = { Text("Say something… (optional)") },
-//                    modifier = Modifier.fillMaxWidth()
-//                )
+            // ⭕ LOADING OVERLAY
+            if (isUploading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.3f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = Color.White)
+                }
             }
         }
     }
 }
-
-
