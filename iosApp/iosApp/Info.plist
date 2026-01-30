@@ -117,6 +117,9 @@
             <string>supermoney</string>
         </array>
 
+
+
+
         <key>CFBundleURLTypes</key>
         <array>
             <dict>

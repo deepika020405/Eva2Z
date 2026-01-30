@@ -504,21 +504,69 @@ fun BoxScope.DeviceReportBottomSheetWithData(
 
             HorizontalDivider(Modifier.padding(horizontal = 18.dp))
 
+//            Row(
+//                modifier = Modifier
+//                    .fillMaxWidth()
+//                    .clickable { onExpandToggle() }
+//                    .padding(18.dp),
+//                verticalAlignment = Alignment.CenterVertically
+//            ) {
+//                Text("Device Analysis", fontSize = 16.sp, fontWeight = FontWeight.Medium)
+//                Spacer(Modifier.weight(1f))
+//                Text(if (isExpanded) "Hide" else "View", color = Color(0xFF3EBB3E))
+//                Icon(
+//                    if (isExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+//                    contentDescription = null,
+//                    tint = Color(0xFF3EBB3E)
+//                )
+//            }
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onExpandToggle() }
                     .padding(18.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Device Analysis", fontSize = 16.sp, fontWeight = FontWeight.Medium)
-                Spacer(Modifier.weight(1f))
-                Text(if (isExpanded) "Hide" else "View", color = Color(0xFF3EBB3E))
-                Icon(
-                    if (isExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                    contentDescription = null,
-                    tint = Color(0xFF3EBB3E)
+
+                // 🔙 BACK ARROW — ONLY WHEN HIDE (Expanded)
+                if (isExpanded) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Back",
+                        modifier = Modifier
+                            .size(22.dp)
+                            .clickable { onExpandToggle() }, // Hide pe collapse
+                        tint = Color.Black
+                    )
+
+                    Spacer(Modifier.width(10.dp))
+                }
+
+                Text(
+                    text = "Device Analysis",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium
                 )
+
+                Spacer(Modifier.weight(1f))
+
+                // VIEW / HIDE ACTION
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { onExpandToggle() }
+                ) {
+                    Text(
+                        text = if (isExpanded) "Hide" else "View",
+                        color = Color(0xFF3EBB3E)
+                    )
+                    Icon(
+                        imageVector =
+                            if (isExpanded) Icons.Default.KeyboardArrowDown
+                            else Icons.Default.KeyboardArrowUp,
+                        contentDescription = null,
+                        tint = Color(0xFF3EBB3E)
+                    )
+                }
             }
 
             if (isExpanded) {
