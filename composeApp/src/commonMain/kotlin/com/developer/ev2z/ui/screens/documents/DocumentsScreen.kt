@@ -533,7 +533,7 @@ fun UploadDocumentScreen(
                                         )
 
                                         snackbarHostState.showSnackbar(
-                                            "E-Vault Document updated successfully ✅"
+                                            "$fileName updated successfully ✅"
                                         )
                                     } else {
                                         // ➕ ADD FLOW
@@ -543,7 +543,7 @@ fun UploadDocumentScreen(
                                         )
 
                                         snackbarHostState.showSnackbar(
-                                            "E-Vault Document uploaded successfully ✅"
+                                            "$fileName uploaded successfully ✅"
                                         )
                                     }
 
