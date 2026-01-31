@@ -42,6 +42,7 @@ import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.util.BottomBarController
 
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StoryViewerScreen(
     onBack: () -> Unit
@@ -153,6 +154,79 @@ fun StoryViewerScreen(
             }
         }
     }
+    if (showViewersSheet) {
+        ModalBottomSheet(
+            onDismissRequest = {
+                showViewersSheet = false
+                vm.clearStoryViewers()
+            }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+
+                Text(
+                    text = "Viewed by",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                if (state.storyViewers.isEmpty()) {
+                    Text(
+                        text = "No views yet",
+                        color = Color.Gray
+                    )
+                } else {
+                    state.storyViewers.forEach { viewer ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFE0E0E0)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (!viewer.user.photo.isNullOrBlank()) {
+                                    AsyncImage(
+                                        model = "https://gps.eva2z.in/storage/${viewer.user.photo}",
+                                        contentDescription = null,
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .clip(CircleShape),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Text(
+                                        text = viewer.user.name.first().uppercase(),
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.Gray
+                                    )
+                                }
+                            }
+
+                            Spacer(Modifier.width(12.dp))
+
+                            Text(
+                                text = viewer.user.name,
+                                fontSize = 15.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
 }
 
 
