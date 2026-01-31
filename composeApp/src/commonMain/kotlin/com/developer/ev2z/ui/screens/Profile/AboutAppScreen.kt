@@ -118,6 +118,7 @@ fun AboutAppScreen(
             }
 
             HighlightCard()
+            Spacer(Modifier.height(12.dp))
         }
     }
 }
