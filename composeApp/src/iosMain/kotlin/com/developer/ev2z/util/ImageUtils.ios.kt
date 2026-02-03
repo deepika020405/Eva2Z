@@ -1,23 +1,18 @@
 package com.developer.ev2z.util
 
-import io.ktor.client.request.invoke
-import kotlinx.cinterop.COpaquePointer
-import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.refTo
-import platform.UIKit.*
+import kotlinx.cinterop.*
 import platform.CoreGraphics.CGFloat
-import platform.Foundation.NSData
-import platform.Foundation.create   // 👈 THIS IS REQUIRED
+import platform.Foundation.*
+import platform.UIKit.*
 import platform.posix.memcpy
 
 // ================= PROFILE IMAGE =================
 actual fun fixAndCompressImage(
     imageBytes: ByteArray,
     maxSizeKB: Int
-): ByteArray {
+): ByteArray = autoreleasepool {
 
-    val data = imageBytes.toNSData()
-    val image = UIImage(data = data) ?: return imageBytes
+    val image = imageBytes.toUIImage() ?: return@autoreleasepool imageBytes
 
     var compression: CGFloat = 0.8
     var outputData: NSData?
@@ -27,21 +22,20 @@ actual fun fixAndCompressImage(
         compression -= 0.05
     } while (
         outputData != null &&
-        (outputData.length.toInt() / 1024) > maxSizeKB &&
+        outputData!!.length.toInt() / 1024 > maxSizeKB &&
         compression > 0.4
     )
 
-    return outputData?.toByteArray() ?: imageBytes
+    outputData?.toByteArraySafe() ?: imageBytes
 }
 
 // ================= STORY IMAGE (NO ROTATION) =================
 actual fun compressStoryImage(
     imageBytes: ByteArray,
     maxSizeKB: Int
-): ByteArray {
+): ByteArray = autoreleasepool {
 
-    val data = imageBytes.toNSData()
-    val image = UIImage(data = data) ?: return imageBytes
+    val image = imageBytes.toUIImage() ?: return@autoreleasepool imageBytes
 
     var compression: CGFloat = 0.85
     var outputData: NSData?
@@ -51,25 +45,27 @@ actual fun compressStoryImage(
         compression -= 0.05
     } while (
         outputData != null &&
-        (outputData.length.toInt() / 1024) > maxSizeKB &&
+        outputData!!.length.toInt() / 1024 > maxSizeKB &&
         compression > 0.45
     )
 
-    return outputData?.toByteArray() ?: imageBytes
+    outputData?.toByteArraySafe() ?: imageBytes
 }
 
-// ================= HELPERS =================
+// ================= SAFE HELPERS =================
 @OptIn(ExperimentalForeignApi::class)
-private fun ByteArray.toNSData(): NSData =
-    NSData.create(
-        bytes = this.refTo(0) as COpaquePointer?,
-        length = this.size.toULong()
-    )
+private fun ByteArray.toUIImage(): UIImage? =
+    usePinned { pinned ->
+        val data = NSData.create(
+            bytes = pinned.addressOf(0),
+            length = size.toULong()
+        )
+        UIImage(data = data)
+    }
 
 @OptIn(ExperimentalForeignApi::class)
-private fun NSData.toByteArray(): ByteArray {
-    val array = ByteArray(this.length.toInt())
-    memcpy(array.refTo(0), this.bytes, this.length)
+private fun NSData.toByteArraySafe(): ByteArray {
+    val array = ByteArray(length.toInt())
+    memcpy(array.refTo(0), bytes, length)
     return array
 }
-
