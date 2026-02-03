@@ -160,5 +160,16 @@
 
         <key>NSContactsUsageDescription</key>
         <string>To autofill OTP from SMS</string>
+
+
+        <key>NSPhotoLibraryUsageDescription</key>
+        <string>Photo access is required to upload profile images</string>
+
+
+        <key>NSPhotoLibraryUsageDescription</key>
+        <string>Allow access to photos</string>
+
+        <key>NSCameraUsageDescription</key>
+        <string>Allow camera access</string>
     </dict>
 </plist>
