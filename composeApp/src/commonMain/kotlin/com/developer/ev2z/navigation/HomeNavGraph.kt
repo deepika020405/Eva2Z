@@ -43,8 +43,13 @@ import com.developer.ev2z.ui.screens.GeneralSettings.GeneralSettingsScreen
 import com.developer.ev2z.ui.screens.AccountActivity.AccountActivityScreen
 import com.developer.ev2z.ui.screens.AddDevice.AddDeviceDetailsCommon
 import com.developer.ev2z.ui.screens.AddDevice.AddDeviceViewModel
+import com.developer.ev2z.ui.screens.BillDetails.BillDetailsScreen
 import com.developer.ev2z.ui.screens.ChangePassword.ChangePasswordScreen
+import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanRoute
+import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanScreen
+import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanViewModel
 import com.developer.ev2z.ui.screens.GPSData.GPSDataScreen
+import com.developer.ev2z.ui.screens.MyAccount.MyAccountScreen
 //import com.developer.ev2z.ui.screens.GPSData.GPSDataScreen
 import com.developer.ev2z.ui.screens.Profile.AboutAppScreen
 import com.developer.ev2z.ui.screens.Profile.ProfileViewModel
@@ -190,6 +195,7 @@ class ProfileTab(
     private val onNavigateToRefundPolicy: () -> Unit,
     private val onNavigateToShippingPolicy: () -> Unit,
     private val onNavigateToChangePassword: () -> Unit,
+    private val onNavigateToMyAccount: () -> Unit,
     private val onNavigateToGeoFencing: () -> Unit,
     private val onNavigateToHistoryPlayback: () -> Unit,
     private val onNavigateToGeneralSettings: () -> Unit,
@@ -221,6 +227,7 @@ class ProfileTab(
             onAboutApp = onNavigateToAboutApp,
             onLogout = onLogout,
             onOpenDocumentsVault = onNavigateToDocuments,
+            onNavigateMyAccount = onNavigateToMyAccount, // ✅ OK NOW
             )
     }
 
@@ -282,6 +289,18 @@ fun HomeNavGraph(
     var showCreatePost by remember { mutableStateOf(false) }
     var showCreateStory by remember { mutableStateOf(false) }
     var showStoryViewer by remember { mutableStateOf(false) }
+
+    // 🔥 MY ACCOUNT FLOW
+    var showMyAccount by remember { mutableStateOf(false) }
+
+// child screens
+    var showChangePlan by remember { mutableStateOf(false) }
+    var showBillDetails by remember { mutableStateOf(false) }
+    var showTransactions by remember { mutableStateOf(false) }
+    var showAutoPay by remember { mutableStateOf(false) }
+    var showWarranty by remember { mutableStateOf(false) }
+    var showPaymentMethods by remember { mutableStateOf(false) }
+    var showNotifications by remember { mutableStateOf(false) }
     var documentsGateState by remember {
         mutableStateOf(DocumentsGateState.NONE)
     }
@@ -328,6 +347,9 @@ fun HomeNavGraph(
             onNavigateToAccountActivity = { showAccountActivity = true },
             onNavigateToReferAndEarn = { showReferAndEarn = true },
             onNavigateToAboutApp = { showAboutApp = true },
+            onNavigateToMyAccount = {
+                showMyAccount = true     // 🔥 THIS IS THE KEY
+            },
             onNavigateToDocuments = {
                 showCommunity = true   // ✅ NOW CORRECT
             },
@@ -339,6 +361,7 @@ fun HomeNavGraph(
                 documentsGateState = DocumentsGateState.LOCKED
                 showVaultPasswordDialog = true
             },
+
             onOpenCommunity = { showCommunity = true }, // ✅ HERE
             onLogout = onLogout
         )
@@ -541,6 +564,68 @@ fun HomeNavGraph(
             )
         }
 
+
+        if (showMyAccount) {
+            MyAccountScreen(
+                onBack = {
+                    showMyAccount = false
+                },
+                onChangePlan = {
+                    showMyAccount = false
+                    showChangePlan = true
+                },
+                onBillDetails = {
+                    showMyAccount = false
+                    showBillDetails = true
+                },
+                onTransactions = {
+                    showMyAccount = false
+                    showTransactions = true
+                },
+                onAutoPay = {
+                    showMyAccount = false
+                    showAutoPay = true
+                },
+                onWarranty = {
+                    showMyAccount = false
+                    showWarranty = true
+                },
+                onPaymentMethods = {
+                    showMyAccount = false
+                    showPaymentMethods = true
+                },
+                onNotifications = {
+                    showMyAccount = false
+                    showNotifications = true
+                },
+                onSupport = {
+                    // optional
+                }
+            )
+        }
+
+
+        if (showChangePlan) {
+            ChangePlanRoute(
+                onBack = {
+                    showChangePlan = false
+                    showMyAccount = true
+                }
+            )
+        }
+
+
+        if (showBillDetails) {
+            BillDetailsScreen(
+                onBack = {
+                    showBillDetails = false
+                    showMyAccount = true
+                },
+                onDownloadPdf = {
+                    println("📄 Download PDF clicked")
+                }
+            )
+        }
 
         // Edit Device Name Screen
         if (showEditDeviceName) {
@@ -878,6 +963,7 @@ fun HomeNavGraphContent(
     onNavigateToReferAndEarn: () -> Unit = {},
     onNavigateToAboutApp: () -> Unit = {},
     onNavigateToDocuments: () -> Unit,
+    onNavigateToMyAccount: () -> Unit,   // ✅ ADD
     onRequestDocumentsWithPassword: () -> Unit,
     onDocumentsTabSelected: () -> Unit,   // ✅ ADD
     onOpenCommunity: () -> Unit,
@@ -906,6 +992,7 @@ fun HomeNavGraphContent(
             onNavigateToRefundPolicy,
             onNavigateToShippingPolicy,
             onNavigateToChangePassword,
+            onNavigateToMyAccount,     // ✅ PASS IT
             onNavigateToGeoFencing,
             onNavigateToHistoryPlayback,
             onNavigateToGeneralSettings,
