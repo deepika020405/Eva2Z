@@ -103,6 +103,18 @@ fun App() {
     // ✅ NEW: Change Password state
     var showChangePassword by remember { mutableStateOf(false) }
 
+
+    // 🔥 My Account navigation states
+    var showMyAccount by remember { mutableStateOf(false) }
+    var showChangePlan by remember { mutableStateOf(false) }
+    var showBillDetails by remember { mutableStateOf(false) }
+    var showTransactions by remember { mutableStateOf(false) }
+    var showAutoPay by remember { mutableStateOf(false) }
+    var showWarranty by remember { mutableStateOf(false) }
+    var showPaymentMethods by remember { mutableStateOf(false) }
+    var showNotifications by remember { mutableStateOf(false) }
+
+
     // Success screen data
     var successDeviceName by remember { mutableStateOf("") }
     var successDeviceId by remember { mutableStateOf("") }
@@ -388,6 +400,7 @@ fun App() {
                         trackTraceSource = OpenSource.HOME   // ✅ CORRECT
                         showTrackTrace = true
                     },
+
                     onLogout = {
                         println("🚪 Logging out...")
 
