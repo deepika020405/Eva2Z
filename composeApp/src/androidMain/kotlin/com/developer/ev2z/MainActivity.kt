@@ -15,7 +15,7 @@ import com.developer.ev2z.util.MetaAnalytics
 import com.developer.ev2z.util.NotificationUtil
 import com.developer.ev2z.util.initGeocoder
 import com.facebook.appevents.AppEventsConstants
-
+import com.developer.ev2z.util.initOpenUrl
 //import com.developer.ev2z.util.AppSignatureHelper
 
 class MainActivity : ComponentActivity() {
@@ -25,6 +25,7 @@ class MainActivity : ComponentActivity() {
         Log.d("MainActivity", "🚀 EVA2Z Connect v5.0.0 starting")
 
         try {
+            initOpenUrl(this)
             NotificationPermissionHelper(this) {
                 // permission granted
                 FcmManager.fetchAndRegisterToken()
