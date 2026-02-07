@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.ui.screens.Profile.ProfileMenuItemRow
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,6 +39,9 @@ fun MyAccountScreen(
     onWarranty: () -> Unit,
 
 ) {
+    PlatformBackHandler(true){
+        onBack()
+    }
     Scaffold(
         topBar = {
             TopAppBar(
