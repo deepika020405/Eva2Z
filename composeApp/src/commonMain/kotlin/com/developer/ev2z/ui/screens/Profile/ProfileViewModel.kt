@@ -82,10 +82,10 @@ class ProfileViewModel(
                 }
 
                 _state.value = _state.value.copy(
-                    isLoading = false,
-                    userName = newName ?: _state.value.userName,
-                    userImage = fullUrl,
-                    error = null
+                        isLoading = false,
+                userName = newName ?: _state.value.userName,
+                userImage = fullUrl,
+                error = null
                 )
 
             } catch (e: Exception) {

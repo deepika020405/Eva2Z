@@ -44,6 +44,7 @@ import com.developer.ev2z.ui.screens.AccountActivity.AccountActivityScreen
 import com.developer.ev2z.ui.screens.AddDevice.AddDeviceDetailsCommon
 import com.developer.ev2z.ui.screens.AddDevice.AddDeviceViewModel
 import com.developer.ev2z.ui.screens.BillDetails.BillDetailsScreen
+import com.developer.ev2z.ui.screens.BillDetails.BillDetailsViewModel
 import com.developer.ev2z.ui.screens.ChangePassword.ChangePasswordScreen
 import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanRoute
 import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanScreen
@@ -55,6 +56,9 @@ import com.developer.ev2z.ui.screens.Profile.AboutAppScreen
 import com.developer.ev2z.ui.screens.Profile.ProfileViewModel
 import com.developer.ev2z.ui.screens.Profile.VaultPasswordDialog
 import com.developer.ev2z.ui.screens.ReferAndEarn.ReferAndEarnScreen
+import com.developer.ev2z.ui.screens.SupportAndWarrenty.SupportWarrantyScreen
+import com.developer.ev2z.ui.screens.SupportAndWarrenty.SupportWarrantyUi
+import com.developer.ev2z.ui.screens.SupportAndWarrenty.WarrantyStatus
 import com.developer.ev2z.ui.screens.community.CommunityScreenRoot
 import com.developer.ev2z.ui.screens.community.CreatePostScreen
 import com.developer.ev2z.ui.screens.community.CreateStoryScreen
@@ -62,6 +66,7 @@ import com.developer.ev2z.ui.screens.community.StoryViewerScreen
 import com.developer.ev2z.ui.screens.documents.DocumentViewerScreen
 import com.developer.ev2z.ui.screens.documents.DocumentsScreen
 import com.developer.ev2z.ui.screens.documents.UploadDocumentScreen
+import com.developer.ev2z.ui.screens.social_media.openUrl
 import com.developer.ev2z.util.BottomBarController
 import com.developer.ev2z.util.platformDownloadFile
 import kotlinx.coroutines.CoroutineScope
@@ -257,6 +262,13 @@ fun HomeNavGraph(
     onLogout: () -> Unit = {}
 ) {
     SetupStatusBar()
+
+    val dummySupportWarranty = SupportWarrantyUi(
+        productName = "EVA2Z GPS Tracker",
+        deviceId = "864839039292",
+        warrantyStatus = WarrantyStatus.EXPIRED,
+        warrantyExpiryDate = "15 Jan 2026"
+    )
 
     // ✅ CREATE pagerState and coroutineScope HERE (at parent level)
     val pagerState = rememberPagerState(pageCount = { 4 })
@@ -578,29 +590,12 @@ fun HomeNavGraph(
                     showMyAccount = false
                     showBillDetails = true
                 },
-                onTransactions = {
-                    showMyAccount = false
-                    showTransactions = true
-                },
-                onAutoPay = {
-                    showMyAccount = false
-                    showAutoPay = true
-                },
+
                 onWarranty = {
                     showMyAccount = false
                     showWarranty = true
-                },
-                onPaymentMethods = {
-                    showMyAccount = false
-                    showPaymentMethods = true
-                },
-                onNotifications = {
-                    showMyAccount = false
-                    showNotifications = true
-                },
-                onSupport = {
-                    // optional
                 }
+
             )
         }
 
@@ -614,15 +609,39 @@ fun HomeNavGraph(
             )
         }
 
-
         if (showBillDetails) {
+
+            val vm = remember {
+                BillDetailsViewModel(apiService, storageManager)
+            }
+
+            LaunchedEffect(Unit) {
+                vm.loadBills()
+            }
+
             BillDetailsScreen(
+                bills = vm.bills,
                 onBack = {
                     showBillDetails = false
                     showMyAccount = true
                 },
-                onDownloadPdf = {
-                    println("📄 Download PDF clicked")
+                onDownloadInvoice = { url ->
+                    openUrl(url)
+                }
+            )
+        }
+
+
+        if (showWarranty) {
+            SupportWarrantyScreen(
+                data = dummySupportWarranty,
+                onBack = {
+                    showWarranty = false
+                    showMyAccount = true
+                },
+                onBuyWarranty = {
+                    println("🛡 Buy 1-Year Warranty @ ₹399 clicked")
+                    // later → payment / checkout
                 }
             )
         }

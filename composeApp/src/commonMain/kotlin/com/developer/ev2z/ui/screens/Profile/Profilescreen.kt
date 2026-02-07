@@ -33,6 +33,7 @@ import com.developer.ev2z.data.local.StorageKeys
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.ui.components.FloatingContactButton
+import com.developer.ev2z.ui.screens.MyAccount.MyAccountScreen
 import com.developer.ev2z.ui.screens.PrivacyPolicy_TandC.PrivacyPolicy_TandCScreen
 import com.developer.ev2z.ui.screens.PrivacyPolicy_TandC.WebViewType
 import com.developer.ev2z.ui.screens.social_media.openUrl
@@ -60,6 +61,7 @@ fun ProfileScreen(
     onRefundPolicy: () -> Unit = {},
     onShippingPolicy: () -> Unit = {},
     onChangePassword: () -> Unit = {},
+    onNavigateMyAccount: () -> Unit,   // ✅ ADD THIS
     onGeoFencing: () -> Unit = {},
     onHistoryPlayback: () -> Unit = {},
     onGeneralSettings: () -> Unit = {},
@@ -100,6 +102,7 @@ fun ProfileScreen(
         onManageDevice = onManageDevice,
         onGPSData = onGpsData,
         onAddFence = onGeoFencing,
+        onNavigateMyAccount = onNavigateMyAccount,   // ✅ ADD THIS LINE
         onHistoryPlayback = onHistoryPlayback,
         onRateApp = { viewModel.openPlayStore() },
         onFeedback = { viewModel.openFeedback() },
@@ -163,6 +166,7 @@ fun ProfileScreenContent(
     onGPSData: () -> Unit = {},
     onAddFence: () -> Unit = {},
     onHistoryPlayback: () -> Unit = {},
+    onNavigateMyAccount: () -> Unit,   // ✅ ADD THIS
     onRateApp: () -> Unit = {},
     onFeedback: () -> Unit = {},
     onPrivacyPolicy: () -> Unit = {},
@@ -247,6 +251,12 @@ fun ProfileScreenContent(
                             ProfileMenuItem("Account Activity", Icons.Rounded.ManageAccounts, onAccountActivity),
                             ProfileMenuItem("Refer And Earn", Icons.Rounded.CardGiftcard, onReferAndEarn),
                             ProfileMenuItem("Change Password", Icons.Rounded.Password, onChangePassword), // ✅ WORKING NOW
+                            ProfileMenuItem(
+                                title = "My Account",
+                                icon = Icons.Rounded.AccountBalance,
+                                onClick = onNavigateMyAccount   // ✅ CALLBACK ONLY
+                            ),
+
 //                            ProfileMenuItem(
 //                                title = "Documents",
 //                                icon = Icons.Rounded.Folder,

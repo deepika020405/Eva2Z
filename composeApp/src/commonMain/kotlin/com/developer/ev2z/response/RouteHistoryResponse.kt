@@ -7,8 +7,15 @@ import kotlinx.serialization.Serializable
 data class RouteHistoryResponse(
     @SerialName("success") val success: Boolean,
     @SerialName("terminal_id") val terminalId: String,
-    @SerialName("count") val count: Int,
-    @SerialName("data") val data: List<RoutePoint>
+
+    @SerialName("count")
+    val count: Int? = null,
+
+    @SerialName("average_speed")
+    val averageSpeed: Double? = 0.0,
+
+    @SerialName("data")
+    val data: List<RoutePoint>
 )
 
 @Serializable

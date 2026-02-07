@@ -2,11 +2,13 @@ package com.developer.ev2z.network
 
 import com.developer.ev2z.data.local.model.DeviceResponse
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
+import com.developer.ev2z.network.KtorClient.client
 import com.developer.ev2z.request.CartAddRequest
 import com.developer.ev2z.request.CommentRequest
 import com.developer.ev2z.request.CreateOrderRequest
 import com.developer.ev2z.request.DeviceAnalyticsRequest
 import com.developer.ev2z.response.*
+import com.developer.ev2z.ui.screens.ChangePlan.UserDevicesResponse
 import com.developer.ev2z.util.AppTokenProvider
 import io.ktor.client.call.*
 import io.ktor.client.plugins.ResponseException
@@ -1113,6 +1115,38 @@ class ApiService {
     }
 
 
+    suspend fun getMyBilling(token: String): MyBillingResponse {
+        val url = "${baseUrl}my-billing"
+
+        println("🌐 API: Fetching My Billing")
+
+        return try {
+            val response = client.get(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+            }
+
+            val raw = response.bodyAsText()
+            println("🧾 MY BILLING RAW = $raw")
+
+            Json {
+                ignoreUnknownKeys = true
+            }.decodeFromString(
+                MyBillingResponse.serializer(),
+                raw
+            )
+
+        } catch (e: Exception) {
+            println("❌ My Billing Error: ${e.message}")
+            MyBillingResponse(
+                status = false,
+                totalOrders = 0,
+                grandTotal = 0,
+                billings = emptyList()
+            )
+        }
+    }
+
     // ---------------- COMMUNITY POSTS ----------------
     suspend fun getCommunityPosts(): CommunityResponse {
         val token = AppTokenProvider.getToken()
@@ -1349,6 +1383,18 @@ class ApiService {
             header(HttpHeaders.Authorization, "Bearer $token")
         }.body()
     }
+
+
+     // Plans and Subcriptions
+     suspend fun getUserDevices(): UserDevicesResponse {
+         val token = AppTokenProvider.getToken()
+
+         println("🌐 API: Fetching plans data")
+         return client.get("${baseUrl}get-user-devices") {
+             header(HttpHeaders.Authorization, "Bearer $token")
+//             header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+         }.body()
+     }
 
 
     // ---------------- ADD STORY ----------------
@@ -1617,4 +1663,8 @@ class ApiService {
         }
     }
 }
+
+
+
+
 
