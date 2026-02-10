@@ -1,5 +1,16 @@
 package com.developer.ev2z.ui.screens.ChangePlan
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.util.AppTokenProvider
 import kotlinx.coroutines.*
@@ -17,9 +28,11 @@ data class UserDevicesResponse(
 @Serializable
 data class UserDeviceDto(
     val device_id: Int,
+    val device_number: String,   // ✅ ADD THIS (IMEI)
+    val sim_num: String? = null,
     val activated_at: String? = null,
     val expires_at: String? = null,
-    val days_left: Int? = null,      // ✅ ADD THIS
+    val days_left: Int? = null,
     val status: String? = null
 )
 
@@ -32,7 +45,8 @@ data class PlansUiState(
 )
 
 data class DevicePlanUi(
-    val deviceId: String,
+    val deviceId: String,    // DB id (247)
+    val imei: String,        // ✅ REAL IMEI
     val deviceName: String,
     val planType: String,
     val expiryDate: String,
@@ -43,29 +57,23 @@ data class DevicePlanUi(
 
 class ChangePlanViewModel(
     private val apiService: ApiService = ApiService()
-) {
-
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+) : ViewModel() {
 
     private val _state = MutableStateFlow(PlansUiState(isLoading = true))
     val state: StateFlow<PlansUiState> = _state.asStateFlow()
+    private val _phonePeToken = MutableStateFlow<String?>(null)
+    val phonePeToken = _phonePeToken.asStateFlow()
 
     init {
         loadPlans()
     }
 
     private fun loadPlans() {
-        scope.launch {
+        viewModelScope.launch {
             try {
                 _state.value = PlansUiState(isLoading = true)
 
-                println("🔁 ChangePlan: loading plans")
-
-                // ✅ token automatically picked inside ApiService
                 val response = apiService.getUserDevices()
-
-                println("📦 RAW RESPONSE = $response")
-                println("📦 DATA SIZE = ${response.data.size}")
 
                 if (response.success) {
                     _state.value = PlansUiState(
@@ -75,13 +83,11 @@ class ChangePlanViewModel(
                 } else {
                     _state.value = PlansUiState(
                         isLoading = false,
-                        devices = emptyList(),
-                        error = "No plans found"
+                        error = "No devices found"
                     )
                 }
 
             } catch (e: Exception) {
-                e.printStackTrace()
                 _state.value = PlansUiState(
                     isLoading = false,
                     error = e.message ?: "Failed to load plans"
@@ -90,36 +96,20 @@ class ChangePlanViewModel(
         }
     }
 
-    fun renewPlan(deviceId: String) {
-        println("🔄 Renew plan for deviceId=$deviceId")
-    }
-
-    fun changePlan(deviceId: String) {
-        println("🔁 Change plan for deviceId=$deviceId")
+    fun renewPlan(deviceId: String, duration: String) {
+        println("🔄 Renew device=$deviceId duration=$duration")
+        // 👉 yahin baad me /device/renew call hoga
     }
 }
-
 /* ================= MAPPER ================= */
 
 private fun UserDeviceDto.toUiModel(): DevicePlanUi {
-
     return DevicePlanUi(
-        deviceId = device_id.toString(),
-
-        // Backend me device ka naam nahi aa raha
-        // isliye device_id se derive ho raha (hardcoded nahi, derived)
+        deviceId = device_id.toString(),        // DB id
+        imei = device_number,                   // ✅ IMEI
         deviceName = "Device #$device_id",
-
-        // Backend status se plan type
         planType = status ?: "unknown",
-
-        // Backend expiry date (safe parsing)
-        expiryDate = expires_at
-            ?.substringBefore(" ")
-            ?: "N/A",
-
-        // ✅ PURE backend value
+        expiryDate = expires_at?.substringBefore(" ") ?: "N/A",
         daysLeft = days_left ?: 0
     )
 }
-

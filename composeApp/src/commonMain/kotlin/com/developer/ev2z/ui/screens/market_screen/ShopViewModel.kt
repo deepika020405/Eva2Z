@@ -467,7 +467,10 @@ class ShopViewModel(
         val billingId = s.selectedAddress?.id
 
         if (billingId == null) {
-            _paymentState.value = PaymentState.Failed("Please select delivery address")
+            _paymentState.value = PaymentState.Failed(
+                reason = "Please select delivery address",
+                amount = 0
+            )
             return
         }
 
@@ -500,31 +503,33 @@ class ShopViewModel(
 
             } catch (e: Exception) {
                 println("❌ Order creation failed: ${e.message}")
-                _paymentState.value = PaymentState.Failed(e.message ?: "Order creation failed")
+                _paymentState.value = PaymentState.Failed(
+                    reason = e.message ?: "Order creation failed",
+                    amount = 0
+                )
             }
         }
     }
 
     // ✅ FIXED: Payment result handler
     private fun handlePaymentResult(result: com.developer.ev2z.phonepe.PaymentResult) {
-        println("📊 Payment Result Received:")
-        println("  - Success: ${result.success}")
-        println("  - TxnId: ${result.transactionId}")
-        println("  - Message: ${result.message}")
+
+        val amountInt =
+            (_state.value.finalAmount ?: _state.value.totalPrice ?: "0")
+                .toDouble()
+                .toInt()
 
         if (result.success) {
-            // ⭐ IMPORTANT: User completed payment flow
-            // Backend will verify via webhook
-            println("✅ Payment flow completed successfully")
-            _paymentState.value = PaymentState.Success(result.transactionId)
-
-            // ✅ Clear cart ONLY after successful payment
+            _paymentState.value = PaymentState.Success(
+                txnId = result.transactionId,
+                amount = amountInt
+            )
             clearCart()
-
         } else {
-            // ❌ Payment failed or cancelled
-            println("❌ Payment failed: ${result.message}")
-            _paymentState.value = PaymentState.Failed(result.message ?: "Payment failed")
+            _paymentState.value = PaymentState.Failed(
+                reason = result.message ?: "Payment failed",
+                amount = amountInt
+            )
         }
     }
 

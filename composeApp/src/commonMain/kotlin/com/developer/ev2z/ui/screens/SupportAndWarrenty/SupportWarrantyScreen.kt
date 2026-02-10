@@ -26,7 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
+import com.developer.ev2z.navigation.PlatformBackHandler
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -36,6 +36,9 @@ fun SupportWarrantyScreen(
     onBack: () -> Unit,
     onBuyWarranty: () -> Unit
 ) {
+    PlatformBackHandler(true){
+        onBack()
+    }
     Scaffold(
         topBar = {
             TopAppBar(

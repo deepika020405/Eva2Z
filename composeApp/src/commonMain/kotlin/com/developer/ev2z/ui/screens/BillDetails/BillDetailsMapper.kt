@@ -6,7 +6,8 @@ import com.developer.ev2z.response.MyBillingResponse
 fun MyBillingResponse.toUiBills(): List<BillTransactionUi> {
     return billings.map { order ->
         BillTransactionUi(
-            orderId = order.orderId.toString(),
+            orderId = order.orderId,
+            transactionId = order.transactionId,
             orderDate = order.orderDate.substring(0, 10),
             totalAmount = "₹${order.orderTotal}",
 
@@ -21,21 +22,22 @@ fun MyBillingResponse.toUiBills(): List<BillTransactionUi> {
 
             items = order.items.map { item ->
                 BillItemUi(
-                    productName = "EV2Z GPS Device",
+                    productName = item.productName.trim(),
                     quantity = item.quantity,
                     planType = item.planType,
-                    price = "₹${item.price}"
+                    price = "₹${item.price}",
+                    rechargeAmount = "₹${item.rechargeAmount}"
                 )
             },
 
-            invoiceUrl = "" // API nahi deta, local PDF generate karoge
+            invoiceUrl = "" // local PDF later
         )
     }
 }
 
 fun BillTransactionUi.toInvoiceData(): InvoiceData {
     return InvoiceData(
-        orderId = orderId,
+        orderId = orderId.toString(),
         orderDate = orderDate,
         totalAmount = totalAmount,
 

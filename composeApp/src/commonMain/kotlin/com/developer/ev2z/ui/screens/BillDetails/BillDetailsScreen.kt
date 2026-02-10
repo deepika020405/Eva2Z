@@ -6,7 +6,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -15,16 +14,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.util.generateInvoicePdf
 import com.developer.ev2z.util.openPdfFile
-import com.developer.ev2z.ui.screens.BillDetails.toInvoiceData
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BillDetailsScreen(
     bills: List<BillTransactionUi>,
-    onBack: () -> Unit,
-    onDownloadInvoice: (String) -> Unit
+    onBack: () -> Unit
 ) {
+    PlatformBackHandler(true){
+        onBack()
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -68,10 +70,7 @@ fun BillDetailsScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 items(bills) { bill ->
-                    BillTransactionCard(
-                        bill = bill,
-                        onDownloadInvoice = onDownloadInvoice
-                    )
+                    BillTransactionCard(bill = bill)
                 }
             }
         }
@@ -80,8 +79,7 @@ fun BillDetailsScreen(
 
 @Composable
 fun BillTransactionCard(
-    bill: BillTransactionUi,
-    onDownloadInvoice: (String) -> Unit
+    bill: BillTransactionUi
 ) {
     Card(
         shape = RoundedCornerShape(18.dp),
@@ -100,7 +98,10 @@ fun BillTransactionCard(
             ) {
                 Column {
                     Text("Order ID", fontSize = 12.sp, color = Color.Gray)
-                    Text(bill.orderId, fontWeight = FontWeight.Bold)
+                    Text(
+                        bill.orderId.toString(), // ✅ FIX
+                        fontWeight = FontWeight.Bold
+                    )
                 }
 
                 Column(horizontalAlignment = Alignment.End) {
@@ -116,7 +117,7 @@ fun BillTransactionCard(
 
             Divider()
 
-            Spacer(Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             Text(
                 "Purchased Items",
@@ -128,15 +129,15 @@ fun BillTransactionCard(
                 BillItemRow(item)
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
-            // ✅ ONLY CALLBACK — NO openUrl HERE
             Button(
                 onClick = {
                     val invoice = bill.toInvoiceData()
                     val path = generateInvoicePdf(invoice)
                     openPdfFile(path)
-                }
+                },
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Download Invoice")
             }

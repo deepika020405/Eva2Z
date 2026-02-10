@@ -19,11 +19,18 @@ data class MyBillingResponse(
 data class BillingOrderDto(
     @SerialName("order_id")
     val orderId: Int,
+
+    @SerialName("transaction_id")
+    val transactionId: String,
+
     @SerialName("order_date")
     val orderDate: String,
+
     val billing: BillingUserDto,
+
     @SerialName("order_total")
     val orderTotal: Int,
+
     val items: List<BillingItemDto>
 )
 
@@ -39,13 +46,19 @@ data class BillingUserDto(
 
 @Serializable
 data class BillingItemDto(
-    val id: Int,
     @SerialName("product_id")
     val productId: Int,
+
+    @SerialName("product_name")
+    val productName: String,
+
     val quantity: Int,
+
     val price: String,
+
     @SerialName("plan_type")
     val planType: String,
+
     @SerialName("recharge_amount")
     val rechargeAmount: String
 )

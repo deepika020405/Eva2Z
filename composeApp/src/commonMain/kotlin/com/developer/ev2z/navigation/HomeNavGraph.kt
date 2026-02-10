@@ -20,7 +20,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.core.screen.Screen
+import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.Navigator
+import cafe.adriel.voyager.navigator.currentOrThrow
 import cafe.adriel.voyager.navigator.tab.*
 import com.developer.ev2z.LocalPlatformActivity
 import com.developer.ev2z.data.local.StorageManager
@@ -46,9 +48,12 @@ import com.developer.ev2z.ui.screens.AddDevice.AddDeviceViewModel
 import com.developer.ev2z.ui.screens.BillDetails.BillDetailsScreen
 import com.developer.ev2z.ui.screens.BillDetails.BillDetailsViewModel
 import com.developer.ev2z.ui.screens.ChangePassword.ChangePasswordScreen
-import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanRoute
 import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanScreen
+import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanScreenHost
+//import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanRoute
+//import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanScreen
 import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanViewModel
+import com.developer.ev2z.ui.screens.ChangePlan.DevicePlanUi
 import com.developer.ev2z.ui.screens.GPSData.GPSDataScreen
 import com.developer.ev2z.ui.screens.MyAccount.MyAccountScreen
 //import com.developer.ev2z.ui.screens.GPSData.GPSDataScreen
@@ -187,6 +192,7 @@ class ShopScreenWrapper : Screen {
         ShopScreenHost()
     }
 }
+
 
 class ProfileTab(
     private val apiService: ApiService,
@@ -576,7 +582,6 @@ fun HomeNavGraph(
             )
         }
 
-
         if (showMyAccount) {
             MyAccountScreen(
                 onBack = {
@@ -584,24 +589,22 @@ fun HomeNavGraph(
                 },
                 onChangePlan = {
                     showMyAccount = false
-                    showChangePlan = true
+                    showChangePlan = true   // ✅ SIMPLE & SAFE
                 },
                 onBillDetails = {
                     showMyAccount = false
                     showBillDetails = true
                 },
-
                 onWarranty = {
                     showMyAccount = false
                     showWarranty = true
                 }
-
             )
         }
 
 
         if (showChangePlan) {
-            ChangePlanRoute(
+            ChangePlanScreenHost(
                 onBack = {
                     showChangePlan = false
                     showMyAccount = true
@@ -624,13 +627,9 @@ fun HomeNavGraph(
                 onBack = {
                     showBillDetails = false
                     showMyAccount = true
-                },
-                onDownloadInvoice = { url ->
-                    openUrl(url)
                 }
             )
         }
-
 
         if (showWarranty) {
             SupportWarrantyScreen(

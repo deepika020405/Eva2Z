@@ -7,7 +7,9 @@ import com.developer.ev2z.request.CartAddRequest
 import com.developer.ev2z.request.CommentRequest
 import com.developer.ev2z.request.CreateOrderRequest
 import com.developer.ev2z.request.DeviceAnalyticsRequest
+import com.developer.ev2z.request.RenewPlanRequest
 import com.developer.ev2z.response.*
+import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanScreenHost
 import com.developer.ev2z.ui.screens.ChangePlan.UserDevicesResponse
 import com.developer.ev2z.util.AppTokenProvider
 import io.ktor.client.call.*
@@ -1147,6 +1149,29 @@ class ApiService {
         }
     }
 
+
+
+    // ---------------- DEVICE PLAN RENEW ----------------
+    suspend fun renewDevicePlan(
+        body: RenewPlanRequest
+    ): RenewPlanResponse {
+
+        val token = AppTokenProvider.getToken()
+
+        val response = client.post("${baseUrl}device/renew") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(body)
+        }
+
+        val raw = response.bodyAsText()
+        println("🧾 RENEW RAW RESPONSE = $raw")
+
+        return Json {
+            ignoreUnknownKeys = true
+        }.decodeFromString(RenewPlanResponse.serializer(), raw)
+    }
+
     // ---------------- COMMUNITY POSTS ----------------
     suspend fun getCommunityPosts(): CommunityResponse {
         val token = AppTokenProvider.getToken()
@@ -1395,6 +1420,8 @@ class ApiService {
 //             header(HttpHeaders.Accept, ContentType.Application.Json.toString())
          }.body()
      }
+
+
 
 
     // ---------------- ADD STORY ----------------

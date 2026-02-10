@@ -1,4 +1,14 @@
 package com.developer.ev2z
 
-class Ev2zApp {
+
+import android.app.Application
+
+class Ev2zApp : Application() {
+
+    override fun onCreate() {
+        super.onCreate()
+
+        // ✅ GLOBAL CONTEXT (CMP safe)
+        AppContextHolder.context = this
+    }
 }

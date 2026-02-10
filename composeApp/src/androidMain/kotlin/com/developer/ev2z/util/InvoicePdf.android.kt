@@ -1,10 +1,8 @@
 package com.developer.ev2z.util
 
-
 import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
 import com.developer.ev2z.ui.screens.BillDetails.InvoiceData
-import com.developer.ev2z.util.OpenUrlHolder
 import java.io.File
 import java.io.FileOutputStream
 
@@ -23,30 +21,41 @@ actual fun generateInvoicePdf(
 
     var y = 40f
 
-    // ---------- HEADER ----------
-    paint.textSize = 22f
+    /* ---------------- HEADER ---------------- */
+
+    paint.textSize = 24f
     paint.isFakeBoldText = true
-    canvas.drawText("INVOICE", 220f, y, paint)
+    canvas.drawText("EV2Z TECHNOLOGIES", 40f, y, paint)
 
     paint.textSize = 12f
     paint.isFakeBoldText = false
-    y += 30
+    y += 22
+    canvas.drawText("GST Invoice", 40f, y, paint)
+
+    paint.textAlign = Paint.Align.RIGHT
+    paint.isFakeBoldText = true
+    canvas.drawText("INVOICE", 555f, 40f, paint)
+    paint.textAlign = Paint.Align.LEFT
+
+    y += 20
     canvas.drawLine(40f, y, 555f, y, paint)
 
-    // ---------- ORDER INFO ----------
-    y += 25
+    /* ---------------- ORDER INFO ---------------- */
+
+    y += 30
     paint.isFakeBoldText = true
     canvas.drawText("Order ID:", 40f, y, paint)
     paint.isFakeBoldText = false
-    canvas.drawText(invoice.orderId, 120f, y, paint)
+    canvas.drawText(invoice.orderId, 140f, y, paint)
 
     y += 18
     paint.isFakeBoldText = true
     canvas.drawText("Order Date:", 40f, y, paint)
     paint.isFakeBoldText = false
-    canvas.drawText(invoice.orderDate, 120f, y, paint)
+    canvas.drawText(invoice.orderDate, 140f, y, paint)
 
-    // ---------- BILLING INFO ----------
+    /* ---------------- BILL TO ---------------- */
+
     y += 30
     paint.isFakeBoldText = true
     canvas.drawText("BILL TO", 40f, y, paint)
@@ -55,9 +64,9 @@ actual fun generateInvoicePdf(
     y += 18
     canvas.drawText(invoice.customerName, 40f, y, paint)
     y += 16
-    canvas.drawText(invoice.phone, 40f, y, paint)
+    canvas.drawText("Phone: ${invoice.phone}", 40f, y, paint)
     y += 16
-    canvas.drawText(invoice.email, 40f, y, paint)
+    canvas.drawText("Email: ${invoice.email}", 40f, y, paint)
     y += 16
     canvas.drawText(
         "${invoice.city}, ${invoice.state} - ${invoice.pincode}",
@@ -66,51 +75,66 @@ actual fun generateInvoicePdf(
         paint
     )
 
-    // ---------- ITEMS TABLE ----------
+    /* ---------------- ITEMS TABLE ---------------- */
+
     y += 30
     paint.isFakeBoldText = true
-    canvas.drawText("ITEMS", 40f, y, paint)
+    canvas.drawText("ITEM DETAILS", 40f, y, paint)
 
     y += 15
     canvas.drawLine(40f, y, 555f, y, paint)
 
     y += 20
     paint.isFakeBoldText = true
-    canvas.drawText("Item", 40f, y, paint)
-    canvas.drawText("Qty", 350f, y, paint)
-    canvas.drawText("Plan", 250f, y, paint)   // ✅ NEW
-    canvas.drawText("Price", 420f, y, paint)
-
+    canvas.drawText("Product", 40f, y, paint)
+    canvas.drawText("Plan", 260f, y, paint)
+    canvas.drawText("Qty", 360f, y, paint)
+    canvas.drawText("Price", 450f, y, paint)
 
     paint.isFakeBoldText = false
-    y += 15
+    y += 12
     canvas.drawLine(40f, y, 555f, y, paint)
 
-    y += 18
-    invoice.items.forEach {
-        canvas.drawText(it.name, 40f, y, paint)
-        canvas.drawText(it.quantity.toString(), 360f, y, paint)
-        canvas.drawText(it.planType ?: "-", 250f, y, paint)
-        canvas.drawText("₹${it.price}", 420f, y, paint)
-        y += 18
+    y += 20
+    invoice.items.forEach { item ->
+        canvas.drawText(item.name.trim(), 40f, y, paint)
+        canvas.drawText(
+            item.planType?.replace("_", " ")?.uppercase() ?: "-",
+            260f,
+            y,
+            paint
+        )
+        canvas.drawText(item.quantity.toString(), 360f, y, paint)
+        canvas.drawText(item.price, 450f, y, paint)
+        y += 20
     }
 
-    // ---------- TOTAL ----------
-    y += 20
+    /* ---------------- TOTAL ---------------- */
+
+    y += 15
     canvas.drawLine(40f, y, 555f, y, paint)
 
-    y += 25
+    y += 28
     paint.isFakeBoldText = true
     paint.textSize = 16f
-    canvas.drawText("TOTAL AMOUNT", 320f, y, paint)
-    canvas.drawText("₹${invoice.totalAmount}", 450f, y, paint)
+    canvas.drawText("TOTAL AMOUNT", 340f, y, paint)
+    canvas.drawText(invoice.totalAmount, 450f, y, paint)
 
-    // ---------- FOOTER ----------
+    /* ---------------- FOOTER ---------------- */
+
     paint.textSize = 10f
     paint.isFakeBoldText = false
-    y += 40
+    y += 50
     canvas.drawText(
-        "Thank you for your purchase!",
+        "This is a computer generated invoice and does not require a signature.",
+        120f,
+        y,
+        paint
+    )
+
+    y += 14
+    canvas.drawText(
+        "Thank you for choosing EV2Z 🚗📍",
         200f,
         y,
         paint

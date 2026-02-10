@@ -1,4 +1,8 @@
 package com.developer.ev2z
 
-class AppContextHolder {
+
+import android.content.Context
+
+object AppContextHolder {
+    lateinit var context: Context
 }
