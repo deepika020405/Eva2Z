@@ -33,11 +33,11 @@ import com.developer.ev2z.ui.screens.Profile.ProfileMenuItemRow
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MyAccountScreen(
+    selectedDeviceId: String,   // 🔥 ADD THIS
     onBack: () -> Unit,
     onChangePlan: () -> Unit,
     onBillDetails: () -> Unit,
-    onWarranty: () -> Unit,
-
+    onWarranty: (String) -> Unit
 ) {
     PlatformBackHandler(true){
         onBack()
@@ -78,10 +78,13 @@ fun MyAccountScreen(
             item {
                 AccountCard(
                     "Device & Warranty",
-                    listOf("Warranty Information" to onWarranty)
+                    listOf(
+                        "Warranty Information" to {
+                            onWarranty(selectedDeviceId)
+                        }
+                    )
                 )
             }
-
         }
     }
 }

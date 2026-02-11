@@ -5,32 +5,37 @@ import com.developer.ev2z.response.MyBillingResponse
 
 fun MyBillingResponse.toUiBills(): List<BillTransactionUi> {
     return billings.map { order ->
+
+        val safeBilling = order.billing
+
         BillTransactionUi(
             orderId = order.orderId,
             transactionId = order.transactionId,
-            orderDate = order.orderDate.substring(0, 10),
+            orderDate = order.orderDate.take(10),
             totalAmount = "₹${order.orderTotal}",
 
+
             billing = BillingUi(
-                name = order.billing.name,
-                phone = order.billing.phone,
-                email = order.billing.email,
-                city = order.billing.city,
-                state = order.billing.state,
-                pincode = order.billing.pincode
+                name = safeBilling?.name ?: "N/A",
+                phone = safeBilling?.phone ?: "N/A",
+                email = safeBilling?.email ?: "N/A",
+                city = safeBilling?.city ?: "N/A",
+                state = safeBilling?.state ?: "N/A",
+                pincode = safeBilling?.pincode ?: "N/A"
             ),
 
             items = order.items.map { item ->
                 BillItemUi(
                     productName = item.productName.trim(),
                     quantity = item.quantity,
-                    planType = item.planType,
+                    planType = item.planType ?: "",
                     price = "₹${item.price}",
-                    rechargeAmount = "₹${item.rechargeAmount}"
+                    rechargeAmount = "₹${item.rechargeAmount}",
+                    deviceId = null // until backend gives it
                 )
             },
 
-            invoiceUrl = "" // local PDF later
+            invoiceUrl = ""
         )
     }
 }

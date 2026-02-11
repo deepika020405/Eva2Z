@@ -28,12 +28,17 @@ data class UserDevicesResponse(
 @Serializable
 data class UserDeviceDto(
     val device_id: Int,
-    val device_number: String,   // ✅ ADD THIS (IMEI)
-    val sim_num: String? = null,
+    val device_number: String,
+    val sim_number: String? = null,
+
     val activated_at: String? = null,
+    val plan_days_left: Int? = null,
     val expires_at: String? = null,
-    val days_left: Int? = null,
-    val status: String? = null
+    val plan_status: String? = null,
+
+    val warranty_start: String? = null,
+    val warranty_expiry: String? = null,
+    val warranty_status: String? = null
 )
 
 /* ================= UI MODELS ================= */
@@ -48,6 +53,7 @@ data class DevicePlanUi(
     val deviceId: String,    // DB id (247)
     val imei: String,        // ✅ REAL IMEI
     val deviceName: String,
+    val simNumber: String?,   // ✅ ADD THIS
     val planType: String,
     val expiryDate: String,
     val daysLeft: Int
@@ -78,8 +84,7 @@ class ChangePlanViewModel(
                 if (response.success) {
                     _state.value = PlansUiState(
                         isLoading = false,
-                        devices = response.data.map { it.toUiModel() }
-                    )
+                        devices = response.data.map { it.toPlanUiModel() }                    )
                 } else {
                     _state.value = PlansUiState(
                         isLoading = false,
@@ -103,13 +108,14 @@ class ChangePlanViewModel(
 }
 /* ================= MAPPER ================= */
 
-private fun UserDeviceDto.toUiModel(): DevicePlanUi {
+private fun UserDeviceDto.toPlanUiModel(): DevicePlanUi {
     return DevicePlanUi(
-        deviceId = device_id.toString(),        // DB id
-        imei = device_number,                   // ✅ IMEI
+        deviceId = device_id.toString(),
+        imei = device_number, // ✅ real IMEI
+        simNumber = sim_number,   // ✅ PASS FROM API
         deviceName = "Device #$device_id",
-        planType = status ?: "unknown",
+        planType = plan_status ?: "unknown",
         expiryDate = expires_at?.substringBefore(" ") ?: "N/A",
-        daysLeft = days_left ?: 0
+        daysLeft = plan_days_left ?: 0
     )
 }

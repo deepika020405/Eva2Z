@@ -50,6 +50,7 @@ fun ChangePlanScreen(
                 }
             )
         }
+
     ) { padding ->
 
         LazyColumn(
@@ -111,6 +112,9 @@ fun DevicePlanCard(
 
             InfoRow("Plan", device.planType)
             InfoRow("Expiry Date", device.expiryDate)
+            device.simNumber?.let {
+                InfoRow("SIM Number", it)   // ✅ ADD THIS
+            }
 
             Spacer(Modifier.height(16.dp))
 

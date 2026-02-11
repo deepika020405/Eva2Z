@@ -26,22 +26,25 @@ data class BillingOrderDto(
     @SerialName("order_date")
     val orderDate: String,
 
-    val billing: BillingUserDto,
+    val billing: BillingUserDto? = null,   // ✅ nullable
 
     @SerialName("order_total")
     val orderTotal: Int,
 
-    val items: List<BillingItemDto>
+    val items: List<BillingItemDto> = emptyList()  // ✅ safe default
 )
 
 @Serializable
 data class BillingUserDto(
-    val name: String,
-    val phone: String,
-    val email: String,
-    val city: String,
-    val state: String,
-    val pincode: String
+    @SerialName("billing_id")
+    val billingId: Int? = null,            // ✅ API me hai
+
+    val name: String? = null,              // ✅ nullable
+    val phone: String? = null,
+    val email: String? = null,
+    val city: String? = null,
+    val state: String? = null,
+    val pincode: String? = null
 )
 
 @Serializable
@@ -57,8 +60,8 @@ data class BillingItemDto(
     val price: String,
 
     @SerialName("plan_type")
-    val planType: String,
+    val planType: String? = null,          // safe
 
     @SerialName("recharge_amount")
-    val rechargeAmount: String
+    val rechargeAmount: String? = null
 )

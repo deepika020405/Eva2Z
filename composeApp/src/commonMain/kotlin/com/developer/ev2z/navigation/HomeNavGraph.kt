@@ -63,6 +63,7 @@ import com.developer.ev2z.ui.screens.Profile.VaultPasswordDialog
 import com.developer.ev2z.ui.screens.ReferAndEarn.ReferAndEarnScreen
 import com.developer.ev2z.ui.screens.SupportAndWarrenty.SupportWarrantyScreen
 import com.developer.ev2z.ui.screens.SupportAndWarrenty.SupportWarrantyUi
+import com.developer.ev2z.ui.screens.SupportAndWarrenty.WarrantyRoute
 import com.developer.ev2z.ui.screens.SupportAndWarrenty.WarrantyStatus
 import com.developer.ev2z.ui.screens.community.CommunityScreenRoot
 import com.developer.ev2z.ui.screens.community.CreatePostScreen
@@ -279,7 +280,7 @@ fun HomeNavGraph(
     // ✅ CREATE pagerState and coroutineScope HERE (at parent level)
     val pagerState = rememberPagerState(pageCount = { 4 })
     val coroutineScope = rememberCoroutineScope()
-
+    var selectedWarrantyDeviceId by remember { mutableStateOf("") }
     // Screen visibility states
     var showEditProfile by remember { mutableStateOf(false) }
     var showManageDevice by remember { mutableStateOf(false) }
@@ -582,20 +583,34 @@ fun HomeNavGraph(
             )
         }
 
+        LaunchedEffect(showMyAccount) {
+            if (showMyAccount && selectedWarrantyDeviceId.isEmpty()) {
+                try {
+                    val devices = apiService.getUserDevices()
+                    val firstId = devices.data.firstOrNull()?.device_id?.toString() ?: ""
+                    println("🔵 Setting default deviceId = $firstId")
+                    selectedWarrantyDeviceId = firstId
+                } catch (e: Exception) {
+                    println("❌ Failed to set default device: ${e.message}")
+                }
+            }
+        }
+
         if (showMyAccount) {
             MyAccountScreen(
-                onBack = {
+                selectedDeviceId = selectedWarrantyDeviceId,                onBack = {
                     showMyAccount = false
                 },
                 onChangePlan = {
                     showMyAccount = false
-                    showChangePlan = true   // ✅ SIMPLE & SAFE
+                    showChangePlan = true
                 },
                 onBillDetails = {
                     showMyAccount = false
                     showBillDetails = true
                 },
-                onWarranty = {
+                onWarranty = { deviceId ->   // ✅ IMPORTANT
+                    selectedWarrantyDeviceId = deviceId
                     showMyAccount = false
                     showWarranty = true
                 }
@@ -631,16 +646,15 @@ fun HomeNavGraph(
             )
         }
 
-        if (showWarranty) {
-            SupportWarrantyScreen(
-                data = dummySupportWarranty,
+        if (showWarranty && selectedWarrantyDeviceId != null) {
+            WarrantyRoute(
+                deviceId = selectedWarrantyDeviceId!!,
                 onBack = {
                     showWarranty = false
                     showMyAccount = true
                 },
                 onBuyWarranty = {
-                    println("🛡 Buy 1-Year Warranty @ ₹399 clicked")
-                    // later → payment / checkout
+                    println("Buy warranty clicked")
                 }
             )
         }

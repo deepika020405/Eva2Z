@@ -31,11 +31,13 @@ class BillDetailsViewModel(
 data class BillTransactionUi(
     val orderId: Int,
     val transactionId: String,
+    val deviceId: String? = null,  // 🔥 future safe
     val orderDate: String,
     val totalAmount: String,
     val billing: BillingUi,
     val items: List<BillItemUi>,
-    val invoiceUrl: String
+    val invoiceUrl: String,
+
 )
 
 data class BillingUi(
@@ -52,7 +54,9 @@ data class BillItemUi(
     val quantity: Int,
     val planType: String,
     val price: String,
-    val rechargeAmount: String
+    val rechargeAmount: String,
+    val deviceId: String? = null   // 🔥 add this
+
 )
 
 data class InvoiceData(
