@@ -7,6 +7,7 @@ import com.developer.ev2z.request.CartAddRequest
 import com.developer.ev2z.request.CommentRequest
 import com.developer.ev2z.request.CreateOrderRequest
 import com.developer.ev2z.request.DeviceAnalyticsRequest
+import com.developer.ev2z.request.PhonePeCallbackRequest
 import com.developer.ev2z.request.RenewPlanRequest
 import com.developer.ev2z.response.*
 import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanScreenHost
@@ -1171,6 +1172,28 @@ class ApiService {
             ignoreUnknownKeys = true
         }.decodeFromString(RenewPlanResponse.serializer(), raw)
     }
+
+
+    suspend fun sendPhonePeCallback(
+        request: PhonePeCallbackRequest
+    ): Boolean {
+        val token = AppTokenProvider.getToken()
+
+        println("📡 Sending PhonePe Callback → $request")
+
+        val response = client.post("${baseUrl}phonepe/callback") {
+            contentType(ContentType.Application.Json)
+            header(HttpHeaders.Authorization, "Bearer $token")
+            setBody(request)
+        }
+
+        println("📡 Callback status = ${response.status}")
+        println("📡 Callback body = ${response.bodyAsText()}")
+
+        return response.status.isSuccess()
+    }
+
+
 
     // ---------------- COMMUNITY POSTS ----------------
     suspend fun getCommunityPosts(): CommunityResponse {

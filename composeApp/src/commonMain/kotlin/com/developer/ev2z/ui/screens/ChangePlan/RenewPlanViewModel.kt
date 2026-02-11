@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.phonepe.PaymentState
+import com.developer.ev2z.request.PhonePeCallbackRequest
 import com.developer.ev2z.request.RenewPlanRequest
 import com.developer.ev2z.response.RenewPlanResponse
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -21,6 +22,10 @@ class RenewPlanViewModel(
 
     private val _phonePeToken = MutableStateFlow<String?>(null)
     val phonePeToken = _phonePeToken.asStateFlow()
+
+    // ✅ YAHI ADD KARNA HAI
+    private var merchantOrderId: String? = null
+    private var phonePeOrderIdFromServer: String? = null
 
     private var currentAmount: Int = 0
 
@@ -49,7 +54,7 @@ class RenewPlanViewModel(
                 currentAmount = when (planDays) {
                     90 -> 399
                     180 -> 699
-                    else -> 1
+                    else -> 999
                 }
 
                 val request = RenewPlanRequest(
@@ -62,6 +67,13 @@ class RenewPlanViewModel(
 
                 val response = apiService.renewDevicePlan(request)
 
+
+// ✅ YAHI ADD-ON HAI
+                merchantOrderId = response.merchantOrderId
+                phonePeOrderIdFromServer = response.phonepeOrderId
+
+
+                println("✅ merchantOrderId = ${response.merchantOrderId}")
                 println("✅ orderToken = ${response.orderToken}")
 
                 _phonePeToken.value = response.orderToken
@@ -79,26 +91,46 @@ class RenewPlanViewModel(
 
     fun onPaymentResult(
         success: Boolean,
-        txnId: String,
+        phonePeOrderId: String,
         message: String?
     ) {
-        println("📲 PhonePe callback → success=$success txnId=$txnId message=$message")
+        viewModelScope.launch {
+            try {
 
-        _paymentState.value =
-            if (success)
-                PaymentState.Success(txnId, currentAmount)
-            else
-                PaymentState.Failed(
-                    message ?: "Payment cancelled",
+                val callbackReq = PhonePeCallbackRequest(
+                    merchantOrderId = merchantOrderId ?: "",
+                    phonepeOrderId = phonePeOrderIdFromServer ?: "",
+                    status = if (success) "SUCCESS" else "FAILED"
+                )
+
+                apiService.sendPhonePeCallback(callbackReq)
+
+                _paymentState.value =
+                    if (success)
+                        PaymentState.Success(phonePeOrderIdFromServer, currentAmount)
+                    else
+                        PaymentState.Failed(
+                            message ?: "Payment failed",
+                            currentAmount
+                        )
+
+            } catch (e: Exception) {
+
+                _paymentState.value = PaymentState.Failed(
+                    "Payment done but callback failed",
                     currentAmount
                 )
 
-        _phonePeToken.value = null
+            } finally {
+                _phonePeToken.value = null
+            }
+        }
     }
 
     fun reset() {
-        println("🔄 Resetting payment state")
         _paymentState.value = PaymentState.Idle
         _phonePeToken.value = null
+        merchantOrderId = null
+        currentAmount = 0
     }
 }

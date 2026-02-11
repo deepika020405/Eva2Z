@@ -8,7 +8,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.developer.ev2z.network.ApiService
-import com.developer.ev2z.phonepe.PaymentResult
 import com.developer.ev2z.phonepe.PaymentState
 import com.developer.ev2z.phonepe.openPhonePeSdk
 import com.developer.ev2z.ui.screens.market_screen.PaymentResultScreen
@@ -25,48 +24,23 @@ fun ChangePlanScreenHost(
     val paymentState by renewViewModel.paymentState.collectAsState()
     val phonePeToken by renewViewModel.phonePeToken.collectAsState()
 
-    // 🔍 DEBUG LOGS (STATE)
-    LaunchedEffect(paymentState) {
-        println("💳 paymentState = $paymentState")
-    }
-
-    LaunchedEffect(phonePeToken) {
-        println("📦 phonePeToken changed = $phonePeToken")
-    }
-
-    // 🔥 PHONEPE SDK TRIGGER (SIDE EFFECT - CORRECT PLACE)
+    // 🔥 PHONEPE SDK TRIGGER
     LaunchedEffect(phonePeToken) {
         phonePeToken?.let { token ->
-            println("🚀 Opening PhonePe SDK with token = $token")
-
             openPhonePeSdk(
                 paymentUrl = token,
                 onResult = { result ->
-                    println(
-                        "📲 PhonePe result → success=${result.success}, " +
-                                "txnId=${result.transactionId}, " +
-                                "message=${result.message}"
+                    renewViewModel.onPaymentResult(
+                        success = result.success,
+                        phonePeOrderId = result.transactionId ?: "",
+                        message = result.message
                     )
-
-                    if (result.success) {
-                        renewViewModel.onPaymentResult(
-                            success = true,
-                            txnId = result.transactionId ?: "",
-                            message = null
-                        )
-                    } else {
-                        renewViewModel.onPaymentResult(
-                            success = false,
-                            txnId = "",
-                            message = result.message ?: "Payment failed"
-                        )
-                    }
                 }
             )
         }
     }
 
-    // 🔥 UI CONTROLLER
+    // ✅ SINGLE UI CONTROLLER
     when {
         paymentState is PaymentState.Processing -> {
             Box(Modifier.fillMaxSize(), Alignment.Center) {
@@ -82,7 +56,7 @@ fun ChangePlanScreenHost(
             val ps = paymentState as PaymentState.Success
             PaymentResultScreen(
                 isSuccess = true,
-                transactionId = ps.txnId,
+                transactionId = ps.txnId ?: "N/A",
                 amount = ps.amount.toString()
             )
         }
@@ -116,7 +90,6 @@ fun ChangePlanScreenHost(
                     onBack()
                 },
                 onRenewConfirm = { deviceId, duration ->
-                    println("🔥 Renew clicked → deviceId=$deviceId duration=$duration")
                     renewViewModel.startRenewPlan(deviceId, duration)
                 }
             )
