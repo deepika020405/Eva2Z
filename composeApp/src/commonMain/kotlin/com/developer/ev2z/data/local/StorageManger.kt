@@ -17,4 +17,6 @@ expect fun createStorageManager(): StorageManager
 object StorageKeys {
     const val VAULT_TOKEN = "vault_token"
     const val VAULT_EXPIRES_AT = "vault_expires_at"
+    const val USER_NAME = "user_name"
+
 }

@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -72,6 +73,8 @@ import com.developer.ev2z.ui.screens.community.StoryViewerScreen
 import com.developer.ev2z.ui.screens.documents.DocumentViewerScreen
 import com.developer.ev2z.ui.screens.documents.DocumentsScreen
 import com.developer.ev2z.ui.screens.documents.UploadDocumentScreen
+import com.developer.ev2z.ui.screens.homeScreen.HomeUiState
+import com.developer.ev2z.ui.screens.homeScreen.LiveLocationScreen
 import com.developer.ev2z.ui.screens.social_media.openUrl
 import com.developer.ev2z.util.BottomBarController
 import com.developer.ev2z.util.platformDownloadFile
@@ -84,21 +87,76 @@ class HomeTab(
     private val viewModel: HomeViewModel,
     private val token: String,
     private val onNavigateToAddDevice: () -> Unit,
+    private val onNavigateToManageDevice: () -> Unit,   // ✅ ADD
+    private val onNavigateToGPSData: () -> Unit,        // ✅ ADD
+    private val onNavigateToGeoFencing: () -> Unit,     // ✅ ADD
+    private val onNavigateToHistory: () -> Unit,        // ✅ ADD
+    private val onNavigateToRefer: () -> Unit,          // ✅ ADD
+    private val onOpenCommunity: () -> Unit,
     private val onOpenDeviceStatus: () -> Unit,
     private val onNavigateToDeviceReport: () -> Unit,
     private val onOpenTrackTrace: () -> Unit,
-    private val onOpenCommunity: () -> Unit
+    private val onDocumentsTabSelected: () -> Unit
 ) : Tab {
+
     @Composable
-    override fun Content() = HomeScreen(
-        viewModel = viewModel,
-        token = token,
-        onNavigateToAddDevice = onNavigateToAddDevice,
-        onNavigateToDeviceReport = onNavigateToDeviceReport,
-        onOpenDeviceStatus = onOpenDeviceStatus,
-        onOpenTrackTrace = onOpenTrackTrace,
-        onOpenCommunity = onOpenCommunity
-    )
+    override fun Content() {
+
+        var showLiveLocation by rememberSaveable { mutableStateOf(false) }
+
+        val uiState by viewModel.uiState.collectAsState()
+
+        LaunchedEffect(Unit) {
+            viewModel.loadDevices(token)
+        }
+
+        val userName = (uiState as? HomeUiState.Success)
+            ?.deviceResponse
+            ?.name
+            ?: "User"
+
+        if (showLiveLocation) {
+
+            LiveLocationScreen(
+                viewModel = viewModel,
+                token = token,
+                onBack = { showLiveLocation = false },
+                onNavigateToAddDevice = onNavigateToAddDevice,
+                onNavigateToDeviceReport = onNavigateToDeviceReport,
+                onOpenDeviceStatus = onOpenDeviceStatus,
+                onOpenTrackTrace = onOpenTrackTrace,
+                onOpenCommunity = onOpenCommunity
+            )
+
+        } else {
+
+            HomeScreen(
+                userName = userName,
+
+                onOpenLiveLocation = { showLiveLocation = true },
+
+                onManageDevice = { onNavigateToManageDevice() },
+
+                onGpsData = { onNavigateToGPSData() },
+
+                onGeoFence = { onNavigateToGeoFencing() },
+
+                onHistory = { onNavigateToHistory() },
+
+                onRefer = { onNavigateToRefer() },
+
+                onCommunity = { onOpenCommunity() },
+
+                onOpenDocuments = {
+                    onDocumentsTabSelected()   // 🔐 Documents vault open flow
+                },
+
+                onOpenDeviceReport = {
+                    onNavigateToDeviceReport()  // 📊 Today Device Report
+                }
+            )
+        }
+    }
 
     override val options: TabOptions
         @Composable get() = TabOptions(
@@ -107,7 +165,6 @@ class HomeTab(
             icon = rememberVectorPainter(Icons.Default.Home)
         )
 }
-
 
 //class DocumentsTab(
 //    private val onRequestDocuments: () -> Unit
@@ -270,12 +327,7 @@ fun HomeNavGraph(
 ) {
     SetupStatusBar()
 
-    val dummySupportWarranty = SupportWarrantyUi(
-        productName = "EVA2Z GPS Tracker",
-        deviceId = "864839039292",
-        warrantyStatus = WarrantyStatus.EXPIRED,
-        warrantyExpiryDate = "15 Jan 2026"
-    )
+
 
     // ✅ CREATE pagerState and coroutineScope HERE (at parent level)
     val pagerState = rememberPagerState(pageCount = { 4 })
@@ -1009,7 +1061,24 @@ fun HomeNavGraphContent(
         ShopViewModel(repo = productRepository, tokenProvider = tokenProvider)
     }
 
-    val homeTab = remember { HomeTab(viewModel, token, onNavigateToAddDevice, onOpenDeviceStatus ,onNavigateToDeviceReport,onOpenTrackTrace,onOpenCommunity ) }
+    val homeTab = remember {
+        HomeTab(
+            viewModel = viewModel,
+            token = token,
+            onNavigateToAddDevice = onNavigateToAddDevice,
+            onNavigateToManageDevice = onNavigateToManageDevice,
+            onNavigateToGPSData = onNavigateToGPSData,
+            onNavigateToGeoFencing = onNavigateToGeoFencing,
+            onNavigateToHistory = onNavigateToHistoryPlayback,
+            onNavigateToRefer = onNavigateToReferAndEarn,
+            onOpenCommunity = onOpenCommunity,
+            onOpenDeviceStatus = onOpenDeviceStatus,
+            onNavigateToDeviceReport = onNavigateToDeviceReport,
+            onOpenTrackTrace = onOpenTrackTrace,
+            onDocumentsTabSelected = onDocumentsTabSelected   // ✅ ADD THIS
+
+        )
+    }
 
     val profileTab = remember(profileRefreshTrigger) {
         ProfileTab(

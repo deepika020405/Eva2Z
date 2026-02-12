@@ -1,772 +1,346 @@
-// composeApp/src/commonMain/kotlin/com/developer/ev2z/ui/screens/homeScreen/HomeScreen.kt
 package com.developer.ev2z.ui.screens.homeScreen
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.developer.ev2z.data.local.model.Device
-import com.developer.ev2z.data.local.model.DeviceResponse
-import org.jetbrains.compose.ui.tooling.preview.Preview
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.size
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.graphicsLayer
-import com.developer.ev2z.ui.components.FloatingContactButton
-import com.developer.ev2z.util.Analytics
-import eva2z_connect_multiplatform.composeapp.generated.resources.Res
-import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
 import org.jetbrains.compose.resources.painterResource
-import org.jetbrains.compose.resources.InternalResourceApi
+import eva2z_connect_multiplatform.composeapp.generated.resources.Res
+import eva2z_connect_multiplatform.composeapp.generated.resources.homebanner
+import eva2z_connect_multiplatform.composeapp.generated.resources.scooter
 
-@OptIn(ExperimentalMaterial3Api::class)
+// ================= COLORS =================
+
+private val BrandGreen = Color(0xFF34A853)
+private val BackgroundColor = Color(0xFFF6F6F6)
+private val CardColor = Color.White
+private val TextPrimary = Color(0xFF1E1E1E)
+private val TextSecondary = Color(0xFF777777)
+
+// ================= DATA MODEL =================
+
+data class QuickActionItem(
+    val title: String,
+    val icon: ImageVector,
+    val onClick: () -> Unit
+)
+
+// ================= MAIN SCREEN =================
+
 @Composable
 fun HomeScreen(
-    viewModel: HomeViewModel,
-    token: String,
-    onNavigateToAddDevice: () -> Unit,
-    onNavigateToDeviceReport: () -> Unit,
-    onOpenDeviceStatus: () -> Unit,
-    onOpenTrackTrace: () -> Unit,
-    onOpenCommunity: () -> Unit   // ✅ ADD
-) {
-    val uiState by viewModel.uiState.collectAsState()
-    val selectedDevice by viewModel.selectedDevice.collectAsState()
-    val showOverview by viewModel.showOverview.collectAsState()
-    val showDeviceDropdown by viewModel.showDeviceDropdown.collectAsState()
-    val isRefreshing by viewModel.isRefreshing.collectAsState()
-    var autoNavigated by remember { mutableStateOf(false) }
-
-
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
-
-    LaunchedEffect(Unit) {
-        Analytics.logEvent(
-            name = "screen_view",
-            params = mapOf(
-                "screen_name" to "home_screen",
-                "screen_class" to "HomeScreen"
-            )
-        )
-        viewModel.loadDevices(token)
-    }
-
-    when (val state = uiState) {
-        is HomeUiState.Loading -> {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
-        }
-
-        is HomeUiState.Error -> {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-//                        text = "Server Error: ${state.message}",
-                        text = "  Server Error ",
-                        color = Color.Red,
-                        fontSize = 16.sp
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = { viewModel.refreshDevices(token) }) {
-                        Text("Retry")
-                    }
-                }
-            }
-        }
-
-        is HomeUiState.Success -> {
-            val response = state.deviceResponse
-            val devices = response.data ?: emptyList()
-            val showDropdownAllowed = devices.size > 1
-            val deviceCount = devices.size
-
-//            LaunchedEffect(devices.size) {
-//                if (devices.size == 1 && !autoNavigated) {
-//                    autoNavigated = true
-//                    onNavigateToDeviceReport()
-//                }
-//            }
-
-
-            Box(modifier = Modifier.fillMaxSize()) {
-                val devicesWithLocation = response.data.filter { it.hasValidLocation() }
-
-                PlatformMapView(
-                    modifier = Modifier.fillMaxSize(),
-                    devices = devicesWithLocation,
-                    selectedDevice = selectedDevice,
-                    onMarkerClick = { device ->
-                        viewModel.selectDevice(device)
-                    }
-                )
-
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.TopCenter)
-                        .padding(16.dp)
-                ) {
-                    TopDeviceCard(
-                        userName = response.name ?: "User",
-                        deviceCount = response.totalDevices ?: 0,
-                        selectedDevice = selectedDevice,
-                        onDropdownClick = {
-//                            if (showDropdownAllowed) {
-                                viewModel.toggleDeviceDropdown()
-//                            }
-                        },
-                        onLocationClick = {
-                            when (deviceCount) {
-                                0 -> {
-                                    // ❌ Do nothing (disabled)
-                                }
-
-                                1 -> {
-                                    // ✅ Direct navigation
-                                    onNavigateToDeviceReport()
-                                }
-
-                                else -> {
-                                    // ✅ Open bottom sheet
-                                    viewModel.showOverviewSheet()
-                                }
-                            }
-                        },
-//                        showDropdown = showDropdownAllowed
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    // ✅ COMMUNITY CARD
-                    CommunityEntryCard(
-                        onClick = {
-                            onOpenCommunity()   // 🔥 navigation trigger
-                        }
-                    )
-
-
-                    if (showDeviceDropdown) {
-                    DeviceDropdownSheet(
-                        devices = response.data ?: emptyList(),
-                        onDeviceSelect = {
-                            viewModel.selectDevice(it)
-//                                viewModel.toggleDeviceDropdown()
-                            onNavigateToDeviceReport()
-                        },
-                        onAddDevice = {
-                            println("➕ Add Device clicked from dropdown")
-                            viewModel.toggleDeviceDropdown()
-                            onNavigateToAddDevice()
-                        },
-                        onDismiss = { viewModel.toggleDeviceDropdown() }
-                    )
-                }
-                }
-                // 🔥 FLOATING CONTACT BUTTON (COMMON)
-                FloatingContactButton(
-                    phoneNumber = "919755273822",
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(start = 20.dp, bottom = 20.dp)
-                )
-                //BottomSheet Logic
-
-//                if (showOverview) {
-//                    ModalBottomSheet(
-//                        onDismissRequest = { viewModel.hideOverviewSheet() },
-//                        sheetState = sheetState,
-//                        containerColor = Color.White,
-//                        dragHandle = {
-//                            Box(
-//                                modifier = Modifier
-//                                    .fillMaxWidth()
-//                                    .padding(vertical = 12.dp),
-//                                contentAlignment = Alignment.Center
-//                            ) {
-//                                Box(
-//                                    modifier = Modifier
-//                                        .width(40.dp)
-//                                        .height(4.dp)
-//                                        .background(Color.LightGray, RoundedCornerShape(2.dp))
-//                                )
-//                            }
-//                        }
-//                    ) {
-////                        OverviewBottomSheet(
-////                            response = response,
-////                            onClose = { viewModel.hideOverviewSheet() },
-////                            onNavigateToDeviceReport = onNavigateToDeviceReport,
-////                            onOpenDeviceStatus = onOpenDeviceStatus,
-////                            onOpenTrackTrace = onOpenTrackTrace,
-////                            token = token,
-////                            viewModel = viewModel,
-////                            isRefreshing = isRefreshing
-////                        )
-//                    }
-//                }
-            }
-        }
-    }
-}
-
-@OptIn(InternalResourceApi::class)
-@Composable
-fun TopDeviceCard(
     userName: String,
-    deviceCount: Int,
-    selectedDevice: Device?,
-    onDropdownClick: () -> Unit,
-    onLocationClick: () -> Unit,
-//    showDropdown: Boolean
+    onOpenLiveLocation: () -> Unit,
+    onManageDevice: () -> Unit,
+    onGpsData: () -> Unit,
+    onGeoFence: () -> Unit,
+    onHistory: () -> Unit,
+    onOpenDocuments: () -> Unit,        // ✅ ADD THIS
+    onOpenDeviceReport: () -> Unit ,
+    onRefer: () -> Unit,
+    onCommunity: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Hello, $userName",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium
-                )
+    Scaffold(containerColor = BackgroundColor) { padding ->
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.LocationOn,
-                        contentDescription = "Location Overview",
-                        tint = Color(0xFF4CAF50),
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clickable { onLocationClick() }
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "$deviceCount Devices Listed",
-                        fontSize = 12.sp,
-                        color = Color.Gray
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-//            if (showDropdown) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Color(0xFFF5F5F5), RoundedCornerShape(8.dp))
-                        .clickable { onDropdownClick() }
-                        .padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Image(
-                            painter = painterResource(Res.drawable.app_logo),
-                            contentDescription = "App Logo",
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = selectedDevice?.getDisplayName() ?: "Select Device",
-                            fontSize = 14.sp
-                        )
-                    }
-
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowDropDown,
-                            contentDescription = null,
-                            tint = Color.Gray
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = null,
-                            tint = Color.Gray,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
-//            }
-        }
-    }
-}
-
-@Composable
-fun DeviceDropdownSheet(
-    devices: List<Device>,
-    onDeviceSelect: (Device) -> Unit,
-    onAddDevice: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(max = 500.dp)
-            .padding(top = 8.dp),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Select device drop down",
-                    fontSize = 14.sp,
-                    color = Color.Gray
-                )
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Close",
-                    modifier = Modifier
-                        .size(20.dp)
-                        .clickable { onDismiss() }
-                )
-            }
-
-            Divider()
-
-            LazyColumn(
-                modifier = Modifier.weight(1f)
-            ) {
-                items(devices) { device ->
-                    DeviceListItem(
-                        device = device,
-                        onClick = { onDeviceSelect(device) }
-                    )
-                }
-            }
-
-            Button(
-                onClick = onAddDevice,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF4CAF50)
-                ),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Add Device")
-            }
-        }
-    }
-}
-
-@Composable
-fun DeviceListItem(device: Device, onClick: () -> Unit) {
-    val statusColor = Color(device.getStatusColor())
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
+        Column(
             modifier = Modifier
-                .size(8.dp)
-                .background(statusColor, CircleShape)
-        )
+                .fillMaxSize()
+                .padding(top = padding.calculateTopPadding())
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
+        ) {
 
-        Spacer(modifier = Modifier.width(12.dp))
+            ModernTopHeader(userName)
 
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = device.getDisplayName(),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium
+            TrackingPreviewCard(onOpenLiveLocation)
+
+            HomeQuickActionsSection(
+                onMyDevices = onOpenLiveLocation,
+                onManageDevice = onManageDevice,
+                onGpsData = onGpsData,
+                onGeoFence = onGeoFence,
+                onHistory = onHistory,
+                onRefer = onRefer,
+                onOpenDocuments = onOpenDocuments,
+                onOpenDeviceReport = onOpenDeviceReport,
+                onCommunity = onCommunity
             )
-            Text(
-                text = "Device ID: ${device.deviceId}",
-                fontSize = 11.sp,
-                color = Color.Gray
-            )
+
+            ModernFeaturesSection()
+
+            Spacer(modifier = Modifier.height(20.dp))
         }
-
-        Text(
-            text = device.getStatusDisplay(),
-            fontSize = 12.sp,
-            color = statusColor,
-            fontWeight = FontWeight.Medium
-        )
     }
 }
 
-@Composable
-fun OverviewBottomSheet(
-    response: DeviceResponse,
-    onClose: () -> Unit,
-    onNavigateToDeviceReport: () -> Unit,
-    onOpenDeviceStatus: () -> Unit,
-    onOpenTrackTrace: () -> Unit,
-    token: String,
-    viewModel : HomeViewModel,
-    isRefreshing : Boolean
-) {
-    val totalDistance = response.data.sumOf { (it.speed * (it.lastSeenMinutesAgo ?: 0)).toLong() }
-    val avgSpeed = response.data.filter { it.speed > 0 }.map { it.speed }.average().takeIf { !it.isNaN() } ?: 0.0
+// ================= HEADER =================
 
-    Column(
+@Composable
+fun ModernTopHeader(userName: String) {
+
+    Card(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
+            .padding(horizontal = 16.dp, vertical = 16.dp)
+            .fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(4.dp),
+        colors = CardDefaults.cardColors(containerColor = CardColor)
     ) {
+
         Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.padding(18.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "Device Overview",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
-            )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                RefreshIcon(
-                    isRefreshing = isRefreshing,
-                    onClick = {
-                        viewModel.refreshDevices(token)
-                    }
-                )
-
-//                Icon(
-//                    imageVector = Icons.Default.Download,
-//                    contentDescription = "Download",
-//                    modifier = Modifier.size(24.dp)
-//                )
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Close",
-                    modifier = Modifier
-                        .size(24.dp)
-                        .clickable { onClose() }
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-//        Row(
-//            modifier = Modifier.fillMaxWidth(),
-//            horizontalArrangement = Arrangement.SpaceEvenly
-//        ) {
-//            StatItem("Average Speed", "${avgSpeed.toInt()} km")
-//            StatItem("Total Distance", "${totalDistance}km")
-//        }
-//
-//        Spacer(modifier = Modifier.height(24.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-
-            // 🔹 Secondary
-            Button(
-                onClick = { onOpenDeviceStatus() },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(52.dp),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text(
-                    text = "Today's Report",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-
-            // 🔹 Primary
-            Button(
-                onClick = { onOpenTrackTrace() },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(52.dp),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text(
-                    text = "Track & Trace",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        }
-
-
-
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            ColorIndicator(response.runningCount.toString(), Color(0xFF86b071), "Running")
-            ColorIndicator(response.idleCount.toString(), Color(0xFFfcd158), "Ideal")
-            ColorIndicator(response.parkedCount.toString(), Color(0xFFfa7575), "Parked")
-            ColorIndicator(response.offlineCount.toString(), Color(0xFFe8e8e8), "Offline")
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        response.data
-            .filter { it.hasValidLocation() }
-            .forEach { device ->
-                DeviceOverviewItem(
-                    device = device,
-                    onClick = {
-                        onNavigateToDeviceReport()
-                    }
-                )
-            }
-
-        Spacer(modifier = Modifier.height(20.dp))
-    }
-}
-
-@Composable
-fun DeviceOverviewItem(
-    device: Device,
-    onClick: () -> Unit
-) {
-    val statusColor = Color(device.getStatusColor())
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .background(statusColor, CircleShape)
-        )
-
-        Spacer(modifier = Modifier.width(12.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = device.getDisplayName(),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium
-            )
-            Text(
-                text = "Device ID: ${device.deviceId}",
-                fontSize = 11.sp,
-                color = Color.Gray
-            )
-        }
-
-        Text(
-            text = device.getStatusDisplay(),
-            fontSize = 12.sp,
-            color = statusColor,
-            fontWeight = FontWeight.Medium
-        )
-    }
-}
-
-@Composable
-fun StatItem(label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = label,
-            fontSize = 12.sp,
-            color = Color.Gray
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = value,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold
-        )
-    }
-}
-
-@Composable
-fun ColorIndicator(value: String, color: Color, label: String) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(80.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(45.dp)
-                .background(color, RoundedCornerShape(8.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = value,
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 22.sp
-            )
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-            modifier = Modifier.fillMaxWidth()
-        ) {
             Box(
                 modifier = Modifier
-                    .size(8.dp)
-                    .background(color, CircleShape)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = label,
-                fontSize = 12.sp,
-                color = Color.DarkGray,
-                fontWeight = FontWeight.Medium
-            )
-        }
-    }
-}
-
-@Composable
-fun RefreshIcon(
-    isRefreshing: Boolean,
-    onClick: () -> Unit
-) {
-    val rotation by animateFloatAsState(
-        targetValue = if (isRefreshing) 360f else 0f,
-        animationSpec = if (isRefreshing)
-            infiniteRepeatable(
-                animation = tween(800, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            )
-        else tween(0),
-        label = "refresh_rotation"
-    )
-
-    Icon(
-        imageVector = Icons.Default.Refresh,
-        contentDescription = "Refresh",
-        modifier = Modifier
-            .size(24.dp)
-            .graphicsLayer { rotationZ = rotation }
-            .clickable(enabled = !isRefreshing) {
-                onClick()
-            },
-        tint = if (isRefreshing) Color.Gray else Color.Black
-    )
-}
-
-@Composable
-fun CommunityEntryCard(
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
-        shape = RoundedCornerShape(14.dp),
-        elevation = CardDefaults.cardElevation(6.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-
-            // 🟣 Icon
-            Surface(
-                shape = CircleShape,
-                color = Color(0xFF7B61FF).copy(alpha = 0.15f),
-                modifier = Modifier.size(40.dp)
+                    .size(50.dp)
+                    .background(
+                        BrandGreen.copy(alpha = 0.12f),
+                        RoundedCornerShape(16.dp)
+                    ),
+                contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.Groups,
-                    contentDescription = "Community",
-                    tint = Color(0xFF7B61FF),
-                    modifier = Modifier.padding(8.dp)
+                Image(
+                    painter = painterResource(Res.drawable.scooter),
+                    contentDescription = null,
+                    modifier = Modifier.size(28.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(Modifier.width(14.dp))
 
-            // 📝 Text
             Column(modifier = Modifier.weight(1f)) {
+
                 Text(
-                    text = "Community",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    text = "Connect with other EVA2Z users",
+                    text = "Welcome Back",
                     fontSize = 12.sp,
-                    color = Color.Gray
+                    color = TextSecondary
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = userName,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextPrimary
                 )
             }
 
             Icon(
-                imageVector = Icons.Default.ArrowForwardIos,
+                imageVector = Icons.Default.Notifications,
                 contentDescription = null,
-                tint = Color.Gray,
-                modifier = Modifier.size(16.dp)
+                tint = BrandGreen
             )
         }
     }
 }
 
+// ================= TRACKING PREVIEW =================
+
 @Composable
-expect fun PlatformMapView(
-    modifier: Modifier,
-    devices: List<Device>,
-    selectedDevice: Device?,
-    onMarkerClick: (Device) -> Unit
-)
+fun TrackingPreviewCard(onClick: () -> Unit) {
+
+    Card(
+        modifier = Modifier
+            .padding(horizontal = 16.dp)
+            .fillMaxWidth()
+            .height(190.dp),
+        shape = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(4.dp),
+        colors = CardDefaults.cardColors(containerColor = CardColor),
+        onClick = onClick
+    ) {
+        Image(
+            painter = painterResource(Res.drawable.homebanner),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
+    }
+}
+
+// ================= QUICK ACTIONS =================
+
+@Composable
+fun HomeQuickActionsSection(
+    onMyDevices: () -> Unit,
+    onManageDevice: () -> Unit,
+    onGpsData: () -> Unit,
+    onGeoFence: () -> Unit,
+    onHistory: () -> Unit,
+    onRefer: () -> Unit,
+    onOpenDocuments: () -> Unit,      // ✅ ADD
+    onOpenDeviceReport: () -> Unit,   // ✅ ADD
+    onCommunity: () -> Unit
+) {
+
+    val features = listOf(
+        QuickActionItem("Live Location", Icons.Default.LocationOn, onMyDevices),
+        QuickActionItem("Create Geofencing", Icons.Default.Security, onGeoFence),
+        QuickActionItem("History Playback", Icons.Default.History, onHistory),
+        QuickActionItem("Engine On/Off", Icons.Default.PowerSettingsNew, onManageDevice),
+//        QuickActionItem("Anti-theft", Icons.Default.Security, onManageDevice),
+        QuickActionItem("Documents Vaults", Icons.Default.Folder, onOpenDocuments),   // ✅ FIXED
+        QuickActionItem("Daily Report", Icons.Default.Assessment, onOpenDeviceReport), // ✅ FIXED
+        QuickActionItem("Background Verification", Icons.Default.Badge, onRefer),
+        QuickActionItem("Criminal Verification", Icons.Default.VerifiedUser, onRefer)
+    )
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        shape = RoundedCornerShape(24.dp),
+        elevation = CardDefaults.cardElevation(4.dp)
+    ) {
+
+        Column(modifier = Modifier.padding(20.dp)) {
+
+            Text(
+                text = "Quick Actions",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextPrimary
+            )
+
+            Spacer(Modifier.height(20.dp))
+
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(3),
+                userScrollEnabled = false,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.height(340.dp) // perfect height for 3 rows
+            ) {
+                items(features) { item ->
+                    ModernFeatureItem(
+                        title = item.title,
+                        icon = item.icon,
+                        onClick = item.onClick
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ================= FEATURE ITEM =================
+
+@Composable
+fun ModernFeatureItem(
+    title: String,
+    icon: ImageVector,
+    onClick: () -> Unit
+) {
+
+    Card(
+        onClick = onClick,
+        shape = RoundedCornerShape(18.dp),
+        elevation = CardDefaults.cardElevation(3.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F8F8)),
+        modifier = Modifier.aspectRatio(1f)
+    ) {
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 8.dp, vertical = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceEvenly // 👈 important
+        ) {
+
+            Box(
+                modifier = Modifier
+                    .size(50.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = BrandGreen,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
+
+            Text(
+                text = title,
+                fontSize = 11.sp, // 👈 slightly smaller
+                fontWeight = FontWeight.Medium,
+                textAlign = TextAlign.Center,
+                color = TextPrimary,
+                maxLines = 2,
+                lineHeight = 14.sp // 👈 better wrapping
+            )
+        }
+    }
+}
+// ================= UPCOMING FEATURES =================
+
+@Composable
+fun ModernFeaturesSection() {
+
+    val features = listOf(
+        "Driver Score" to Icons.Default.EmojiEvents,
+        "Service Market" to Icons.Default.Build,
+        "Repair Market" to Icons.Default.DirectionsCar,
+        "Charging" to Icons.Default.EvStation,
+        "Parking" to Icons.Default.LocalParking,
+        "SOS" to Icons.Default.Warning
+    )
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        shape = RoundedCornerShape(24.dp),
+        elevation = CardDefaults.cardElevation(4.dp)
+    ) {
+
+        Column(modifier = Modifier.padding(20.dp)) {
+
+            Text(
+                text = "Upcoming Features",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(Modifier.height(20.dp))
+
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(3),
+                userScrollEnabled = false,
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                modifier = Modifier.height(220.dp)
+            ) {
+                items(features) { (title, icon) ->
+                    ModernFeatureItem(
+                        title = title,
+                        icon = icon,
+                        onClick = {}
+                    )
+                }
+            }
+        }
+    }
+}
