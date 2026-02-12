@@ -124,12 +124,11 @@ fun LiveLocationScreen(
             val showDropdownAllowed = devices.size > 1
             val deviceCount = devices.size
 
-//            LaunchedEffect(devices.size) {
-//                if (devices.size == 1 && !autoNavigated) {
-//                    autoNavigated = true
-//                    onNavigateToDeviceReport()
-//                }
-//            }
+            LaunchedEffect(devices.size) {
+                if (devices.size == 1) {
+                    viewModel.selectDevice(devices.first())
+                }
+            }
 
 
             Box(modifier = Modifier.fillMaxSize()) {
@@ -154,29 +153,21 @@ fun LiveLocationScreen(
                         userName = response.name ?: "User",
                         deviceCount = response.totalDevices ?: 0,
                         selectedDevice = selectedDevice,
+                        onBackClick = {
+                            onBack()    // 🔥 THIS WILL GO BACK
+                        },
                         onDropdownClick = {
-//                            if (showDropdownAllowed) {
-                                viewModel.toggleDeviceDropdown()
-//                            }
+                            viewModel.toggleDeviceDropdown()
                         },
                         onLocationClick = {
                             when (deviceCount) {
-                                0 -> {
-                                    // ❌ Do nothing (disabled)
-                                }
-
-                                1 -> {
-                                    // ✅ Direct navigation
-                                    onNavigateToDeviceReport()
-                                }
-
-                                else -> {
-                                    // ✅ Open bottom sheet
-                                    viewModel.showOverviewSheet()
-                                }
+                                0 -> {}
+                                1 -> onNavigateToDeviceReport()
+                                else -> viewModel.showOverviewSheet()
                             }
                         },
-//                        showDropdown = showDropdownAllowed
+                        showDropdown = deviceCount > 1   // ✅ ONLY SHOW IF MULTIPLE
+
                     )
                     Spacer(Modifier.height(4.dp))
                     // ✅ COMMUNITY CARD
@@ -257,9 +248,10 @@ fun TopDeviceCard(
     userName: String,
     deviceCount: Int,
     selectedDevice: Device?,
+    onBackClick: () -> Unit,        // ✅ ADD THIS
     onDropdownClick: () -> Unit,
     onLocationClick: () -> Unit,
-//    showDropdown: Boolean
+   showDropdown: Boolean
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -273,11 +265,27 @@ fun TopDeviceCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Hello, $userName",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium
-                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Back",
+                        modifier = Modifier
+                            .size(24.dp)
+                            .clickable { onBackClick() }
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Text(
+                        text = "Hello, $userName",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
@@ -299,7 +307,7 @@ fun TopDeviceCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-//            if (showDropdown) {
+            if (showDropdown) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -337,7 +345,7 @@ fun TopDeviceCard(
                         )
                     }
                 }
-//            }
+            }
         }
     }
 }

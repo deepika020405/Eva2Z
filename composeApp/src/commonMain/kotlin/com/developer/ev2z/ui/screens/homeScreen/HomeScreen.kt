@@ -3,12 +3,11 @@ package com.developer.ev2z.ui.screens.homeScreen
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -20,8 +19,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.times
 import org.jetbrains.compose.resources.painterResource
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.homebanner
@@ -43,6 +44,18 @@ data class QuickActionItem(
     val onClick: () -> Unit
 )
 
+// ================= GRID HEIGHT CALCULATOR =================
+
+fun calculateGridHeight(
+    itemCount: Int,
+    columns: Int,
+    itemHeight: Dp,
+    verticalSpacing: Dp
+): Dp {
+    val rows = (itemCount + columns - 1) / columns
+    return (rows * itemHeight) + ((rows - 1) * verticalSpacing)
+}
+
 // ================= MAIN SCREEN =================
 
 @Composable
@@ -53,40 +66,41 @@ fun HomeScreen(
     onGpsData: () -> Unit,
     onGeoFence: () -> Unit,
     onHistory: () -> Unit,
-    onOpenDocuments: () -> Unit,        // ✅ ADD THIS
-    onOpenDeviceReport: () -> Unit ,
+    onOpenDocuments: () -> Unit,
+    onOpenDeviceReport: () -> Unit,
     onRefer: () -> Unit,
     onCommunity: () -> Unit
 ) {
     Scaffold(containerColor = BackgroundColor) { padding ->
 
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = padding.calculateTopPadding())
-                .verticalScroll(rememberScrollState()),
+                .padding(top = padding.calculateTopPadding()),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
 
-            ModernTopHeader(userName)
+            item { ModernTopHeader(userName) }
 
-            TrackingPreviewCard(onOpenLiveLocation)
+            item { TrackingPreviewCard() }
 
-            HomeQuickActionsSection(
-                onMyDevices = onOpenLiveLocation,
-                onManageDevice = onManageDevice,
-                onGpsData = onGpsData,
-                onGeoFence = onGeoFence,
-                onHistory = onHistory,
-                onRefer = onRefer,
-                onOpenDocuments = onOpenDocuments,
-                onOpenDeviceReport = onOpenDeviceReport,
-                onCommunity = onCommunity
-            )
+            item {
+                HomeQuickActionsSection(
+                    onMyDevices = onOpenLiveLocation,
+                    onManageDevice = onManageDevice,
+                    onGpsData = onGpsData,
+                    onGeoFence = onGeoFence,
+                    onHistory = onHistory,
+                    onRefer = onRefer,
+                    onOpenDocuments = onOpenDocuments,
+                    onOpenDeviceReport = onOpenDeviceReport,
+                    onCommunity = onCommunity
+                )
+            }
 
-            ModernFeaturesSection()
+            item { ModernFeaturesSection() }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            item { Spacer(modifier = Modifier.height(20.dp)) }
         }
     }
 }
@@ -130,14 +144,8 @@ fun ModernTopHeader(userName: String) {
 
             Column(modifier = Modifier.weight(1f)) {
 
-                Text(
-                    text = "Welcome Back",
-                    fontSize = 12.sp,
-                    color = TextSecondary
-                )
-
+                Text("Welcome Back", fontSize = 12.sp, color = TextSecondary)
                 Spacer(modifier = Modifier.height(4.dp))
-
                 Text(
                     text = userName,
                     fontSize = 20.sp,
@@ -146,19 +154,15 @@ fun ModernTopHeader(userName: String) {
                 )
             }
 
-            Icon(
-                imageVector = Icons.Default.Notifications,
-                contentDescription = null,
-                tint = BrandGreen
-            )
+            Icon(Icons.Default.Notifications, null, tint = BrandGreen)
         }
     }
 }
 
-// ================= TRACKING PREVIEW =================
+// ================= TRACKING CARD =================
 
 @Composable
-fun TrackingPreviewCard(onClick: () -> Unit) {
+fun TrackingPreviewCard() {
 
     Card(
         modifier = Modifier
@@ -166,9 +170,7 @@ fun TrackingPreviewCard(onClick: () -> Unit) {
             .fillMaxWidth()
             .height(190.dp),
         shape = RoundedCornerShape(20.dp),
-        elevation = CardDefaults.cardElevation(4.dp),
-        colors = CardDefaults.cardColors(containerColor = CardColor),
-        onClick = onClick
+        elevation = CardDefaults.cardElevation(4.dp)
     ) {
         Image(
             painter = painterResource(Res.drawable.homebanner),
@@ -189,8 +191,8 @@ fun HomeQuickActionsSection(
     onGeoFence: () -> Unit,
     onHistory: () -> Unit,
     onRefer: () -> Unit,
-    onOpenDocuments: () -> Unit,      // ✅ ADD
-    onOpenDeviceReport: () -> Unit,   // ✅ ADD
+    onOpenDocuments: () -> Unit,
+    onOpenDeviceReport: () -> Unit,
     onCommunity: () -> Unit
 ) {
 
@@ -199,12 +201,16 @@ fun HomeQuickActionsSection(
         QuickActionItem("Create Geofencing", Icons.Default.Security, onGeoFence),
         QuickActionItem("History Playback", Icons.Default.History, onHistory),
         QuickActionItem("Engine On/Off", Icons.Default.PowerSettingsNew, onManageDevice),
-//        QuickActionItem("Anti-theft", Icons.Default.Security, onManageDevice),
-        QuickActionItem("Documents Vaults", Icons.Default.Folder, onOpenDocuments),   // ✅ FIXED
-        QuickActionItem("Daily Report", Icons.Default.Assessment, onOpenDeviceReport), // ✅ FIXED
-        QuickActionItem("Background Verification", Icons.Default.Badge, onRefer),
-        QuickActionItem("Criminal Verification", Icons.Default.VerifiedUser, onRefer)
+        QuickActionItem("Documents Vaults", Icons.Default.Folder, onOpenDocuments),
+        QuickActionItem("Daily Report", Icons.Default.Assessment, onOpenDeviceReport),
+        QuickActionItem("Background Verification", Icons.Default.Badge) {},
+        QuickActionItem("Criminal Verification", Icons.Default.VerifiedUser) {}
     )
+
+    val columns = 3
+    val itemHeight = 110.dp
+    val spacing = 16.dp
+    val gridHeight = calculateGridHeight(features.size, columns, itemHeight, spacing)
 
     Card(
         modifier = Modifier
@@ -216,28 +222,71 @@ fun HomeQuickActionsSection(
 
         Column(modifier = Modifier.padding(20.dp)) {
 
-            Text(
-                text = "Quick Actions",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimary
-            )
+            Text("Quick Actions", fontSize = 18.sp, fontWeight = FontWeight.Bold)
 
             Spacer(Modifier.height(20.dp))
 
             LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
+                columns = GridCells.Fixed(columns),
                 userScrollEnabled = false,
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                modifier = Modifier.height(340.dp) // perfect height for 3 rows
+                verticalArrangement = Arrangement.spacedBy(spacing),
+                horizontalArrangement = Arrangement.spacedBy(spacing),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(gridHeight)
             ) {
                 items(features) { item ->
-                    ModernFeatureItem(
-                        title = item.title,
-                        icon = item.icon,
-                        onClick = item.onClick
-                    )
+                    ModernFeatureItem(item.title, item.icon, item.onClick)
+                }
+            }
+        }
+    }
+}
+
+// ================= UPCOMING FEATURES =================
+
+@Composable
+fun ModernFeaturesSection() {
+
+    val features = listOf(
+        "Driver Score" to Icons.Default.EmojiEvents,
+        "Service Market" to Icons.Default.Build,
+        "Repair Market" to Icons.Default.DirectionsCar,
+        "Charging" to Icons.Default.EvStation,
+        "Parking" to Icons.Default.LocalParking,
+        "SOS" to Icons.Default.Warning
+    )
+
+    val columns = 3
+    val itemHeight = 110.dp
+    val spacing = 16.dp
+    val gridHeight = calculateGridHeight(features.size, columns, itemHeight, spacing)
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        shape = RoundedCornerShape(24.dp),
+        elevation = CardDefaults.cardElevation(4.dp)
+    ) {
+
+        Column(modifier = Modifier.padding(20.dp)) {
+
+            Text("Upcoming Features", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+
+            Spacer(Modifier.height(20.dp))
+
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(columns),
+                userScrollEnabled = false,
+                verticalArrangement = Arrangement.spacedBy(spacing),
+                horizontalArrangement = Arrangement.spacedBy(spacing),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(gridHeight)
+            ) {
+                items(features) { (title, icon) ->
+                    ModernFeatureItem(title, icon) {}
                 }
             }
         }
@@ -258,89 +307,29 @@ fun ModernFeatureItem(
         shape = RoundedCornerShape(18.dp),
         elevation = CardDefaults.cardElevation(3.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F8F8)),
-        modifier = Modifier.aspectRatio(1f)
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(110.dp)
     ) {
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 8.dp, vertical = 12.dp),
+                .padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceEvenly // 👈 important
+            verticalArrangement = Arrangement.Center
         ) {
 
-            Box(
-                modifier = Modifier
-                    .size(50.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = BrandGreen,
-                    modifier = Modifier.size(26.dp)
-                )
-            }
+            Icon(icon, null, tint = BrandGreen, modifier = Modifier.size(26.dp))
+            Spacer(Modifier.height(8.dp))
 
             Text(
                 text = title,
-                fontSize = 11.sp, // 👈 slightly smaller
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Medium,
                 textAlign = TextAlign.Center,
-                color = TextPrimary,
-                maxLines = 2,
-                lineHeight = 14.sp // 👈 better wrapping
+                maxLines = 2
             )
-        }
-    }
-}
-// ================= UPCOMING FEATURES =================
-
-@Composable
-fun ModernFeaturesSection() {
-
-    val features = listOf(
-        "Driver Score" to Icons.Default.EmojiEvents,
-        "Service Market" to Icons.Default.Build,
-        "Repair Market" to Icons.Default.DirectionsCar,
-        "Charging" to Icons.Default.EvStation,
-        "Parking" to Icons.Default.LocalParking,
-        "SOS" to Icons.Default.Warning
-    )
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
-        shape = RoundedCornerShape(24.dp),
-        elevation = CardDefaults.cardElevation(4.dp)
-    ) {
-
-        Column(modifier = Modifier.padding(20.dp)) {
-
-            Text(
-                text = "Upcoming Features",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            Spacer(Modifier.height(20.dp))
-
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(3),
-                userScrollEnabled = false,
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                modifier = Modifier.height(220.dp)
-            ) {
-                items(features) { (title, icon) ->
-                    ModernFeatureItem(
-                        title = title,
-                        icon = icon,
-                        onClick = {}
-                    )
-                }
-            }
         }
     }
 }

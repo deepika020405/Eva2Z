@@ -67,6 +67,12 @@ fun HistoryPlaybackScreen(
         viewModel.loadDevices()
     }
 
+    LaunchedEffect(devices) {
+        if (devices.size == 1 && selectedDevice == null) {
+            viewModel.selectDevice(devices.first())
+        }
+    }
+
     LaunchedEffect(selectedDevice) {
         if (selectedDevice != null) {
             viewModel.fetchHistory()
@@ -327,25 +333,62 @@ fun BoxScope.TopDeviceBoxWithData(
 
             Spacer(Modifier.height(14.dp))
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp))
-                    .clickable { onDropdownClick() }
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+            if (deviceCount > 1) {
+
+                // 🔽 Multiple devices → clickable dropdown
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp))
+                        .clickable { onDropdownClick() }
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painter = painterResource(Res.drawable.app_logo),
+                            contentDescription = null,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(Modifier.width(10.dp))
+                        Text(selectedDevice ?: "Select Device", fontSize = 15.sp)
+                    }
+
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                }
+
+            } else if (deviceCount == 1) {
+
+                // 🔹 Single device → no dropdown, no click
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp))
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Image(
                         painter = painterResource(Res.drawable.app_logo),
                         contentDescription = null,
                         modifier = Modifier.size(22.dp)
                     )
                     Spacer(Modifier.width(10.dp))
-                    Text(selectedDevice ?: "Select Device", fontSize = 15.sp)
+                    Text(selectedDevice ?: "", fontSize = 15.sp)
                 }
-                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = Color.Gray)
+
+            } else {
+
+                // 🔹 No device case
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp))
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("No Device Found", fontSize = 15.sp)
+                }
             }
         }
     }
