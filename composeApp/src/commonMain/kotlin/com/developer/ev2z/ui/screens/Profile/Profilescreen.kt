@@ -826,9 +826,9 @@ fun AboutSection(
             )
 
             SocialLinksRow(
-                onFacebook = { openUrl("https://www.facebook.com/eva2zconnect") },
-                onInstagram = { openUrl("https://www.instagram.com/eva2z_connect/") },
-                onLinkedIn = { openUrl("https://www.linkedin.com/company/eva2zconnect/") },
+                onFacebook = { openUrl("https://www.facebook.com/Eva2zofficial/") },
+                onInstagram = { openUrl("https://www.instagram.com/eva2z_/") },
+                onLinkedIn = { openUrl("https://www.linkedin.com/company/86388029/admin/dashboard/") },
                 onYouTube = { openUrl("https://youtube.com/@eva2z_connect?si=MDx3Obn2fAxwSyL7") },
 //                onTwitter = { openUrl("https://www.youtube.com/@eva2zconnect") }
             )
