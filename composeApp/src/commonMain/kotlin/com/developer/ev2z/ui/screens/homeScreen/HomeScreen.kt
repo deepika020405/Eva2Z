@@ -259,8 +259,8 @@ fun HomeQuickActionsSection(
         QuickActionItem("Create Geofencing", Icons.Default.Security, onGeoFence),
         QuickActionItem("History Playback", Icons.Default.History, onHistory),
         QuickActionItem("Engine On/Off", Icons.Default.PowerSettingsNew, onManageDevice),
-        QuickActionItem("Documents Vaults", Icons.Default.Folder, onOpenDocuments),
-        QuickActionItem("Daily Report", Icons.Default.Assessment, onOpenDeviceReport),
+        QuickActionItem("Document Vault", Icons.Default.Folder, onOpenDocuments),
+        QuickActionItem("Device Report", Icons.Default.Assessment, onOpenDeviceReport),
         QuickActionItem("Add Device", Icons.Default.Add, onOpenAddDevice) ,
 //        QuickActionItem(
 //            "Criminal Verification",
