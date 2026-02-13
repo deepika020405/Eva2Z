@@ -30,6 +30,8 @@ data class UserDeviceDto(
     val device_id: Int,
     val device_number: String,
     val sim_number: String? = null,
+    val device_name: String? = null,   // ✅ ADD THIS
+
 
     val activated_at: String? = null,
     val plan_days_left: Int? = null,
@@ -109,11 +111,14 @@ class ChangePlanViewModel(
 /* ================= MAPPER ================= */
 
 private fun UserDeviceDto.toPlanUiModel(): DevicePlanUi {
+
+    println("📡 API SIM for device $device_id → $sim_number")
+
     return DevicePlanUi(
         deviceId = device_id.toString(),
-        imei = device_number, // ✅ real IMEI
-        simNumber = sim_number,   // ✅ PASS FROM API
-        deviceName = "Device #$device_id",
+        imei = device_number,
+        simNumber = sim_number,
+        deviceName = device_name ?: device_number,
         planType = plan_status ?: "unknown",
         expiryDate = expires_at?.substringBefore(" ") ?: "N/A",
         daysLeft = plan_days_left ?: 0

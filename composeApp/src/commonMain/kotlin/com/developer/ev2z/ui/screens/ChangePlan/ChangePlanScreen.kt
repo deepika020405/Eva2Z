@@ -103,8 +103,7 @@ fun DevicePlanCard(
             ) {
                 Column {
                     Text(device.deviceName, fontWeight = FontWeight.Bold)
-                    Text(device.deviceId, fontSize = 12.sp, color = Color.Gray)
-                }
+                    Text("Id: ${device.imei}", fontSize = 12.sp, color = Color.Gray)                }
                 ExpiryChip(device.daysLeft)
             }
 
@@ -112,9 +111,10 @@ fun DevicePlanCard(
 
             InfoRow("Plan", device.planType)
             InfoRow("Expiry Date", device.expiryDate)
-            device.simNumber?.let {
-                InfoRow("SIM Number", it)   // ✅ ADD THIS
-            }
+            InfoRow(
+                "SIM Number",
+                device.simNumber?.takeIf { it.isNotBlank() } ?: "Not Available"
+            )
 
             Spacer(Modifier.height(16.dp))
 
@@ -148,20 +148,18 @@ fun RenewPlanBottomSheet(
         ) {
 
             Text(
-                text = "Renew ${device.deviceName}",
+                text = "Renew:  ${device.deviceName}",
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp
             )
 
             Spacer(Modifier.height(16.dp))
 
-            listOf("3 Months", "6 Months", "1 Year").forEach {
-                DurationOption(
-                    text = it,
-                    selected = duration == it,
-                    onClick = { duration = it }
-                )
-            }
+            DurationOption(
+                text = "1 Year",
+                selected = true,
+                onClick = { duration = "1 Year" }
+            )
 
             Spacer(Modifier.height(24.dp))
 
@@ -223,7 +221,6 @@ fun ExpiryChip(daysLeft: Int) {
         )
     }
 }
-
 @Composable
 fun InfoRow(label: String, value: String) {
     Row(

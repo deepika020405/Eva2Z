@@ -386,7 +386,7 @@ private fun DeviceListItem(
 
     if (showTurnOffDialog) {
         ConfirmationDialog(
-            title = "Turn Off Device",
+            title = "Turn Off Vehicle",
             message = "Are you sure you want to turn off '${device.device_name}'?",
             confirmText = "Turn Off",
             confirmColor = secondaryContainerLight,
@@ -400,7 +400,7 @@ private fun DeviceListItem(
 
     if (showTurnOnDialog) {
         ConfirmationDialog(
-            title = "Turn On Device",
+            title = "Turn On Vehicle",
             message = "Are you sure you want to turn on '${device.device_name}'?",
             confirmText = "Turn On",
             confirmColor = primaryContainerLight,

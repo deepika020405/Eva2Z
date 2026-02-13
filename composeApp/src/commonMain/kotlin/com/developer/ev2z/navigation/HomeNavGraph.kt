@@ -55,6 +55,9 @@ import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanScreenHost
 //import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanScreen
 import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanViewModel
 import com.developer.ev2z.ui.screens.ChangePlan.DevicePlanUi
+import com.developer.ev2z.ui.screens.CriminalVerification.CriminalVerificationFlow
+//import com.developer.ev2z.ui.screens.CriminalVerification.CriminalVerificationScreen
+import com.developer.ev2z.ui.screens.CriminalVerification.CriminalVerificationViewModel
 import com.developer.ev2z.ui.screens.GPSData.GPSDataScreen
 import com.developer.ev2z.ui.screens.MyAccount.MyAccountScreen
 //import com.developer.ev2z.ui.screens.GPSData.GPSDataScreen
@@ -96,6 +99,7 @@ class HomeTab(
     private val onOpenDeviceStatus: () -> Unit,
     private val onNavigateToDeviceReport: () -> Unit,
     private val onOpenTrackTrace: () -> Unit,
+    private val onNavigateToCriminalVerification: () -> Unit,
     private val onDocumentsTabSelected: () -> Unit
 ) : Tab {
 
@@ -145,15 +149,19 @@ class HomeTab(
 
                 onRefer = { onNavigateToRefer() },
 
-                onCommunity = { onOpenCommunity() },
+                onOpenAddDevice = { onNavigateToAddDevice() },
 
                 onOpenDocuments = {
                     onDocumentsTabSelected()   // 🔐 Documents vault open flow
                 },
 
+
                 onOpenDeviceReport = {
                     onNavigateToDeviceReport()  // 📊 Today Device Report
-                }
+                },
+
+                        onCriminalVerification = onNavigateToCriminalVerification // ✅ NEW
+
             )
         }
     }
@@ -333,6 +341,7 @@ fun HomeNavGraph(
     val pagerState = rememberPagerState(pageCount = { 4 })
     val coroutineScope = rememberCoroutineScope()
     var selectedWarrantyDeviceId by remember { mutableStateOf("") }
+    var showCriminalVerification by remember { mutableStateOf(false) }
     // Screen visibility states
     var showEditProfile by remember { mutableStateOf(false) }
     var showManageDevice by remember { mutableStateOf(false) }
@@ -418,6 +427,8 @@ fun HomeNavGraph(
             onNavigateToAccountActivity = { showAccountActivity = true },
             onNavigateToReferAndEarn = { showReferAndEarn = true },
             onNavigateToAboutApp = { showAboutApp = true },
+            onNavigateToCriminalVerification = { showCriminalVerification = true },
+
             onNavigateToMyAccount = {
                 showMyAccount = true     // 🔥 THIS IS THE KEY
             },
@@ -534,6 +545,7 @@ fun HomeNavGraph(
                 }
             )
         }
+
         if (showDocuments) {
             DocumentsScreen(
                 apiService = apiService,
@@ -896,6 +908,14 @@ fun HomeNavGraph(
             )
         }
 
+        //Criminal Verification
+        if (showCriminalVerification) {
+            CriminalVerificationFlow(
+                apiService = ApiService(),
+                onBack = { showCriminalVerification = false }
+            )
+        }
+
         if (showExitDialog) {
             val activity = LocalPlatformActivity.current
             AlertDialog(
@@ -1050,6 +1070,7 @@ fun HomeNavGraphContent(
     onNavigateToMyAccount: () -> Unit,   // ✅ ADD
     onRequestDocumentsWithPassword: () -> Unit,
     onDocumentsTabSelected: () -> Unit,   // ✅ ADD
+    onNavigateToCriminalVerification: () -> Unit,   // ✅ ADD HERE
     onOpenCommunity: () -> Unit,
     onLogout: () -> Unit
 ) {
@@ -1075,7 +1096,8 @@ fun HomeNavGraphContent(
             onOpenDeviceStatus = onOpenDeviceStatus,
             onNavigateToDeviceReport = onNavigateToDeviceReport,
             onOpenTrackTrace = onOpenTrackTrace,
-            onDocumentsTabSelected = onDocumentsTabSelected   // ✅ ADD THIS
+            onDocumentsTabSelected = onDocumentsTabSelected,  // ✅ ADD THIS
+            onNavigateToCriminalVerification = onNavigateToCriminalVerification // ✅ FIX
 
         )
     }

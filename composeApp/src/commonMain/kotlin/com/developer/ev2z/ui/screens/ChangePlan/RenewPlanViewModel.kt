@@ -54,7 +54,7 @@ class RenewPlanViewModel(
                 currentAmount = when (planDays) {
                     90 -> 399
                     180 -> 699
-                    else -> 999
+                    else -> 1
                 }
 
                 val request = RenewPlanRequest(
@@ -95,8 +95,15 @@ class RenewPlanViewModel(
         message: String?
     ) {
         viewModelScope.launch {
-            try {
 
+            // ✅ CANCEL DETECT
+            if (!success && phonePeOrderId.isBlank()) {
+                _paymentState.value = PaymentState.Cancelled
+                _phonePeToken.value = null
+                return@launch
+            }
+
+            try {
                 val callbackReq = PhonePeCallbackRequest(
                     merchantOrderId = merchantOrderId ?: "",
                     phonepeOrderId = phonePeOrderIdFromServer ?: "",

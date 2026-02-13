@@ -3,6 +3,7 @@ package com.developer.ev2z.phonepe
 sealed class PaymentState {
     object Idle : PaymentState()
     object Processing : PaymentState()
+    object Cancelled : PaymentState()
 
     data class Success(
         val txnId: String?,

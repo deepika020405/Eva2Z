@@ -12,8 +12,12 @@ import com.developer.ev2z.request.RenewPlanRequest
 import com.developer.ev2z.response.*
 import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanScreenHost
 import com.developer.ev2z.ui.screens.ChangePlan.UserDevicesResponse
+import com.developer.ev2z.ui.screens.CriminalVerification.CandidateResult
+import com.developer.ev2z.ui.screens.CriminalVerification.CriminalForm
+import com.developer.ev2z.ui.screens.CriminalVerification.generateUUID
 import com.developer.ev2z.util.AppTokenProvider
 import io.ktor.client.call.*
+import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.ResponseException
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
@@ -23,9 +27,13 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 
 class ApiService {
 
@@ -435,6 +443,70 @@ class ApiService {
             throw e
         }
     }
+
+
+
+    suspend fun createCandidateWithPackage(form: CriminalForm): CandidateResult {
+        println("🌐 API: Creating candidate...")
+
+        val token = AppTokenProvider.getToken()
+        val url = "${baseUrl}candidate"
+
+        val body = buildJsonObject {
+            putJsonObject("candidate") {
+                put("name", form.name)
+                put("email", form.email)
+                put("phone", form.phone)
+                put("employee_id", form.employeeId)
+                put("invite", false)
+                put("is_consent_undertaking_letter", form.consent)
+                put("category_id", 200)
+
+                putJsonObject("meta_data") {
+                    put("uuid", generateUUID())
+                }
+            }
+
+            putJsonObject("package") {
+                put("package_id", 2289)
+                put("subtype_id", 3542)
+                putJsonObject("config") {}
+            }
+        }
+
+        println("📦 Request Body → $body")
+
+        return try {
+            val response: JsonObject = client.post(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(body)
+            }.body()
+
+            println("📥 RAW RESPONSE → $response")
+
+            // ✅ SAFE PARSING
+            val candidateId =
+                response["candidate_id"]?.jsonPrimitive?.contentOrNull
+                    ?: response["data"]?.jsonObject
+                        ?.get("candidate_id")?.jsonPrimitive?.contentOrNull
+
+            println("✅ Parsed candidateId = $candidateId")
+
+            CandidateResult(candidateId = candidateId)
+
+        } catch (e: ClientRequestException) {
+
+            if (e.response.status.value == 409) {
+                println("⚠️ Duplicate Candidate (409)")
+                CandidateResult(isDuplicate = true)
+            } else {
+                println("❌ API Error: ${e.message}")
+                CandidateResult(error = "Something went wrong")
+            }
+        }
+    }
+
 
     // ---------------- TOTAL MILAGES ----------------
     suspend fun getTotalMilages(token: String, terminalId: String): TotalMilagesResponse {

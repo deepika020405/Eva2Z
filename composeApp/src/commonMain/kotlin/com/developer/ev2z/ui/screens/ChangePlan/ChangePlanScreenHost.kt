@@ -12,6 +12,9 @@ import com.developer.ev2z.phonepe.PaymentState
 import com.developer.ev2z.phonepe.openPhonePeSdk
 import com.developer.ev2z.ui.screens.market_screen.PaymentResultScreen
 
+
+
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChangePlanScreenHost(
@@ -41,8 +44,10 @@ fun ChangePlanScreenHost(
     }
 
     // ✅ SINGLE UI CONTROLLER
-    when {
-        paymentState is PaymentState.Processing -> {
+    when (paymentState) {
+
+        // 🔄 Processing
+        is PaymentState.Processing -> {
             Box(Modifier.fillMaxSize(), Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     CircularProgressIndicator()
@@ -52,87 +57,69 @@ fun ChangePlanScreenHost(
             }
         }
 
-        paymentState is PaymentState.Success -> {
+        // ✅ SUCCESS
+        is PaymentState.Success -> {
             val ps = paymentState as PaymentState.Success
-            PaymentResultScreen(
-                isSuccess = true,
-                transactionId = ps.txnId ?: "N/A",
-                amount = ps.amount.toString()
-            )
-        }
-
-        paymentState is PaymentState.Failed -> {
-            val pf = paymentState as PaymentState.Failed
-            PaymentResultScreen(
-                isSuccess = false,
-                reason = pf.reason,
-                amount = pf.amount.toString()
-            )
-        }
-
-        planState.isLoading -> {
-            Box(Modifier.fillMaxSize(), Alignment.Center) {
-                CircularProgressIndicator()
-            }
-        }
-
-        planState.error != null -> {
-            Box(Modifier.fillMaxSize(), Alignment.Center) {
-                Text(planState.error ?: "Something went wrong")
-            }
-        }
-
-        else -> {
-            ChangePlanScreen(
-                devices = planState.devices,
-                onBack = {
+            PaymentPlanScreen(
+                state = PaymentUiState.Success,
+                amount = ps.amount.toString(),
+                transactionId = ps.txnId,
+                onPrimaryAction = {
                     renewViewModel.reset()
                     onBack()
-                },
-                onRenewConfirm = { deviceId, duration ->
-                    renewViewModel.startRenewPlan(deviceId, duration)
                 }
             )
         }
-    }
 
-
-
-
-    /* ===============================
-       UI STATE HANDLING
-    =============================== */
-    when {
-        planState.isLoading -> {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
+        // ⚪ CANCELLED
+        is PaymentState.Cancelled -> {
+            PaymentPlanScreen(
+                state = PaymentUiState.Cancelled,
+                onPrimaryAction = {
+                    renewViewModel.reset()
+                }
+            )
         }
 
-        planState.error != null -> {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(planState.error ?: "Something went wrong")
-            }
+        // ❌ FAILED
+        is PaymentState.Failed -> {
+            val pf = paymentState as PaymentState.Failed
+            PaymentPlanScreen(
+                state = PaymentUiState.Failed,
+                onPrimaryAction = {
+                    renewViewModel.reset()
+                }
+            )
         }
 
+        // 🟢 NORMAL FLOW
         else -> {
-            ChangePlanScreen(
-                devices = planState.devices,
-                onBack = onBack,
-                onRenewConfirm = { deviceId, duration ->
-                    // 🔥 REAL RENEW FLOW
-                    renewViewModel.startRenewPlan(
-                        deviceId = deviceId,
-                        duration = duration
+            when {
+                planState.isLoading -> {
+                    Box(Modifier.fillMaxSize(), Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                }
+
+                planState.error != null -> {
+                    Box(Modifier.fillMaxSize(), Alignment.Center) {
+                        Text(planState.error ?: "Something went wrong")
+                    }
+                }
+
+                else -> {
+                    ChangePlanScreen(
+                        devices = planState.devices,
+                        onBack = {
+                            renewViewModel.reset()
+                            onBack()
+                        },
+                        onRenewConfirm = { deviceId, duration ->
+                            renewViewModel.startRenewPlan(deviceId, duration)
+                        }
                     )
                 }
-            )
+            }
         }
     }
 }

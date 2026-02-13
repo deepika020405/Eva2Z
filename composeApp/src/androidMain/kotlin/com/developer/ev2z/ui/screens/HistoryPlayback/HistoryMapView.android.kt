@@ -29,25 +29,8 @@ actual fun HistoryMapView(
 
     val currentPoint = latLngList.getOrElse(currentIndex) { latLngList.first() }
 
-//    val cameraPositionState = rememberCameraPositionState {
-//        position = CameraPosition.fromLatLngZoom(currentPoint, 15f)
-//    }
-
     val markerState = remember(currentPoint) { MarkerState(position = currentPoint) }
-
     val cameraPositionState = rememberCameraPositionState()
-
-    LaunchedEffect(currentIndex, latLngList) {
-        if (currentIndex in latLngList.indices) {
-            val newLatLng = latLngList[currentIndex]
-
-            // ✅ Animate camera safely
-            cameraPositionState.animate(
-                CameraUpdateFactory.newLatLngZoom(newLatLng, 15f)
-            )
-        }
-    }
-
 
     GoogleMap(
         modifier = modifier,
@@ -55,6 +38,16 @@ actual fun HistoryMapView(
         properties = MapProperties(isMyLocationEnabled = false),
         uiSettings = MapUiSettings(zoomControlsEnabled = true)
     ) {
+
+        // ✅ Move camera ONLY when map is ready
+        MapEffect(currentIndex, latLngList) { map ->
+            val newLatLng = latLngList.getOrNull(currentIndex) ?: return@MapEffect
+
+            map.animateCamera(
+                CameraUpdateFactory.newLatLngZoom(newLatLng, 15f)
+            )
+        }
+
         Polyline(
             points = latLngList,
             color = androidx.compose.ui.graphics.Color(0xFF4CAF50),
@@ -68,4 +61,3 @@ actual fun HistoryMapView(
         )
     }
 }
-
