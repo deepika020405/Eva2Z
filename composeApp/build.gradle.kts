@@ -136,8 +136,8 @@ android {
         applicationId = "com.developer.ev2z"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 78  // ✅ INCREMENTED
-        versionName = "5.0.1"  // ✅ NEW MAJOR VERSION (Play Protect fixed)
+        versionCode = 81  // ✅ INCREMENTED
+        versionName = "5.0.2"  // ✅ NEW MAJOR VERSION (Play Protect fixed)
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

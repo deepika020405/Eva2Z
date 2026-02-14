@@ -54,7 +54,7 @@ class RenewPlanViewModel(
                 currentAmount = when (planDays) {
                     90 -> 399
                     180 -> 699
-                    else -> 1
+                    else -> 999
                 }
 
                 val request = RenewPlanRequest(

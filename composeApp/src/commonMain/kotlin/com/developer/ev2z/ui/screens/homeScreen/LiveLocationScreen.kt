@@ -281,7 +281,7 @@ fun TopDeviceCard(
                     Spacer(modifier = Modifier.width(8.dp))
 
                     Text(
-                        text = "Hello, $userName",
+                        text = "$userName",
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Medium
                     )
