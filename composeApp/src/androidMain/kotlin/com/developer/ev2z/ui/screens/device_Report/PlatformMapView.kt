@@ -40,7 +40,7 @@ actual fun PlatformMapView(
 
                     val location = LatLng(latitude, longitude)
 
-                    val bikeIcon = getResizedBikeIcon(context)
+                    val bikeIcon = getNavigationIcon(context)
 
                     markerHolder[0] = map.addMarker(
                         MarkerOptions()
@@ -86,7 +86,33 @@ actual fun PlatformMapView(
     )
 }
 
-private fun getResizedBikeIcon(
+//private fun getResizedBikeIcon(
+//    context: Context,
+//    width: Int = 120,
+//    height: Int = 120
+//): BitmapDescriptor {
+//
+//    val drawable = ContextCompat.getDrawable(
+//        context,
+//        R.drawable.ic_vechile
+//    ) ?: return BitmapDescriptorFactory.defaultMarker()
+//
+//    val bitmap = Bitmap.createBitmap(
+//        width,
+//        height,
+//        Bitmap.Config.ARGB_8888
+//    )
+//
+//    val canvas = Canvas(bitmap)
+//    drawable.setBounds(0, 0, width, height)
+//    drawable.draw(canvas)
+//
+//    return BitmapDescriptorFactory.fromBitmap(bitmap)
+//}
+
+
+
+private fun getNavigationIcon(
     context: Context,
     width: Int = 120,
     height: Int = 120
@@ -94,7 +120,7 @@ private fun getResizedBikeIcon(
 
     val drawable = ContextCompat.getDrawable(
         context,
-        R.drawable.ic_vechile
+        R.drawable.navigation   // 👈 new icon
     ) ?: return BitmapDescriptorFactory.defaultMarker()
 
     val bitmap = Bitmap.createBitmap(
@@ -109,7 +135,6 @@ private fun getResizedBikeIcon(
 
     return BitmapDescriptorFactory.fromBitmap(bitmap)
 }
-
 
 fun calculateBearing(
     lat1: Double,

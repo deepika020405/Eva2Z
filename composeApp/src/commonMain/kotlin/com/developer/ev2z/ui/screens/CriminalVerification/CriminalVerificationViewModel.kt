@@ -1,16 +1,27 @@
 package com.developer.ev2z.ui.screens.CriminalVerification
 
 import androidx.compose.runtime.*
-import androidx.lifecycle.ViewModel
 import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.util.AppTokenProvider
+import kotlinx.serialization.json.jsonPrimitive
+
+// ================= DATA MODELS =================
 
 data class CriminalForm(
     val name: String,
     val email: String,
     val phone: String,
     val employeeId: String,
-    val consent: Boolean
+    val consent: Boolean,
+    val houseNo: String,
+    val colony: String,
+    val city: String,
+    val state: String,
+    val pincode: String,
+    val landmark: String,
+    val stayingPeriod: String
 )
+
 
 data class CandidateResult(
     val candidateId: String? = null,
@@ -18,77 +29,108 @@ data class CandidateResult(
     val error: String? = null
 )
 
-data class PaymentResult(
-    val success: Boolean,
-    val transactionId: String? = null
-)
-
 enum class VerificationStep {
     FORM,
+    CREATING_CANDIDATE,
     PAYMENT,
-    STATUS
+    SUBMITTING_BGV,
+    SUCCESS,
+    ERROR
 }
+
+// ================= VIEWMODEL =================
 
 class CriminalVerificationViewModel(
     private val api: ApiService
-) : ViewModel() {
+) {
 
     var step by mutableStateOf(VerificationStep.FORM)
-        private set
-
     var loading by mutableStateOf(false)
-        private set
 
-    var candidateId by mutableStateOf<String?>(null)
-        private set
+    var merchantOrderId by mutableStateOf<String?>(null)
+    var paymentToken by mutableStateOf<String?>(null)
+    var errorMessage by mutableStateOf("")
+    var amount = 299
 
-    var showDuplicateDialog by mutableStateOf(false)
-        private set
+    private var cachedForm: CriminalForm? = null
 
-    fun dismissDuplicateDialog() {
-        showDuplicateDialog = false
-    }
-
-    fun goToForm() {
-        step = VerificationStep.FORM
-    }
-
-    fun goToPayment() {
-        step = VerificationStep.PAYMENT
-    }
-
-    fun goToStatus() {
-        step = VerificationStep.STATUS
-    }
-
+    // =========================
+    // STEP 1 → USER SUBMIT FORM
+    // =========================
     suspend fun submitForm(form: CriminalForm) {
+        cachedForm = form
+        startPayment()
+    }
+
+    // =========================
+    // STEP 2 → CREATE PAYMENT ORDER
+    // =========================
+    private suspend fun startPayment() {
         loading = true
-        println("🌐 Creating candidate...")
+        step = VerificationStep.CREATING_CANDIDATE // show loader
 
-        val result = api.createCandidateWithPackage(form)
+        try {
+            val order = api.createCriminalOrder(amount)
 
-        loading = false
+            merchantOrderId = order["merchantOrderId"]?.jsonPrimitive?.content
+            paymentToken = order["token"]?.jsonPrimitive?.content
 
-        when {
-            result.candidateId != null -> {
-                candidateId = result.candidateId
-                goToPayment()
+            if (paymentToken.isNullOrEmpty()) {
+                throw Exception("Payment token missing")
             }
 
-            result.isDuplicate -> {
-                showDuplicateDialog = true
-            }
+            step = VerificationStep.PAYMENT
 
-            else -> println("❌ Error: ${result.error}")
+        } catch (e: Exception) {
+            errorMessage = e.message ?: "Payment init failed"
+            step = VerificationStep.ERROR
+        } finally {
+            loading = false
         }
     }
 
-    fun continueWithDuplicate() {
-        showDuplicateDialog = false
-        goToPayment()
+    // =========================
+    // STEP 3 → PAYMENT SUCCESS
+    // =========================
+    suspend fun onPaymentSuccess(phonepeOrderId: String) {
+        loading = true
+        step = VerificationStep.SUBMITTING_BGV
+
+        try {
+            val merchantId = merchantOrderId
+                ?: throw Exception("Missing merchantOrderId")
+
+            // ✅ 1. CALLBACK BACKEND
+            api.sendCriminalPaymentCallback(
+                merchantOrderId = merchantId,
+                phonepeOrderId = phonepeOrderId,
+                status = "SUCCESS"
+            )
+
+            // ✅ 2. CREATE CANDIDATE AFTER PAYMENT
+            val candidateResult = api.createCandidateWithPackage(cachedForm!!)
+
+            val candidateId = candidateResult.candidateId?.toIntOrNull()
+                ?: throw Exception("Candidate creation failed")
+
+            // ✅ 3. SUBMIT BGV
+            api.submitBgvVerification(candidateId, cachedForm!!)
+
+            step = VerificationStep.SUCCESS
+
+        } catch (e: Exception) {
+            errorMessage = e.message ?: "Verification failed"
+            step = VerificationStep.ERROR
+        } finally {
+            loading = false
+        }
     }
 
-    fun paymentSuccess() {
-        goToStatus()
+    fun reset() {
+        step = VerificationStep.FORM
+        merchantOrderId = null
+        paymentToken = null
+        errorMessage = ""
+        cachedForm = null
     }
 }

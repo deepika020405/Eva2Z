@@ -37,6 +37,13 @@ fun CriminalVerificationScreen(
     var phone by remember { mutableStateOf("") }
     var employeeId by remember { mutableStateOf("") }
     var consent by remember { mutableStateOf(false) }
+    var houseNo by remember { mutableStateOf("") }
+    var colony by remember { mutableStateOf("") }
+    var city by remember { mutableStateOf("") }
+    var state by remember { mutableStateOf("") }
+    var pincode by remember { mutableStateOf("") }
+    var landmark by remember { mutableStateOf("") }
+    var stayingPeriod by remember { mutableStateOf("") }
 
     Scaffold(
         topBar = {
@@ -56,7 +63,22 @@ fun CriminalVerificationScreen(
                         println("🟢 Submit Button Clicked")
                         println("📋 Form Data → name=$name email=$email phone=$phone empId=$employeeId consent=$consent")
 
-                        onSubmit(CriminalForm(name, email, phone, employeeId, consent))
+                        onSubmit(
+                            CriminalForm(
+                                name = name,
+                                email = email,
+                                phone = phone,
+                                employeeId = employeeId,
+                                consent = consent,
+                                houseNo = houseNo,
+                                colony = colony,
+                                city = city,
+                                state = state,
+                                pincode = pincode,
+                                landmark = landmark,
+                                stayingPeriod = stayingPeriod
+                            )
+                        )
                     },
                     enabled = consent && name.isNotBlank(),
                     modifier = Modifier

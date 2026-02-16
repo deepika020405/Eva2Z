@@ -101,7 +101,7 @@ fun HomeScreen(
                     onRefer = onRefer,
                     onOpenDocuments = onOpenDocuments,
                     onOpenDeviceReport = onOpenDeviceReport,
-//                    onCriminalVerification = onCriminalVerification,   // ✅ ADD
+                    onCriminalVerification = onCriminalVerification,   // ✅ ADD
                     onOpenAddDevice = onOpenAddDevice
                 )
             }
@@ -247,7 +247,7 @@ fun HomeQuickActionsSection(
     onRefer: () -> Unit,
     onOpenDocuments: () -> Unit,
     onOpenDeviceReport: () -> Unit,
-//    onCriminalVerification: () -> Unit,   // ✅ ADD
+    onCriminalVerification: () -> Unit,   // ✅ ADD
     onOpenAddDevice:  () -> Unit
 ) {
 
@@ -259,11 +259,11 @@ fun HomeQuickActionsSection(
         QuickActionItem("Document Vault", Icons.Default.Folder, onOpenDocuments),
         QuickActionItem("Device Report", Icons.Default.Assessment, onOpenDeviceReport),
         QuickActionItem("Add Device", Icons.Default.Add, onOpenAddDevice) ,
-//        QuickActionItem(
-//            "Criminal Verification",
-//            Icons.Default.VerifiedUser,
-//            onCriminalVerification   // ✅ connect
-//        )
+        QuickActionItem(
+            "Criminal Verification",
+            Icons.Default.VerifiedUser,
+            onCriminalVerification   // ✅ connect
+        )
        )
 
     val columns = 3
@@ -315,7 +315,7 @@ fun ModernFeaturesSection() {
         "Parking" to Icons.Default.LocalParking,
         "SOS" to Icons.Default.Warning,
         "Background Verfication" to Icons.Default.Badge,
-        "Criminal Verification" to Icons.Default.VerifiedUser   // ✅ added
+//        "Criminal Verification" to Icons.Default.VerifiedUser   // ✅ added
 
 
     )

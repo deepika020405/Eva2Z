@@ -1,5 +1,6 @@
 package com.developer.ev2z.ui.screens.CriminalVerification
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -14,17 +15,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun VerificationProcessingScreen() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+fun ProcessingScreen(message: String) {
+    Column(
+        Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator()
-            Spacer(Modifier.height(16.dp))
-            Text("Verification in progress...")
-            Spacer(Modifier.height(8.dp))
-            Text("This may take 24–48 hours", color = Color.Gray)
-        }
+        CircularProgressIndicator()
+        Spacer(Modifier.height(16.dp))
+        Text(message)
     }
 }

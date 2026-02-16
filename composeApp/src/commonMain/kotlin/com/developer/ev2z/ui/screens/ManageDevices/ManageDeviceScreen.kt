@@ -400,7 +400,7 @@ private fun DeviceListItem(
 
     if (showTurnOnDialog) {
         ConfirmationDialog(
-            title = "Turn On Vehicle",
+            title = "Turn On Vehicle ",
             message = "Are you sure you want to turn on '${device.device_name}'?",
             confirmText = "Turn On",
             confirmColor = primaryContainerLight,

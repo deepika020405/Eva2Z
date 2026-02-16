@@ -400,53 +400,56 @@ fun HomeNavGraph(
     var showExitDialog by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        HomeNavGraphContent(
-            viewModel = viewModel,
-            apiService = apiService,
-            storageManager = storageManager,
-            token = token,
-            profileRefreshTrigger = profileRefresh,
-            pagerState = pagerState, // ✅ PASS HERE
-            coroutineScope = coroutineScope, // ✅ PASS HERE
-            onNavigateToAddDevice = onNavigateToAddDevice,
-            onNavigateToDeviceReport = onNavigateToDeviceReport,
-            documentsGateState = documentsGateState,   // ✅ PASS HERE
-            onOpenDeviceStatus = onOpenDeviceStatus,
-            onOpenTrackTrace = onOpenTrackTrace,
-            onNavigateToEditProfile = { showEditProfile = true },
-            onNavigateToManageDevice = { showManageDevice = true },
-            onNavigateToGPSData = { showGPSData = true },
-            onNavigateToPrivacyPolicy = { showPrivacyPolicy = true },
-            onNavigateToTermsConditions = { showTermsConditions = true },
-            onNavigateToRefundPolicy = { showRefundPolicy = true },
-            onNavigateToShippingPolicy = { showShippingPolicy = true },
-            onNavigateToChangePassword = { showChangePassword = true },
-            onNavigateToGeoFencing = { showGeoFencing = true },
-            onNavigateToHistoryPlayback = { showHistoryPlayback = true },
-            onNavigateToGeneralSettings = { showGeneralSettings = true },
-            onNavigateToAccountActivity = { showAccountActivity = true },
-            onNavigateToReferAndEarn = { showReferAndEarn = true },
-            onNavigateToAboutApp = { showAboutApp = true },
-            onNavigateToCriminalVerification = { showCriminalVerification = true },
 
-            onNavigateToMyAccount = {
-                showMyAccount = true     // 🔥 THIS IS THE KEY
-            },
-            onNavigateToDocuments = {
-                showCommunity = true   // ✅ NOW CORRECT
-            },
-            onRequestDocumentsWithPassword = {
-                showVaultPasswordDialog = true
-            },
+        if (showCriminalVerification) {
 
-            onDocumentsTabSelected = {              // ✅ ADD THIS
-                documentsGateState = DocumentsGateState.LOCKED
-                showVaultPasswordDialog = true
-            },
+            CriminalVerificationFlow(
+                apiService = apiService,
+                onBack = { showCriminalVerification = false }
+            )
 
-            onOpenCommunity = { showCommunity = true }, // ✅ HERE
-            onLogout = onLogout
-        )
+        } else {
+
+            HomeNavGraphContent(
+                viewModel = viewModel,
+                apiService = apiService,
+                storageManager = storageManager,
+                token = token,
+                profileRefreshTrigger = profileRefresh,
+                pagerState = pagerState,
+                coroutineScope = coroutineScope,
+                onNavigateToAddDevice = onNavigateToAddDevice,
+                onNavigateToDeviceReport = onNavigateToDeviceReport,
+                documentsGateState = documentsGateState,
+                onOpenDeviceStatus = onOpenDeviceStatus,
+                onOpenTrackTrace = onOpenTrackTrace,
+                onNavigateToEditProfile = { showEditProfile = true },
+                onNavigateToManageDevice = { showManageDevice = true },
+                onNavigateToGPSData = { showGPSData = true },
+                onNavigateToPrivacyPolicy = { showPrivacyPolicy = true },
+                onNavigateToTermsConditions = { showTermsConditions = true },
+                onNavigateToRefundPolicy = { showRefundPolicy = true },
+                onNavigateToShippingPolicy = { showShippingPolicy = true },
+                onNavigateToChangePassword = { showChangePassword = true },
+                onNavigateToGeoFencing = { showGeoFencing = true },
+                onNavigateToHistoryPlayback = { showHistoryPlayback = true },
+                onNavigateToGeneralSettings = { showGeneralSettings = true },
+                onNavigateToAccountActivity = { showAccountActivity = true },
+                onNavigateToReferAndEarn = { showReferAndEarn = true },
+                onNavigateToAboutApp = { showAboutApp = true },
+                onNavigateToCriminalVerification = { showCriminalVerification = true },
+                onNavigateToMyAccount = { showMyAccount = true },
+                onNavigateToDocuments = { showCommunity = true },
+                onRequestDocumentsWithPassword = { showVaultPasswordDialog = true },
+                onDocumentsTabSelected = {
+                    documentsGateState = DocumentsGateState.LOCKED
+                    showVaultPasswordDialog = true
+                },
+                onOpenCommunity = { showCommunity = true },
+                onLogout = onLogout
+            )
+        }
+    }
         val addDeviceViewModel = remember {
             AddDeviceViewModel()
         }
@@ -942,7 +945,6 @@ fun HomeNavGraph(
             )
         }
     }
-}
 
 @Composable
 fun LockedDocumentsPlaceholder(

@@ -205,7 +205,7 @@ private fun GPSDeviceCard(
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 QuickStat(
-                    icon = Icons.Default.ElectricBike,
+                    icon = Icons.Default.Navigation,
                     label = "Vehicle Status",
                     value = device.ignition.replaceFirstChar { it.uppercase() },
                     color = statusColor(device.ignition)
@@ -634,7 +634,7 @@ fun batteryText(device: GPSDevice): String {
         // not moving / offline
         device.battery == 0 &&
                 device.speed <= 0.0 &&
-                status in listOf("offline", "parked", "idle") -> {
+                status in listOf("offline") -> {
             "Vehicle not moving"
         }
 

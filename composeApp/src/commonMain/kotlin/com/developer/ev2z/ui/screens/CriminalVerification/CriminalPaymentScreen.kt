@@ -13,51 +13,54 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.developer.ev2z.phonepe.openPhonePeSdk
+import com.developer.ev2z.ui.screens.social_media.openUrl
 import io.ktor.websocket.Frame
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CriminalPaymentScreen(
-    candidateId: String,
+    paymentUrl: String,
     amount: Int,
-    onSuccess: () -> Unit,
+    onSuccess: (String?) -> Unit,
+    onFailure: (String?) -> Unit,
     onBack: () -> Unit
 ) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Payment") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
+    Column(Modifier.fillMaxSize().padding(16.dp)) {
+
+        Text("Pay ₹$amount for Criminal Verification")
+
+        Spacer(Modifier.height(20.dp))
+
+        Button(
+            onClick = {
+                openPhonePeSdk(paymentUrl) { result ->
+                    if (result.success) {
+                        onSuccess(result.transactionId)
+                    } else {
+                        onFailure(result.message)
                     }
                 }
-            )
-        }
-    ) { padding ->
-        Column(
-            Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(20.dp),
-            verticalArrangement = Arrangement.Center,
-            horizontalAlignment = Alignment.CenterHorizontally
+            },
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Candidate: $candidateId")
-            Text("Amount: ₹$amount")
+            Text("Pay with PhonePe")
+        }
 
-            Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(16.dp))
 
-            Button(onClick = onSuccess) {
-                Text("Pay Now")
-            }
+        TextButton(onClick = onBack) {
+            Text("Cancel")
         }
     }
 }

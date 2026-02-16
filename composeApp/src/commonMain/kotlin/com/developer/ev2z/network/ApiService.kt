@@ -14,7 +14,6 @@ import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanScreenHost
 import com.developer.ev2z.ui.screens.ChangePlan.UserDevicesResponse
 import com.developer.ev2z.ui.screens.CriminalVerification.CandidateResult
 import com.developer.ev2z.ui.screens.CriminalVerification.CriminalForm
-import com.developer.ev2z.ui.screens.CriminalVerification.generateUUID
 import com.developer.ev2z.util.AppTokenProvider
 import io.ktor.client.call.*
 import io.ktor.client.plugins.ClientRequestException
@@ -461,10 +460,7 @@ class ApiService {
                 put("invite", false)
                 put("is_consent_undertaking_letter", form.consent)
                 put("category_id", 200)
-
-                putJsonObject("meta_data") {
-                    put("uuid", generateUUID())
-                }
+                putJsonObject("meta_data") {}
             }
 
             putJsonObject("package") {
@@ -485,18 +481,17 @@ class ApiService {
 
             println("📥 RAW RESPONSE → $response")
 
-            // ✅ SAFE PARSING
+            // ✅ FIXED PARSING
             val candidateId =
-                response["candidate_id"]?.jsonPrimitive?.contentOrNull
-                    ?: response["data"]?.jsonObject
-                        ?.get("candidate_id")?.jsonPrimitive?.contentOrNull
+                response["data"]?.jsonObject
+                    ?.get("data")?.jsonObject
+                    ?.get("candidate_id")?.jsonPrimitive?.contentOrNull
 
             println("✅ Parsed candidateId = $candidateId")
 
             CandidateResult(candidateId = candidateId)
 
         } catch (e: ClientRequestException) {
-
             if (e.response.status.value == 409) {
                 println("⚠️ Duplicate Candidate (409)")
                 CandidateResult(isDuplicate = true)
@@ -505,6 +500,104 @@ class ApiService {
                 CandidateResult(error = "Something went wrong")
             }
         }
+    }
+
+
+
+
+    // ===============================================
+// CRIMINAL VERIFICATION → SUBMIT BGV
+// ===============================================
+    suspend fun submitBgvVerification(
+        candidateId: Int,
+        form: CriminalForm
+    ): JsonObject {
+
+        val bgvUrl = "https://dev-webhook.in.springverify.com/submit_bgv"
+        val bgvToken = "Bearer YOUR_SPRINGVERIFY_TOKEN"
+
+        val body = buildJsonObject {
+            put("integrationName", "SUBMIT_BGV")
+            put("candidate_id", candidateId)
+
+            putJsonObject("background_check_details") {
+
+                putJsonObject("candidate_details") {
+                    put("full_name", form.name)
+                    put("email_address", form.email)
+                    put("mobile_number", form.phone)
+                    put("employee_id", form.employeeId)
+                    put("uan_number", "")
+                    put("uan_not_available", true)
+                }
+
+                put("address_details", Json.encodeToJsonElement(
+                    listOf(
+                        mapOf(
+                            "house_no" to form.houseNo,
+                            "colony" to form.colony,
+                            "city" to form.city,
+                            "state" to form.state,
+                            "pincode" to form.pincode,
+                            "country" to "India",
+                            "staying_period" to form.stayingPeriod,
+                            "is_current_permanent_same" to true,
+                            "isProofDocOptional" to true,
+                            "rented" to false,
+                            "landmark" to form.landmark,
+                            "doc_type" to "others"
+                        )
+                    )
+                ))
+            }
+        }
+
+        println("📦 BGV BODY → $body")
+
+        return client.post(bgvUrl) {
+            header(HttpHeaders.Authorization, bgvToken)
+            contentType(ContentType.Application.Json)
+            setBody(body)
+        }.body()
+    }
+
+
+
+
+
+    suspend fun createCriminalOrder(amount: Int): JsonObject {
+        val token = AppTokenProvider.getToken()
+
+        return client.post("${baseUrl}crminal-create-order") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(mapOf("amount" to amount))
+        }.body()
+    }
+
+
+
+    suspend fun sendCriminalPaymentCallback(
+        merchantOrderId: String,
+        phonepeOrderId: String,
+        status: String
+    ): Boolean {
+
+        val token = AppTokenProvider.getToken()
+
+        val response = client.post("${baseUrl}crminal-callback") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(
+                mapOf(
+                    "merchantOrderId" to merchantOrderId,
+                    "phonepeOrderId" to phonepeOrderId,
+                    "status" to status
+                )
+            )
+        }
+
+        return response.status.isSuccess()
     }
 
 
