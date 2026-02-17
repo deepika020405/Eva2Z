@@ -38,6 +38,7 @@ import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.InternalResourceApi
 import com.developer.ev2z.util.BottomBarController
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.text.style.TextOverflow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -125,8 +126,10 @@ fun LiveLocationScreen(
             val deviceCount = devices.size
 
             LaunchedEffect(devices.size) {
-                if (devices.size == 1) {
+                if (devices.size == 1 && !autoNavigated) {
+                    autoNavigated = true
                     viewModel.selectDevice(devices.first())
+                    onNavigateToDeviceReport()   // 🚀 direct open
                 }
             }
 
@@ -151,14 +154,10 @@ fun LiveLocationScreen(
                 ) {
                     TopDeviceCard(
                         userName = response.name ?: "User",
-                        deviceCount = response.totalDevices ?: 0,
+                        deviceCount = deviceCount,              // ✅ use actual list size
                         selectedDevice = selectedDevice,
-                        onBackClick = {
-                            onBack()    // 🔥 THIS WILL GO BACK
-                        },
-                        onDropdownClick = {
-                            viewModel.toggleDeviceDropdown()
-                        },
+                        onBackClick = { onBack() },
+                        onDropdownClick = { viewModel.toggleDeviceDropdown() },
                         onLocationClick = {
                             when (deviceCount) {
                                 0 -> {}
@@ -166,8 +165,7 @@ fun LiveLocationScreen(
                                 else -> viewModel.showOverviewSheet()
                             }
                         },
-                        showDropdown = deviceCount > 1   // ✅ ONLY SHOW IF MULTIPLE
-
+                        showDropdown = deviceCount > 1          // ✅ correct logic
                     )
                     Spacer(Modifier.height(4.dp))
                     // ✅ COMMUNITY CARD
@@ -177,23 +175,20 @@ fun LiveLocationScreen(
                         }
                     )
 
-
-                    if (showDeviceDropdown) {
-                    DeviceDropdownSheet(
-                        devices = response.data ?: emptyList(),
-                        onDeviceSelect = {
-                            viewModel.selectDevice(it)
-//                                viewModel.toggleDeviceDropdown()
-                            onNavigateToDeviceReport()
-                        },
-                        onAddDevice = {
-                            println("➕ Add Device clicked from dropdown")
-                            viewModel.toggleDeviceDropdown()
-                            onNavigateToAddDevice()
-                        },
-                        onDismiss = { viewModel.toggleDeviceDropdown() }
-                    )
-                }
+                    if (showDeviceDropdown && deviceCount > 1) {
+                        DeviceDropdownSheet(
+                            devices = devices,
+                            onDeviceSelect = {
+                                viewModel.selectDevice(it)
+                                onNavigateToDeviceReport()
+                            },
+                            onAddDevice = {
+                                viewModel.toggleDeviceDropdown()
+                                onNavigateToAddDevice()
+                            },
+                            onDismiss = { viewModel.toggleDeviceDropdown() }
+                        )
+                    }
                 }
                 // 🔥 FLOATING CONTACT BUTTON (COMMON)
                 FloatingContactButton(
@@ -248,10 +243,10 @@ fun TopDeviceCard(
     userName: String,
     deviceCount: Int,
     selectedDevice: Device?,
-    onBackClick: () -> Unit,        // ✅ ADD THIS
+    onBackClick: () -> Unit,
     onDropdownClick: () -> Unit,
     onLocationClick: () -> Unit,
-   showDropdown: Boolean
+    showDropdown: Boolean
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -260,14 +255,16 @@ fun TopDeviceCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
 
+                // 🔹 LEFT SIDE
                 Row(
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)   // ✅ prevent overflow
                 ) {
 
                     Icon(
@@ -281,13 +278,18 @@ fun TopDeviceCard(
                     Spacer(modifier = Modifier.width(8.dp))
 
                     Text(
-                        text = "$userName",
+                        text = userName,
                         fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis   // ✅ long name safe
                     )
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                // 🔹 RIGHT SIDE
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Icon(
                         imageVector = Icons.Default.LocationOn,
                         contentDescription = "Location Overview",
@@ -300,7 +302,9 @@ fun TopDeviceCard(
                     Text(
                         text = "$deviceCount Devices Listed",
                         fontSize = 12.sp,
-                        color = Color.Gray
+                        color = Color.Gray,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis   // ✅ safe
                     )
                 }
             }
@@ -314,10 +318,14 @@ fun TopDeviceCard(
                         .background(Color(0xFFF5F5F5), RoundedCornerShape(8.dp))
                         .clickable { onDropdownClick() }
                         .padding(12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+
+                    // 🔹 DEVICE INFO
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)   // ✅ prevents overflow
+                    ) {
                         Image(
                             painter = painterResource(Res.drawable.app_logo),
                             contentDescription = "App Logo",
@@ -326,10 +334,13 @@ fun TopDeviceCard(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = selectedDevice?.getDisplayName() ?: "Select Device",
-                            fontSize = 14.sp
+                            fontSize = 14.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis   // ✅ long device name safe
                         )
                     }
 
+                    // 🔹 ICONS
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = Icons.Default.ArrowDropDown,

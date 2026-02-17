@@ -213,24 +213,24 @@ private fun GPSDeviceCard(
 
 
                 val batteryIcon = when {
-                    device.battery >= 90 -> Icons.Default.BatteryFull
-                    device.battery >= 70 -> Icons.Default.Battery6Bar
-                    device.battery >= 50 -> Icons.Default.Battery5Bar
-                    device.battery >= 30 -> Icons.Default.Battery3Bar
-                    device.battery >= 15 -> Icons.Default.Battery2Bar
-                    else -> Icons.Default.BatteryAlert
+                    device.battery in 90..100 -> Icons.Default.BatteryFull
+                    device.battery in 70..89 -> Icons.Default.Battery6Bar
+                    device.battery in 50..69 -> Icons.Default.Battery5Bar
+                    device.battery in 30..49 -> Icons.Default.Battery3Bar
+                    device.battery in 15..29 -> Icons.Default.Battery2Bar
+                    device.battery in 1..14 -> Icons.Default.BatteryAlert
+                    else -> Icons.Default.BatteryUnknown
                 }
 
                 QuickStat(
                     icon = batteryIcon,
                     label = "Battery",
                     value = batteryText(device),
-                    color = when {
-                        device.battery == 0 && device.speed > 0 -> Color(0xFF1976D2) // blue (moving)
-                        device.battery == 0 -> Color.Gray
-                        device.battery > 50 -> Color(0xFF4CAF50)
-                        device.battery > 20 -> Color(0xFFFFC107)
-                        else -> Color(0xFFE53935)
+                    color = when (device.battery) {
+                        in 60..100 -> Color(0xFF4CAF50)
+                        in 30..59 -> Color(0xFFFFC107)
+                        in 1..29 -> Color(0xFFE53935)
+                        else -> Color.Gray
                     }
 
                 )
@@ -393,10 +393,12 @@ private fun DeviceStatusSection(device: GPSDevice) {
             label = "Battery",
             value = batteryText(device),
             valueColor = when {
-                device.battery == 0 && device.speed > 0 -> Color(0xFF1976D2) // Fetching → blue
-                device.battery == 0 -> Color.Gray
-                else -> statusColor(device.status)
+                device.battery < 0 -> Color.Gray
+                device.battery >= 60 -> Color(0xFF4CAF50)
+                device.battery >= 30 -> Color(0xFFFFC107)
+                else -> Color(0xFFE53935)
             }
+
         )
 
 
@@ -623,24 +625,9 @@ fun statusColor(status: String): Color =
 
 
 fun batteryText(device: GPSDevice): String {
-    val status = device.status.lowercase()
-
     return when {
-        // moving but battery not yet received
-        device.battery == 0 && device.speed > 0.0 -> {
-            "Fetching"
-        }
-
-        // not moving / offline
-        device.battery == 0 &&
-                device.speed <= 0.0 &&
-                status in listOf("offline") -> {
-            "Vehicle not moving"
-        }
-
-        // normal case
-        else -> {
-            "${device.battery}%"
-        }
+        device.battery < 0 -> "Unknown"
+        device.status.lowercase() == "offline" && device.battery == 0 -> "No Power"
+        else -> "${device.battery}%"
     }
 }

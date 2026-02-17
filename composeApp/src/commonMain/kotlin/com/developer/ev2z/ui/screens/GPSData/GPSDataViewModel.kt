@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.util.getAddressFromLatLng
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -56,7 +57,12 @@ class GPSDataViewModel(
     val state: StateFlow<GPSDataState> = _state.asStateFlow()
 
     init {
-        loadDevices()
+        viewModelScope.launch {
+            while (true) {
+                loadDevices()
+                delay(10000)
+            }
+        }
     }
 
     fun loadDevices() {
@@ -66,13 +72,19 @@ class GPSDataViewModel(
             try {
                 val token = storageManager.getString("token", "")
                 if (token.isEmpty()) {
-                    _state.value = _state.value.copy(isLoading = false, error = "Authentication required")
+                    _state.value = _state.value.copy(
+                        isLoading = false,
+                        error = "Authentication required"
+                    )
                     return@launch
                 }
 
                 val devicesResponse = apiService.getMyDevices("Bearer $token")
                 if (!devicesResponse.success) {
-                    _state.value = _state.value.copy(isLoading = false, error = "Failed to load devices")
+                    _state.value = _state.value.copy(
+                        isLoading = false,
+                        error = "Failed to load devices"
+                    )
                     return@launch
                 }
 
@@ -80,12 +92,25 @@ class GPSDataViewModel(
 
                 for (device in devicesResponse.devices) {
                     try {
-                        val locationResponse = apiService.getDeviceLiveLocation("Bearer $token", device.device_id)
-                        val statusResponse = apiService.getDeviceStatus("Bearer $token", device.device_id)
+                        val locationResponse = apiService.getDeviceLiveLocation(
+                            "Bearer $token",
+                            device.device_id
+                        )
 
                         val latestLocation = locationResponse.data?.latestLocation
 
                         if (latestLocation != null) {
+
+                            val minutesAgo = latestLocation.lastSeenMinutesAgo ?: 999
+                            val isOnline = minutesAgo <= 5
+
+                            println("📡 Device ${device.device_id}")
+                            println("   API Status: ${latestLocation.status}")
+                            println("   Last Seen: $minutesAgo min")
+                            println("   Calculated: ${if (isOnline) "ONLINE" else "OFFLINE"}")
+                            println("   Battery: ${latestLocation.batteryDisplay}")
+                            println("------------------------------------------------")
+
                             val address = getAddressFromLatLng(
                                 latestLocation.latitude.toDouble(),
                                 latestLocation.longitude.toDouble()
@@ -95,9 +120,12 @@ class GPSDataViewModel(
                                 GPSDevice(
                                     deviceId = device.device_id,
                                     deviceName = device.device_name,
-//                                    status = parseDeviceStatus(latestLocation.status),
-                                    status = latestLocation.status.replaceFirstChar { it.uppercase() },
-                                    ignition = latestLocation.status.replaceFirstChar { it.uppercase() },
+
+                                    // ✅ FIXED STATUS
+                                    status = if (isOnline) "Online" else "Offline",
+
+                                    ignition = if (latestLocation.speed.toDouble() > 0) "On" else "Off",
+
                                     battery = parseBattery(latestLocation.batteryDisplay),
                                     batteryStatus = parseBatteryStatus(latestLocation.batteryStatus),
                                     distance = 0.0,
@@ -107,26 +135,60 @@ class GPSDataViewModel(
                                     longitude = latestLocation.longitude.toDoubleOrNull() ?: 0.0,
                                     fixTime = convertUtcToIst(latestLocation.timestamp),
                                     serverTime = convertUtcToIst(latestLocation.timestamp),
-                                    lastUpdated = formatLastSeen(latestLocation.lastSeenMinutesAgo)
+                                    lastUpdated = formatLastSeen(minutesAgo)
                                 )
                             )
                         } else {
                             gpsDevices.add(createOfflineDevice(device))
                         }
+
                     } catch (e: Exception) {
-                        println("❌ Device load failed: ${e.message}")
                         gpsDevices.add(createOfflineDevice(device))
                     }
                 }
 
-                _state.value = _state.value.copy(isLoading = false, devices = gpsDevices, selectedDevice = null)
+                // ✅ Preserve selected device & update it
+                val currentSelectedId = _state.value.selectedDevice?.deviceId
+                val updatedSelected =
+                    gpsDevices.find { it.deviceId == currentSelectedId }
+
+                _state.value = _state.value.copy(
+                    isLoading = false,
+                    devices = gpsDevices.toList(), // force new reference
+                    selectedDevice = updatedSelected
+                )
 
             } catch (e: Exception) {
-                _state.value = _state.value.copy(isLoading = false, error = e.message ?: "Failed")
+                _state.value = _state.value.copy(
+                    isLoading = false,
+                    error = e.message ?: "Failed"
+                )
             }
         }
-
     }
+
+
+
+
+    // ✅ Refresh single device (used in detail screen)
+    fun refreshDeviceData(deviceId: String) {
+        viewModelScope.launch {
+            loadDevices()
+        }
+    }
+
+    fun selectDevice(device: GPSDevice) {
+        _state.value = _state.value.copy(selectedDevice = device)
+    }
+
+    fun deselectDevice() {
+        _state.value = _state.value.copy(selectedDevice = null)
+    }
+
+    fun clearError() {
+        _state.value = _state.value.copy(error = null)
+    }
+
 
     private fun createOfflineDevice(device: com.developer.ev2z.response.Device) = GPSDevice(
         deviceId = device.device_id,
@@ -134,27 +196,32 @@ class GPSDataViewModel(
         status = "Offline",
         ignition = "Off",
         battery = 0,
-        batteryStatus = BatteryStatus.MEDUIM,
+        batteryStatus = BatteryStatus.NO_POWER,
         distance = 0.0,
         speed = 0.0,
         location = "No recent data",
         latitude = 0.0,
         longitude = 0.0,
-        fixTime = getCurrentTime(),
-        serverTime = getCurrentTime(),
+        fixTime = "—",
+        serverTime = "—",
         lastUpdated = "No data"
     )
 
 
-    private fun parseBattery(batteryDisplay: String?) =
-        batteryDisplay?.replace("%", "")?.trim()?.toIntOrNull() ?: 0
+    private fun parseBattery(batteryDisplay: String?): Int {
+        if (batteryDisplay.isNullOrBlank()) return -1   // unknown
+
+        val value = batteryDisplay.replace("%", "").trim().toIntOrNull()
+        return value ?: -1
+
+    }
 
     private fun parseBatteryStatus(status: String?) =
         when (status?.lowercase()) {
             "charging" -> BatteryStatus.CHARGING
             "no power" -> BatteryStatus.NO_POWER
             "normal" -> BatteryStatus.NORMAL
-            else -> BatteryStatus.MEDUIM
+            else -> BatteryStatus.NORMAL
         }
 
 //    private fun convertUtcToIst(utcTime: String): String {
@@ -217,29 +284,22 @@ class GPSDataViewModel(
 
     private fun convertUtcToIst(utcTime: String): String {
         return try {
-            val parts = utcTime.replace("T", " ")
-                .split(" ", ":", "-")
+            val parts = utcTime.replace("T", " ").split(" ", ":", "-")
 
             val year = parts[0].toInt()
             val month = parts[1].toInt()
             val day = parts[2].toInt()
-
             var hour = parts[3].toInt()
             var minute = parts[4].toInt()
             val second = parts[5].toInt()
 
-            // IST offset
             hour += 5
             minute += 30
-
             hour += minute / 60
             minute %= 60
             hour %= 24
 
-            // ✅ KMP-safe formatting
-            "${year.pad()}-${month.pad()}-${day.pad()} " +
-                    "${hour.pad()}:${minute.pad()}:${second.pad()}"
-
+            "${year.pad()}-${month.pad()}-${day.pad()} ${hour.pad()}:${minute.pad()}:${second.pad()}"
         } catch (e: Exception) {
             utcTime
         }
@@ -247,33 +307,6 @@ class GPSDataViewModel(
 
     private fun Int.pad(): String =
         if (this < 10) "0$this" else this.toString()
-
-
-    private fun getCurrentTime(): String {
-        return "Just now"
-    }
-
-    private fun getRelativeTime(utcTime: String): String {
-        return try {
-            val parts = utcTime.replace("T", " ").split(" ", ":", "-")
-            val hour = parts[3].toInt()
-            val minute = parts[4].toInt()
-
-            val nowHour = 12 // You can improve later if needed
-
-            val diffHours = abs(nowHour - hour)
-
-            when {
-                diffHours == 0 -> "Just now"
-                diffHours == 1 -> "1 hour ago"
-                diffHours < 24 -> "$diffHours hours ago"
-                else -> "1+ days ago"
-            }
-        } catch (e: Exception) {
-            "Unknown"
-        }
-    }
-
 
     private fun formatLastSeen(minutes: Int?): String {
         if (minutes == null) return "Live location"
@@ -285,21 +318,6 @@ class GPSDataViewModel(
             else -> "${minutes / 1440} days ago"
         }
     }
-
-
-    fun selectDevice(device: GPSDevice) {
-        _state.value = _state.value.copy(selectedDevice = device)
-    }
-
-    fun deselectDevice() {
-        _state.value = _state.value.copy(selectedDevice = null)
-    }
-
-    fun refreshDeviceData(deviceId: String) {
-        loadDevices()
-    }
-
-    fun clearError() {
-        _state.value = _state.value.copy(error = null)
-    }
 }
+
+

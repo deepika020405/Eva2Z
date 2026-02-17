@@ -141,6 +141,7 @@ fun DeviceDropdownCardSimple(
     onDeviceSelect: (Device) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val isSingleDevice = devices.size <= 1
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -150,15 +151,20 @@ fun DeviceDropdownCardSimple(
     ) {
         Column(Modifier.padding(16.dp)) {
 
+            // 🔹 Header Row (Responsive)
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("Hello, $userName", fontWeight = FontWeight.SemiBold)
+                Text(
+                    text = userName,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1
+                )
 
                 Text(
-                    "${devices.size} Devices",
+                    text = "${devices.size} Devices",
                     fontSize = 12.sp,
                     color = Color.Gray
                 )
@@ -166,16 +172,22 @@ fun DeviceDropdownCardSimple(
 
             Spacer(Modifier.height(12.dp))
 
+            // 🔹 Device Row
             Row(
                 Modifier
                     .fillMaxWidth()
                     .background(Color(0xFFF4F4F4), RoundedCornerShape(12.dp))
-                    .clickable { expanded = true }
+                    .clickable(enabled = !isSingleDevice) {
+                        if (!isSingleDevice) expanded = true
+                    }
                     .padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
                     Image(
                         painter = painterResource(Res.drawable.app_logo),
                         contentDescription = null,
@@ -183,32 +195,38 @@ fun DeviceDropdownCardSimple(
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        selectedDevice?.device_name ?: "Select Device",
-                        fontSize = 14.sp
+                        text = selectedDevice?.device_name ?: "Select Device",
+                        fontSize = 14.sp,
+                        maxLines = 1
                     )
                 }
 
-                Icon(Icons.Default.ArrowDropDown, null)
+                // 🔥 Arrow only when multiple devices
+                if (!isSingleDevice) {
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                }
             }
 
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false }
-            ) {
-                devices.forEach { device ->
-                    DropdownMenuItem(
-                        text = { Text(device.device_name) },
-                        onClick = {
-                            expanded = false
-                            onDeviceSelect(device)
-                        }
-                    )
+            // 🔹 Dropdown (only when multiple devices)
+            if (!isSingleDevice) {
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    devices.forEach { device ->
+                        DropdownMenuItem(
+                            text = { Text(device.device_name) },
+                            onClick = {
+                                expanded = false
+                                onDeviceSelect(device)
+                            }
+                        )
+                    }
                 }
             }
         }
     }
 }
-
 
 @Composable
 fun rememberAnimatedLatLng(

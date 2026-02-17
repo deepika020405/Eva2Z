@@ -59,6 +59,14 @@ fun DeviceStatusScreen(onBack: () -> Unit) {
         viewModel.loadDevices()
     }
 
+    LaunchedEffect(devices) {
+        val deviceList = devices?.devices ?: emptyList()
+
+        if (deviceList.size == 1) {
+            viewModel.selectDevice(deviceList.first().device_id)
+        }
+    }
+
     Scaffold(
         containerColor = Color(0xFFF5F5F5), // 👈 screen background
         topBar = {
@@ -181,6 +189,18 @@ fun DeviceDropdownCardSimple(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
+    val deviceCount = devices.devices.size
+    val isSingleDevice = deviceCount == 1
+
+    // 🔥 device name resolve
+    val selectedDeviceName = devices.devices
+        .find { it.device_id == selectedDeviceId }
+        ?.device_name
+        ?.takeIf { it.isNotEmpty() }
+        ?: devices.devices.firstOrNull()?.device_name
+        ?: selectedDeviceId
+        ?: "Select Device"
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
@@ -189,16 +209,17 @@ fun DeviceDropdownCardSimple(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
 
-            // Top row: Greeting + Location + Device count
+            // 🔹 TOP ROW
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Hello, $userName",
+                    text = "$userName",
                     fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1
                 )
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -212,7 +233,7 @@ fun DeviceDropdownCardSimple(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "${devices.devices.size} Devices Listed",
+                        text = "$deviceCount Devices Listed",
                         fontSize = 12.sp,
                         color = Color.Gray
                     )
@@ -221,52 +242,57 @@ fun DeviceDropdownCardSimple(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Device row (clickable)
+            // 🔹 DEVICE ROW
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color(0xFFF5F5F5), RoundedCornerShape(8.dp))
-                    .clickable { expanded = true }
+                    .clickable(enabled = !isSingleDevice) { expanded = true }
                     .padding(12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Image(
-                        Icons.Default.Navigation,
+                    Icon(
+                        imageVector = Icons.Default.Navigation,
                         contentDescription = null,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = devices.devices.find { it.device_id == selectedDeviceId }?.device_name
-                            .takeIf { !it.isNullOrEmpty() }
-                            ?: selectedDeviceId
-                            ?: "Select Device",
-                        fontSize = 14.sp
+                        text = selectedDeviceName,
+                        fontSize = 14.sp,
+                        maxLines = 1
                     )
                 }
 
-                Icon(
-                    imageVector = Icons.Default.ArrowDropDown,
-                    contentDescription = null,
-                    tint = Color.Gray
-                )
+                // 🔥 Hide dropdown icon if single device
+                if (!isSingleDevice) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowDropDown,
+                        contentDescription = null,
+                        tint = Color.Gray
+                    )
+                }
             }
 
-            // Dropdown menu using Material3 DropdownMenu
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false }
-            ) {
-                devices.devices.forEach { device ->
-                    DropdownMenuItem(
-                        text = { Text(device.device_name.ifEmpty { device.device_id }) },
-                        onClick = {
-                            expanded = false
-                            onDeviceSelect(device.device_id)
-                        }
-                    )
+            // 🔥 Dropdown only if multiple devices
+            if (!isSingleDevice) {
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    devices.devices.forEach { device ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(device.device_name.ifEmpty { device.device_id })
+                            },
+                            onClick = {
+                                expanded = false
+                                onDeviceSelect(device.device_id)
+                            }
+                        )
+                    }
                 }
             }
         }

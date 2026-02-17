@@ -120,8 +120,11 @@ fun HistoryPlaybackScreen(
             deviceCount = devices.size,
             selectedDevice = selectedDevice?.device_name,
             onBackClick = onBackPressed,
-            onDropdownClick = { viewModel.toggleDeviceDropdown() }
-        )
+            onDropdownClick = {
+                if (devices.size > 1) {
+                    viewModel.toggleDeviceDropdown()
+                }
+            }        )
 
         HistoryPlaybackBottomSheet(
             hasData = routePoints.isNotEmpty(),
@@ -138,7 +141,7 @@ fun HistoryPlaybackScreen(
         )
 
         // ✅ DROPDOWN (HOME SCREEN STYLE - FIXED)
-        if (showDeviceDropdown) {
+        if (showDeviceDropdown && devices.size > 1) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -352,8 +355,11 @@ fun BoxScope.TopDeviceBoxWithData(
                             modifier = Modifier.size(22.dp)
                         )
                         Spacer(Modifier.width(10.dp))
-                        Text(selectedDevice ?: "Select Device", fontSize = 15.sp)
-                    }
+                        Text(
+                            text = selectedDevice ?: "Select Device",
+                            fontSize = 15.sp,
+                            maxLines = 1
+                        )                    }
 
                     Icon(Icons.Default.ArrowDropDown, contentDescription = null)
                 }

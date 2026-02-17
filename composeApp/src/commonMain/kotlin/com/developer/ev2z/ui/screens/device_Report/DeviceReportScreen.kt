@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -240,13 +241,15 @@ fun TopDeviceBoxWithData(
     onDropdownClick: () -> Unit,
     onAddClick: () -> Unit
 ) {
+    val isSingleDevice = deviceCount <= 1
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(
                 top = WindowInsets.statusBars
                     .asPaddingValues()
-                    .calculateTopPadding() + 12.dp, // 🔥 SAFE
+                    .calculateTopPadding() + 12.dp,
                 start = 16.dp,
                 end = 16.dp,
                 bottom = 16.dp
@@ -255,6 +258,8 @@ fun TopDeviceBoxWithData(
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
+
+            // 🔹 TOP ROW (Responsive)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
@@ -264,58 +269,92 @@ fun TopDeviceBoxWithData(
                     contentDescription = "Back",
                     modifier = Modifier.clickable { onBackClick() }
                 )
+
                 Spacer(Modifier.width(10.dp))
 
-                val firstName = remember(userName) {
-                    extractFirstName(userName)
-                }
+                val firstName = remember(userName) { extractFirstName(userName) }
 
-                Text("Hello, $firstName", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                // ✅ Responsive username
+                Text(
+                    text = firstName,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
+                )
 
-                Spacer(Modifier.weight(1f))
+                Spacer(Modifier.width(8.dp))
 
-                Text("$deviceCount Devices Listed", fontSize = 13.sp, color = Color.Gray)
+                // ✅ Responsive device count
+                Text(
+                    text = "$deviceCount Devices",
+                    fontSize = 13.sp,
+                    color = Color.Gray,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
             }
 
             Spacer(Modifier.height(14.dp))
 
+            // 🔹 DEVICE ROW (Responsive + Rules)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp))
-                    .clickable { onDropdownClick() }
+                    .clickable(enabled = !isSingleDevice) { onDropdownClick() }
                     .padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+
+                // 🔹 Device Name Section
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
                     Image(
                         painter = painterResource(Res.drawable.app_logo),
                         contentDescription = null,
                         modifier = Modifier.size(22.dp)
                     )
+
                     Spacer(Modifier.width(10.dp))
-                    Text(selectedDevice ?: "Select Device", fontSize = 15.sp)
+
+                    Text(
+                        text = selectedDevice ?: "Select Device",
+                        fontSize = 15.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        Icons.Default.ArrowDropDown,
-                        contentDescription = null,
-                        tint = Color.Gray
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = null,
-                        tint = Color.Gray,
-                        modifier = Modifier.clickable { onAddClick() }
-                    )
+                // 🔹 ACTION ICONS (Only when multiple devices)
+                if (!isSingleDevice) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+
+                        Icon(
+                            Icons.Default.ArrowDropDown,
+                            contentDescription = "Select Device",
+                            tint = Color.Gray
+                        )
+
+                        Spacer(Modifier.width(8.dp))
+
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = "Add Device",
+                            tint = Color.Gray,
+                            modifier = Modifier.clickable { onAddClick() }
+                        )
+                    }
                 }
             }
         }
     }
 }
+
 fun extractFirstName(fullName: String): String {
     return fullName
         .trim()
