@@ -13,8 +13,6 @@ import com.developer.ev2z.phonepe.openPhonePeSdk
 import com.developer.ev2z.ui.screens.market_screen.PaymentResultScreen
 
 
-
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChangePlanScreenHost(
@@ -27,97 +25,103 @@ fun ChangePlanScreenHost(
     val paymentState by renewViewModel.paymentState.collectAsState()
     val phonePeToken by renewViewModel.phonePeToken.collectAsState()
 
-    // 🔥 PHONEPE SDK TRIGGER
+    var sdkLaunched by remember { mutableStateOf(false) }
+
+    // 🔥 SAFE SDK TRIGGER
     LaunchedEffect(phonePeToken) {
-        phonePeToken?.let { token ->
+        if (phonePeToken != null && !sdkLaunched) {
+            sdkLaunched = true
             openPhonePeSdk(
-                paymentUrl = token,
+                paymentUrl = phonePeToken!!,
                 onResult = { result ->
                     renewViewModel.onPaymentResult(
                         success = result.success,
                         phonePeOrderId = result.transactionId ?: "",
                         message = result.message
                     )
+                    sdkLaunched = false
                 }
             )
         }
     }
 
-    // ✅ SINGLE UI CONTROLLER
-    when (paymentState) {
+    Surface(modifier = Modifier.fillMaxSize()) {
 
-        // 🔄 Processing
-        is PaymentState.Processing -> {
-            Box(Modifier.fillMaxSize(), Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator()
-                    Spacer(Modifier.height(12.dp))
-                    Text("Redirecting to PhonePe…")
+        when (paymentState) {
+
+            // 🔄 PROCESSING
+            is PaymentState.Processing -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .systemBarsPadding(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressIndicator()
+                        Spacer(Modifier.height(12.dp))
+                        Text("Redirecting to PhonePe…")
+                    }
                 }
             }
-        }
 
-        // ✅ SUCCESS
-        is PaymentState.Success -> {
-            val ps = paymentState as PaymentState.Success
-            PaymentPlanScreen(
-                state = PaymentUiState.Success,
-                amount = ps.amount.toString(),
-                transactionId = ps.txnId,
-                onPrimaryAction = {
-                    renewViewModel.reset()
-                    onBack()
-                }
-            )
-        }
-
-        // ⚪ CANCELLED
-        is PaymentState.Cancelled -> {
-            PaymentPlanScreen(
-                state = PaymentUiState.Cancelled,
-                onPrimaryAction = {
-                    renewViewModel.reset()
-                }
-            )
-        }
-
-        // ❌ FAILED
-        is PaymentState.Failed -> {
-            val pf = paymentState as PaymentState.Failed
-            PaymentPlanScreen(
-                state = PaymentUiState.Failed,
-                onPrimaryAction = {
-                    renewViewModel.reset()
-                }
-            )
-        }
-
-        // 🟢 NORMAL FLOW
-        else -> {
-            when {
-                planState.isLoading -> {
-                    Box(Modifier.fillMaxSize(), Alignment.Center) {
-                        CircularProgressIndicator()
+            // ✅ SUCCESS
+            is PaymentState.Success -> {
+                val ps = paymentState as PaymentState.Success
+                PaymentPlanScreen(
+                    state = PaymentUiState.Success,
+                    amount = ps.amount.toString(),
+                    transactionId = ps.txnId,
+                    onPrimaryAction = {
+                        renewViewModel.reset()
+                        onBack()
                     }
-                }
+                )
+            }
 
-                planState.error != null -> {
-                    Box(Modifier.fillMaxSize(), Alignment.Center) {
-                        Text(planState.error ?: "Something went wrong")
-                    }
-                }
+            // ⚪ CANCELLED
+            is PaymentState.Cancelled -> {
+                PaymentPlanScreen(
+                    state = PaymentUiState.Cancelled,
+                    onPrimaryAction = { renewViewModel.reset() }
+                )
+            }
 
-                else -> {
-                    ChangePlanScreen(
-                        devices = planState.devices,
-                        onBack = {
-                            renewViewModel.reset()
-                            onBack()
-                        },
-                        onRenewConfirm = { deviceId, duration ->
-                            renewViewModel.startRenewPlan(deviceId, duration)
+            // ❌ FAILED
+            is PaymentState.Failed -> {
+                PaymentPlanScreen(
+                    state = PaymentUiState.Failed,
+                    onPrimaryAction = { renewViewModel.reset() }
+                )
+            }
+
+            // 🟢 NORMAL FLOW
+            else -> {
+                when {
+                    planState.isLoading -> {
+                        Box(Modifier.fillMaxSize(), Alignment.Center) {
+                            CircularProgressIndicator()
                         }
-                    )
+                    }
+
+                    planState.error != null -> {
+                        Box(Modifier.fillMaxSize(), Alignment.Center) {
+                            Text(planState.error ?: "Something went wrong")
+                        }
+                    }
+
+                    else -> {
+                        ChangePlanScreen(
+                            devices = planState.devices,
+                            onBack = {
+                                renewViewModel.reset()
+                                onBack()
+                            },
+                            onRenewConfirm = { deviceId, duration ->
+                                renewViewModel.startRenewPlan(deviceId, duration)
+                            }
+                        )
+                    }
                 }
             }
         }

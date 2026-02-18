@@ -3,10 +3,13 @@ package com.developer.ev2z.network
 import com.developer.ev2z.data.local.model.DeviceResponse
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
 import com.developer.ev2z.network.KtorClient.client
+import com.developer.ev2z.request.CandidateDto
+import com.developer.ev2z.request.CandidateRequest
 import com.developer.ev2z.request.CartAddRequest
 import com.developer.ev2z.request.CommentRequest
 import com.developer.ev2z.request.CreateOrderRequest
 import com.developer.ev2z.request.DeviceAnalyticsRequest
+import com.developer.ev2z.request.PackageDto
 import com.developer.ev2z.request.PhonePeCallbackRequest
 import com.developer.ev2z.request.RenewPlanRequest
 import com.developer.ev2z.response.*
@@ -26,6 +29,7 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.encodeToJsonElement
@@ -444,6 +448,7 @@ class ApiService {
     }
 
 
+    //create candidate id
 
     suspend fun createCandidateWithPackage(form: CriminalForm): CandidateResult {
         println("🌐 API: Creating candidate...")
@@ -451,24 +456,22 @@ class ApiService {
         val token = AppTokenProvider.getToken()
         val url = "${baseUrl}candidate"
 
-        val body = buildJsonObject {
-            putJsonObject("candidate") {
-                put("name", form.name)
-                put("email", form.email)
-                put("phone", form.phone)
-                put("employee_id", form.employeeId)
-                put("invite", false)
-                put("is_consent_undertaking_letter", form.consent)
-                put("category_id", 200)
-                putJsonObject("meta_data") {}
-            }
-
-            putJsonObject("package") {
-                put("package_id", 2289)
-                put("subtype_id", 3542)
-                putJsonObject("config") {}
-            }
-        }
+        // ✅ DTO instead of manual JSON
+        val body = CandidateRequest(
+            candidate = CandidateDto(
+                name = form.name,
+                email = form.email,
+                phone = form.phone,
+                employee_id = form.employeeId,
+                invite = false,
+                is_consent_undertaking_letter = form.consent,
+                category_id = 200
+            ),
+            `package` = PackageDto(
+                package_id = 2289,
+                subtype_id = 3542
+            )
+        )
 
         println("📦 Request Body → $body")
 
@@ -481,7 +484,6 @@ class ApiService {
 
             println("📥 RAW RESPONSE → $response")
 
-            // ✅ FIXED PARSING
             val candidateId =
                 response["data"]?.jsonObject
                     ?.get("data")?.jsonObject
@@ -513,15 +515,14 @@ class ApiService {
         form: CriminalForm
     ): JsonObject {
 
-        val bgvUrl = "https://dev-webhook.in.springverify.com/submit_bgv"
-        val bgvToken = "Bearer YOUR_SPRINGVERIFY_TOKEN"
+        val bgvUrl = "https://gps.eva2z.in/api/submit-bgv"
+        val appToken = AppTokenProvider.getToken()
 
         val body = buildJsonObject {
             put("integrationName", "SUBMIT_BGV")
             put("candidate_id", candidateId)
 
             putJsonObject("background_check_details") {
-
                 putJsonObject("candidate_details") {
                     put("full_name", form.name)
                     put("email_address", form.email)
@@ -531,40 +532,62 @@ class ApiService {
                     put("uan_not_available", true)
                 }
 
-                put("address_details", Json.encodeToJsonElement(
-                    listOf(
-                        mapOf(
-                            "house_no" to form.houseNo,
-                            "colony" to form.colony,
-                            "city" to form.city,
-                            "state" to form.state,
-                            "pincode" to form.pincode,
-                            "country" to "India",
-                            "staying_period" to form.stayingPeriod,
-                            "is_current_permanent_same" to true,
-                            "isProofDocOptional" to true,
-                            "rented" to false,
-                            "landmark" to form.landmark,
-                            "doc_type" to "others"
-                        )
-                    )
-                ))
+                put("address_details", buildJsonArray {
+                    add(buildJsonObject {
+                        put("house_no", form.houseNo)
+                        put("colony", form.colony)
+                        put("city", form.city)
+                        put("state", form.state)
+                        put("pincode", form.pincode)
+                        put("country", "India")
+                        put("staying_period", form.stayingPeriod)
+                        put("is_current_permanent_same", true)
+                        put("isProofDocOptional", true)
+                        put("rented", false)
+                        put("landmark", form.landmark)
+                        put("doc_type", "others")
+                    })
+                })
             }
         }
 
         println("📦 BGV BODY → $body")
 
-        return client.post(bgvUrl) {
-            header(HttpHeaders.Authorization, bgvToken)
+        val response: JsonObject = client.post(bgvUrl) {
+            header(HttpHeaders.Authorization, "Bearer $appToken")  // ✅ FIXED
             contentType(ContentType.Application.Json)
             setBody(body)
         }.body()
+
+        // ✅ PRINT RESPONSE
+        println("📥 BGV RESPONSE → $response")
+
+        return response
+    }
+
+    //Candidate verfication callback
+    suspend fun getCandidateStatus(candidateId: Int): JsonObject {
+        val token = AppTokenProvider.getToken()
+        val url = "${baseUrl}candidate/$candidateId"
+
+        println("🌐 GET Candidate Status → $url")
+
+        val response = client.get(url) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+        }
+
+        val raw = response.bodyAsText()
+
+        println("📡 Status Code = ${response.status}")
+        println("📥 RAW RESPONSE = $raw")
+
+        return kotlinx.serialization.json.Json
+            .parseToJsonElement(raw)
+            .jsonObject
     }
 
 
-
-
-
+    //criminal payment create order
     suspend fun createCriminalOrder(amount: Int): JsonObject {
         val token = AppTokenProvider.getToken()
 
@@ -576,7 +599,7 @@ class ApiService {
     }
 
 
-
+//criminal payment callback
     suspend fun sendCriminalPaymentCallback(
         merchantOrderId: String,
         phonepeOrderId: String,

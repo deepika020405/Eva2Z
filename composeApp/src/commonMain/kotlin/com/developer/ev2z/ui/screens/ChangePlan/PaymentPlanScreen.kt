@@ -32,128 +32,146 @@ fun PaymentPlanScreen(
 ) {
 
     val (title, message, primaryColor, icon) = when (state) {
-
         PaymentUiState.Success -> Quad(
             "Payment Successful",
             "Your plan has been renewed successfully.",
-            Color(0xFF16A34A), // modern green
+            Color(0xFF16A34A),
             Icons.Default.CheckCircle
         )
-
         PaymentUiState.Failed -> Quad(
             "Payment Failed",
             "We couldn't process your payment. Please try again.",
-            Color(0xFFDC2626), // premium red
+            Color(0xFFDC2626),
             Icons.Default.Error
         )
-
         PaymentUiState.Cancelled -> Quad(
             "Payment Cancelled",
             "You cancelled the payment process.",
-            Color(0xFFDC2626), // 🔴 red theme
+            Color(0xFFDC2626),
             Icons.Default.Cancel
         )
     }
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF5F7FA)),
-        contentAlignment = Alignment.Center
+            .background(Color(0xFFF5F7FA))
     ) {
-        Card(
-            shape = RoundedCornerShape(28.dp),
-            elevation = CardDefaults.cardElevation(8.dp),
+
+        val isCompactHeight = maxHeight < 600.dp
+
+        Column(
             modifier = Modifier
-                .padding(24.dp)
-                .fillMaxWidth(),
-            colors = CardDefaults.cardColors(containerColor = Color.White)
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = if (isCompactHeight)
+                Arrangement.Top
+            else
+                Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Column(
-                modifier = Modifier.padding(vertical = 36.dp, horizontal = 24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+
+            Card(
+                shape = RoundedCornerShape(28.dp),
+                elevation = CardDefaults.cardElevation(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 480.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White)
             ) {
 
-                // 🔵 Premium Icon Badge
-                Box(
+                Column(
                     modifier = Modifier
-                        .size(96.dp)
-                        .background(primaryColor.copy(alpha = 0.12f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        icon,
-                        contentDescription = null,
-                        tint = primaryColor,
-                        modifier = Modifier.size(52.dp)
-                    )
-                }
-
-                Spacer(Modifier.height(24.dp))
-
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.headlineSmall,
-                    color = Color(0xFF1F2937)
-                )
-
-                Spacer(Modifier.height(10.dp))
-
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFF6B7280),
-                    lineHeight = MaterialTheme.typography.bodyMedium.lineHeight
-                )
-
-                // 💰 Amount
-                if (amount != null && state == PaymentUiState.Success) {
-                    Spacer(Modifier.height(20.dp))
-                    Text(
-                        "Amount Paid",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color.Gray
-                    )
-                    Text(
-                        "₹$amount",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = primaryColor
-                    )
-                }
-
-                // 🧾 Transaction ID
-                transactionId?.let {
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        "Transaction ID",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.Gray
-                    )
-                    Text(
-                        it,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF374151)
-                    )
-                }
-
-                Spacer(Modifier.height(30.dp))
-
-                // 🔘 Primary Button
-                Button(
-                    onClick = onPrimaryAction,
-                    shape = RoundedCornerShape(14.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
-                    modifier = Modifier
+                        .padding(vertical = 32.dp, horizontal = 20.dp)
                         .fillMaxWidth()
-                        .height(52.dp)
+                        .wrapContentHeight()
                 ) {
+
+                    // 🔵 Icon Badge
+                    Box(
+                        modifier = Modifier
+                            .size(88.dp)
+                            .background(primaryColor.copy(alpha = 0.12f), CircleShape)
+                            .align(Alignment.CenterHorizontally),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            icon,
+                            contentDescription = null,
+                            tint = primaryColor,
+                            modifier = Modifier.size(48.dp)
+                        )
+                    }
+
+                    Spacer(Modifier.height(20.dp))
+
                     Text(
-                        when (state) {
-                            PaymentUiState.Success -> "Done"
-                            PaymentUiState.Failed -> "Retry Payment"
-                            PaymentUiState.Cancelled -> "Go Back"
-                        }
+                        text = title,
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = Color(0xFF1F2937),
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
                     )
+
+                    Spacer(Modifier.height(8.dp))
+
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF6B7280),
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    )
+
+                    // 💰 Amount
+                    if (amount != null && state == PaymentUiState.Success) {
+                        Spacer(Modifier.height(18.dp))
+                        Text(
+                            "Amount Paid",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color.Gray,
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        )
+                        Text(
+                            "₹$amount",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = primaryColor,
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        )
+                    }
+
+                    // 🧾 Transaction ID
+                    transactionId?.let {
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            "Transaction ID",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.Gray
+                        )
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF374151),
+                            maxLines = 2
+                        )
+                    }
+
+                    Spacer(Modifier.height(28.dp))
+
+                    Button(
+                        onClick = onPrimaryAction,
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = primaryColor),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                    ) {
+                        Text(
+                            when (state) {
+                                PaymentUiState.Success -> "Done"
+                                PaymentUiState.Failed -> "Retry Payment"
+                                PaymentUiState.Cancelled -> "Go Back"
+                            }
+                        )
+                    }
                 }
             }
         }

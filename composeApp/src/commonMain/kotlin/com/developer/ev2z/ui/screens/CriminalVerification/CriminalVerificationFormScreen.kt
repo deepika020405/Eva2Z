@@ -1,192 +1,304 @@
 package com.developer.ev2z.ui.screens.CriminalVerification
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.SearchBarDefaults.InputField
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CriminalVerificationFormScreen(
     isLoading: Boolean,
     onBack: () -> Unit,
     onSubmit: (CriminalForm) -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
-    var employeeId by remember { mutableStateOf("") }
-    var houseNo by remember { mutableStateOf("") }
-    var colony by remember { mutableStateOf("") }
-    var city by remember { mutableStateOf("") }
-    var state by remember { mutableStateOf("") }
-    var pincode by remember { mutableStateOf("") }
-    var landmark by remember { mutableStateOf("") }
-    var stayingPeriod by remember { mutableStateOf("") }
-    var consent by remember { mutableStateOf(false) }
+    var name by rememberSaveable { mutableStateOf("") }
+    var email by rememberSaveable { mutableStateOf("") }
+    var phone by rememberSaveable { mutableStateOf("") }
+    var employeeId by rememberSaveable { mutableStateOf("") }
+    var houseNo by rememberSaveable { mutableStateOf("") }
+    var colony by rememberSaveable { mutableStateOf("") }
+    var city by rememberSaveable { mutableStateOf("") }
+    var state by rememberSaveable { mutableStateOf("") }
+    var pincode by rememberSaveable { mutableStateOf("") }
+    var landmark by rememberSaveable { mutableStateOf("") }
+    var stayingPeriod by rememberSaveable { mutableStateOf("") }
+    var consent by rememberSaveable { mutableStateOf(false) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp)
+    // 🔥 NEW FIELDS
+    var uanNumber by rememberSaveable { mutableStateOf("") }
+    var rented by rememberSaveable { mutableStateOf(false) }
+
+    var expanded by remember { mutableStateOf(false) }
+
+    val stayingOptions = listOf(
+        "Under 6 months",
+        "6 months to 1 year",
+        "2 years",
+        "3 years",
+        "More than 3 years"
+    )
+
+    val emailValid = email.matches(Regex("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$"))
+    val phoneValid = phone.length == 10
+    val pincodeValid = pincode.length == 6
+
+    val isFormValid =
+        name.isNotBlank() &&
+                emailValid &&
+                phoneValid &&
+                employeeId.isNotBlank() &&
+                houseNo.isNotBlank() &&
+                colony.isNotBlank() &&
+                city.isNotBlank() &&
+                state.isNotBlank() &&
+                pincodeValid &&
+                stayingPeriod.isNotBlank() &&
+                consent
+
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.TopCenter
     ) {
-
-        // 🔹 Header
-        Text(
-            text = "Criminal Verification",
-            style = MaterialTheme.typography.headlineSmall
-        )
-
-        Spacer(Modifier.height(16.dp))
-
-        // 🔹 Personal Details Card
-        FormSectionCard(title = "Personal Details") {
-
-            FormInputField("Full Name", name) { name = it }
-            FormInputField("Email Address", email) { email = it }
-            FormInputField("Phone Number", phone) { phone = it }
-            FormInputField("Employee ID", employeeId) { employeeId = it }
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        // 🔹 Address Card
-        FormSectionCard(title = "Address Details") {
-
-            FormInputField("House No", houseNo) { houseNo = it }
-            FormInputField("Colony", colony) { colony = it }
-            FormInputField("City", city) { city = it }
-            FormInputField("State", state) { state = it }
-            FormInputField("Pincode", pincode) { pincode = it }
-            FormInputField("Landmark", landmark) { landmark = it }
-            FormInputField("Staying Period", stayingPeriod) { stayingPeriod = it }
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        // 🔹 Consent Card
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFF7F7F7))
-        ) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Checkbox(
-                    checked = consent,
-                    onCheckedChange = { consent = it }
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    text = "I confirm that the provided information is accurate.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
-        }
-
-        Spacer(Modifier.height(24.dp))
-
-        // 🔹 Submit Button
-        Button(
-            onClick = {
-                onSubmit(
-                    CriminalForm(
-                        name, email, phone, employeeId, consent,
-                        houseNo, colony, city, state, pincode,
-                        landmark, stayingPeriod
-                    )
-                )
-            },
+        Column(
             modifier = Modifier
+                .widthIn(max = 600.dp)
                 .fillMaxWidth()
-                .height(52.dp),
-            shape = RoundedCornerShape(12.dp),
-            enabled = !isLoading
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
         ) {
-            Text(
-                if (isLoading) "Processing..." else "Proceed to Payment",
-                style = MaterialTheme.typography.titleMedium
-            )
-        }
 
-        Spacer(Modifier.height(24.dp))
+            SectionCard("Personal Details") {
+
+                InputField("Full Name", name) { name = it.trimStart() }
+
+                InputField(
+                    "Email Address",
+                    email,
+                    KeyboardType.Email,
+                    email.isNotEmpty() && !emailValid,
+                    "Enter valid email"
+                ) { email = it.trim() }
+
+                InputField(
+                    "Phone Number",
+                    phone,
+                    KeyboardType.Phone,
+                    phone.isNotEmpty() && !phoneValid,
+                    "Must be 10 digits"
+                ) {
+                    phone = it.filter { ch -> ch.isDigit() }.take(10)
+                }
+
+                InputField("Employee ID", employeeId) {
+                    employeeId = it.uppercase()
+                }
+
+                // 🔥 NEW → UAN (optional)
+                InputField(
+                    label = "UAN Number (optional)",
+                    value = uanNumber,
+                    keyboardType = KeyboardType.Number
+                ) {
+                    uanNumber = it.filter { ch -> ch.isDigit() }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            SectionCard("Address Details") {
+
+                InputField("House No", houseNo) { houseNo = it }
+                InputField("Colony", colony) { colony = it }
+                InputField("City", city) { city = it }
+                InputField("State", state) { state = it }
+
+                InputField(
+                    "Pincode",
+                    pincode,
+                    KeyboardType.Number,
+                    pincode.isNotEmpty() && !pincodeValid,
+                    "Must be 6 digits"
+                ) {
+                    pincode = it.filter { ch -> ch.isDigit() }.take(6)
+                }
+
+                InputField("Landmark", landmark) { landmark = it }
+
+                // 🔥 Rented Toggle
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        checked = rented,
+                        onCheckedChange = { rented = it }
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("This is a rented property")
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                // Staying Period Dropdown
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded }
+                ) {
+                    OutlinedTextField(
+                        value = stayingPeriod,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Staying Period") },
+                        trailingIcon = {
+                            Icon(Icons.Outlined.KeyboardArrowDown, null)
+                        },
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        isError = stayingPeriod.isBlank()
+                    )
+
+                    ExposedDropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        stayingOptions.forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(option) },
+                                onClick = {
+                                    stayingPeriod = option
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            // Consent
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                )
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = consent,
+                        onCheckedChange = { consent = it }
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("I confirm the information is accurate.")
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            Button(
+                onClick = {
+                    onSubmit(
+                        CriminalForm(
+                            name.trim(),
+                            email.trim(),
+                            phone,
+                            employeeId.trim(),
+                            consent,
+                            houseNo.trim(),
+                            colony.trim(),
+                            city.trim(),
+                            state.trim(),
+                            pincode,
+                            landmark.trim(),
+                            stayingPeriod,
+
+                            // 🔥 NEW FIELDS
+                            uanNumber = uanNumber,
+                            uanNotAvailable = uanNumber.isBlank(),
+                            rented = rented
+                        )
+                    )
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(54.dp),
+                enabled = !isLoading && isFormValid
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(20.dp)
+                    )
+                } else {
+                    Text("Proceed to Payment")
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+        }
     }
 }
 
 @Composable
-fun FormSectionCard(
+fun SectionCard(
     title: String,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Card(
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(2.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        shape = RoundedCornerShape(18.dp),
+        elevation = CardDefaults.cardElevation(3.dp)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium
-            )
+        Column(Modifier.padding(16.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(12.dp))
             content()
         }
     }
 }
 
-
 @Composable
-fun FormInputField(
+fun InputField(
     label: String,
     value: String,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    isError: Boolean = false,
+    errorText: String = "",
     onChange: (String) -> Unit
 ) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onChange,
-        label = { Text(label) },
-        singleLine = true,
-        shape = RoundedCornerShape(12.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp)
-    )
-}
+    Column {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onChange,
+            label = { Text(label) },
+            singleLine = true,
+            shape = RoundedCornerShape(12.dp),
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+            isError = isError,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 6.dp)
+        )
 
-
-@Composable
-fun InputField(label: String, value: String, onChange: (String) -> Unit) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onChange,
-        label = { Text(label) },
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-    )
+        if (isError) {
+            Text(
+                text = errorText,
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(start = 12.dp)
+            )
+        }
+    }
 }

@@ -160,7 +160,7 @@ class HomeTab(
                     onNavigateToDeviceReport()  // 📊 Today Device Report
                 },
 
-//                        onCriminalVerification = onNavigateToCriminalVerification // ✅ NEW
+                        onCriminalVerification = onNavigateToCriminalVerification // ✅ NEW
 
             )
         }

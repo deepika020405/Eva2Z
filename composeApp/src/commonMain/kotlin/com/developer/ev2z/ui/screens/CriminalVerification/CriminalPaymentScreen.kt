@@ -30,37 +30,95 @@ import io.ktor.websocket.Frame
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CriminalPaymentScreen(
-    paymentUrl: String,
+    paymentToken: String,
     amount: Int,
     onSuccess: (String?) -> Unit,
     onFailure: (String?) -> Unit,
     onBack: () -> Unit
 ) {
-    Column(Modifier.fillMaxSize().padding(16.dp)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(20.dp),
+        verticalArrangement = Arrangement.SpaceBetween,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
 
-        Text("Pay ₹$amount for Criminal Verification")
+        // 🔹 Header
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = "Secure Payment",
+                style = MaterialTheme.typography.headlineSmall
+            )
 
-        Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(6.dp))
 
-        Button(
-            onClick = {
-                openPhonePeSdk(paymentUrl) { result ->
-                    if (result.success) {
-                        onSuccess(result.transactionId)
-                    } else {
-                        onFailure(result.message)
-                    }
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Pay with PhonePe")
+            Text(
+                text = "Complete your verification payment",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
 
-        Spacer(Modifier.height(16.dp))
+        // 🔹 Payment Card
+        androidx.compose.material3.ElevatedCard(
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.extraLarge
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
 
-        TextButton(onClick = onBack) {
-            Text("Cancel")
+                Text(
+                    text = "Amount to Pay",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                Text(
+                    text = "₹$amount",
+                    style = MaterialTheme.typography.displaySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+
+                Spacer(Modifier.height(20.dp))
+
+                Text(
+                    text = "You will be redirected to PhonePe to complete the payment securely.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+        }
+
+        // 🔹 Buttons
+        Column(modifier = Modifier.fillMaxWidth()) {
+
+            Button(
+                onClick = {
+                    openPhonePeSdk(paymentToken) { result ->
+                        if (result.success) onSuccess(result.transactionId)
+                        else onFailure(result.message)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = MaterialTheme.shapes.large
+            ) {
+                Text("Pay with PhonePe")
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            TextButton(
+                onClick = onBack,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Cancel Payment")
+            }
         }
     }
 }
