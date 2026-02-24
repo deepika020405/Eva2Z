@@ -23,6 +23,8 @@ import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.ui.components.FloatingContactButton
+import com.developer.ev2z.util.AlertPrefs
+import com.developer.ev2z.util.saveAlertPrefs
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,22 +42,20 @@ fun AccountActivityScreen(
     var showPasswordDialog by remember { mutableStateOf(false) }
     var password by remember { mutableStateOf("") }
 
-    // ✅ Watch for delete success and trigger logout
+    // ✅ NEW — Alert toggles (no LocalContext needed)
+    var alarmEnabled by remember { mutableStateOf(AlertPrefs.alarmEnabled) }
+    var smsEnabled by remember { mutableStateOf(AlertPrefs.smsEnabled) }
+
+    // ✅ UNCHANGED — Watch for delete success and trigger logout
     LaunchedEffect(state.deleteSuccess) {
         if (state.deleteSuccess) {
             println("✅ AccountActivityScreen: Delete success detected!")
-
-            // Wait a moment for user to see success message
             delay(1500)
-
             println("🚪 AccountActivityScreen: Closing dialogs...")
-            // Close dialogs
             showPasswordDialog = false
             showDeleteDialog = false
             password = ""
-
             println("🚪 AccountActivityScreen: Calling onAccountDeleted()...")
-            // Trigger logout callback
             onAccountDeleted()
         }
     }
@@ -102,107 +102,81 @@ fun AccountActivityScreen(
                     .background(Color(0xFFF5F5F5))
             ) {
                 item {
-                    /*
-                Spacer(modifier = Modifier.height(16.dp))
 
-                // Account Information Section (Future Feature)
-                Text(
-                    text = "Account Information",
-                    fontSize = 14.sp,
-                    color = Color.Gray,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 8.dp)
-                )
+                    // ─────────────────────────────────────
+                    // ✅ NEW — GeoFence Alert Settings
+                    // ─────────────────────────────────────
+                    Spacer(Modifier.height(16.dp))
 
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 8.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Column {
-                        SettingNavigationItem(
-                            icon = Icons.Default.Person,
-                            title = "Profile",
-                            subtitle = "View and edit your profile",
-                            onClick = { /* TODO: Navigate to profile */ }
-                        )
+                    Text(
+                        text = "GeoFence Alert Settings",
+                        fontSize = 14.sp,
+                        color = Color.Gray,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 8.dp)
+                    )
 
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            color = Color(0xFFE0E0E0)
-                        )
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Column {
 
-                        SettingNavigationItem(
-                            icon = Icons.Default.Lock,
-                            title = "Change Password",
-                            subtitle = "Update your password",
-                            onClick = { /* TODO: Navigate to change password */ }
-                        )
+                            // 🔊 Alarm Toggle
+                            AlertToggleItem(
+                                icon = Icons.Default.Notifications,
+                                title = "Alarm",
+                                subtitle = if (alarmEnabled)
+                                    "Alarm will ring on breach"
+                                else
+                                    "Alarm is disabled",
+                                checked = alarmEnabled,
+                                onCheckedChange = {
+                                    alarmEnabled = it
+                                    AlertPrefs.alarmEnabled = it
+                                    saveAlertPrefs(
+                                        AlertPrefs.alarmEnabled,
+                                        AlertPrefs.smsEnabled
+                                    )
+                                }
+                            )
 
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            color = Color(0xFFE0E0E0)
-                        )
+                            HorizontalDivider(
+                                modifier = Modifier.padding(horizontal = 16.dp),
+                                color = Color(0xFFE0E0E0)
+                            )
 
-                        SettingNavigationItem(
-                            icon = Icons.Default.Email,
-                            title = "Email",
-                            subtitle = "Manage email settings",
-                            onClick = { /* TODO: Navigate to email settings */ }
-                        )
+                            // 📩 SMS Toggle
+                            AlertToggleItem(
+                                icon = Icons.Default.Sms,
+                                title = "SMS Alert",
+                                subtitle = if (smsEnabled)
+                                    "SMS will be sent on breach"
+                                else
+                                    "SMS alert is disabled",
+                                checked = smsEnabled,
+                                onCheckedChange = {
+                                    smsEnabled = it
+                                    AlertPrefs.smsEnabled = it
+                                    saveAlertPrefs(
+                                        AlertPrefs.alarmEnabled,
+                                        AlertPrefs.smsEnabled
+                                    )
+                                }
+                            )
+                        }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                    // ─────────────────────────────────────
+                    // ✅ UNCHANGED — Delete Account
+                    // ─────────────────────────────────────
+                    Spacer(Modifier.height(16.dp))
 
-                // Activity Section (Future Feature)
-                Text(
-                    text = "Activity",
-                    fontSize = 14.sp,
-                    color = Color.Gray,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 8.dp)
-                )
-
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 8.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Column {
-                        SettingNavigationItem(
-                            icon = Icons.Default.History,
-                            title = "Login History",
-                            subtitle = "View your login activity",
-                            onClick = { /* TODO: Navigate to login history */ }
-                        )
-
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            color = Color(0xFFE0E0E0)
-                        )
-
-                        SettingNavigationItem(
-                            icon = Icons.Default.Devices,
-                            title = "Active Sessions",
-                            subtitle = "Manage active devices",
-                            onClick = { /* TODO: Navigate to active sessions */ }
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-                */
-
-                    // Danger Zone Section
                     Text(
                         text = "Delete Account",
                         fontSize = 14.sp,
@@ -232,8 +206,9 @@ fun AccountActivityScreen(
 
                     Spacer(modifier = Modifier.height(100.dp))
                 }
-
             }
+
+            // ✅ UNCHANGED
             FloatingContactButton(
                 phoneNumber = "919755273822",
                 modifier = Modifier
@@ -241,11 +216,9 @@ fun AccountActivityScreen(
                     .padding(end = 20.dp, bottom = 40.dp)
             )
         }
-
-
     }
 
-    // First Dialog - Confirmation
+    // ✅ UNCHANGED — First Dialog - Confirmation
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = {
@@ -260,10 +233,7 @@ fun AccountActivityScreen(
                 )
             },
             title = {
-                Text(
-                    "Delete Account",
-                    fontWeight = FontWeight.Bold
-                )
+                Text("Delete Account", fontWeight = FontWeight.Bold)
             },
             text = {
                 Column {
@@ -309,7 +279,7 @@ fun AccountActivityScreen(
         )
     }
 
-    // Second Dialog - Password Confirmation
+    // ✅ UNCHANGED — Second Dialog - Password Confirmation
     if (showPasswordDialog) {
         AlertDialog(
             onDismissRequest = {
@@ -328,10 +298,7 @@ fun AccountActivityScreen(
                 )
             },
             title = {
-                Text(
-                    "Confirm Password",
-                    fontWeight = FontWeight.Bold
-                )
+                Text("Confirm Password", fontWeight = FontWeight.Bold)
             },
             text = {
                 Column {
@@ -355,8 +322,6 @@ fun AccountActivityScreen(
                         isError = state.errorMessage != null
                     )
 
-                    // ✅ Show success message
-                    // ✅ Show success message
                     if (state.deleteSuccess) {
                         Spacer(Modifier.height(8.dp))
                         Text(
@@ -365,15 +330,12 @@ fun AccountActivityScreen(
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold
                         )
-
-                        // ✅ Trigger logout immediately when success message shows
                         LaunchedEffect(Unit) {
                             delay(1000)
                             onAccountDeleted()
                         }
                     }
 
-                    // Show error message
                     state.errorMessage?.let { error ->
                         Spacer(Modifier.height(8.dp))
                         Text(
@@ -387,9 +349,7 @@ fun AccountActivityScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        if (password.isEmpty()) {
-                            return@Button
-                        }
+                        if (password.isEmpty()) return@Button
                         println("🗑️ AccountActivityScreen: Delete button clicked")
                         viewModel.deleteAccount(password)
                     },
@@ -425,6 +385,58 @@ fun AccountActivityScreen(
     }
 }
 
+// ✅ NEW — Alert Toggle Item composable
+@Composable
+fun AlertToggleItem(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = title,
+            tint = if (checked) Color(0xFF4CAF50) else Color.Gray,
+            modifier = Modifier.size(24.dp)
+        )
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF333333)
+            )
+            Text(
+                text = subtitle,
+                fontSize = 13.sp,
+                color = if (checked) Color(0xFF4CAF50) else Color.Gray
+            )
+        }
+
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White,
+                checkedTrackColor = Color(0xFF4CAF50),
+                uncheckedThumbColor = Color.White,
+                uncheckedTrackColor = Color.LightGray
+            )
+        )
+    }
+}
+
+// ✅ UNCHANGED — SettingNavigationItem
 @Composable
 fun SettingNavigationItem(
     icon: ImageVector,

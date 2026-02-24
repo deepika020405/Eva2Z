@@ -3,15 +3,21 @@ package com.developer.ev2z
 import android.app.Application
 import android.util.Log
 import com.developer.ev2z.ui.screens.social_media.initOpenUrl
+import com.developer.ev2z.util.AlertPrefs
 import com.developer.ev2z.util.Analytics
+import com.developer.ev2z.util.AppContextProvider
 import com.developer.ev2z.util.MetaAnalytics
 import com.developer.ev2z.util.initContexts
+import com.developer.ev2z.util.loadAlertPrefs
 import com.facebook.FacebookSdk
 import com.facebook.appevents.AppEventsLogger
 
 class MainApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        AppContextHolder.context = this
+        loadAlertPrefs() // ✅ add karo — baaki sab unchanged
+
 
 
         try {

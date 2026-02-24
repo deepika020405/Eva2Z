@@ -42,10 +42,10 @@ class ProductDetailsScreen(
             }
         )
     }
-
 }
 
 @Composable
+
 fun ProductDetailsContent(
     product: ShopProduct,
     viewModel: ShopViewModel,

@@ -80,6 +80,7 @@ import com.developer.ev2z.ui.screens.homeScreen.HomeUiState
 import com.developer.ev2z.ui.screens.homeScreen.LiveLocationScreen
 import com.developer.ev2z.ui.screens.social_media.openUrl
 import com.developer.ev2z.util.BottomBarController
+import com.developer.ev2z.util.DeepLinkBus
 import com.developer.ev2z.util.platformDownloadFile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -114,10 +115,17 @@ class HomeTab(
             viewModel.loadDevices(token)
         }
 
-        val userName = (uiState as? HomeUiState.Success)
-            ?.deviceResponse
-            ?.name
-            ?: "User"
+        val userName = remember(uiState) {
+            val rawName = (uiState as? HomeUiState.Success)
+                ?.deviceResponse
+                ?.name
+
+            rawName
+                ?.substringBefore("@")
+                ?.replaceFirstChar { it.uppercase() }
+                ?.takeIf { it.isNotBlank() }
+                ?: "User"
+        }
 
         if (showLiveLocation) {
 
@@ -340,6 +348,23 @@ fun HomeNavGraph(
     // ✅ CREATE pagerState and coroutineScope HERE (at parent level)
     val pagerState = rememberPagerState(pageCount = { 4 })
     val coroutineScope = rememberCoroutineScope()
+
+
+    // ✅ StateFlow collect karo
+    val deepLinkDestination by DeepLinkBus.navigateTo.collectAsState()
+
+    LaunchedEffect(deepLinkDestination) {
+        when (deepLinkDestination) {
+            "shop" -> {
+                println("🧭 Deep link → Shop tab")
+                coroutineScope.launch {
+                    pagerState.animateScrollToPage(2)
+                }
+                DeepLinkBus.clear() // ✅ reset
+            }
+        }
+    }
+
     var selectedWarrantyDeviceId by remember { mutableStateOf("") }
     var showCriminalVerification by remember { mutableStateOf(false) }
     // Screen visibility states

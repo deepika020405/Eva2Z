@@ -5,17 +5,10 @@ import androidx.lifecycle.viewModelScope
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.util.getAddressFromLatLng
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.jsonPrimitive
-//import kotlinx.datetime.Clock
-//import kotlinx.datetime.Instant
-//import kotlinx.datetime.TimeZone
-//import kotlinx.datetime.toLocalDateTime
-import kotlin.math.abs
 
 
 data class GPSDevice(
@@ -57,12 +50,7 @@ class GPSDataViewModel(
     val state: StateFlow<GPSDataState> = _state.asStateFlow()
 
     init {
-        viewModelScope.launch {
-            while (true) {
-                loadDevices()
-                delay(10000)
-            }
-        }
+        loadDevices()
     }
 
     fun loadDevices() {

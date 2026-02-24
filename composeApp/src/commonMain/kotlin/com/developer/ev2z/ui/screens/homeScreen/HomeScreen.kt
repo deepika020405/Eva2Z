@@ -31,6 +31,7 @@ import org.jetbrains.compose.resources.painterResource
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.homebanner
 import eva2z_connect_multiplatform.composeapp.generated.resources.homebanner1
+import eva2z_connect_multiplatform.composeapp.generated.resources.homebanner2
 import eva2z_connect_multiplatform.composeapp.generated.resources.scooter
 
 // ================= COLORS =================
@@ -175,7 +176,8 @@ fun TrackingPreviewCard() {
 
     val images = listOf(
         Res.drawable.homebanner,
-        Res.drawable.homebanner1
+        Res.drawable.homebanner1,
+        Res.drawable.homebanner2
     )
 
     val pagerState = rememberPagerState(pageCount = { images.size })
@@ -316,8 +318,6 @@ fun ModernFeaturesSection() {
         "SOS" to Icons.Default.Warning,
         "Background Verfication" to Icons.Default.Badge,
 //        "Criminal Verification" to Icons.Default.VerifiedUser   // ✅ added
-
-
     )
 
     val columns = 3

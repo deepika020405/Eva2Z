@@ -84,6 +84,20 @@
                     android:host="payment"
                     android:pathPrefix="/callback" />
             </intent-filter>
+
+
+
+            <!-- ✅ ALL DEEP LINKS HANDLER -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="https"
+                    android:host="go.eva2z.com"
+                    android:pathPrefix="/shop"/>
+            </intent-filter>
+
         </activity>
 
         <!-- Google Maps API Key -->
@@ -121,6 +135,13 @@
         <meta-data
             android:name="com.facebook.sdk.AutoLogAppEventsEnabled"
             android:value="true"/>
+
+
+        <!-- ✅ Stop Alarm Receiver -->
+        <receiver
+            android:name=".AlarmStopReceiver"
+            android:exported="false" />
+
 
 
 
