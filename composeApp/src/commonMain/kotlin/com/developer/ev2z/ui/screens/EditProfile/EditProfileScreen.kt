@@ -50,13 +50,17 @@ fun EditProfileScreen(
 //    var showSuccessDialog by remember { mutableStateOf(false) }
 
     var emailError by remember(state.userEmail) {
-        mutableStateOf(!isValidEmail(state.userEmail))
+        mutableStateOf(
+            state.userEmail.isNotBlank() && !isValidEmail(state.userEmail)
+        )
     }
 
     val hasChanges = remember(state) {
-        state.userName.trim() != state.originalName ||
-                state.userEmail.trim() != state.originalEmail ||
-                state.userImageBytes != null
+        val nameChanged = state.userName.trim() != state.originalName
+        val emailChanged = state.userEmail.trim() != state.originalEmail
+        val imageChanged = state.userImageBytes != null
+
+        nameChanged || emailChanged || imageChanged
     }
 
     val scrollState = rememberScrollState()

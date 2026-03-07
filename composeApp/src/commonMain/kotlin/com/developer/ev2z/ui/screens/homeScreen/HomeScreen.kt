@@ -76,7 +76,11 @@ fun HomeScreen(
     onOpenDeviceReport: () -> Unit,
     onRefer: () -> Unit,
     onOpenAddDevice: () -> Unit,
-    onCriminalVerification: () -> Unit   // ✅ ADD THIS
+    onCriminalVerification: () -> Unit,   // ✅ ADD THIS
+    onDriverScore: () -> Unit ,            // ✅ NEW — Driver Score navigation
+    onParking: () -> Unit,           // ✅ CHANGED — new param
+    onOpenCommunity: () -> Unit
+
 
 ) {
     Scaffold(containerColor = BackgroundColor) { padding ->
@@ -103,11 +107,17 @@ fun HomeScreen(
                     onOpenDocuments = onOpenDocuments,
                     onOpenDeviceReport = onOpenDeviceReport,
                     onCriminalVerification = onCriminalVerification,   // ✅ ADD
-                    onOpenAddDevice = onOpenAddDevice
+                    onOpenAddDevice = onOpenAddDevice,
+                    onOpenCommunity = onOpenCommunity
                 )
             }
 
-            item { ModernFeaturesSection() }
+            item { ModernFeaturesSection(
+                onDriverScore = onDriverScore,  // ✅ NEW — pass karo
+                onParking     = onParking         // ✅ CHANGED — pass through
+
+
+            ) }
 
             item { Spacer(modifier = Modifier.height(20.dp)) }
         }
@@ -250,7 +260,9 @@ fun HomeQuickActionsSection(
     onOpenDocuments: () -> Unit,
     onOpenDeviceReport: () -> Unit,
     onCriminalVerification: () -> Unit,   // ✅ ADD
-    onOpenAddDevice:  () -> Unit
+    onOpenAddDevice:  () -> Unit,
+    onOpenCommunity: () -> Unit
+
 ) {
 
     val features = listOf(
@@ -265,7 +277,14 @@ fun HomeQuickActionsSection(
             "Criminal Verification",
             Icons.Default.VerifiedUser,
             onCriminalVerification   // ✅ connect
+        ),
+
+        QuickActionItem(
+            "Community",
+            Icons.Default.Groups,
+            onOpenCommunity   // ✅ connect
         )
+
        )
 
     val columns = 3
@@ -307,17 +326,20 @@ fun HomeQuickActionsSection(
 // ================= UPCOMING FEATURES =================
 
 @Composable
-fun ModernFeaturesSection() {
+fun ModernFeaturesSection(
+    onDriverScore: () -> Unit,
+    onParking: () -> Unit             // ✅ CHANGED — new param
+
+) {
 
     val features = listOf(
-        "Driver Score" to Icons.Default.EmojiEvents,
-        "Service Market" to Icons.Default.Build,
-        "Repair Market" to Icons.Default.DirectionsCar,
-        "Charging" to Icons.Default.EvStation,
-        "Parking" to Icons.Default.LocalParking,
-        "SOS" to Icons.Default.Warning,
-        "Background Verfication" to Icons.Default.Badge,
-//        "Criminal Verification" to Icons.Default.VerifiedUser   // ✅ added
+        QuickActionItem("Driver Score", Icons.Default.EmojiEvents, onDriverScore),
+        QuickActionItem("Service Market", Icons.Default.Build) {},
+        QuickActionItem("Repair Market", Icons.Default.DirectionsCar) {},
+        QuickActionItem("Charging", Icons.Default.EvStation) {},
+        QuickActionItem("Parking",Icons.Default.LocalParking,   onParking),  // ✅ CHANGED
+        QuickActionItem("SOS", Icons.Default.Warning) {},
+        QuickActionItem("Background Verification", Icons.Default.Badge) {}
     )
 
     val columns = 3
@@ -348,8 +370,8 @@ fun ModernFeaturesSection() {
                     .fillMaxWidth()
                     .height(gridHeight)
             ) {
-                items(features) { (title, icon) ->
-                    ModernFeatureItem(title, icon) {}
+                items(features) { item ->
+                    ModernFeatureItem(item.title, item.icon, item.onClick)
                 }
             }
         }

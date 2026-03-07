@@ -23,7 +23,6 @@ enum class WarrantyStatus {
     EXPIRED
 }
 
-
 class WarrantyViewModel(
     private val apiService: ApiService = ApiService()
 ) : ViewModel() {
@@ -31,31 +30,17 @@ class WarrantyViewModel(
     private val _state = MutableStateFlow<SupportWarrantyUi?>(null)
     val state: StateFlow<SupportWarrantyUi?> = _state.asStateFlow()
 
+    private val _isLoaded = MutableStateFlow(false)  // 👈 add this
+    val isLoaded: StateFlow<Boolean> = _isLoaded.asStateFlow()
+
     fun loadWarranty(deviceId: String) {
         viewModelScope.launch {
             try {
-                println("🟢 loadWarranty called with deviceId = $deviceId")
-
                 val response = apiService.getUserDevices()
 
-                println("🟢 API success = ${response.success}")
-                println("🟢 API total devices = ${response.data.size}")
-
-                response.data.forEach {
-                    println(
-                        "📦 API Device -> id=${it.device_id}, " +
-                                "number=${it.device_number}, " +
-                                "warranty_status=${it.warranty_status}"
-                    )
-                }
-
                 if (response.success) {
-
                     val device = response.data
                         .firstOrNull { it.device_id.toString() == deviceId }
-
-                    println("🔍 Matched device = $device")
-
                     device?.let {
                         _state.value = it.toWarrantyUiModel()
                     }
@@ -63,6 +48,8 @@ class WarrantyViewModel(
 
             } catch (e: Exception) {
                 println("❌ Warranty load error: ${e.message}")
+            } finally {
+                _isLoaded.value = true  // 👈 always mark as done
             }
         }
     }

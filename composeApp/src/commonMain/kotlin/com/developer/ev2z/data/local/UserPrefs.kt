@@ -1,5 +1,7 @@
 package com.developer.ev2z.data.local
 
+import kotlinx.serialization.encodeToString
+
 class UserPrefs(private val storage: StorageManager) {  // ✅ Storage → StorageManager
 
     fun saveUser(
@@ -29,8 +31,33 @@ class UserPrefs(private val storage: StorageManager) {  // ✅ Storage → Stora
     }
 
 
-
     fun isLoggedIn() = getToken()?.isNotEmpty()
 
     fun clear() = storage.clear()
+
+
+
+    // ── PARKING HISTORY ──────────────────────────────────────────────
+    private val parkingJson = kotlinx.serialization.json.Json {
+        ignoreUnknownKeys = true
+        isLenient         = true
+        coerceInputValues = true
+    }
+
+    fun saveParkingEntry(entry: com.developer.ev2z.ui.screens.VechicleParkingTag.ParkingData) {
+        val existing = getParkingHistory()
+        val updated  = listOf(entry) + existing.take(49)  // max 50 entries
+        storage.saveString("parking_history", parkingJson.encodeToString(updated))
+    }
+
+    fun getParkingHistory(): List<com.developer.ev2z.ui.screens.VechicleParkingTag.ParkingData> {
+        val raw = storage.getString("parking_history", "")
+        if (raw.isBlank()) return emptyList()
+        return runCatching {
+            parkingJson.decodeFromString<List<com.developer.ev2z.ui.screens.VechicleParkingTag.ParkingData>>(raw)
+        }.getOrElse { emptyList() }
+    }
+
 }
+
+

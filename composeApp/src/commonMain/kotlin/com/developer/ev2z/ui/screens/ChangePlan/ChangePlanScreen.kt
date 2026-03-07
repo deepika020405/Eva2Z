@@ -70,23 +70,50 @@ fun ChangePlanScreen(
             val pad = responsivePadding(maxWidth)
             val contentWidth = responsiveContentWidth(maxWidth)
 
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = pad),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                items(devices) { device ->
-                    DevicePlanCard(
-                        device = device,
-                        onRenew = { selectedDevice = device },
-                        contentWidth = contentWidth
-                    )
+            // ✅ EMPTY STATE (NEW — safe addition)
+            if (devices.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+
+                        Text(
+                            text = "No devices found",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+
+                        Spacer(Modifier.height(8.dp))
+
+                        Text(
+                            text = "Add a device to start using plans & subscriptions.",
+                            color = Color.Gray
+                        )
+                    }
+                }
+            } else {
+                // ✅ EXISTING DEVICE LIST (unchanged)
+                LazyColumn(
+
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = pad),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    items(devices) { device ->
+                        DevicePlanCard(
+                            device = device,
+                            onRenew = { selectedDevice = device },
+                            contentWidth = contentWidth
+                        )
+                    }
                 }
             }
         }
     }
 
+    // ✅ Bottom sheet logic (unchanged)
     selectedDevice?.let { device ->
         RenewPlanBottomSheet(
             device = device,

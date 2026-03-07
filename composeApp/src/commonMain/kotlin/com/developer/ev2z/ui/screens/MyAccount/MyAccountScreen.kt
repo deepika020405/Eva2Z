@@ -9,19 +9,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -29,20 +19,27 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.ui.screens.Profile.ProfileMenuItemRow
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MyAccountScreen(
-    selectedDeviceId: String,   // 🔥 ADD THIS
+    selectedDeviceId: String,
     onBack: () -> Unit,
     onChangePlan: () -> Unit,
     onBillDetails: () -> Unit,
     onWarranty: (String) -> Unit
 ) {
-    PlatformBackHandler(true){
+    PlatformBackHandler(true) {
         onBack()
     }
+
+    // 🔹 Snackbar for user feedback
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("My Account", fontWeight = FontWeight.SemiBold) },
@@ -65,6 +62,7 @@ fun MyAccountScreen(
                 .background(Color(0xFFF5F5F5))
         ) {
 
+            // 🔹 Plan & Billing Section
             item {
                 AccountCard(
                     "Plan & Billing",
@@ -75,12 +73,23 @@ fun MyAccountScreen(
                 )
             }
 
+            // 🔹 Device & Warranty Section
             item {
                 AccountCard(
                     "Device & Warranty",
                     listOf(
                         "Warranty Information" to {
-                            onWarranty(selectedDeviceId)
+                            if (selectedDeviceId.isNotBlank()) {
+                                // ✅ Device exists → open warranty
+                                onWarranty(selectedDeviceId)
+                            } else {
+                                // ❌ No device → show message only
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(
+                                        "No device added. Please add a device first."
+                                    )
+                                }
+                            }
                         }
                     )
                 )

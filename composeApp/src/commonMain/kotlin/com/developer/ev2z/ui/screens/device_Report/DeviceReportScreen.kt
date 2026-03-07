@@ -322,8 +322,14 @@ fun TopDeviceBoxWithData(
 
                     Spacer(Modifier.width(10.dp))
 
+                    val deviceText = when {
+                        deviceCount == 0 -> "No Devices Added"
+                        selectedDevice.isNullOrBlank() -> "Select Device"
+                        else -> selectedDevice
+                    }
+
                     Text(
-                        text = selectedDevice ?: "Select Device",
+                        text = deviceText,
                         fontSize = 15.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis

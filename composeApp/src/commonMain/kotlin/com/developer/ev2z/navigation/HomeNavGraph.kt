@@ -27,6 +27,7 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import cafe.adriel.voyager.navigator.tab.*
 import com.developer.ev2z.LocalPlatformActivity
 import com.developer.ev2z.data.local.StorageManager
+import com.developer.ev2z.data.local.UserPrefs
 import com.developer.ev2z.getAppContext
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.repository.ProductRepository
@@ -58,6 +59,7 @@ import com.developer.ev2z.ui.screens.ChangePlan.DevicePlanUi
 import com.developer.ev2z.ui.screens.CriminalVerification.CriminalVerificationFlow
 //import com.developer.ev2z.ui.screens.CriminalVerification.CriminalVerificationScreen
 import com.developer.ev2z.ui.screens.CriminalVerification.CriminalVerificationViewModel
+import com.developer.ev2z.ui.screens.DriverScore.DriverScoreFlowScreen
 import com.developer.ev2z.ui.screens.GPSData.GPSDataScreen
 import com.developer.ev2z.ui.screens.MyAccount.MyAccountScreen
 //import com.developer.ev2z.ui.screens.GPSData.GPSDataScreen
@@ -69,6 +71,8 @@ import com.developer.ev2z.ui.screens.SupportAndWarrenty.SupportWarrantyScreen
 import com.developer.ev2z.ui.screens.SupportAndWarrenty.SupportWarrantyUi
 import com.developer.ev2z.ui.screens.SupportAndWarrenty.WarrantyRoute
 import com.developer.ev2z.ui.screens.SupportAndWarrenty.WarrantyStatus
+import com.developer.ev2z.ui.screens.VechicleParkingTag.ParkingScreen
+import com.developer.ev2z.ui.screens.VechicleParkingTag.ParkingViewModel
 import com.developer.ev2z.ui.screens.community.CommunityScreenRoot
 import com.developer.ev2z.ui.screens.community.CreatePostScreen
 import com.developer.ev2z.ui.screens.community.CreateStoryScreen
@@ -101,13 +105,16 @@ class HomeTab(
     private val onNavigateToDeviceReport: () -> Unit,
     private val onOpenTrackTrace: () -> Unit,
     private val onNavigateToCriminalVerification: () -> Unit,
-    private val onDocumentsTabSelected: () -> Unit
+    private val onDocumentsTabSelected: () -> Unit,
+    private val onNavigateToDriverScore: () -> Unit, // ✅ NEW
+    private val onNavigateToParking: () -> Unit   // ✅ CHANGED — add this
 ) : Tab {
 
     @Composable
     override fun Content() {
 
         var showLiveLocation by rememberSaveable { mutableStateOf(false) }
+
 
         val uiState by viewModel.uiState.collectAsState()
 
@@ -144,7 +151,8 @@ class HomeTab(
 
             HomeScreen(
                 userName = userName,
-
+                onDriverScore = onNavigateToDriverScore,
+                onParking = onNavigateToParking,         // ✅ CHANGED
                 onOpenLiveLocation = { showLiveLocation = true },
 
                 onManageDevice = { onNavigateToManageDevice() },
@@ -164,9 +172,12 @@ class HomeTab(
                 },
 
 
+
                 onOpenDeviceReport = {
                     onNavigateToDeviceReport()  // 📊 Today Device Report
                 },
+
+                onOpenCommunity = onOpenCommunity,
 
                         onCriminalVerification = onNavigateToCriminalVerification // ✅ NEW
 
@@ -333,13 +344,14 @@ fun HomeNavGraph(
     apiService: ApiService,
     storageManager: StorageManager,
     token: String,
+    userPrefs: UserPrefs,         // ✅ add karo
     onNavigateToAddDevice: () -> Unit,
     onNavigateToDeviceReport: () -> Unit,
     onOpenDeviceStatus: () -> Unit,
     onOpenTrackTrace: () -> Unit,
     onNavigateToChangePassword: () -> Unit = {},
     onNavigateToAboutApp: () -> Unit = {},
-    onLogout: () -> Unit = {}
+    onLogout: () -> Unit = {},
 ) {
     SetupStatusBar()
 
@@ -394,6 +406,10 @@ fun HomeNavGraph(
     var showCreatePost by remember { mutableStateOf(false) }
     var showCreateStory by remember { mutableStateOf(false) }
     var showStoryViewer by remember { mutableStateOf(false) }
+
+
+    var showDriverScore by remember { mutableStateOf(false) }
+    var showParking     by remember { mutableStateOf(false) }  // ✅ CHANGED — add
 
     // 🔥 MY ACCOUNT FLOW
     var showMyAccount by remember { mutableStateOf(false) }
@@ -471,6 +487,10 @@ fun HomeNavGraph(
                     showVaultPasswordDialog = true
                 },
                 onOpenCommunity = { showCommunity = true },
+                onNavigateToDriverScore = { showDriverScore = true },  // ✅ ADD
+                onNavigateToParking     = { showParking = true },    // ✅ CHANGED
+
+
                 onLogout = onLogout
             )
         }
@@ -532,6 +552,7 @@ fun HomeNavGraph(
 //                )
 //            }
 //        }
+
         if (showCommunity) {
             CommunityScreenRoot(
                 onBack = { showCommunity = false },
@@ -701,7 +722,7 @@ fun HomeNavGraph(
                     showMyAccount = false
                     showBillDetails = true
                 },
-                onWarranty = { deviceId ->   // ✅ IMPORTANT
+                onWarranty = { deviceId ->
                     selectedWarrantyDeviceId = deviceId
                     showMyAccount = false
                     showWarranty = true
@@ -738,18 +759,22 @@ fun HomeNavGraph(
             )
         }
 
-        if (showWarranty && selectedWarrantyDeviceId != null) {
-            WarrantyRoute(
-                deviceId = selectedWarrantyDeviceId!!,
-                onBack = {
-                    showWarranty = false
-                    showMyAccount = true
-                },
-                onBuyWarranty = {
-                    println("Buy warranty clicked")
-                }
-            )
-        }
+    if (showWarranty) {
+        WarrantyRoute(
+            deviceId = selectedWarrantyDeviceId,
+            onBack = {
+                showWarranty = false
+                showMyAccount = true
+            },
+            onBuyWarranty = {
+                println("Buy warranty clicked")
+            },
+            onAddDevice = {          // 🔥 ADD THIS
+                showWarranty = false
+                showAddDevice = true
+            }
+        )
+    }
 
         // Edit Device Name Screen
         if (showEditDeviceName) {
@@ -766,6 +791,27 @@ fun HomeNavGraph(
                 }
             )
         }
+
+
+
+
+    if (showDriverScore) {
+        DriverScoreFlowScreen(
+            onBack = { showDriverScore = false }
+        )
+    }
+
+// Parking
+    if (showParking) {
+        // ✅ NAYA — variable mein assign karo
+        val parkingViewModel = remember {
+            ParkingViewModel(apiService = apiService, userPrefs = userPrefs)
+        }
+        ParkingScreen(
+            viewModel     = parkingViewModel,
+            onBackPressed = { showParking = false }
+        )
+    }
 
         // Privacy Policy
         if (showPrivacyPolicy) {
@@ -1099,6 +1145,8 @@ fun HomeNavGraphContent(
     onDocumentsTabSelected: () -> Unit,   // ✅ ADD
     onNavigateToCriminalVerification: () -> Unit,   // ✅ ADD HERE
     onOpenCommunity: () -> Unit,
+    onNavigateToDriverScore: () -> Unit,  // ✅ ADD THIS LINE
+    onNavigateToParking: () -> Unit,    // ✅ CHANGED — add after onNavigateToDriverScore
     onLogout: () -> Unit
 ) {
     val productRepository = remember { ProductRepository(apiService) }
@@ -1124,7 +1172,11 @@ fun HomeNavGraphContent(
             onNavigateToDeviceReport = onNavigateToDeviceReport,
             onOpenTrackTrace = onOpenTrackTrace,
             onDocumentsTabSelected = onDocumentsTabSelected,  // ✅ ADD THIS
-            onNavigateToCriminalVerification = onNavigateToCriminalVerification // ✅ FIX
+            onNavigateToCriminalVerification = onNavigateToCriminalVerification, // ✅ FIX
+            onNavigateToDriverScore = onNavigateToDriverScore,// ✅ ADD
+            onNavigateToParking     = onNavigateToParking,    // ✅ CHANGED
+
+
 
         )
     }

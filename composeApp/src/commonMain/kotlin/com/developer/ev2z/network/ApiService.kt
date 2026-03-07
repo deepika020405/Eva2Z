@@ -17,9 +17,13 @@ import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanScreenHost
 import com.developer.ev2z.ui.screens.ChangePlan.UserDevicesResponse
 import com.developer.ev2z.ui.screens.CriminalVerification.CandidateResult
 import com.developer.ev2z.ui.screens.CriminalVerification.CriminalForm
+import com.developer.ev2z.ui.screens.VechicleParkingTag.ParkingData
+import com.developer.ev2z.ui.screens.VechicleParkingTag.ParkingRequest
+import com.developer.ev2z.ui.screens.VechicleParkingTag.ParkingResponse
 import com.developer.ev2z.util.AppTokenProvider
 import io.ktor.client.call.*
 import io.ktor.client.plugins.ClientRequestException
+import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.ResponseException
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
@@ -1109,6 +1113,104 @@ class ApiService {
         }
     }
 
+
+
+    // ---------------- VEHICLE PARKING ----------------
+    suspend fun parkVehicle(
+        vehicleType: String,
+        vehicleNumber: String
+    ): ParkingResponse {
+
+        val token = AppTokenProvider.getToken()
+        val url   = "${baseUrl}vehicle-parking"
+
+        println("🌐 parkVehicle → POST $url")
+
+        return try {
+            val response = client.post(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(ParkingRequest(
+                    vehicle_type   = vehicleType.trim(),
+                    vehicle_number = vehicleNumber.trim()
+                ))
+            }
+
+            val raw = response.bodyAsText()
+            println("✔️ parkVehicle ${response.status}: $raw")
+
+            val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
+
+            when {
+                response.status == HttpStatusCode.OK ||
+                        response.status == HttpStatusCode.Created ->
+                    json.decodeFromString(ParkingResponse.serializer(), raw)
+
+                response.status == HttpStatusCode.UnprocessableEntity -> {
+                    val body = runCatching {
+                        json.decodeFromString(ParkingResponse.serializer(), raw)
+                    }.getOrNull()
+                    ParkingResponse(
+                        status  = false,
+                        message = body?.message ?: "Validation failed.",
+                        errors  = body?.errors
+                    )
+                }
+
+                response.status == HttpStatusCode.Unauthorized ->
+                    ParkingResponse(status = false, message = "Session expired. Please login again.")
+
+                else ->
+                    ParkingResponse(status = false, message = "Error: ${response.status.value}")
+            }
+
+        } catch (e: Exception) {
+            println("❌ parkVehicle: ${e.message}")
+            ParkingResponse(status = false, message = "Network error: ${e.message ?: "Unknown"}")
+        }
+    }
+
+    // ---------------- PARKING HISTORY ----------------
+    suspend fun getParkingHistory(): List<ParkingData> {
+
+        val token = AppTokenProvider.getToken()
+        val url   = "${baseUrl}vehicle-parking"
+
+        println("🌐 getParkingHistory → GET $url")
+
+        return try {
+            val response = client.get(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                contentType(ContentType.Application.Json)
+            }
+
+            val raw = response.bodyAsText()
+            println("📥 getParkingHistory: $raw")
+
+            if (!response.status.isSuccess()) return emptyList()
+
+            val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
+
+            // Try list response: { "status": true, "data": [ {...}, {...} ] }
+            runCatching {
+                @kotlinx.serialization.Serializable
+                data class HistoryList(
+                    val status: Boolean           = false,
+                    val data: List<ParkingData>?  = null
+                )
+                json.decodeFromString(HistoryList.serializer(), raw).data ?: emptyList()
+            }.getOrElse {
+                // Fallback: single object response like POST
+                runCatching {
+                    listOfNotNull(json.decodeFromString(ParkingResponse.serializer(), raw).data)
+                }.getOrElse { emptyList() }
+            }
+
+        } catch (e: Exception) {
+            println("❌ getParkingHistory: ${e.message}")
+            emptyList()
+        }
+    }
     // ---------------- ADD TO CART ----------------
     suspend fun addToCart(
         token: String,

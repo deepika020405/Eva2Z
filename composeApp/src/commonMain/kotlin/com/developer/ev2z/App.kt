@@ -379,6 +379,7 @@ fun App() {
                     viewModel = homeViewModel,
                     apiService = apiService,
                     storageManager = storage,
+                    userPrefs = userPrefs,        // ✅ add karo
                     token = authToken,
                     onNavigateToAddDevice = {
                         println("➕ Navigate to Add Device triggered")
@@ -592,3 +593,6 @@ enum class OpenSource {
     HOME,
     DEVICE_REPORT
 }
+
+
+
