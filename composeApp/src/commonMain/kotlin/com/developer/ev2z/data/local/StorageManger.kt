@@ -19,4 +19,9 @@ object StorageKeys {
     const val VAULT_EXPIRES_AT = "vault_expires_at"
     const val USER_NAME = "user_name"
 
+
+    // Deep Link keys
+    const val PENDING_DEEP_LINK = "pending_deep_link"
+    const val IS_FIRST_LAUNCH = "is_first_launch"
+
 }

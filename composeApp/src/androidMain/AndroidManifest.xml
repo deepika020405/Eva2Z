@@ -68,13 +68,13 @@
             android:launchMode="singleTop"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
 
-            <!-- Launcher -->
+            <!-- ✅ Launcher — sirf ek baar -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- PhonePe Callback -->
+            <!-- ✅ PhonePe Callback -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -85,17 +85,26 @@
                     android:pathPrefix="/callback" />
             </intent-filter>
 
-
-
-            <!-- ✅ ALL DEEP LINKS HANDLER -->
+            <!-- ✅ Shop Screen Deep Link -->
             <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW"/>
-                <category android:name="android.intent.category.DEFAULT"/>
-                <category android:name="android.intent.category.BROWSABLE"/>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
                 <data
                     android:scheme="https"
                     android:host="go.eva2z.com"
-                    android:pathPrefix="/shop"/>
+                    android:pathPrefix="/shop" />
+            </intent-filter>
+
+            <!-- ✅ Product Detail Deep Link -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="go.eva2z.com"
+                    android:pathPrefix="/shop/product" />
             </intent-filter>
 
         </activity>

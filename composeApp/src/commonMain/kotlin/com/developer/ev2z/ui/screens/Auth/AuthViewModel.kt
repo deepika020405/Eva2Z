@@ -115,17 +115,14 @@ class AuthViewModel(
                 onResult(true)
 
             } catch (e: Exception) {
+
                 val msg = e.message?.lowercase() ?: ""
 
                 when {
                     msg.contains("invalid password") ||
-                            msg.contains("wrong password") -> {
-                        onResult(true)
-                    }
-
-                    msg.contains("already registered") -> {
-                        _error.value = "This phone number is already registered."
-                        onResult(true)
+                            msg.contains("wrong password") ||
+                            msg.contains("incorrect password") -> {
+                        onResult(true) // user exists
                     }
 
                     msg.contains("user not registered") ||
@@ -134,8 +131,7 @@ class AuthViewModel(
                     }
 
                     else -> {
-                        _error.value = mapToUserError(e)
-                        onResult(true) // ⛔ STOP OTP
+                        onResult(true)
                     }
                 }
             }

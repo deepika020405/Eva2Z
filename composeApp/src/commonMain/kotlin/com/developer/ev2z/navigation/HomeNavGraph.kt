@@ -1175,9 +1175,6 @@ fun HomeNavGraphContent(
             onNavigateToCriminalVerification = onNavigateToCriminalVerification, // ✅ FIX
             onNavigateToDriverScore = onNavigateToDriverScore,// ✅ ADD
             onNavigateToParking     = onNavigateToParking,    // ✅ CHANGED
-
-
-
         )
     }
 

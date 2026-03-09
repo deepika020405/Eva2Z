@@ -333,7 +333,7 @@ fun ModernFeaturesSection(
 ) {
 
     val features = listOf(
-        QuickActionItem("Driver Score", Icons.Default.EmojiEvents, onDriverScore),
+        QuickActionItem("Driver Score", Icons.Default.EmojiEvents){},
         QuickActionItem("Service Market", Icons.Default.Build) {},
         QuickActionItem("Repair Market", Icons.Default.DirectionsCar) {},
         QuickActionItem("Charging", Icons.Default.EvStation) {},

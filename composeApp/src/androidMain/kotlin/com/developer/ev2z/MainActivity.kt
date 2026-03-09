@@ -7,10 +7,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import com.developer.ev2z.data.local.DeepLinkManager
+import com.developer.ev2z.data.local.createStorageManager
 import com.developer.ev2z.data.local.initStorageManager
 import com.developer.ev2z.phonepe.PaymentBus
 import com.developer.ev2z.ui.screens.Profile.GlobalContext
-import com.developer.ev2z.util.Analytics
 import com.developer.ev2z.util.DeepLinkBus
 import com.developer.ev2z.util.MetaAnalytics
 import com.developer.ev2z.util.NotificationUtil
@@ -26,12 +27,21 @@ class MainActivity : ComponentActivity() {
 
         try {
             initOpenUrl(applicationContext)
+
             NotificationPermissionHelper(this) {
                 FcmManager.fetchAndRegisterToken()
             }.checkAndRequest()
 
             NotificationUtil.createChannel(this)
+
+            // ✅ Step 1: Storage init karo
             initStorageManager(this)
+
+// ✅ Step 2: DeepLinkManager init karo — createStorageManager() se
+            DeepLinkManager.init(createStorageManager())
+
+// ✅ Step 3: Context set karo
+            AppContextHolder.context = applicationContext
             ActivityProvider.setActivity(this)
             initGeocoder(this)
             GlobalContext.set(this)
@@ -75,7 +85,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // ✅ Single function — sab deep links yahan handle honge
     private fun handleDeepLink(uriString: String) {
         val uri = android.net.Uri.parse(uriString)
         Log.d("DeepLink", "🔗 Received URI: $uri")
@@ -84,29 +93,30 @@ class MainActivity : ComponentActivity() {
         Log.d("DeepLink", "   path:   ${uri.path}")
 
         when {
-
-            // ✅ SHOP DEEP LINK — https://ev2z.com/shop
             uri.host == "go.eva2z.com" && uri.path?.startsWith("/shop") == true -> {
-                Log.d("DeepLink", "🛒 Shop deep link triggered")
-                DeepLinkBus.navigateTo("shop")
+                val path = uri.path ?: ""
+                if (path.startsWith("/shop/product/")) {
+                    val productId = path.removePrefix("/shop/product/")
+                    Log.d("DeepLink", "🛍️ Product deep link: $productId")
+                    DeepLinkBus.navigateTo("product/$productId")
+                } else {
+                    Log.d("DeepLink", "🛒 Shop deep link triggered")
+                    DeepLinkBus.navigateTo("shop")
+                }
             }
 
-            // ✅ PHONEPE CALLBACK — ev2z://payment/callback
             uri.scheme == "ev2z" && uri.host == "payment" -> {
                 Log.d("PhonePe", "🔗 Payment callback: $uri")
-
                 val status = uri.getQueryParameter("status")
-                val txnId  = uri.getQueryParameter("transactionId")
+                val txnId = uri.getQueryParameter("transactionId")
                     ?: uri.getQueryParameter("providerReferenceId")
-                val code   = uri.getQueryParameter("code")
-
+                val code = uri.getQueryParameter("code")
                 Log.d("PhonePe", "Status: $status, TxnId: $txnId, Code: $code")
-
                 when (status?.uppercase()) {
                     "SUCCESS" -> PaymentBus.notify(true, txnId, "SUCCESS")
-                    "FAILED"  -> PaymentBus.notify(false, txnId, "FAILED")
+                    "FAILED" -> PaymentBus.notify(false, txnId, "FAILED")
                     "PENDING" -> PaymentBus.notify(false, txnId, "PENDING")
-                    else      -> PaymentBus.notify(false, txnId, code ?: "UNKNOWN")
+                    else -> PaymentBus.notify(false, txnId, code ?: "UNKNOWN")
                 }
             }
 
@@ -121,6 +131,3 @@ class MainActivity : ComponentActivity() {
         App()
     }
 }
-
-
-

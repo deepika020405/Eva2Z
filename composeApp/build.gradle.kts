@@ -69,6 +69,7 @@ kotlin {
             implementation(libs.play.services.auth)
             implementation(libs.play.services.auth.api.phone)
 
+            implementation("com.android.installreferrer:installreferrer:2.2")
             // ✅ FIREBASE ONLY - NO PLAY INTEGRITY
             implementation(project.dependencies.platform("com.google.firebase:firebase-bom:33.7.0"))
             implementation(libs.firebase.analytics)
@@ -136,8 +137,8 @@ android {
         applicationId = "com.developer.ev2z"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 82  // ✅ INCREMENTED
-        versionName = "5.0.3"  // ✅ NEW MAJOR VERSION (Play Protect fixed)
+        versionCode = 83  // ✅ INCREMENTED
+        versionName = "5.0.1"  // ✅ NEW MAJOR VERSION (Play Protect fixed)
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

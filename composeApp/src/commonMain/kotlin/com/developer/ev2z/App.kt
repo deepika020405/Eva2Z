@@ -48,6 +48,9 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.developer.ev2z.data.local.DeepLinkManager
+import com.developer.ev2z.data.local.StorageKeys
+import com.developer.ev2z.ui.screens.SplashScreen
 import com.developer.ev2z.ui.screens.deviceStatus.DeviceStatusScreen
 import com.developer.ev2z.ui.screens.trackTrace.TrackTraceScreen
 import com.developer.ev2z.util.FcmRegistrar
@@ -63,6 +66,8 @@ fun App() {
     val deviceReportRepository = remember { DeviceReportRepository(apiService) }
     val storage = remember { createStorageManager() }
     val userPrefs = remember { UserPrefs(storage) }
+    // ✅ DeepLinkManager init karo
+    remember { DeepLinkManager.init(storage) }
     val authViewModel = remember { AuthViewModel(authRepository, storage) }
     val homeViewModel = remember { HomeViewModel(homeRepository) }
     val addDeviceViewModel = remember { AddDeviceViewModel() }
@@ -125,22 +130,9 @@ fun App() {
     val addDeviceResult by addDeviceViewModel.addDeviceResult.collectAsState()
     var forgetPasswordPhone by remember { mutableStateOf("") }
 
-    // Initial load
     LaunchedEffect(Unit) {
         println("🚀 App: Starting initial load")
-        delay(2000)
-        isLoggedIn = userPrefs.isLoggedIn() == true
-        if (isLoggedIn) {
-            authToken = userPrefs.getToken() ?: ""
-            username = userPrefs.getName() ?: "User"
-            AppTokenProvider.getToken = {
-                userPrefs.getToken() ?: ""
-            }
 
-
-            println("📱 Token loaded from storage: $authToken")
-        }
-        isLoading = false
     }
 
     // Login success handler
@@ -228,8 +220,42 @@ fun App() {
 
     MaterialTheme {
         when {
+            // App.kt mein — isLoading block
             isLoading -> {
-                SplashScreen()
+                SplashScreen(
+                    storage = storage,
+                    userPrefs = userPrefs,
+                    onNavigateToHome = {
+                        // ✅ Token bhi load karo
+                        val token = userPrefs.getToken() ?: ""
+                        authToken = token
+                        username = userPrefs.getName() ?: "User"
+                        AppTokenProvider.getToken = { token }
+                        isLoggedIn = true
+                        isLoading = false
+                    },
+                    onNavigateToLogin = {
+                        isLoggedIn = false
+                        authToken = ""
+                        isLoading = false
+                    },
+                    onNavigateToShop = {
+                        val token = userPrefs.getToken() ?: ""
+                        authToken = token
+                        username = userPrefs.getName() ?: "User"
+                        AppTokenProvider.getToken = { token }
+                        isLoggedIn = true
+                        isLoading = false
+                    },
+                    onNavigateToProduct = { productId ->
+                        val token = userPrefs.getToken() ?: ""
+                        authToken = token
+                        username = userPrefs.getName() ?: "User"
+                        AppTokenProvider.getToken = { token }
+                        isLoggedIn = true
+                        isLoading = false
+                    }
+                )
             }
 
             // UPDATE showChangePassword rendering
@@ -457,137 +483,133 @@ fun App() {
     }
 }
 
-@Composable
-fun SplashScreen() {
-
-    val infiniteTransition = rememberInfiniteTransition()
-
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(
-                durationMillis = 2000,
-                easing = LinearEasing
-            ),
-            repeatMode = RepeatMode.Restart
-        )
-    )
-
-    val scale by infiniteTransition.animateFloat(
-        initialValue = 0.95f,
-        targetValue = 1.05f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(
-                durationMillis = 1000,
-                easing = FastOutSlowInEasing
-            ),
-            repeatMode = RepeatMode.Reverse
-        )
-    )
-
-    val alpha by infiniteTransition.animateFloat(
-        initialValue = 0.7f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(
-                durationMillis = 1500,
-                easing = FastOutSlowInEasing
-            ),
-            repeatMode = RepeatMode.Reverse
-        )
-    )
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFFFFFFF)
-//                brush = Brush.verticalGradient(
-//                    colors = listOf(
-//                        Color(0xFF1B5E20),
-//                        Color(0xFF2E7D32),
-//                        Color(0xFF388E3C),
-//                        Color(0xFF4CAF50),
-//                        Color(0xFF66BB6A),
-//                        Color(0xFF81C784)
-//                    )
+//@Composable
+//fun SplashScreen(
+//    onNavigateToHome: () -> Unit,
+//    onNavigateToLogin: () -> Unit,
+//    onNavigateToShop: () -> Unit,
+//    onNavigateToProduct: (String) -> Unit,
+//    isUserLoggedIn: () -> Boolean  // pass from your auth manager
+//) {
+//    LaunchedEffect(Unit) {
+//        // Android only — referrer fetch
+//        ReferrerHelper(context).fetchIfFirstLaunch {
+//            val token = storage.getString(StorageKeys.VAULT_TOKEN)
+//
+//            if (token.isNotEmpty()) {
+//                // Logged in
+//                val pendingLink = DeepLinkManager.consumePendingDeepLink()
+//                if (pendingLink != null) {
+//                    when {
+//                        pendingLink.startsWith("/shop/product/") -> {
+//                            val id = pendingLink.removePrefix("/shop/product/")
+//                            onNavigateToProduct(id)
+//                        }
+//                        pendingLink.startsWith("/shop") -> onNavigateToShop()
+//                        else -> onNavigateToHome()
+//                    }
+//                } else {
+//                    onNavigateToHome()
+//                }
+//            } else {
+//                onNavigateToLogin()
+//            }
+//        }
+//    }
+//
+//    // ✅ Your existing UI — NO CHANGES NEEDED BELOW
+//    val infiniteTransition = rememberInfiniteTransition()
+//
+//    val rotation by infiniteTransition.animateFloat(
+//        initialValue = 0f,
+//        targetValue = 360f,
+//        animationSpec = infiniteRepeatable(
+//            animation = tween(durationMillis = 2000, easing = LinearEasing),
+//            repeatMode = RepeatMode.Restart
+//        )
+//    )
+//
+//    val scale by infiniteTransition.animateFloat(
+//        initialValue = 0.95f,
+//        targetValue = 1.05f,
+//        animationSpec = infiniteRepeatable(
+//            animation = tween(durationMillis = 1000, easing = FastOutSlowInEasing),
+//            repeatMode = RepeatMode.Reverse
+//        )
+//    )
+//
+//    val alpha by infiniteTransition.animateFloat(
+//        initialValue = 0.7f,
+//        targetValue = 1f,
+//        animationSpec = infiniteRepeatable(
+//            animation = tween(durationMillis = 1500, easing = FastOutSlowInEasing),
+//            repeatMode = RepeatMode.Reverse
+//        )
+//    )
+//
+//    Box(
+//        modifier = Modifier
+//            .fillMaxSize()
+//            .background(Color(0xFFFFFFFF)),
+//        contentAlignment = Alignment.Center
+//    ) {
+//        Column(
+//            horizontalAlignment = Alignment.CenterHorizontally,
+//            verticalArrangement = Arrangement.Center
+//        ) {
+//            Box(
+//                modifier = Modifier
+//                    .size(160.dp)
+//                    .scale(scale)
+//                    .rotate(rotation),
+//                contentAlignment = Alignment.Center
+//            ) {
+//                Image(
+//                    painter = painterResource(Res.drawable.app_logo),
+//                    contentDescription = "App Logo",
+//                    modifier = Modifier.size(140.dp)
 //                )
-            ),
-        contentAlignment = Alignment.Center
-    ) {
-
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-
-            Box(
-                modifier = Modifier
-                    .size(160.dp)
-                    .scale(scale)
-                    .rotate(rotation),
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    painter = painterResource(Res.drawable.app_logo),
-                    contentDescription = "App Logo",
-                    modifier = Modifier.size(140.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Text(
-                text = "EVA2Z",
-                fontSize = 48.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.Black.copy(alpha = alpha)
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "Connect",
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color.Black.copy(alpha = alpha * 0.9f),
-                letterSpacing = 2.sp
-            )
-
-            Spacer(modifier = Modifier.height(48.dp))
-
-            CircularProgressIndicator(
-                color = Color.Black,
-                modifier = Modifier.size(48.dp),
-                strokeWidth = 4.dp
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = "Loading...",
-                fontSize = 14.sp,
-                color = Color.Black.copy(alpha = 0.8f),
-                letterSpacing = 1.sp
-            )
-        }
-
-        // ✅ Bottom Version Text (safe for gesture nav)
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .navigationBarsPadding() // 👈🔥 bottom safe
-                .padding(bottom = 16.dp),
-            contentAlignment = Alignment.BottomCenter
-        ) {
+//            }
+//
+//            Spacer(modifier = Modifier.height(32.dp))
 //            Text(
-//                text = "Version 1.0.0",
-//                fontSize = 12.sp,
-//                color = Color.White.copy(alpha = 0.6f)
+//                text = "EVA2Z",
+//                fontSize = 48.sp,
+//                fontWeight = FontWeight.Bold,
+//                color = Color.Black.copy(alpha = alpha)
 //            )
-        }
-    }
-}
+//            Spacer(modifier = Modifier.height(8.dp))
+//            Text(
+//                text = "Connect",
+//                fontSize = 24.sp,
+//                fontWeight = FontWeight.Medium,
+//                color = Color.Black.copy(alpha = alpha * 0.9f),
+//                letterSpacing = 2.sp
+//            )
+//            Spacer(modifier = Modifier.height(48.dp))
+//            CircularProgressIndicator(
+//                color = Color.Black,
+//                modifier = Modifier.size(48.dp),
+//                strokeWidth = 4.dp
+//            )
+//            Spacer(modifier = Modifier.height(16.dp))
+//            Text(
+//                text = "Loading...",
+//                fontSize = 14.sp,
+//                color = Color.Black.copy(alpha = 0.8f),
+//                letterSpacing = 1.sp
+//            )
+//        }
+//
+//        Box(
+//            modifier = Modifier
+//                .fillMaxSize()
+//                .navigationBarsPadding()
+//                .padding(bottom = 16.dp),
+//            contentAlignment = Alignment.BottomCenter
+//        ) {}
+//    }
+//}
 
 enum class OpenSource {
     HOME,
