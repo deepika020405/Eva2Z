@@ -89,25 +89,38 @@ import com.developer.ev2z.util.platformDownloadFile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
+
+// ✅ SOS Tag imports
+
+import com.developer.ev2z.ui.screens.SOSParkingTag.ConfirmationScreen
+import com.developer.ev2z.ui.screens.SOSParkingTag.QuickReplyScreen
+import com.developer.ev2z.ui.screens.SOSParkingTag.SosTagAlertScreen
+import com.developer.ev2z.ui.screens.SOSParkingTag.SosTagViewModel
+import com.developer.ev2z.util.SosNotificationHandler
+import kotlinx.coroutines.flow.collectLatest
+
+
 // ------------------ TABS -------------------
 
 class HomeTab(
     private val viewModel: HomeViewModel,
     private val token: String,
     private val onNavigateToAddDevice: () -> Unit,
-    private val onNavigateToManageDevice: () -> Unit,   // ✅ ADD
-    private val onNavigateToGPSData: () -> Unit,        // ✅ ADD
-    private val onNavigateToGeoFencing: () -> Unit,     // ✅ ADD
-    private val onNavigateToHistory: () -> Unit,        // ✅ ADD
-    private val onNavigateToRefer: () -> Unit,          // ✅ ADD
+    private val onNavigateToManageDevice: () -> Unit,
+    private val onNavigateToGPSData: () -> Unit,
+    private val onNavigateToGeoFencing: () -> Unit,
+    private val onNavigateToHistory: () -> Unit,
+    private val onNavigateToRefer: () -> Unit,
     private val onOpenCommunity: () -> Unit,
     private val onOpenDeviceStatus: () -> Unit,
     private val onNavigateToDeviceReport: () -> Unit,
     private val onOpenTrackTrace: () -> Unit,
     private val onNavigateToCriminalVerification: () -> Unit,
     private val onDocumentsTabSelected: () -> Unit,
-    private val onNavigateToDriverScore: () -> Unit, // ✅ NEW
-    private val onNavigateToParking: () -> Unit   // ✅ CHANGED — add this
+    private val onNavigateToDriverScore: () -> Unit,
+    private val onNavigateToParking: () -> Unit,
+    private val onNavigateToSosTag: (Int) -> Unit,
+    private val onSosTagManual: () -> Unit,   // ✅ NEW — manual button ke liye
 ) : Tab {
 
     @Composable
@@ -153,6 +166,10 @@ class HomeTab(
                 userName = userName,
                 onDriverScore = onNavigateToDriverScore,
                 onParking = onNavigateToParking,         // ✅ CHANGED
+                onSosTag = {
+                    println("SOS Tag opened manually")
+                    onSosTagManual()   // ✅ HomeNavGraph ka state set hoga
+                },
                 onOpenLiveLocation = { showLiveLocation = true },
 
                 onManageDevice = { onNavigateToManageDevice() },
@@ -257,10 +274,13 @@ override fun Content() {
         )
 }
 
-class OrdersTab : Tab {
+class OrdersTab(
+    private val category: String?
+) : Tab {
+
     @Composable
     override fun Content() {
-        Navigator(ShopScreenWrapper())
+        Navigator(ShopScreenWrapper(category))
     }
 
     override val options: TabOptions
@@ -271,13 +291,16 @@ class OrdersTab : Tab {
         )
 }
 
-class ShopScreenWrapper : Screen {
+
+class ShopScreenWrapper(
+    private val category: String? = null
+) : Screen {
+
     @Composable
     override fun Content() {
-        ShopScreenHost()
+        ShopScreenHost(category)
     }
 }
-
 
 class ProfileTab(
     private val apiService: ApiService,
@@ -364,15 +387,30 @@ fun HomeNavGraph(
 
     // ✅ StateFlow collect karo
     val deepLinkDestination by DeepLinkBus.navigateTo.collectAsState()
+    var shopCategory by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(deepLinkDestination) {
         when (deepLinkDestination) {
+
             "shop" -> {
-                println("🧭 Deep link → Shop tab")
+                shopCategory = null
                 coroutineScope.launch {
                     pagerState.animateScrollToPage(2)
                 }
-                DeepLinkBus.clear() // ✅ reset
+            }
+
+            "shop_wired" -> {
+                shopCategory = "wired"
+                coroutineScope.launch {
+                    pagerState.animateScrollToPage(2)
+                }
+            }
+
+            "shop_wireless" -> {
+                shopCategory = "wireless"
+                coroutineScope.launch {
+                    pagerState.animateScrollToPage(2)
+                }
             }
         }
     }
@@ -410,6 +448,34 @@ fun HomeNavGraph(
 
     var showDriverScore by remember { mutableStateOf(false) }
     var showParking     by remember { mutableStateOf(false) }  // ✅ CHANGED — add
+
+
+    // ✅ SOS Tag — 3 screen states + alertId
+    var showSosTagAlert     by remember { mutableStateOf(false) }
+    var showSosQuickReply   by remember { mutableStateOf(false) }
+    var showSosConfirmation by remember { mutableStateOf(false) }
+    var currentSosAlertId by remember { mutableStateOf<Int?>(null) }
+    val sosTagViewModel = remember {
+        SosTagViewModel(
+            apiService = apiService,
+            userPrefs = userPrefs
+        )
+    }
+
+    // ✅ Notification automatic redirect
+    LaunchedEffect(Unit) {
+        SosNotificationHandler.alertFlow.collect { alertId ->
+            println("📲 Auto redirect SOS Alert $alertId")
+            // ✅ Pehle sab reset karo
+            sosTagViewModel.resetAll()
+            currentSosAlertId = alertId
+            showSosTagAlert = true
+            showSosQuickReply = false
+            showSosConfirmation = false
+            SosNotificationHandler.clear()
+        }
+    }
+
 
     // 🔥 MY ACCOUNT FLOW
     var showMyAccount by remember { mutableStateOf(false) }
@@ -458,6 +524,7 @@ fun HomeNavGraph(
                 token = token,
                 profileRefreshTrigger = profileRefresh,
                 pagerState = pagerState,
+                shopCategory = shopCategory,
                 coroutineScope = coroutineScope,
                 onNavigateToAddDevice = onNavigateToAddDevice,
                 onNavigateToDeviceReport = onNavigateToDeviceReport,
@@ -489,8 +556,17 @@ fun HomeNavGraph(
                 onOpenCommunity = { showCommunity = true },
                 onNavigateToDriverScore = { showDriverScore = true },  // ✅ ADD
                 onNavigateToParking     = { showParking = true },    // ✅ CHANGED
-
-
+                // ✅ SOS Tag — notification se alertId milega, yahan set karo
+                onNavigateToSosTag = { alertId ->
+                    // Notification se (alertId real hoga)
+                    currentSosAlertId = alertId
+                    showSosTagAlert = true
+                },
+                onSosTagManual = {
+                    // Manual button tap
+                    currentSosAlertId = null
+                    showSosTagAlert = true
+                },
                 onLogout = onLogout
             )
         }
@@ -813,6 +889,63 @@ fun HomeNavGraph(
         )
     }
 
+
+
+    // ✅ Screen 1 — dono cases handle
+    if (showSosTagAlert) {
+        SosTagAlertScreen(
+            alertId = currentSosAlertId ?: 0,
+            viewModel = sosTagViewModel,
+            onRespondNow = {
+                showSosTagAlert = false
+                showSosQuickReply = true
+            },
+            onIgnore = {
+                showSosTagAlert = false
+                sosTagViewModel.resetAll()
+            },
+            onBackPressed = {
+                showSosTagAlert = false
+                sosTagViewModel.resetAll()
+            }
+        )
+    }
+
+// Screen 2 condition change karo
+    if (showSosQuickReply) {  // ← null check hata do
+        QuickReplyScreen(
+            alertId = currentSosAlertId ?: 0,  // ← 0 fallback
+            viewModel = sosTagViewModel,
+            onConfirmed = {
+                showSosQuickReply = false
+                showSosConfirmation = true
+            },
+            onBackPressed = {
+                showSosQuickReply = false
+                showSosTagAlert = true
+            }
+        )
+    }
+
+// Screen 3 bhi fix karo
+    if (showSosConfirmation) {  // ← null check hata do
+        ConfirmationScreen(
+            alertId = currentSosAlertId ?: 0,
+            viewModel = sosTagViewModel,
+            onViewAlertDetails = {
+                showSosConfirmation = false
+                showSosTagAlert = true
+            },
+            onClose = {
+                showSosConfirmation = false
+                currentSosAlertId = null
+                sosTagViewModel.resetAll()
+            }
+        )
+    }
+
+
+
         // Privacy Policy
         if (showPrivacyPolicy) {
             PrivacyPolicy_TandCScreen(
@@ -1120,6 +1253,7 @@ fun HomeNavGraphContent(
     profileRefreshTrigger: Int = 0,
     pagerState: PagerState, // ✅ RECEIVE pagerState
     coroutineScope: CoroutineScope, // ✅ RECEIVE coroutineScope
+    shopCategory: String?,
     onNavigateToAddDevice: () -> Unit,
     onNavigateToDeviceReport: () -> Unit,
     onOpenDeviceStatus: () -> Unit,
@@ -1147,6 +1281,8 @@ fun HomeNavGraphContent(
     onOpenCommunity: () -> Unit,
     onNavigateToDriverScore: () -> Unit,  // ✅ ADD THIS LINE
     onNavigateToParking: () -> Unit,    // ✅ CHANGED — add after onNavigateToDriverScore
+    onNavigateToSosTag: (Int) -> Unit,   // ✅ alertId pass karna hoga
+    onSosTagManual: () -> Unit,    // ✅ NEW
     onLogout: () -> Unit
 ) {
     val productRepository = remember { ProductRepository(apiService) }
@@ -1156,6 +1292,10 @@ fun HomeNavGraphContent(
     val shopViewModel = remember {
         ShopViewModel(repo = productRepository, tokenProvider = tokenProvider)
     }
+
+    // rememberUpdatedState — stale lambda problem fix
+    val latestOnSosTag by rememberUpdatedState(onNavigateToSosTag)
+    val latestOnSosTagManual by rememberUpdatedState(onSosTagManual)
 
     val homeTab = remember {
         HomeTab(
@@ -1171,10 +1311,12 @@ fun HomeNavGraphContent(
             onOpenDeviceStatus = onOpenDeviceStatus,
             onNavigateToDeviceReport = onNavigateToDeviceReport,
             onOpenTrackTrace = onOpenTrackTrace,
-            onDocumentsTabSelected = onDocumentsTabSelected,  // ✅ ADD THIS
-            onNavigateToCriminalVerification = onNavigateToCriminalVerification, // ✅ FIX
-            onNavigateToDriverScore = onNavigateToDriverScore,// ✅ ADD
-            onNavigateToParking     = onNavigateToParking,    // ✅ CHANGED
+            onDocumentsTabSelected = onDocumentsTabSelected,
+            onNavigateToCriminalVerification = onNavigateToCriminalVerification,
+            onNavigateToDriverScore = onNavigateToDriverScore,
+            onNavigateToParking = onNavigateToParking,
+            onNavigateToSosTag = { alertId -> latestOnSosTag(alertId) },  // ✅ fresh lambda
+            onSosTagManual = { latestOnSosTagManual() },                   // ✅ fresh lambda
         )
     }
 
@@ -1204,7 +1346,9 @@ fun HomeNavGraphContent(
         )
     }
 
-    val ordersTab = remember { OrdersTab() }
+    val ordersTab = remember(shopCategory) {
+        OrdersTab(shopCategory)
+    }
     val documentsTab = remember(documentsGateState) {
         DocumentsTab(
             documentsGateState = documentsGateState,

@@ -1,6 +1,7 @@
 package com.developer.ev2z.data.local
 
 import kotlinx.serialization.encodeToString
+import org.jetbrains.compose.resources.getString
 
 class UserPrefs(private val storage: StorageManager) {  // ✅ Storage → StorageManager
 
@@ -34,6 +35,12 @@ class UserPrefs(private val storage: StorageManager) {  // ✅ Storage → Stora
     fun isLoggedIn() = getToken()?.isNotEmpty()
 
     fun clear() = storage.clear()
+
+    fun getUserPhone(): String? {
+        // ✅ storage.getString use karo, not Compose getString
+        val phone = storage.getString("phone", "")
+        return if (phone.isNullOrBlank()) null else phone
+    }
 
 
 

@@ -79,6 +79,7 @@ fun HomeScreen(
     onCriminalVerification: () -> Unit,   // ✅ ADD THIS
     onDriverScore: () -> Unit ,            // ✅ NEW — Driver Score navigation
     onParking: () -> Unit,           // ✅ CHANGED — new param
+    onSosTag: () -> Unit,              // ✅ NEW — SOS Tag
     onOpenCommunity: () -> Unit
 
 
@@ -114,7 +115,8 @@ fun HomeScreen(
 
             item { ModernFeaturesSection(
                 onDriverScore = onDriverScore,  // ✅ NEW — pass karo
-                onParking     = onParking         // ✅ CHANGED — pass through
+                onParking     = onParking,         // ✅ CHANGED — pass through
+                onSosTag      = onSosTag    // ✅ NEW — pass karo
 
 
             ) }
@@ -328,7 +330,9 @@ fun HomeQuickActionsSection(
 @Composable
 fun ModernFeaturesSection(
     onDriverScore: () -> Unit,
-    onParking: () -> Unit             // ✅ CHANGED — new param
+    onParking: () -> Unit,            // ✅ CHANGED — new param
+    onSosTag: () -> Unit              // ✅ NEW — SOS Tag param
+
 
 ) {
 
@@ -338,7 +342,7 @@ fun ModernFeaturesSection(
         QuickActionItem("Repair Market", Icons.Default.DirectionsCar) {},
         QuickActionItem("Charging", Icons.Default.EvStation) {},
         QuickActionItem("Parking",Icons.Default.LocalParking,   onParking),  // ✅ CHANGED
-        QuickActionItem("SOS", Icons.Default.Warning) {},
+        QuickActionItem("SOS",Icons.Default.Warning,onSosTag),  // ✅ WIRED
         QuickActionItem("Background Verification", Icons.Default.Badge) {}
     )
 

@@ -353,12 +353,12 @@ private fun DeviceDetailsSection(device: GPSDevice) {
                 .padding(16.dp)
         ) {
             Column {
-                Text(
-                    text =  "GPS Device Connected",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color =  Color(0xFF4CAF50)
-                )
+//                Text(
+//                    text =  "GPS Device Connected",
+//                    fontSize = 16.sp,
+//                    fontWeight = FontWeight.Bold,
+//                    color =  Color(0xFF4CAF50)
+//                )
             }
         }
 

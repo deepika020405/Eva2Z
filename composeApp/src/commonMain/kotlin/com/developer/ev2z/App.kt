@@ -1,17 +1,8 @@
 package com.developer.ev2z
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.CircularProgressIndicator
+
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.developer.ev2z.data.local.UserPrefs
 import com.developer.ev2z.data.local.createStorageManager
 import com.developer.ev2z.network.ApiService
@@ -35,28 +26,14 @@ import com.developer.ev2z.util.AppTokenProvider
 import com.developer.ev2z.ui.screens.AuthFlows.ForgetPasswordFlow
 import com.developer.ev2z.ui.screens.AuthFlows.RegistrationFlow
 import kotlinx.coroutines.delay
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.developer.ev2z.data.local.DeepLinkManager
-import com.developer.ev2z.data.local.StorageKeys
 import com.developer.ev2z.ui.screens.SplashScreen
 import com.developer.ev2z.ui.screens.deviceStatus.DeviceStatusScreen
 import com.developer.ev2z.ui.screens.trackTrace.TrackTraceScreen
 import com.developer.ev2z.util.FcmRegistrar
-import eva2z_connect_multiplatform.composeapp.generated.resources.Res
-import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
-import org.jetbrains.compose.resources.painterResource
+
 
 @Composable
 fun App() {

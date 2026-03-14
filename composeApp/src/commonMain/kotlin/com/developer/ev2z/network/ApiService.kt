@@ -17,6 +17,11 @@ import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanScreenHost
 import com.developer.ev2z.ui.screens.ChangePlan.UserDevicesResponse
 import com.developer.ev2z.ui.screens.CriminalVerification.CandidateResult
 import com.developer.ev2z.ui.screens.CriminalVerification.CriminalForm
+import com.developer.ev2z.ui.screens.SOSParkingTag.OwnerReplyRequest
+import com.developer.ev2z.ui.screens.SOSParkingTag.SosAlertDetailResponse
+import com.developer.ev2z.ui.screens.SOSParkingTag.SosAlertListResponse
+import com.developer.ev2z.ui.screens.SOSParkingTag.SosReplyRequest
+import com.developer.ev2z.ui.screens.SOSParkingTag.SosReplyResponse
 import com.developer.ev2z.ui.screens.VechicleParkingTag.ParkingData
 import com.developer.ev2z.ui.screens.VechicleParkingTag.ParkingRequest
 import com.developer.ev2z.ui.screens.VechicleParkingTag.ParkingResponse
@@ -1118,7 +1123,9 @@ class ApiService {
     // ---------------- VEHICLE PARKING ----------------
     suspend fun parkVehicle(
         vehicleType: String,
-        vehicleNumber: String
+        vehicleNumber: String,
+        phone: String,
+        alternatePhone: String? = null
     ): ParkingResponse {
 
         val token = AppTokenProvider.getToken()
@@ -1131,8 +1138,10 @@ class ApiService {
                 header(HttpHeaders.Authorization, "Bearer $token")
                 contentType(ContentType.Application.Json)
                 setBody(ParkingRequest(
-                    vehicle_type   = vehicleType.trim(),
-                    vehicle_number = vehicleNumber.trim()
+                    vehicle_type    = vehicleType.trim(),
+                    vehicle_number  = vehicleNumber.trim(),
+                    phone           = phone.trim(),
+                    alternate_phone = alternatePhone?.trim()
                 ))
             }
 
@@ -1195,8 +1204,8 @@ class ApiService {
             runCatching {
                 @kotlinx.serialization.Serializable
                 data class HistoryList(
-                    val status: Boolean           = false,
-                    val data: List<ParkingData>?  = null
+                    val status: Boolean          = false,
+                    val data: List<ParkingData>? = null
                 )
                 json.decodeFromString(HistoryList.serializer(), raw).data ?: emptyList()
             }.getOrElse {
@@ -1211,6 +1220,167 @@ class ApiService {
             emptyList()
         }
     }
+
+
+
+
+    // ─────────────────────────────────────────────────────────────────
+// Add these 3 functions inside your existing ApiService class
+// ─────────────────────────────────────────────────────────────────
+
+    // ---------------- GET ALL SOS ALERTS ----------------
+    suspend fun getSosAlerts(): SosAlertListResponse {
+
+        val token = AppTokenProvider.getToken()
+        val url   = "${baseUrl}visitor-notifications"  // ✅ SIRF YAHI CHANGE HUA
+
+        println("🌐 getSosAlerts → GET $url")
+
+        return try {
+            val response = client.get(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                contentType(ContentType.Application.Json)
+            }
+
+            val raw = response.bodyAsText()
+            println("📥 getSosAlerts ${response.status}: $raw")
+
+            val json = Json {
+                ignoreUnknownKeys = true
+                isLenient = true
+                coerceInputValues = true
+            }
+
+            if (response.status.isSuccess()) {
+                json.decodeFromString(SosAlertListResponse.serializer(), raw)
+            } else {
+                SosAlertListResponse(
+                    status = false,
+                    message = "Error: ${response.status.value}"
+                )
+            }
+
+        } catch (e: Exception) {
+            println("❌ getSosAlerts: ${e.message}")
+            SosAlertListResponse(
+                status = false,
+                message = "Network error: ${e.message ?: "Unknown"}"
+            )
+        }
+    }
+
+    // ---------------- GET SINGLE ALERT DETAIL ----------------
+    suspend fun getSosAlertDetail(alertId: Int): SosAlertDetailResponse {
+
+        val token = AppTokenProvider.getToken()
+
+        // 🔥 FIXED ENDPOINT
+        val url = "${baseUrl}visitor-notifications/$alertId"
+
+        println("🌐 getSosAlertDetail → GET $url")
+
+        return try {
+
+            val response = client.get(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                contentType(ContentType.Application.Json)
+            }
+
+            val raw = response.bodyAsText()
+
+            println("📥 getSosAlertDetail ${response.status}: $raw")
+
+            val json = Json {
+                ignoreUnknownKeys = true
+                isLenient = true
+                coerceInputValues = true
+            }
+
+            when {
+
+                response.status.isSuccess() -> {
+                    json.decodeFromString(
+                        SosAlertDetailResponse.serializer(),
+                        raw
+                    )
+                }
+
+                response.status == HttpStatusCode.NotFound -> {
+                    SosAlertDetailResponse(
+                        status = false,
+                        message = "Alert not found."
+                    )
+                }
+
+                response.status == HttpStatusCode.Unauthorized -> {
+                    SosAlertDetailResponse(
+                        status = false,
+                        message = "Session expired. Please login again."
+                    )
+                }
+
+                else -> {
+                    SosAlertDetailResponse(
+                        status = false,
+                        message = "Error: ${response.status.value}"
+                    )
+                }
+            }
+
+        } catch (e: Exception) {
+
+            println("❌ getSosAlertDetail: ${e.message}")
+
+            SosAlertDetailResponse(
+                status = false,
+                message = "Network error: ${e.message ?: "Unknown"}"
+            )
+        }
+    }
+    // ---------------- REPLY TO SOS ALERT ----------------
+    // ---------------- OWNER REPLY TO ALERT ----------------
+    suspend fun sendOwnerReply(request: OwnerReplyRequest): SosReplyResponse {
+
+        val token = AppTokenProvider.getToken()
+        val url   = "${baseUrl}owner-replies"
+
+        println("🌐 sendOwnerReply → POST $url")
+
+        return try {
+            val response = client.post(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(request)
+            }
+
+            val raw = response.bodyAsText()
+            println("✔️ sendOwnerReply ${response.status}: $raw")
+
+            val json = Json {
+                ignoreUnknownKeys = true
+                isLenient = true
+                coerceInputValues = true
+            }
+
+            when {
+                response.status == HttpStatusCode.OK ||
+                        response.status == HttpStatusCode.Created ->
+                    json.decodeFromString(SosReplyResponse.serializer(), raw)
+
+                response.status == HttpStatusCode.Unauthorized ->
+                    SosReplyResponse(status = false, message = "Session expired. Please login again.")
+
+                else ->
+                    SosReplyResponse(status = false, message = "Error: ${response.status.value}")
+            }
+
+        } catch (e: Exception) {
+            println("❌ sendOwnerReply: ${e.message}")
+            SosReplyResponse(status = false, message = "Network error: ${e.message ?: "Unknown"}")
+        }
+    }
+
+
     // ---------------- ADD TO CART ----------------
     suspend fun addToCart(
         token: String,

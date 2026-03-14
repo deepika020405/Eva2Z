@@ -15,6 +15,7 @@ import com.developer.ev2z.ui.screens.Profile.GlobalContext
 import com.developer.ev2z.util.DeepLinkBus
 import com.developer.ev2z.util.MetaAnalytics
 import com.developer.ev2z.util.NotificationUtil
+import com.developer.ev2z.util.SosNotificationHandler
 import com.developer.ev2z.util.initGeocoder
 import com.developer.ev2z.util.initOpenUrl
 import com.facebook.appevents.AppEventsConstants
@@ -37,15 +38,16 @@ class MainActivity : ComponentActivity() {
             // ✅ Step 1: Storage init karo
             initStorageManager(this)
 
-// ✅ Step 2: DeepLinkManager init karo — createStorageManager() se
+            // ✅ Step 2: DeepLinkManager init karo
             DeepLinkManager.init(createStorageManager())
 
-// ✅ Step 3: Context set karo
+            // ✅ Step 3: Context set karo
             AppContextHolder.context = applicationContext
             ActivityProvider.setActivity(this)
             initGeocoder(this)
             GlobalContext.set(this)
 
+            // ✅ setContent PEHLE — App() compose start ho
             setContent {
                 CompositionLocalProvider(
                     LocalPlatformActivity provides this
@@ -61,9 +63,21 @@ class MainActivity : ComponentActivity() {
                 mapOf("login_method" to "password")
             )
 
-            // ✅ Handle deep link from cold start (app band tha)
+            // ✅ Deep link — cold start (same as before)
             intent?.data?.let { uri ->
                 handleDeepLink(uri.toString())
+            }
+
+            // ✅ SOS — setContent KE BAAD handle karo
+            // SharedFlow replay=1 hai — HomeNavGraph ready hone par collect karega
+            intent?.let {
+                val alertId = it.getIntExtra("sos_alert_id", -1)
+                if (alertId != -1) {
+                    Log.d("SOS", "🚨 Cold Start alertId=$alertId")
+                    SosNotificationHandler.onSosAlertReceived(alertId)
+                    // ✅ prevent duplicate trigger
+                    it.removeExtra("sos_alert_id")
+                }
             }
 
         } catch (e: Exception) {
@@ -76,12 +90,21 @@ class MainActivity : ComponentActivity() {
         ActivityProvider.clearActivity()
     }
 
+    // ✅ App open ho — notification tap
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
 
+        // Deep link (same as before)
         intent.data?.let { uri ->
             handleDeepLink(uri.toString())
+        }
+
+        // ✅ SOS — app already open
+        val alertId = intent.getIntExtra("sos_alert_id", -1)
+        if (alertId != -1) {
+            Log.d("SOS", "🚨 App Open alertId=$alertId")
+            SosNotificationHandler.onSosAlertReceived(alertId)
         }
     }
 
@@ -96,9 +119,24 @@ class MainActivity : ComponentActivity() {
             uri.host == "go.eva2z.com" && uri.path?.startsWith("/shop") == true -> {
                 val path = uri.path ?: ""
                 if (path.startsWith("/shop/product/")) {
-                    val productId = path.removePrefix("/shop/product/")
-                    Log.d("DeepLink", "🛍️ Product deep link: $productId")
-                    DeepLinkBus.navigateTo("product/$productId")
+
+                    val value = path.removePrefix("/shop/product/")
+
+                    when (value) {
+                        "wired" -> {
+                            Log.d("DeepLink", "🔌 Wired products deep link")
+                            DeepLinkBus.navigateTo("shop_wired")
+                        }
+                        "wireless" -> {
+                            Log.d("DeepLink", "📡 Wireless products deep link")
+                            DeepLinkBus.navigateTo("shop_wireless")
+                        }
+                        else -> {
+                            Log.d("DeepLink", "🛍️ Product deep link: $value")
+                            DeepLinkBus.navigateTo("product/$value")
+                        }
+                    }
+
                 } else {
                     Log.d("DeepLink", "🛒 Shop deep link triggered")
                     DeepLinkBus.navigateTo("shop")
@@ -114,9 +152,9 @@ class MainActivity : ComponentActivity() {
                 Log.d("PhonePe", "Status: $status, TxnId: $txnId, Code: $code")
                 when (status?.uppercase()) {
                     "SUCCESS" -> PaymentBus.notify(true, txnId, "SUCCESS")
-                    "FAILED" -> PaymentBus.notify(false, txnId, "FAILED")
+                    "FAILED"  -> PaymentBus.notify(false, txnId, "FAILED")
                     "PENDING" -> PaymentBus.notify(false, txnId, "PENDING")
-                    else -> PaymentBus.notify(false, txnId, code ?: "UNKNOWN")
+                    else      -> PaymentBus.notify(false, txnId, code ?: "UNKNOWN")
                 }
             }
 

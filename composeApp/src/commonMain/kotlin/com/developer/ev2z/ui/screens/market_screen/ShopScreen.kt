@@ -362,10 +362,22 @@ private fun CartBottomBar(
 
 
 @Composable
-fun ShopScreenHost() {
+fun ShopScreenHost(
+    category: String? = null
+) {
     val viewModel = ShopViewModelProvider.viewModel   // ✅ SINGLE SOURCE
     val state by viewModel.state.collectAsState()
     val navigator = LocalNavigator.current
+
+    val filteredProducts = state.products.filter { dto ->
+
+        when(category){
+            "wired" -> dto.device_type?.lowercase() == "wired"
+            "wireless" -> dto.device_type?.lowercase() == "wireless"
+            else -> true
+        }
+
+    }
 
     // ✅ Debug: Check if navigator is null
 //    LaunchedEffect(Unit) {
@@ -416,7 +428,7 @@ fun ShopScreenHost() {
         }
     }
     ShopScreen(
-        products = state.products.map { dto ->
+        products = filteredProducts.map { dto ->
             ShopProduct(
                 id = dto.id,
                 title = dto.name ?: "",

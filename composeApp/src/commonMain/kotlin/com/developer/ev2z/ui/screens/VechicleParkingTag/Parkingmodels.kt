@@ -4,43 +4,49 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 // ─────────────────────────────────────────────────────────────────
-// Request
+// Request  — matches API: vehicle_type, vehicle_number, phone, alternate_phone
 // ─────────────────────────────────────────────────────────────────
 
 @Serializable
 data class ParkingRequest(
-    @SerialName("vehicle_type")   val vehicle_type: String,
-    @SerialName("vehicle_number") val vehicle_number: String
+    @SerialName("vehicle_type")     val vehicle_type: String,
+    @SerialName("vehicle_number")   val vehicle_number: String,
+    @SerialName("phone")            val phone: String,
+    @SerialName("alternate_phone")  val alternate_phone: String? = null
 )
 
 // ─────────────────────────────────────────────────────────────────
-// Response  — API returns "status": true  (NOT "success")
+// Response  — API returns "status": true
 // ─────────────────────────────────────────────────────────────────
 
 @Serializable
 data class ParkingResponse(
-    val status: Boolean              = false,   // ✅ FIXED: was "success"
-    val message: String?             = null,
-    val data: ParkingData?           = null,
-    val errors: ParkingFieldErrors?  = null
+    val status: Boolean             = false,
+    val message: String?            = null,
+    val data: ParkingData?          = null,
+    val errors: ParkingFieldErrors? = null
 )
 
 @Serializable
 data class ParkingData(
-    val id: Int?                               = null,
-    @SerialName("vehicle_type")   val vehicle_type: String?   = null,
-    @SerialName("vehicle_number") val vehicle_number: String? = null,
-    @SerialName("parked_at")      val parked_at: String?      = null,
-    @SerialName("created_at")     val created_at: String?     = null,
-    @SerialName("updated_at")     val updated_at: String?     = null,
-    val status: String?                        = null,
-    @SerialName("user_id")        val user_id: Int?           = null
+    val id: Int?                                             = null,
+    @SerialName("vehicle_type")    val vehicle_type: String?    = null,
+    @SerialName("vehicle_number")  val vehicle_number: String?  = null,
+    @SerialName("phone")           val phone: String?           = null,
+    @SerialName("alternate_phone") val alternate_phone: String? = null,
+    @SerialName("parked_at")       val parked_at: String?       = null,
+    @SerialName("created_at")      val created_at: String?      = null,
+    @SerialName("updated_at")      val updated_at: String?      = null,
+    val status: String?                                      = null,
+    @SerialName("user_id")         val user_id: Int?            = null
 )
 
 @Serializable
 data class ParkingFieldErrors(
-    @SerialName("vehicle_type")   val vehicle_type: List<String>?   = null,
-    @SerialName("vehicle_number") val vehicle_number: List<String>? = null
+    @SerialName("vehicle_type")    val vehicle_type: List<String>?    = null,
+    @SerialName("vehicle_number")  val vehicle_number: List<String>?  = null,
+    @SerialName("phone")           val phone: List<String>?           = null,
+    @SerialName("alternate_phone") val alternate_phone: List<String>? = null
 )
 
 // ─────────────────────────────────────────────────────────────────

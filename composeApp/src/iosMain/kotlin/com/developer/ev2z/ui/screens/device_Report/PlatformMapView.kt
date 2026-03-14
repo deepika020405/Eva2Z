@@ -3,6 +3,7 @@ package com.developer.ev2z.ui.screens.device_Report
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.UIKitView
+import com.developer.ev2z.ui.screens.trackTrace.TrailPoint
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.CoreGraphics.CGAffineTransformMakeRotation
 import platform.CoreLocation.CLLocationCoordinate2DMake
@@ -16,7 +17,8 @@ actual fun PlatformMapView(
     modifier: Modifier,
     latitude: Double,
     longitude: Double,
-    zoom: Double
+    zoom: Double,
+    trailPoints: List<TrailPoint>   // ✅ ADD THIS
 ) {
     val annotation = remember { MKPointAnnotation() }
     val lastLocation = remember { doubleArrayOf(latitude, longitude) }

@@ -495,7 +495,8 @@ fun BoxScope.DeviceReportBottomSheetWithData(
             // Report Header
             ReportHeaderWithData(
                 deviceName = device.device_name,
-                speed = liveLocation?.data?.latestLocation?.speed?.toString() ?: "0"
+                speed = liveLocation?.data?.latestLocation?.speed?.toString() ?: "0",
+                status = liveLocation?.data?.latestLocation?.status ?: "Unknown"
             )
 
             // Device Basic Info
@@ -624,17 +625,56 @@ fun BoxScope.DeviceReportBottomSheetWithData(
 @Composable
 fun ReportHeaderWithData(
     deviceName: String,
-    speed: String
+    speed: String,
+    status: String
 ) {
+
+    val color = statusColor(status)
+
     Row(
         Modifier
             .fillMaxWidth()
             .padding(18.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("• $deviceName", fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+
+        Column {
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+
+                Text(
+                    text = "• $deviceName",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+
+                Spacer(Modifier.width(10.dp))
+
+                // Status chip
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = color.copy(alpha = 0.15f)
+                ) {
+                    Text(
+                        text = status.replaceFirstChar { it.uppercase() },
+                        color = color,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(
+                            horizontal = 10.dp,
+                            vertical = 4.dp
+                        )
+                    )
+                }
+            }
+        }
+
         Spacer(Modifier.weight(1f))
-        Text("$speed km/h", fontSize = 18.sp, fontWeight = FontWeight.Medium)
+
+        Text(
+            "$speed km/h",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 

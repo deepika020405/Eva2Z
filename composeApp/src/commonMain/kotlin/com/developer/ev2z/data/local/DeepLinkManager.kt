@@ -1,5 +1,7 @@
 package com.developer.ev2z.data.local
 
+import com.developer.ev2z.util.DeepLinkBus
+
 // commonMain/com/developer/ev2z/data/local/DeepLinkManager.kt
 
 object DeepLinkManager {
@@ -15,12 +17,36 @@ object DeepLinkManager {
     }
 
     fun consumePendingDeepLink(): String? {
+
         val link = storage.getString(StorageKeys.PENDING_DEEP_LINK)
+
         if (link.isNotEmpty()) {
             storage.remove(StorageKeys.PENDING_DEEP_LINK)
+
+            handleDeepLink(link)   // ⭐ IMPORTANT
+
             return link
         }
+
         return null
+    }
+
+    fun handleDeepLink(path: String) {
+
+        when {
+
+            path.contains("/shop/product/wired") -> {
+                DeepLinkBus.navigateTo("shop_wired")
+            }
+
+            path.contains("/shop/product/wireless") -> {
+                DeepLinkBus.navigateTo("shop_wireless")
+            }
+
+            path.contains("/shop") -> {
+                DeepLinkBus.navigateTo("shop")
+            }
+        }
     }
 
     fun isFirstLaunch(): Boolean {

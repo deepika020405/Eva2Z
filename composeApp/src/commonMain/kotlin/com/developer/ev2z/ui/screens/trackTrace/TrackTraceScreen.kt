@@ -7,20 +7,12 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -36,6 +28,11 @@ import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
 import org.jetbrains.compose.resources.painterResource
 import kotlin.text.ifEmpty
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  TrackTraceScreen
+//  FIX: liveLocation + trailPoints collected ONLY inside StableTrackMapSection
+//       so location polling never recomposes the top-level screen.
+// ─────────────────────────────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TrackTraceScreen(
@@ -43,11 +40,11 @@ fun TrackTraceScreen(
 ) {
     val viewModel = TrackTraceViewModelProvider.viewModel
 
-    val devices by viewModel.devices.collectAsState()
+    // ── Only device-list state collected here — location polling doesn't
+    //    touch this scope at all.
+    val devices        by viewModel.devices.collectAsState()
     val selectedDevice by viewModel.selectedDevice.collectAsState()
-    val liveLocation by viewModel.liveLocation.collectAsState()
-    val username by viewModel.username.collectAsState()
-
+    val username       by viewModel.username.collectAsState()
 
     PlatformBackHandler(true) { onBack() }
 
@@ -55,10 +52,8 @@ fun TrackTraceScreen(
         viewModel.loadDevices()
     }
 
-    val lat = liveLocation?.data?.latestLocation?.latitude?.toDoubleOrNull()
-    val lng = liveLocation?.data?.latestLocation?.longitude?.toDoubleOrNull()
-
-    Scaffold(containerColor = Color(0xFFFFFFFF),
+    Scaffold(
+        containerColor = Color(0xFFFFFFFF),
         topBar = {
             TopAppBar(
                 title = { Text("Track & Trace") },
@@ -71,7 +66,7 @@ fun TrackTraceScreen(
                     containerColor = Color.White
                 )
             )
-        },
+        }
     ) { padding ->
 
         Box(
@@ -80,49 +75,24 @@ fun TrackTraceScreen(
                 .fillMaxSize()
         ) {
 
-            // 🗺️ LIVE MAP
-            if (lat != null && lng != null) {
+            // ── FIX: Map + animation + trail isolated here.
+            //         Only this composable recomposes on every location poll.
+            StableTrackMapSection(viewModel = viewModel)
 
-                val animatedLat by animateFloatAsState(
-                    targetValue = lat.toFloat(),
-                    animationSpec = tween(
-                        durationMillis = 1000,
-                        easing = LinearEasing
-                    ),
-                    label = "latAnimation"
-                )
-
-                val animatedLng by animateFloatAsState(
-                    targetValue = lng.toFloat(),
-                    animationSpec = tween(
-                        durationMillis = 1000,
-                        easing = LinearEasing
-                    ),
-                    label = "lngAnimation"
-                )
-
-                PlatformMapView(
-                    modifier = Modifier.fillMaxSize(),
-                    latitude = animatedLat.toDouble(),
-                    longitude = animatedLng.toDouble(),
-                    zoom = 15.0
-                )
-            }
-
-
-            // 🔽 DEVICE SELECTOR (TOP)
+            // ── Device selector — never recomposed by location updates ───────
             DeviceDropdownCardSimple(
                 modifier = Modifier
                     .padding(16.dp)
                     .align(Alignment.TopCenter),
-                userName = username.ifEmpty { "User" },
-                devices = devices,
+                userName       = username.ifEmpty { "User" },
+                devices        = devices,
                 selectedDevice = selectedDevice,
                 onDeviceSelect = viewModel::selectDevice
             )
+
             FloatingContactButton(
                 phoneNumber = "919755273822",
-                modifier = Modifier
+                modifier    = Modifier
                     .align(Alignment.BottomStart)
                     .padding(start = 20.dp, bottom = 20.dp)
             )
@@ -130,8 +100,39 @@ fun TrackTraceScreen(
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  StableTrackMapSection
+//  - liveLocation & trailPoints collected HERE only
+//  - animation lives here — never in the parent scope
+//  - PlatformMapView receives stable inputs
+// ─────────────────────────────────────────────────────────────────────────────
+@Composable
+private fun StableTrackMapSection(viewModel: TrackTraceViewModel) {
 
+    val liveLocation by viewModel.liveLocation.collectAsState()
+    val trailPoints  by viewModel.trailPoints.collectAsState()
 
+    val lat = liveLocation?.data?.latestLocation?.latitude?.toDoubleOrNull()
+    val lng = liveLocation?.data?.latestLocation?.longitude?.toDoubleOrNull()
+
+    if (lat != null && lng != null) {
+
+        // rememberAnimatedLatLng — smooth camera movement between polls
+        val (animatedLat, animatedLng) = rememberAnimatedLatLng(lat, lng)
+
+        PlatformMapView(
+            modifier    = Modifier.fillMaxSize(),
+            latitude    = animatedLat,
+            longitude   = animatedLng,
+            zoom        = 15.0,
+            trailPoints = trailPoints
+        )
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  DeviceDropdownCardSimple — unchanged logic
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 fun DeviceDropdownCardSimple(
     modifier: Modifier = Modifier,
@@ -144,35 +145,34 @@ fun DeviceDropdownCardSimple(
     val isSingleDevice = devices.size <= 1
 
     Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
+        modifier  = modifier.fillMaxWidth(),
+        shape     = RoundedCornerShape(16.dp),
+        colors    = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(6.dp)
     ) {
         Column(Modifier.padding(16.dp)) {
 
-            // 🔹 Header Row (Responsive)
+            // Header row
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment     = Alignment.CenterVertically
             ) {
                 Text(
-                    text = userName,
+                    text       = userName,
                     fontWeight = FontWeight.SemiBold,
-                    maxLines = 1
+                    maxLines   = 1
                 )
-
                 Text(
-                    text = "${devices.size} Devices",
+                    text     = "${devices.size} Devices",
                     fontSize = 12.sp,
-                    color = Color.Gray
+                    color    = Color.Gray
                 )
             }
 
             Spacer(Modifier.height(12.dp))
 
-            // 🔹 Device Row
+            // Device selector row
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -181,41 +181,40 @@ fun DeviceDropdownCardSimple(
                         if (!isSingleDevice) expanded = true
                     }
                     .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                verticalAlignment     = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
+                    modifier          = Modifier.weight(1f)
                 ) {
                     Image(
-                        painter = painterResource(Res.drawable.app_logo),
+                        painter            = painterResource(Res.drawable.app_logo),
                         contentDescription = null,
-                        modifier = Modifier.size(22.dp)
+                        modifier           = Modifier.size(22.dp)
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        text = selectedDevice?.device_name ?: "Select Device",
+                        text     = selectedDevice?.device_name ?: "Select Device",
                         fontSize = 14.sp,
                         maxLines = 1
                     )
                 }
 
-                // 🔥 Arrow only when multiple devices
                 if (!isSingleDevice) {
                     Icon(Icons.Default.ArrowDropDown, contentDescription = null)
                 }
             }
 
-            // 🔹 Dropdown (only when multiple devices)
+            // Dropdown menu (multi-device only)
             if (!isSingleDevice) {
                 DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false }
+                    expanded          = expanded,
+                    onDismissRequest  = { expanded = false }
                 ) {
                     devices.forEach { device ->
                         DropdownMenuItem(
-                            text = { Text(device.device_name) },
+                            text    = { Text(device.device_name) },
                             onClick = {
                                 expanded = false
                                 onDeviceSelect(device)
@@ -228,6 +227,9 @@ fun DeviceDropdownCardSimple(
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  rememberAnimatedLatLng — smooth lat/lng animation helper
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 fun rememberAnimatedLatLng(
     latitude: Double,
@@ -235,20 +237,18 @@ fun rememberAnimatedLatLng(
 ): Pair<Double, Double> {
 
     val animatedLat by animateFloatAsState(
-        targetValue = latitude.toFloat(),
-        animationSpec = tween(
-            durationMillis = 1000,
-            easing = LinearEasing
-        )
+        targetValue   = latitude.toFloat(),
+        animationSpec = tween(durationMillis = 1000, easing = LinearEasing),
+        label         = "latAnimation"
     )
 
     val animatedLng by animateFloatAsState(
-        targetValue = longitude.toFloat(),
-        animationSpec = tween(
-            durationMillis = 1000,
-            easing = LinearEasing
-        )
+        targetValue   = longitude.toFloat(),
+        animationSpec = tween(durationMillis = 1000, easing = LinearEasing),
+        label         = "lngAnimation"
     )
 
     return animatedLat.toDouble() to animatedLng.toDouble()
 }
+
+

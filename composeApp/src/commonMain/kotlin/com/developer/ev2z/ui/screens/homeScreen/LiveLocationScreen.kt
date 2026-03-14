@@ -40,12 +40,22 @@ import com.developer.ev2z.util.BottomBarController
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.text.style.TextOverflow
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  FIX 1: Stable wrapper so the map never sees a new object reference unless
+//          the actual device data changes.
+// ─────────────────────────────────────────────────────────────────────────────
+@Stable
+private data class MapState(
+    val devices: List<Device>,
+    val selectedDevice: Device?
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LiveLocationScreen(
     viewModel: HomeViewModel,
     token: String,
-    onBack: () -> Unit,   // ✅ ADD THIS
+    onBack: () -> Unit,
     onNavigateToAddDevice: () -> Unit,
     onNavigateToDeviceReport: () -> Unit,
     onOpenDeviceStatus: () -> Unit,
@@ -54,13 +64,9 @@ fun LiveLocationScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val selectedDevice by viewModel.selectedDevice.collectAsState()
-    val showOverview by viewModel.showOverview.collectAsState()
     val showDeviceDropdown by viewModel.showDeviceDropdown.collectAsState()
     val isRefreshing by viewModel.isRefreshing.collectAsState()
     var autoNavigated by remember { mutableStateOf(false) }
-
-
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
 
     LaunchedEffect(Unit) {
         Analytics.logEvent(
@@ -78,7 +84,7 @@ fun LiveLocationScreen(
         BottomBarController.visible = false
     }
 
-// 🔥 Restore bottom navigation when leaving this screen
+    // 🔥 Restore bottom navigation when leaving this screen
     DisposableEffect(Unit) {
         onDispose {
             BottomBarController.visible = true
@@ -106,7 +112,6 @@ fun LiveLocationScreen(
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-//                        text = "Server Error: ${state.message}",
                         text = "  Server Error ",
                         color = Color.Red,
                         fontSize = 16.sp
@@ -122,28 +127,45 @@ fun LiveLocationScreen(
         is HomeUiState.Success -> {
             val response = state.deviceResponse
             val devices = response.data ?: emptyList()
-            val showDropdownAllowed = devices.size > 1
             val deviceCount = devices.size
 
-            LaunchedEffect(devices.size) {
-                if (devices.size == 1 && !autoNavigated) {
+            // ─────────────────────────────────────────────────────────────
+            //  FIX 2: Compute filtered list ONCE per data change, not on
+            //         every recomposition.
+            // ─────────────────────────────────────────────────────────────
+            val devicesWithLocation = remember(devices) {
+                devices.filter { it.hasValidLocation() }
+            }
+
+            // ─────────────────────────────────────────────────────────────
+            //  FIX 3: Stable MapState so PlatformMapView only recomposes
+            //         when the map-relevant data actually changes.
+            // ─────────────────────────────────────────────────────────────
+            val mapState = remember(devicesWithLocation, selectedDevice?.deviceId) {
+                MapState(
+                    devices = devicesWithLocation,
+                    selectedDevice = selectedDevice
+                )
+            }
+
+            LaunchedEffect(deviceCount) {
+                if (deviceCount == 1 && !autoNavigated) {
                     autoNavigated = true
                     viewModel.selectDevice(devices.first())
-                    onNavigateToDeviceReport()   // 🚀 direct open
+                    onNavigateToDeviceReport()
                 }
             }
 
-
             Box(modifier = Modifier.fillMaxSize()) {
-                val devicesWithLocation = response.data.filter { it.hasValidLocation() }
 
-                PlatformMapView(
-                    modifier = Modifier.fillMaxSize(),
-                    devices = devicesWithLocation,
-                    selectedDevice = selectedDevice,
-                    onMarkerClick = { device ->
-                        viewModel.selectDevice(device)
-                    }
+                // ─────────────────────────────────────────────────────────
+                //  FIX 4: Map is isolated in its own composable so that
+                //         dropdown / refresh state changes don't trigger a
+                //         map redraw.
+                // ─────────────────────────────────────────────────────────
+                StableMapSection(
+                    mapState = mapState,
+                    onMarkerClick = { device -> viewModel.selectDevice(device) }
                 )
 
                 Column(
@@ -154,7 +176,7 @@ fun LiveLocationScreen(
                 ) {
                     TopDeviceCard(
                         userName = response.name ?: "User",
-                        deviceCount = deviceCount,              // ✅ use actual list size
+                        deviceCount = deviceCount,
                         selectedDevice = selectedDevice,
                         onBackClick = { onBack() },
                         onDropdownClick = { viewModel.toggleDeviceDropdown() },
@@ -165,78 +187,66 @@ fun LiveLocationScreen(
                                 else -> viewModel.showOverviewSheet()
                             }
                         },
-                        showDropdown = deviceCount > 1          // ✅ correct logic
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    // ✅ COMMUNITY CARD
-                    CommunityEntryCard(
-                        onClick = {
-                            onOpenCommunity()   // 🔥 navigation trigger
-                        }
+                        showDropdown = deviceCount > 1
                     )
 
+                    Spacer(Modifier.height(4.dp))
+
+                    CommunityEntryCard(onClick = { onOpenCommunity() })
+
+                    // ─────────────────────────────────────────────────────
+                    //  FIX 5: Dropdown only rendered when visible, extracted
+                    //         to its own key so it doesn't dirty the map.
+                    // ─────────────────────────────────────────────────────
                     if (showDeviceDropdown && deviceCount > 1) {
-                        DeviceDropdownSheet(
-                            devices = devices,
-                            onDeviceSelect = {
-                                viewModel.selectDevice(it)
-                                onNavigateToDeviceReport()
-                            },
-                            onAddDevice = {
-                                viewModel.toggleDeviceDropdown()
-                                onNavigateToAddDevice()
-                            },
-                            onDismiss = { viewModel.toggleDeviceDropdown() }
-                        )
+                        key("device_dropdown") {
+                            DeviceDropdownSheet(
+                                devices = devices,
+                                onDeviceSelect = {
+                                    viewModel.selectDevice(it)
+                                    onNavigateToDeviceReport()
+                                },
+                                onAddDevice = {
+                                    viewModel.toggleDeviceDropdown()
+                                    onNavigateToAddDevice()
+                                },
+                                onDismiss = { viewModel.toggleDeviceDropdown() }
+                            )
+                        }
                     }
                 }
-                // 🔥 FLOATING CONTACT BUTTON (COMMON)
+
                 FloatingContactButton(
                     phoneNumber = "919755273822",
                     modifier = Modifier
                         .align(Alignment.BottomStart)
                         .padding(start = 20.dp, bottom = 20.dp)
                 )
-                //BottomSheet Logic
-
-//                if (showOverview) {
-//                    ModalBottomSheet(
-//                        onDismissRequest = { viewModel.hideOverviewSheet() },
-//                        sheetState = sheetState,
-//                        containerColor = Color.White,
-//                        dragHandle = {
-//                            Box(
-//                                modifier = Modifier
-//                                    .fillMaxWidth()
-//                                    .padding(vertical = 12.dp),
-//                                contentAlignment = Alignment.Center
-//                            ) {
-//                                Box(
-//                                    modifier = Modifier
-//                                        .width(40.dp)
-//                                        .height(4.dp)
-//                                        .background(Color.LightGray, RoundedCornerShape(2.dp))
-//                                )
-//                            }
-//                        }
-//                    ) {
-////                        OverviewBottomSheet(
-////                            response = response,
-////                            onClose = { viewModel.hideOverviewSheet() },
-////                            onNavigateToDeviceReport = onNavigateToDeviceReport,
-////                            onOpenDeviceStatus = onOpenDeviceStatus,
-////                            onOpenTrackTrace = onOpenTrackTrace,
-////                            token = token,
-////                            viewModel = viewModel,
-////                            isRefreshing = isRefreshing
-////                        )
-//                    }
-//                }
             }
         }
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  FIX 4 (continued): Isolated, stable map composable.
+//  Uses @Stable MapState so Compose skips recomposition unless map data changes.
+// ─────────────────────────────────────────────────────────────────────────────
+@Composable
+private fun StableMapSection(
+    mapState: MapState,
+    onMarkerClick: (Device) -> Unit
+) {
+    PlatformMapView(
+        modifier = Modifier.fillMaxSize(),
+        devices = mapState.devices,
+        selectedDevice = mapState.selectedDevice,
+        onMarkerClick = onMarkerClick
+    )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  TopDeviceCard — unchanged logic, no performance issue here
+// ─────────────────────────────────────────────────────────────────────────────
 @OptIn(InternalResourceApi::class)
 @Composable
 fun TopDeviceCard(
@@ -260,13 +270,10 @@ fun TopDeviceCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-
-                // 🔹 LEFT SIDE
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)   // ✅ prevent overflow
+                    modifier = Modifier.weight(1f)
                 ) {
-
                     Icon(
                         imageVector = Icons.Default.ArrowBack,
                         contentDescription = "Back",
@@ -274,22 +281,17 @@ fun TopDeviceCard(
                             .size(24.dp)
                             .clickable { onBackClick() }
                     )
-
                     Spacer(modifier = Modifier.width(8.dp))
-
                     Text(
                         text = userName,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis   // ✅ long name safe
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
-                // 🔹 RIGHT SIDE
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Default.LocationOn,
                         contentDescription = "Location Overview",
@@ -304,7 +306,7 @@ fun TopDeviceCard(
                         fontSize = 12.sp,
                         color = Color.Gray,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis   // ✅ safe
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -320,11 +322,9 @@ fun TopDeviceCard(
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-
-                    // 🔹 DEVICE INFO
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)   // ✅ prevents overflow
+                        modifier = Modifier.weight(1f)
                     ) {
                         Image(
                             painter = painterResource(Res.drawable.app_logo),
@@ -336,11 +336,10 @@ fun TopDeviceCard(
                             text = selectedDevice?.getDisplayName() ?: "Select Device",
                             fontSize = 14.sp,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis   // ✅ long device name safe
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
 
-                    // 🔹 ICONS
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = Icons.Default.ArrowDropDown,
@@ -361,6 +360,9 @@ fun TopDeviceCard(
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  DeviceDropdownSheet — unchanged logic
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 fun DeviceDropdownSheet(
     devices: List<Device>,
@@ -401,10 +403,12 @@ fun DeviceDropdownSheet(
 
             Divider()
 
-            LazyColumn(
-                modifier = Modifier.weight(1f)
-            ) {
-                items(devices) { device ->
+            // ─────────────────────────────────────────────────────────────
+            //  FIX 6: key() on each LazyColumn item prevents full list
+            //         rebind when selection changes.
+            // ─────────────────────────────────────────────────────────────
+            LazyColumn(modifier = Modifier.weight(1f)) {
+                items(devices, key = { it.deviceId ?: it.hashCode() }) { device ->
                     DeviceListItem(
                         device = device,
                         onClick = { onDeviceSelect(device) }
@@ -417,9 +421,7 @@ fun DeviceDropdownSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF4CAF50)
-                ),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Icon(
@@ -450,9 +452,7 @@ fun DeviceListItem(device: Device, onClick: () -> Unit) {
                 .size(8.dp)
                 .background(statusColor, CircleShape)
         )
-
         Spacer(modifier = Modifier.width(12.dp))
-
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = device.getDisplayName(),
@@ -465,7 +465,6 @@ fun DeviceListItem(device: Device, onClick: () -> Unit) {
                 color = Color.Gray
             )
         }
-
         Text(
             text = device.getStatusDisplay(),
             fontSize = 12.sp,
@@ -475,6 +474,10 @@ fun DeviceListItem(device: Device, onClick: () -> Unit) {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  OverviewBottomSheet
+//  FIX 7: Heavy calculations wrapped in remember(response.data)
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 fun OverviewBottomSheet(
     response: DeviceResponse,
@@ -483,11 +486,13 @@ fun OverviewBottomSheet(
     onOpenDeviceStatus: () -> Unit,
     onOpenTrackTrace: () -> Unit,
     token: String,
-    viewModel : HomeViewModel,
-    isRefreshing : Boolean
+    viewModel: HomeViewModel,
+    isRefreshing: Boolean
 ) {
-    val totalDistance = response.data.sumOf { (it.speed * (it.lastSeenMinutesAgo ?: 0)).toLong() }
-    val avgSpeed = response.data.filter { it.speed > 0 }.map { it.speed }.average().takeIf { !it.isNaN() } ?: 0.0
+    // FIX 7: Only recompute when response.data actually changes
+    val devicesWithLocation = remember(response.data) {
+        response.data.filter { it.hasValidLocation() }
+    }
 
     Column(
         modifier = Modifier
@@ -508,16 +513,8 @@ fun OverviewBottomSheet(
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 RefreshIcon(
                     isRefreshing = isRefreshing,
-                    onClick = {
-                        viewModel.refreshDevices(token)
-                    }
+                    onClick = { viewModel.refreshDevices(token) }
                 )
-
-//                Icon(
-//                    imageVector = Icons.Default.Download,
-//                    contentDescription = "Download",
-//                    modifier = Modifier.size(24.dp)
-//                )
                 Icon(
                     imageVector = Icons.Default.Close,
                     contentDescription = "Close",
@@ -530,22 +527,10 @@ fun OverviewBottomSheet(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-//        Row(
-//            modifier = Modifier.fillMaxWidth(),
-//            horizontalArrangement = Arrangement.SpaceEvenly
-//        ) {
-//            StatItem("Average Speed", "${avgSpeed.toInt()} km")
-//            StatItem("Total Distance", "${totalDistance}km")
-//        }
-//
-//        Spacer(modifier = Modifier.height(24.dp))
-
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-
-            // 🔹 Secondary
             Button(
                 onClick = { onOpenDeviceStatus() },
                 modifier = Modifier
@@ -560,7 +545,6 @@ fun OverviewBottomSheet(
                 )
             }
 
-            // 🔹 Primary
             Button(
                 onClick = { onOpenTrackTrace() },
                 modifier = Modifier
@@ -576,9 +560,6 @@ fun OverviewBottomSheet(
             }
         }
 
-
-
-
         Spacer(modifier = Modifier.height(20.dp))
 
         Row(
@@ -593,16 +574,15 @@ fun OverviewBottomSheet(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        response.data
-            .filter { it.hasValidLocation() }
-            .forEach { device ->
+        // FIX 6 (continued): key() so list items don't fully rebind on refresh
+        devicesWithLocation.forEach { device ->
+            key(device.deviceId ?: device.hashCode()) {
                 DeviceOverviewItem(
                     device = device,
-                    onClick = {
-                        onNavigateToDeviceReport()
-                    }
+                    onClick = { onNavigateToDeviceReport() }
                 )
             }
+        }
 
         Spacer(modifier = Modifier.height(20.dp))
     }
@@ -627,9 +607,7 @@ fun DeviceOverviewItem(
                 .size(8.dp)
                 .background(statusColor, CircleShape)
         )
-
         Spacer(modifier = Modifier.width(12.dp))
-
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = device.getDisplayName(),
@@ -642,7 +620,6 @@ fun DeviceOverviewItem(
                 color = Color.Gray
             )
         }
-
         Text(
             text = device.getStatusDisplay(),
             fontSize = 12.sp,
@@ -655,17 +632,9 @@ fun DeviceOverviewItem(
 @Composable
 fun StatItem(label: String, value: String) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = label,
-            fontSize = 12.sp,
-            color = Color.Gray
-        )
+        Text(text = label, fontSize = 12.sp, color = Color.Gray)
         Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = value,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold
-        )
+        Text(text = value, fontSize = 16.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -690,7 +659,6 @@ fun ColorIndicator(value: String, color: Color, label: String) {
             )
         }
         Spacer(modifier = Modifier.height(6.dp))
-
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center,
@@ -712,6 +680,9 @@ fun ColorIndicator(value: String, color: Color, label: String) {
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  RefreshIcon — unchanged
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 fun RefreshIcon(
     isRefreshing: Boolean,
@@ -734,34 +705,28 @@ fun RefreshIcon(
         modifier = Modifier
             .size(24.dp)
             .graphicsLayer { rotationZ = rotation }
-            .clickable(enabled = !isRefreshing) {
-                onClick()
-            },
+            .clickable(enabled = !isRefreshing) { onClick() },
         tint = if (isRefreshing) Color.Gray else Color.Black
     )
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  CommunityEntryCard — unchanged
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
-fun CommunityEntryCard(
-    onClick: () -> Unit
-) {
+fun CommunityEntryCard(onClick: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable { onClick() },
         shape = RoundedCornerShape(14.dp),
         elevation = CardDefaults.cardElevation(6.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = Color.White
-        )
+        colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         Row(
-            modifier = Modifier
-                .padding(horizontal = 16.dp, vertical = 14.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-
-            // 🟣 Icon
             Surface(
                 shape = CircleShape,
                 color = Color(0xFF7B61FF).copy(alpha = 0.15f),
@@ -774,23 +739,15 @@ fun CommunityEntryCard(
                     modifier = Modifier.padding(8.dp)
                 )
             }
-
             Spacer(modifier = Modifier.width(12.dp))
-
-            // 📝 Text
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "Community",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
+                Text(text = "Community", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                 Text(
                     text = "Connect with other EVA2Z users",
                     fontSize = 12.sp,
                     color = Color.Gray
                 )
             }
-
             Icon(
                 imageVector = Icons.Default.ArrowForwardIos,
                 contentDescription = null,
@@ -801,6 +758,9 @@ fun CommunityEntryCard(
     }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  Platform expect — unchanged
+// ─────────────────────────────────────────────────────────────────────────────
 @Composable
 expect fun PlatformMapView(
     modifier: Modifier,
