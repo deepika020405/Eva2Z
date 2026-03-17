@@ -107,6 +107,17 @@
                     android:pathPrefix="/shop/product" />
             </intent-filter>
 
+            <!-- ✅ Product Detail Deep Link — ADD THIS -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="https"
+                    android:host="go.eva2z.com"
+                    android:pathPrefix="/product" />
+            </intent-filter>
+
         </activity>
 
         <!-- Google Maps API Key -->

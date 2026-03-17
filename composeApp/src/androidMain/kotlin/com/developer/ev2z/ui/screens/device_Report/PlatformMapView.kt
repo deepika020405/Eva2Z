@@ -3,11 +3,27 @@ package com.developer.ev2z.ui.screens.device_Report
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.developer.ev2z.R
@@ -18,9 +34,8 @@ import com.google.android.gms.maps.model.BitmapDescriptor
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
-import com.google.android.gms.maps.model.PolylineOptions
 import com.google.android.gms.maps.model.Polyline
-import com.google.android.gms.maps.model.CircleOptions
+import com.google.android.gms.maps.model.PolylineOptions
 
 @Composable
 actual fun PlatformMapView(
@@ -31,110 +46,137 @@ actual fun PlatformMapView(
     trailPoints: List<TrailPoint>
 ) {
     val context = LocalContext.current
+    var isHybrid by remember { mutableStateOf(false) }
 
-    val mapView       = remember { MapView(context) }
-    val markerHolder  = remember { arrayOfNulls<com.google.android.gms.maps.model.Marker>(1) }
-    val startMarker   = remember { arrayOfNulls<com.google.android.gms.maps.model.Marker>(1) }
+    val mapView        = remember { MapView(context) }
+    val markerHolder   = remember { arrayOfNulls<com.google.android.gms.maps.model.Marker>(1) }
+    val startMarker    = remember { arrayOfNulls<com.google.android.gms.maps.model.Marker>(1) }
     val polylineHolder = remember { arrayOfNulls<Polyline>(1) }
-    val lastLocation  = remember { doubleArrayOf(latitude, longitude) }
+    val lastLocation   = remember { doubleArrayOf(latitude, longitude) }
 
-    AndroidView(
-        factory = { ctx ->
-            mapView.apply {
-                onCreate(null)
-                getMapAsync { map ->
-                    val location  = LatLng(latitude, longitude)
-                    val bikeIcon  = getNavigationIcon(ctx)
+    // ✅ mapType toggle
+    LaunchedEffect(isHybrid) {
+        mapView.getMapAsync { map ->
+            map.mapType = if (isHybrid)
+                com.google.android.gms.maps.GoogleMap.MAP_TYPE_HYBRID
+            else
+                com.google.android.gms.maps.GoogleMap.MAP_TYPE_NORMAL
+        }
+    }
 
-                    // 📍 Vehicle marker
-                    markerHolder[0] = map.addMarker(
-                        MarkerOptions()
-                            .position(location)
-                            .icon(bikeIcon)
-                            .anchor(0.5f, 0.5f)
-                            .flat(true)
+    Box(modifier = modifier) {
+
+        AndroidView(
+            factory = { ctx ->
+                mapView.apply {
+                    onCreate(null)
+                    getMapAsync { map ->
+                        val location = LatLng(latitude, longitude)
+                        val bikeIcon = getNavigationIcon(ctx)
+
+                        markerHolder[0] = map.addMarker(
+                            MarkerOptions()
+                                .position(location)
+                                .icon(bikeIcon)
+                                .anchor(0.5f, 0.5f)
+                                .flat(true)
+                        )
+
+                        map.moveCamera(
+                            CameraUpdateFactory.newLatLngZoom(location, zoom.toFloat())
+                        )
+                    }
+                }
+            },
+            update = { _ ->
+                val newLocation = LatLng(latitude, longitude)
+
+                mapView.getMapAsync { map ->
+
+                    // ── 1. Vehicle marker move + rotate ──────────────
+                    val bearing = calculateBearing(
+                        lastLocation[0], lastLocation[1],
+                        latitude, longitude
                     )
 
-                    map.moveCamera(
-                        CameraUpdateFactory.newLatLngZoom(location, zoom.toFloat())
-                    )
-                }
-            }
-        },
-        update = { _ ->
-            val newLocation = LatLng(latitude, longitude)
-
-            mapView.getMapAsync { map ->
-
-                // ── 1. Vehicle marker move + rotate ──────────────────────────
-                val bearing = calculateBearing(
-                    lastLocation[0], lastLocation[1],
-                    latitude, longitude
-                )
-
-                markerHolder[0]?.let { marker ->
-                    marker.position = newLocation
-                    marker.rotation = bearing
-                }
-
-                lastLocation[0] = latitude
-                lastLocation[1] = longitude
-
-                // ── 2. Camera follow ─────────────────────────────────────────
-                map.animateCamera(
-                    CameraUpdateFactory.newLatLng(newLocation)
-                )
-
-                // ── 3. Trail polyline ─────────────────────────────────────────
-                if (trailPoints.size >= 2) {
-
-                    // Remove old polyline before drawing new one
-                    polylineHolder[0]?.remove()
-
-                    val latLngPoints = trailPoints.map {
-                        LatLng(it.latitude, it.longitude)
+                    markerHolder[0]?.let { marker ->
+                        marker.position = newLocation
+                        marker.rotation = bearing
                     }
 
-                    polylineHolder[0] = map.addPolyline(
-                        PolylineOptions()
-                            .addAll(latLngPoints)
-                            .color(android.graphics.Color.parseColor("#2196F3")) // 🔵 blue
-                            .width(8f)
-                            .geodesic(true)
+                    lastLocation[0] = latitude
+                    lastLocation[1] = longitude
+
+                    // ── 2. Camera follow ──────────────────────────────
+                    map.animateCamera(
+                        CameraUpdateFactory.newLatLng(newLocation)
                     )
 
-                    // ── 4. Start point marker (green dot) ────────────────────
-                    startMarker[0]?.remove()
+                    // ── 3. Trail polyline ─────────────────────────────
+                    if (trailPoints.size >= 2) {
 
-                    // Draw a small green circle at the trip start
-                    val startPoint = latLngPoints.first()
-                    startMarker[0] = map.addMarker(
-                        MarkerOptions()
-                            .position(startPoint)
-                            .icon(
-                                BitmapDescriptorFactory.defaultMarker(
-                                    BitmapDescriptorFactory.HUE_GREEN
+                        polylineHolder[0]?.remove()
+
+                        val latLngPoints = trailPoints.map {
+                            LatLng(it.latitude, it.longitude)
+                        }
+
+                        polylineHolder[0] = map.addPolyline(
+                            PolylineOptions()
+                                .addAll(latLngPoints)
+                                .color(android.graphics.Color.parseColor("#2196F3"))
+                                .width(8f)
+                                .geodesic(true)
+                        )
+
+                        // ── 4. Start point marker ─────────────────────
+                        startMarker[0]?.remove()
+
+                        val startPoint = latLngPoints.first()
+                        startMarker[0] = map.addMarker(
+                            MarkerOptions()
+                                .position(startPoint)
+                                .icon(
+                                    BitmapDescriptorFactory.defaultMarker(
+                                        BitmapDescriptorFactory.HUE_GREEN
+                                    )
                                 )
-                            )
-                            .title("Start")
-                            .anchor(0.5f, 0.5f)
-                    )
+                                .title("Start")
+                                .anchor(0.5f, 0.5f)
+                        )
+                    }
                 }
-            }
-        },
-        modifier = modifier
-    )
+            },
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // ✅ Toggle Button
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)        // ← middle right
+                .padding(end = 10.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color.White)
+                .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(8.dp))
+                .clickable { isHybrid = !isHybrid }
+                .padding(8.dp)
+        ) {
+            Text(
+                text = if (!isHybrid) "🛰️" else "🗺️",
+                fontSize = 18.sp
+            )
+        }
+    }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Navigation arrow icon (existing helper — unchanged)
-// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────
+// Navigation arrow icon
+// ─────────────────────────────────────────────────────────────────
 private fun getNavigationIcon(
     context: Context,
     width: Int  = 120,
     height: Int = 120
 ): BitmapDescriptor {
-
     val drawable = ContextCompat.getDrawable(context, R.drawable.navigation)
         ?: return BitmapDescriptorFactory.defaultMarker()
 
@@ -146,9 +188,9 @@ private fun getNavigationIcon(
     return BitmapDescriptorFactory.fromBitmap(bitmap)
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Bearing calculator (existing helper — unchanged)
-// ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────
+// Bearing calculator
+// ─────────────────────────────────────────────────────────────────
 fun calculateBearing(
     lat1: Double,
     lon1: Double,

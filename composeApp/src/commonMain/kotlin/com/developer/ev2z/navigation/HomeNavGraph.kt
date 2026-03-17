@@ -96,6 +96,7 @@ import com.developer.ev2z.ui.screens.SOSParkingTag.ConfirmationScreen
 import com.developer.ev2z.ui.screens.SOSParkingTag.QuickReplyScreen
 import com.developer.ev2z.ui.screens.SOSParkingTag.SosTagAlertScreen
 import com.developer.ev2z.ui.screens.SOSParkingTag.SosTagViewModel
+import com.developer.ev2z.ui.screens.market_screen.ShopProduct
 import com.developer.ev2z.util.SosNotificationHandler
 import kotlinx.coroutines.flow.collectLatest
 
@@ -384,33 +385,46 @@ fun HomeNavGraph(
     val pagerState = rememberPagerState(pageCount = { 4 })
     val coroutineScope = rememberCoroutineScope()
 
-
-    // ✅ StateFlow collect karo
     val deepLinkDestination by DeepLinkBus.navigateTo.collectAsState()
     var shopCategory by remember { mutableStateOf<String?>(null) }
+    var pendingProductId by remember { mutableStateOf<Int?>(null) }
 
     LaunchedEffect(deepLinkDestination) {
-        when (deepLinkDestination) {
+        val dest = deepLinkDestination ?: return@LaunchedEffect
 
-            "shop" -> {
+        when {
+            dest.startsWith("product_detail_10") -> {
+                pendingProductId = 10
                 shopCategory = null
-                coroutineScope.launch {
-                    pagerState.animateScrollToPage(2)
-                }
+                coroutineScope.launch { pagerState.animateScrollToPage(2) }
+                DeepLinkBus.clear()
             }
-
-            "shop_wired" -> {
+            dest.startsWith("product_detail_11") -> {
+                pendingProductId = 11
+                shopCategory = null
+                coroutineScope.launch { pagerState.animateScrollToPage(2) }
+                DeepLinkBus.clear()
+            }
+            dest.startsWith("product_detail_26") -> {
+                pendingProductId = 26
+                shopCategory = null
+                coroutineScope.launch { pagerState.animateScrollToPage(2) }
+                DeepLinkBus.clear()
+            }
+            dest.startsWith("shop_wired") -> {
                 shopCategory = "wired"
-                coroutineScope.launch {
-                    pagerState.animateScrollToPage(2)
-                }
+                coroutineScope.launch { pagerState.animateScrollToPage(2) }
+                DeepLinkBus.clear()
             }
-
-            "shop_wireless" -> {
+            dest.startsWith("shop_wireless") -> {
                 shopCategory = "wireless"
-                coroutineScope.launch {
-                    pagerState.animateScrollToPage(2)
-                }
+                coroutineScope.launch { pagerState.animateScrollToPage(2) }
+                DeepLinkBus.clear()
+            }
+            dest.startsWith("shop") -> {
+                shopCategory = null
+                coroutineScope.launch { pagerState.animateScrollToPage(2) }
+                DeepLinkBus.clear()
             }
         }
     }
@@ -522,6 +536,8 @@ fun HomeNavGraph(
                 apiService = apiService,
                 storageManager = storageManager,
                 token = token,
+                pendingProductId = pendingProductId,         // ✅ ADD
+                onProductConsumed = { pendingProductId = null } ,// ✅ ADD
                 profileRefreshTrigger = profileRefresh,
                 pagerState = pagerState,
                 shopCategory = shopCategory,
@@ -1250,6 +1266,8 @@ fun HomeNavGraphContent(
     apiService: ApiService,
     storageManager: StorageManager,
     token: String,
+    pendingProductId: Int? = null,           // ✅ ADD
+    onProductConsumed: () -> Unit = {},      // ✅ ADD
     profileRefreshTrigger: Int = 0,
     pagerState: PagerState, // ✅ RECEIVE pagerState
     coroutineScope: CoroutineScope, // ✅ RECEIVE coroutineScope
@@ -1287,10 +1305,46 @@ fun HomeNavGraphContent(
 ) {
     val productRepository = remember { ProductRepository(apiService) }
     val tokenProvider: () -> String = remember {
-        { storageManager.getString("token","") }
+        { storageManager.getString("token", "") }
     }
     val shopViewModel = remember {
         ShopViewModel(repo = productRepository, tokenProvider = tokenProvider)
+    }
+    val shopState by shopViewModel.state.collectAsState()
+
+    // ✅ Deeplink product navigate
+    LaunchedEffect(pendingProductId, shopState.products) {
+        val pid = pendingProductId ?: return@LaunchedEffect
+        if (shopState.products.isEmpty()) {
+            shopViewModel.loadData()
+            return@LaunchedEffect
+        }
+
+        val dto = shopState.products.firstOrNull { it.id == pid }
+        if (dto != null) {
+            val product = ShopProduct(
+                id = dto.id,
+                title = dto.name ?: "",
+                subtitle = dto.device_type ?: "",
+                price = dto.sale_price?.toDoubleOrNull() ?: 0.0,
+                rechargePrice = dto.recharge_price?.toDoubleOrNull() ?: 0.0,
+                promoAmount = dto.promo_amt?.toDoubleOrNull() ?: 0.0,
+                promoCode = dto.promo_code ?: "",
+                imageUrl = dto.image ?: "",
+                description = dto.description ?: "",
+                features = listOfNotNull(
+                    dto.features1, dto.features2, dto.features3,
+                    dto.features4, dto.features5, dto.features6, dto.features7
+                ),
+                deviceType = dto.device_type ?: "",
+                rating = 4.8,
+                ratingCount = 50,
+                isFavorite = shopViewModel.isFavorite(dto.id)
+            )
+            // ✅ ShopScreenWrapper ke navigator mein push karo
+            DeepLinkBus.navigateTo("open_product_${pid}")
+            onProductConsumed()
+        }
     }
 
     // rememberUpdatedState — stale lambda problem fix

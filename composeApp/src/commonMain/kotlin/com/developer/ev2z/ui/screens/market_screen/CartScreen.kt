@@ -1,48 +1,38 @@
-// This is CMP new code Android Ios Both
 package com.developer.ev2z.ui.screens.market_screen
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TextField
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.animation.core.animateIntOffsetAsState
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -50,44 +40,16 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import coil3.compose.AsyncImage
-import com.developer.ev2z.getPlatformContext
-import com.developer.ev2z.response.CartItemDto
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.animation.core.animateIntOffsetAsState
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.text.input.KeyboardType
-import com.developer.ev2z.data.local.model.UpiApp
 import com.developer.ev2z.phonepe.PaymentState
-import com.developer.ev2z.phonepe.openPhonePeSdk
+import com.developer.ev2z.response.CartItemDto
 import com.developer.ev2z.ui.components.FloatingContactButton
-import com.developer.ev2z.upi.UPI_APPS
-import com.developer.ev2z.upi.launchUpiPayment
 import com.developer.ev2z.util.Analytics
 import kotlin.math.roundToInt
 
 class CartScreen : Screen {
     @Composable
-    override fun Content() {
-        CartScreenContent()
-    }
+    override fun Content() { CartScreenContent() }
 }
-
-
 
 @Composable
 fun CartScreenContent() {
@@ -96,371 +58,312 @@ fun CartScreenContent() {
     val navigator = LocalNavigator.currentOrThrow
 
     LaunchedEffect(Unit) {
-        Analytics.logEvent(
-            name = "screen_view",
-            params = mapOf(
-                "screen_name" to "cart_screen",
-                "screen_class" to "CartScreen"
-            )
-        )
+        Analytics.logEvent("screen_view", mapOf("screen_name" to "cart_screen"))
         viewModel.loadCart()
         viewModel.loadBillingAddresses()
     }
 
     if (state.loading) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator()
+            CircularProgressIndicator(color = P_Green, strokeWidth = 2.dp)
         }
         return
     }
 
-    LaunchedEffect(state.cart) {
-        if (state.cart.isNotEmpty()) {
-            Analytics.logEvent(
-                name = "view_cart",
-                params = mapOf(
-                    "currency" to "INR",
-                    "value" to (state.finalAmount ?: state.totalPrice ?: 0),
-                    "items_count" to state.cart.size
-                )
-            )
-        }
-    }
+    Box(modifier = Modifier.fillMaxSize().background(P_Bg)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            Column(modifier = Modifier.weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 16.dp)) {
+                PremiumCartHeader(state.cartCount)
+                Spacer(Modifier.height(8.dp))
 
-    Box(
-        modifier = Modifier.fillMaxSize()
-    ) {
-
-        Column(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            // ⭐ Scrollable content
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState())
-                    .padding(bottom = 16.dp)
-            ) {
-                CartHeader(state.cartCount)
-                Spacer(Modifier.height(12.dp))
-
-                state.cart.forEach { item ->
-                    CartItemCard(item, viewModel)
-                    Spacer(Modifier.height(12.dp))
+                if (state.cart.isEmpty()) {
+                    PremiumEmptyCart()
+                } else {
+                    state.cart.forEach { item ->
+                        PremiumCartItem(item, viewModel)
+                        Spacer(Modifier.height(12.dp))
+                    }
+                    PremiumAddressSection(
+                        selectedAddress = state.selectedAddress,
+                        addresses = state.addresses,
+                        onSelect = { viewModel.selectAddress(it) },
+                        onAddNew = { navigator.push(AddNewAddressScreen()) },
+                        viewModel = viewModel
+                    )
+                    if (state.cart.isNotEmpty()) {
+                        PremiumCouponsSection(viewModel)
+                        PremiumOrderSummary(viewModel)
+                    }
                 }
-
-                AddressSection(
-                    selectedAddress = state.selectedAddress,
-                    addresses = state.addresses,
-                    onSelect = { viewModel.selectAddress(it) },
-                    onAddNew = { navigator.push(AddNewAddressScreen()) },
-                    viewModel = viewModel
-                )
-
-                // 👇 Promo + Summary yahin condition ke saath aayega
-                if (state.cart.isNotEmpty()) {
-                    CouponsSection(viewModel)
-                    PaymentSummarySection(viewModel)
-                }
-
             }
             if (state.cart.isNotEmpty()) {
-                CheckoutBottomBar(viewModel)
+                PremiumCheckoutBar(viewModel)
             }
-
         }
 
-        // ⭐ FLOATING CONTACT BUTTON (ALWAYS VISIBLE)
         FloatingContactButton(
             phoneNumber = "919755273822",
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 20.dp, bottom = 20.dp)
+                .padding(end = 16.dp, bottom = 90.dp)
         )
     }
-
 }
+
+// ── Header ─────────────────────────────────────────────────────────
+@Composable
+fun CartHeader(count: Int) { PremiumCartHeader(count) }
 
 @Composable
-fun CartHeader(count: Int) {
+private fun PremiumCartHeader(count: Int) {
     val navigator = LocalNavigator.currentOrThrow
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-
-        Text("Cart ($count item)", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-
-
-
-        Text(
-            "Continue Shopping ✕",
-            color = Color.Gray,
-            fontSize = 14.sp,
-            modifier = Modifier.clickable { navigator.pop() }
-        )
+    Surface(color = P_Card, shadowElevation = 0.dp) {
+        Column {
+            Row(modifier = Modifier.fillMaxWidth().statusBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.size(38.dp).clip(CircleShape)
+                    .background(P_Bg).clickable { navigator.pop() },
+                    contentAlignment = Alignment.Center) {
+                    Icon(Icons.Default.ArrowBack, null,
+                        tint = P_Dark, modifier = Modifier.size(18.dp))
+                }
+                Spacer(Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("My Cart", fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold, color = P_Dark)
+                    Text("$count item${if (count != 1) "s" else ""}",
+                        fontSize = 12.sp, color = P_Light)
+                }
+                Text("Continue Shopping", fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium, color = P_Green,
+                    modifier = Modifier.clickable { navigator.pop() })
+            }
+            HorizontalDivider(color = P_Border, thickness = 0.5.dp)
+        }
     }
 }
 
+// ── Empty Cart ─────────────────────────────────────────────────────
+@Composable
+private fun PremiumEmptyCart() {
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 100.dp),
+        horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(modifier = Modifier.size(80.dp).clip(CircleShape)
+            .background(P_GreenSurface), contentAlignment = Alignment.Center) {
+            Icon(Icons.Outlined.ShoppingBag, null,
+                tint = P_Green, modifier = Modifier.size(36.dp))
+        }
+        Spacer(Modifier.height(20.dp))
+        Text("Cart is empty", fontSize = 18.sp,
+            fontWeight = FontWeight.Bold, color = P_Dark)
+        Spacer(Modifier.height(6.dp))
+        Text("Browse our GPS trackers to get started",
+            fontSize = 14.sp, color = P_Light)
+    }
+}
 
-
-
+// ── Cart Item ──────────────────────────────────────────────────────
 @Composable
 fun CartItemCard(item: CartItemDto, viewModel: ShopViewModel) {
+    PremiumCartItem(item, viewModel)
+}
+
+@Composable
+private fun PremiumCartItem(item: CartItemDto, viewModel: ShopViewModel) {
     val salePrice = item.product?.sale_price?.toDoubleOrNull() ?: 0.0
-    val fakeOldPrice = (salePrice * 1.5).toInt()
-    val discountPercent = (((fakeOldPrice - salePrice) / fakeOldPrice) * 100).toInt()
+    val fakeOld = (salePrice * 1.5).toInt()
+    val disc = (((fakeOld - salePrice) / fakeOld) * 100).toInt()
+    var showRemove by remember { mutableStateOf(false) }
 
-    var showRemoveDialog by remember { mutableStateOf(false) }
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+    Card(modifier = Modifier.fillMaxWidth()
+        .padding(horizontal = 20.dp),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFf2f5f0))
-    ) {
-        Row(
-            Modifier.padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AsyncImage(
-                model = item.product?.image.orEmpty(),
-                contentDescription = null,
-                modifier = Modifier
-                    .size(70.dp)
-                    .clip(RoundedCornerShape(12.dp)),
-                contentScale = ContentScale.Crop
-            )
-
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(item.product?.name ?: "", fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(4.dp))
-
-                val planType = when (item.plan_type?.lowercase()) {
-                    "with_recharge" -> "With Recharge"
-                    "without_recharge" -> "Without Recharge"
-                    else -> null
+        colors = CardDefaults.cardColors(containerColor = P_Card),
+        elevation = CardDefaults.cardElevation(0.dp),
+        border = BorderStroke(1.dp, P_Border)) {
+        Column {
+            Row(modifier = Modifier.padding(14.dp),
+                verticalAlignment = Alignment.Top) {
+                // Image
+                Box(modifier = Modifier.size(80.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(P_Bg)) {
+                    AsyncImage(model = item.product?.image.orEmpty(),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize().padding(8.dp),
+                        contentScale = ContentScale.Fit)
                 }
-
-                val deviceType = when (item.device_type?.lowercase()) {
-                    "android" -> "Android"
-                    "ios" -> "iOS"
-                    else -> null
-                }
-
-                val displayText = planType ?: deviceType ?: ""
-                Text(displayText, fontWeight = FontWeight.Bold)
-
-                Spacer(Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier
-                            .background(Color(0xFF1B9F4A), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Text("Rs. $salePrice", color = Color.White)
+                Spacer(Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(item.product?.name ?: "",
+                        fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+                        color = P_Dark, maxLines = 2,
+                        overflow = TextOverflow.Ellipsis)
+                    Spacer(Modifier.height(5.dp))
+                    // Tag
+                    val tag = when {
+                        item.plan_type == "with_recharge" -> "With Recharge"
+                        item.plan_type == "without_recharge" -> "Without Recharge"
+                        item.device_type?.lowercase() == "android" -> "Android"
+                        item.device_type?.lowercase() == "ios" -> "iOS"
+                        else -> null
                     }
-
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "Rs. $fakeOldPrice",
-                        textDecoration = TextDecoration.LineThrough,
-                        color = Color.Gray,
-                        fontSize = 12.sp
-                    )
-
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        "$discountPercent% OFF",
-                        color = Color(0xFF1B9F4A),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
-                    )
-                }
-
-                if (item.plan_type == "with_recharge") {
-                    val recharge = item.recharge_amount ?: "0"
-                    Spacer(Modifier.height(6.dp))
-                    Box(
-                        Modifier
-                            .background(Color(0xFF005BBB), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            "Recharge Included: ₹$recharge",
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
+                    tag?.let {
+                        Box(modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(P_GreenSurface)
+                            .padding(horizontal = 7.dp, vertical = 3.dp)) {
+                            Text(it, fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium, color = P_Green)
+                        }
+                        Spacer(Modifier.height(6.dp))
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("₹${salePrice.toInt()}", fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold, color = P_Dark)
+                        Spacer(Modifier.width(8.dp))
+                        Text("₹$fakeOld", fontSize = 12.sp, color = P_Light,
+                            textDecoration = TextDecoration.LineThrough)
+                        Spacer(Modifier.width(6.dp))
+                        Text("$disc% off", fontSize = 11.sp,
+                            fontWeight = FontWeight.Medium, color = P_Green)
                     }
                 }
+                Spacer(Modifier.width(10.dp))
+                PremiumQtyController(item, viewModel) { showRemove = true }
             }
-
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                // DELETE ICON TRIGGERS CONFIRMATION DIALOG
-//                Box(
-//                    modifier = Modifier
-//                        .size(28.dp)
-//                        .clip(CircleShape)
-//                        .background(Color(0xFFE53935))
-//                        .clickable { showRemoveDialog = true },
-//                    contentAlignment = Alignment.Center
-//                ) {
-//                    Text("🗑", color = Color.White, fontSize = 14.sp)
-//                }
-
-//                Spacer(Modifier.height(8.dp))
-
-                QuantityControllerWithRemove(item, viewModel) {
-                    // Callback when quantity becomes zero → show remove dialog
-                    showRemoveDialog = true
+            if (item.plan_type == "with_recharge") {
+                Row(modifier = Modifier.fillMaxWidth()
+                    .background(Color(0xFFF0F4FF))
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Icon(Icons.Default.Wifi, null,
+                        tint = Color(0xFF3B82F6),
+                        modifier = Modifier.size(14.dp))
+                    Text("Recharge Plan: ₹${item.recharge_amount ?: "0"}",
+                        fontSize = 12.sp, fontWeight = FontWeight.Medium,
+                        color = Color(0xFF3B82F6))
                 }
             }
         }
     }
 
-    // ✅ Remove Confirmation Dialog
-    if (showRemoveDialog) {
-        AlertDialog(
-            onDismissRequest = { showRemoveDialog = false },
-            title = { Text("Remove Item?") },
-            text = { Text("Are you sure you want to remove this item from your cart?") },
+    if (showRemove) {
+        AlertDialog(onDismissRequest = { showRemove = false },
+            title = { Text("Remove item?", fontWeight = FontWeight.Bold) },
+            text = { Text("This item will be removed from your cart.") },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        showRemoveDialog = false
-                        // Trigger analytics on removal
-                        Analytics.logEvent(
-                            name = "remove_from_cart",
-                            params = mapOf(
-                                "item_id" to item.product_id,
-                                "item_name" to item.product?.name,
-                                "item_variant" to (item.device_type ?: ""),
-                                "quantity" to item.quantity
-                            )
-                        )
-                        viewModel.removeFromCart(item)
-                    }
-                ) { Text("Yes", color = Color.Red) }
+                TextButton(onClick = {
+                    showRemove = false
+                    Analytics.logEvent("remove_from_cart", mapOf(
+                        "item_id" to item.product_id, "item_name" to item.product?.name))
+                    viewModel.removeFromCart(item)
+                }) { Text("Remove", color = P_Red, fontWeight = FontWeight.SemiBold) }
             },
             dismissButton = {
-                TextButton(onClick = { showRemoveDialog = false }) {
-                    Text("No")
+                TextButton(onClick = { showRemove = false }) {
+                    Text("Cancel", color = P_Mid)
                 }
-            }
-        )
+            },
+            shape = RoundedCornerShape(16.dp))
     }
 }
 
-
+// ── Qty Controller ─────────────────────────────────────────────────
+@Composable
+fun QuantityControllerWithRemove(item: CartItemDto, viewModel: ShopViewModel, onZeroReached: () -> Unit) {
+    PremiumQtyController(item, viewModel, onZeroReached)
+}
 
 @Composable
-fun QuantityControllerWithRemove(
-    item: CartItemDto,
-    viewModel: ShopViewModel,
-    onZeroReached: () -> Unit
+private fun PremiumQtyController(
+    item: CartItemDto, viewModel: ShopViewModel, onZeroReached: () -> Unit
 ) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Button(
-            onClick = {
-                viewModel.updateQuantity(
-                    productId = item.product_id,
-                    newQty = item.quantity + 1,
-                    plan_type = item.plan_type,
-                    device_type = item.device_type
-                )
-            },
-            contentPadding = PaddingValues(0.dp),
-            modifier = Modifier.size(28.dp),
-            shape = CircleShape
-        ) { Text("+") }
-
-        Text(item.quantity.toString(), fontWeight = FontWeight.Bold, fontSize = 14.sp)
-
-        Button(
-            onClick = {
-                if (item.quantity > 1) {
-                    viewModel.updateQuantity(
-                        productId = item.product_id,
-                        newQty = item.quantity - 1,
-                        plan_type = item.plan_type,
-                        device_type = item.device_type
-                    )
-                } else {
-                    // If quantity is 1 → trigger remove confirmation
-                    onZeroReached()
-                }
-            },
-            contentPadding = PaddingValues(0.dp),
-            modifier = Modifier.size(28.dp),
-            shape = CircleShape
-        ) { Text("-") }
+    Column(horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Box(modifier = Modifier.size(30.dp).clip(RoundedCornerShape(8.dp))
+            .border(1.dp, P_GreenBorder, RoundedCornerShape(8.dp))
+            .background(P_GreenSurface)
+            .clickable {
+                viewModel.updateQuantity(item.product_id, item.quantity + 1,
+                    item.plan_type, item.device_type)
+            }, contentAlignment = Alignment.Center) {
+            Text("+", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = P_Green)
+        }
+        Text(item.quantity.toString(), fontSize = 15.sp,
+            fontWeight = FontWeight.Bold, color = P_Dark)
+        Box(modifier = Modifier.size(30.dp).clip(RoundedCornerShape(8.dp))
+            .border(1.dp, if (item.quantity == 1) Color(0xFFFFCDD2) else P_Border,
+                RoundedCornerShape(8.dp))
+            .background(if (item.quantity == 1) Color(0xFFFFF0F0) else P_Bg)
+            .clickable {
+                if (item.quantity > 1) viewModel.updateQuantity(item.product_id,
+                    item.quantity - 1, item.plan_type, item.device_type)
+                else onZeroReached()
+            }, contentAlignment = Alignment.Center) {
+            Icon(
+                if (item.quantity == 1) Icons.Default.DeleteOutline
+                else Icons.Default.Remove,
+                null,
+                tint = if (item.quantity == 1) P_Red else P_Mid,
+                modifier = Modifier.size(15.dp))
+        }
     }
 }
 
-
-
+// ── Address Section ────────────────────────────────────────────────
 @Composable
 fun AddressSection(
-    selectedAddress: BillingAddress?,
-    addresses: List<BillingAddress>,
-    onSelect: (BillingAddress) -> Unit,
-    onAddNew: () -> Unit,
-    viewModel: ShopViewModel
+    selectedAddress: BillingAddress?, addresses: List<BillingAddress>,
+    onSelect: (BillingAddress) -> Unit, onAddNew: () -> Unit, viewModel: ShopViewModel
+) { PremiumAddressSection(selectedAddress, addresses, onSelect, onAddNew, viewModel) }
+
+@Composable
+private fun PremiumAddressSection(
+    selectedAddress: BillingAddress?, addresses: List<BillingAddress>,
+    onSelect: (BillingAddress) -> Unit, onAddNew: () -> Unit, viewModel: ShopViewModel
 ) {
     var showDialog by remember { mutableStateOf(false) }
     val navigator = LocalNavigator.currentOrThrow
-    Column(Modifier.padding(16.dp)) {
 
-        Text(
-            "Delivery Address",
-            fontWeight = FontWeight.Bold,
-            fontSize = 18.sp
-        )
-
+    Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
+        Text("Delivery Address", fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold, color = P_Dark)
         Spacer(Modifier.height(10.dp))
-
-        Card(
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(Color(0xFFEFF7F0)),
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { showDialog = true }
-        ) {
-            Column(Modifier.padding(16.dp)) {
-
-                Text("📍 Selected Address", fontWeight = FontWeight.SemiBold)
-
-                Spacer(Modifier.height(6.dp))
-
-                if (selectedAddress == null) {
-                    Text("No Billing Address Found")
-                } else {
-                    Text(
-                        "${selectedAddress.fullName} | ${selectedAddress.phone}",
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text("${selectedAddress.address}, ${selectedAddress.city}")
-                    Text("${selectedAddress.state} - ${selectedAddress.pincode}")
+        Card(shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = P_Card),
+            elevation = CardDefaults.cardElevation(0.dp),
+            modifier = Modifier.fillMaxWidth()
+                .border(1.dp, P_Border, RoundedCornerShape(14.dp))
+                .clickable { showDialog = true }) {
+            Row(modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Box(modifier = Modifier.size(38.dp).clip(CircleShape)
+                    .background(P_GreenSurface), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Outlined.LocationOn, null,
+                        tint = P_Green, modifier = Modifier.size(18.dp))
                 }
-
-                Spacer(Modifier.height(10.dp))
-
-                Text(
-                    "Change / Select Address",
-                    color = Color(0xFF1B9F4A),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    if (selectedAddress == null) {
+                        Text("Add delivery address", fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium, color = P_Mid)
+                        Text("Tap to select or add",
+                            fontSize = 12.sp, color = P_Light)
+                    } else {
+                        Text(selectedAddress.fullName, fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold, color = P_Dark)
+                        Text("${selectedAddress.address}, ${selectedAddress.city}, ${selectedAddress.state}",
+                            fontSize = 12.sp, color = P_Mid, maxLines = 2,
+                            overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                Icon(Icons.Default.ChevronRight, null,
+                    tint = P_Light, modifier = Modifier.size(20.dp))
             }
         }
     }
@@ -468,402 +371,281 @@ fun AddressSection(
     if (showDialog) {
         AddressDialog(
             list = addresses,
-            onSelect = {
-                onSelect(it)
-                showDialog = false
-            },
-            onDelete = {
-                viewModel.deleteBillingAddress(it.id)
-            },
-            onAddNew = {
-                showDialog = false
-                navigator.push(AddNewAddressScreen())
-            },
-            onDismiss = { showDialog = false }
-        )
+            onSelect = { onSelect(it); showDialog = false },
+            onDelete = { viewModel.deleteBillingAddress(it.id) },
+            onAddNew = { showDialog = false; navigator.push(AddNewAddressScreen()) },
+            onDismiss = { showDialog = false })
     }
 }
 
-
+// ── Address Dialog ─────────────────────────────────────────────────
 @Composable
 fun AddressDialog(
-    list: List<BillingAddress>,
-    onSelect: (BillingAddress) -> Unit,
-    onDelete: (BillingAddress) -> Unit,
-    onAddNew: () -> Unit,
-    onDismiss: () -> Unit
+    list: List<BillingAddress>, onSelect: (BillingAddress) -> Unit,
+    onDelete: (BillingAddress) -> Unit, onAddNew: () -> Unit, onDismiss: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
-
-        Card(
-            shape = RoundedCornerShape(18.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp)
-        ) {
-
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-            ) {
-
-                Text("Select Address", fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                Spacer(Modifier.height(12.dp))
-
-                Column(
-                    modifier = Modifier
-                        .heightIn(max = 350.dp)
-                        .verticalScroll(rememberScrollState())
-                ) {
-
+        Card(shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = P_Card)) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text("Delivery Address", fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp, color = P_Dark)
+                Spacer(Modifier.height(16.dp))
+                Column(modifier = Modifier.heightIn(max = 360.dp)
+                    .verticalScroll(rememberScrollState())) {
                     list.forEach { addr ->
-
-                        Card(
-                            shape = RoundedCornerShape(12.dp),
-                            colors = CardDefaults.cardColors(Color(0xFFF4F7F4)),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 6.dp)
-                        ) {
-
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-
-                                Column(
-                                    Modifier
-                                        .weight(1f)
-                                        .clickable { onSelect(addr) }
-                                ) {
-                                    Text(addr.fullName, fontWeight = FontWeight.Bold)
-                                    Text("📞 ${addr.phone}")
-                                    Spacer(Modifier.height(4.dp))
-                                    Text("${addr.address}, ${addr.city}")
-                                    Text("${addr.state} - ${addr.pincode}")
+                        Card(shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(P_Bg),
+                            elevation = CardDefaults.cardElevation(0.dp),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp)
+                                .border(1.dp, P_Border, RoundedCornerShape(12.dp))) {
+                            Row(modifier = Modifier.fillMaxWidth().padding(14.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.Top) {
+                                Column(modifier = Modifier.weight(1f)
+                                    .clickable { onSelect(addr) }) {
+                                    Text(addr.fullName, fontWeight = FontWeight.SemiBold,
+                                        color = P_Dark)
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(addr.phone, fontSize = 13.sp, color = P_Mid)
+                                    Text("${addr.address}, ${addr.city}",
+                                        fontSize = 12.sp, color = P_Light)
+                                    Text("${addr.state} − ${addr.pincode}",
+                                        fontSize = 12.sp, color = P_Light)
                                 }
-
-                                IconButton(
-                                    onClick = { onDelete(addr) }
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Delete,
-                                        contentDescription = "Delete Address",
-                                        tint = Color.Red
-                                    )
+                                IconButton(onClick = { onDelete(addr) },
+                                    modifier = Modifier.size(32.dp)) {
+                                    Icon(Icons.Default.DeleteOutline, null,
+                                        tint = P_Red, modifier = Modifier.size(17.dp))
                                 }
                             }
                         }
                     }
                 }
-
                 Spacer(Modifier.height(16.dp))
-
-                Button(
-                    onClick = onAddNew,
-                    modifier = Modifier.fillMaxWidth(),
+                Button(onClick = onAddNew,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(Color(0xFF1B9F4A))
-                ) {
-                    Text("➕ Add New Address", color = Color.White)
+                    colors = ButtonDefaults.buttonColors(containerColor = P_Green),
+                    elevation = ButtonDefaults.buttonElevation(0.dp)) {
+                    Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Add New Address", fontWeight = FontWeight.SemiBold)
                 }
             }
         }
     }
 }
 
-
+// ── Coupons ────────────────────────────────────────────────────────
+@Composable
+fun CouponsSection(viewModel: ShopViewModel) { PremiumCouponsSection(viewModel) }
 
 @Composable
-fun CouponsSection(viewModel: ShopViewModel) {
+private fun PremiumCouponsSection(viewModel: ShopViewModel) {
     val state by viewModel.state.collectAsState()
-
     var code by remember { mutableStateOf("") }
 
-    Column(Modifier.padding(16.dp)) {
-
-        Text("Apply Promo Code", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-        Spacer(Modifier.height(12.dp))
-
-        TextField(
-            value = code,
-            onValueChange = {
-                code = it
-                // Clear error while typing
-                viewModel.clearPromoError()
-            },
-            label = { Text("Enter Promo Code") },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp)
-        )
-
-        if (state.promoError != null) {
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = state.promoError!!,
-                color = Color.Red,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
+    Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+        Text("Promo Code", fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold, color = P_Dark)
         Spacer(Modifier.height(10.dp))
-
-        Button(
-            onClick = { viewModel.applyPromo(code) },
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(Color(0xFF1B9F4A))
-        ) {
-            Text("Apply Code", color = Color.White)
-        }
-
-        Spacer(Modifier.height(20.dp))
-
-        if (state.promoApplied) {
-
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(Color(0xFFDFF5E1)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-
-                Column(Modifier.padding(16.dp)) {
-
-                    Text(
-                        "Promo Applied: ${state.appliedPromoCode}",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = Color(0xFF1B9F4A)
-                    )
-
-                    Spacer(Modifier.height(10.dp))
-
-                    Text("Price Breakup", fontWeight = FontWeight.SemiBold)
-
-                    Spacer(Modifier.height(8.dp))
-
-                    SummaryRow("Original Price", "₹${state.originalAmount}")
-                    SummaryRow("Discount Applied", "-₹${state.discountApplied}")
-                    Divider(Modifier.padding(vertical = 8.dp))
-                    SummaryRow("Final Amount", "₹${state.finalAmount}", isBold = true)
+        Card(shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = P_Card),
+            elevation = CardDefaults.cardElevation(0.dp),
+            modifier = Modifier.fillMaxWidth()
+                .border(1.dp, P_Border, RoundedCornerShape(14.dp))) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedTextField(
+                        value = code,
+                        onValueChange = { code = it; viewModel.clearPromoError() },
+                        placeholder = { Text("Enter promo code",
+                            fontSize = 14.sp, color = P_Light) },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = P_Green,
+                            unfocusedBorderColor = P_Border))
+                    Button(onClick = { viewModel.applyPromo(code) },
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = P_Green),
+                        elevation = ButtonDefaults.buttonElevation(0.dp),
+                        modifier = Modifier.height(56.dp)) {
+                        Text("Apply", fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                    }
+                }
+                state.promoError?.let {
+                    Spacer(Modifier.height(6.dp))
+                    Text(it, color = P_Red, fontSize = 12.sp)
+                }
+                if (state.promoApplied) {
+                    Spacer(Modifier.height(12.dp))
+                    Row(modifier = Modifier.fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(P_GreenSurface)
+                        .border(1.dp, P_GreenBorder, RoundedCornerShape(10.dp))
+                        .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Default.CheckCircle, null,
+                            tint = P_Green, modifier = Modifier.size(18.dp))
+                        Column {
+                            Text("${state.appliedPromoCode} applied",
+                                fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                                color = P_Green)
+                            Text("You save ₹${state.discountApplied}",
+                                fontSize = 12.sp, color = P_Mid)
+                        }
+                    }
                 }
             }
         }
-        LaunchedEffect(state.promoApplied) {
-            if (state.promoApplied) {
-                Analytics.logEvent(
-                    name = "select_promotion",
-                    params = mapOf(
-                        "promotion_name" to state.appliedPromoCode,
-                        "discount_value" to state.discountApplied,
-                        "currency" to "INR"
-                    )
-                )
-            }
-        }
     }
 }
 
-
-
-
-
-
-
+// ── Order Summary ──────────────────────────────────────────────────
+@Composable
+fun PaymentSummarySection(viewModel: ShopViewModel) { PremiumOrderSummary(viewModel) }
 
 @Composable
-fun PaymentSummarySection(viewModel: ShopViewModel) {
+private fun PremiumOrderSummary(viewModel: ShopViewModel) {
     val state by viewModel.state.collectAsState()
-
-    // Check if any item in cart is with_recharge
     val hasRecharge = state.cart.any { it.plan_type == "with_recharge" }
 
-    Column(Modifier.padding(16.dp)) {
-
-        Text("Payment Summary", fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(8.dp))
-
-        if (hasRecharge) {
-            // 1️⃣ Show Recharge Items
-            state.cart.filter { it.plan_type == "with_recharge" }.forEach { item ->
-                SummaryRow(
-                    label = "${item.product?.name} \n(Recharge Included)",
-                    value = "₹${item.recharge_amount ?: "0"}"
-                )
+    Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+        Text("Order Summary", fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold, color = P_Dark)
+        Spacer(Modifier.height(10.dp))
+        Card(shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = P_Card),
+            elevation = CardDefaults.cardElevation(0.dp),
+            modifier = Modifier.fillMaxWidth()
+                .border(1.dp, P_Border, RoundedCornerShape(14.dp))) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                if (hasRecharge) {
+                    state.cart.filter { it.plan_type == "with_recharge" }.forEach { item ->
+                        SummaryRow("${item.product?.name} (Recharge)",
+                            "₹${item.recharge_amount ?: "0"}")
+                    }
+                    state.cart.forEach { item ->
+                        SummaryRow("${item.product?.name} (Base)",
+                            "₹${item.product?.sale_price ?: 0}")
+                    }
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp),
+                        color = P_Border, thickness = 0.5.dp)
+                    SummaryRow("Total",
+                        "₹${state.finalAmount ?: state.totalPrice ?: "0"}", isBold = true)
+                } else {
+                    SummaryRow("Subtotal",
+                        "₹${state.originalAmount ?: state.totalPrice ?: "0"}")
+                    if (state.promoApplied) {
+                        SummaryRow("Promo Discount",
+                            "−₹${state.discountApplied ?: 0.0}", isGreen = true)
+                    }
+                    SummaryRow("Delivery", "FREE", isGreen = true)
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 10.dp),
+                        color = P_Border, thickness = 0.5.dp)
+                    SummaryRow("Total Payable",
+                        "₹${state.finalAmount ?: state.totalPrice ?: "0"}", isBold = true)
+                }
             }
-
-            Spacer(Modifier.height(8.dp))
-
-            // 2️⃣ Show Product Base Prices
-            state.cart.forEach { item ->
-                val salePrice = item.product?.sale_price ?: 0
-                SummaryRow(
-                    label = "${item.product?.name} \nBase Price",
-                    value = "₹$salePrice"
-                )
-            }
-
-            Spacer(Modifier.height(8.dp))
-
-            // 3️⃣ Cart Total
-            SummaryRow("Cart Total", "₹${state.finalAmount ?: state.totalPrice ?: "0"}", isBold = true)
-
-        } else {
-            // Existing summary for normal products
-            SummaryRow("Cart Total", "₹${state.originalAmount ?: state.totalPrice ?: "0"}")
-
-            if (state.promoApplied) {
-                SummaryRow(
-                    "Promo Discount",
-                    "-₹${state.discountApplied ?: 0.0}"
-                )
-            }
-
-            SummaryRow("Shipping", "Free")
-            Divider(Modifier.padding(vertical = 12.dp))
-
-            SummaryRow(
-                "Total Payable",
-                "₹${state.finalAmount ?: state.totalPrice ?: "0"}",
-                isBold = true
-            )
         }
     }
 }
 
-
-
 @Composable
-fun SummaryRow(label: String, value: String, isBold: Boolean = false) {
-    Row(
-        Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(label, fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal)
-        Text(value, fontWeight = if (isBold) FontWeight.Bold else FontWeight.Normal)
+fun SummaryRow(label: String, value: String, isBold: Boolean = false, isGreen: Boolean = false) {
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, fontSize = 14.sp,
+            fontWeight = if (isBold) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (isBold) P_Dark else P_Mid)
+        Text(value, fontSize = 14.sp,
+            fontWeight = if (isBold) FontWeight.Bold else FontWeight.Medium,
+            color = if (isGreen) P_Green else if (isBold) P_Dark else P_Mid)
     }
 }
 
-
-
+// ── Checkout Bar ───────────────────────────────────────────────────
+@Composable
+fun CheckoutBottomBar(viewModel: ShopViewModel) { PremiumCheckoutBar(viewModel) }
 
 @Composable
-fun CheckoutBottomBar(viewModel: ShopViewModel) {
+private fun PremiumCheckoutBar(viewModel: ShopViewModel) {
     val state by viewModel.state.collectAsState()
     val paymentState by viewModel.paymentState.collectAsState()
     val navigator = LocalNavigator.currentOrThrow
+    var showErr by remember { mutableStateOf(false) }
 
-    var showAddressError by remember { mutableStateOf(false) }
-
-    // 🚨 ADDRESS NOT SELECTED POPUP
-    if (showAddressError) {
-        AlertDialog(
-            onDismissRequest = { showAddressError = false },
-            confirmButton = {
-                TextButton(onClick = { showAddressError = false }) {
-                    Text("OK")
+    Surface(modifier = Modifier.fillMaxWidth(), color = P_Card,
+        shadowElevation = 24.dp, tonalElevation = 0.dp) {
+        Column {
+            HorizontalDivider(color = P_Border, thickness = 0.5.dp)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 14.dp),
+                // ✅ .navigationBarsPadding() hatao
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ){
+                Column {
+                    Text("Total", fontSize = 12.sp, color = P_Light)
+                    Text("₹${state.finalAmount ?: state.totalPrice ?: "0"}",
+                        fontSize = 22.sp, fontWeight = FontWeight.Black, color = P_Dark)
                 }
-            },
-            title = {
-                Text("Address Required")
-            },
-            text = {
-                Text("Please select or add a delivery address before checkout.")
-            }
-        )
-    }
-
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-    ) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(30.dp))
-                .background(Color.White)
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-
-            Column {
-                Text("Total Amount", color = Color.Gray)
-                Text(
-                    "₹${state.finalAmount ?: state.totalPrice ?: "0"}",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            if (paymentState is PaymentState.Processing) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(36.dp),
-                    strokeWidth = 3.dp
-                )
-            } else {
-                Button(
-                    onClick = {
-
-                        // 🔴 VALIDATION FIRST
-                        if (state.selectedAddress == null) {
-                            showAddressError = true
-                            return@Button
-                        }
-
-                        // ✅ ADDRESS OK → CONTINUE
-                        Analytics.logEvent(
-                            name = "begin_checkout",
-                            params = mapOf(
-                                "currency" to "INR",
-                                "value" to (state.finalAmount ?: state.totalPrice ?: 0),
-                                "items_count" to state.cart.size
-                            )
-                        )
-
+                if (paymentState is PaymentState.Processing) {
+                    CircularProgressIndicator(color = P_Green,
+                        modifier = Modifier.size(34.dp), strokeWidth = 2.dp)
+                } else {
+                    Button(onClick = {
+                        if (state.selectedAddress == null) { showErr = true; return@Button }
+                        Analytics.logEvent("begin_checkout", mapOf(
+                            "currency" to "INR",
+                            "value" to (state.finalAmount ?: state.totalPrice ?: 0),
+                            "items_count" to state.cart.size))
                         navigator.push(PaymentScreen())
                     },
-                    shape = RoundedCornerShape(30.dp)
-                ) {
-                    Text("Checkout")
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = P_Green),
+                        elevation = ButtonDefaults.buttonElevation(0.dp),
+                        modifier = Modifier.height(50.dp).widthIn(min = 150.dp)) {
+                        Text("Proceed to Pay",
+                            fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                    }
                 }
             }
         }
     }
+
+    if (showErr) {
+        AlertDialog(onDismissRequest = { showErr = false },
+            confirmButton = {
+                TextButton(onClick = { showErr = false }) {
+                    Text("OK", color = P_Green)
+                }
+            },
+            title = { Text("Address Required", fontWeight = FontWeight.Bold) },
+            text = { Text("Please add or select a delivery address.") },
+            shape = RoundedCornerShape(16.dp))
+    }
 }
 
+// ── Swipe to Remove ────────────────────────────────────────────────
 @Composable
-fun SwipeToRemove(
-    onRemove: () -> Unit,
-    content: @Composable () -> Unit
-) {
+fun SwipeToRemove(onRemove: () -> Unit, content: @Composable () -> Unit) {
     var offsetX by remember { mutableStateOf(0f) }
-
     val animatedOffset by animateIntOffsetAsState(
-        targetValue = IntOffset(offsetX.roundToInt(), 0)
-    )
-
-    Box(
-        modifier = Modifier
-            .offset { animatedOffset }
-            .pointerInput(Unit) {
-                detectHorizontalDragGestures(
-                    onDragEnd = {
-                        if (kotlin.math.abs(offsetX) > 250f) {
-                            onRemove()
-                        } else {
-                            offsetX = 0f
-                        }
-                    }
-                ) { _, dragAmount ->
-                    offsetX += dragAmount
-                }
-            }
-    ) {
-        content()
-    }
+        targetValue = IntOffset(offsetX.roundToInt(), 0))
+    Box(modifier = Modifier.offset { animatedOffset }
+        .pointerInput(Unit) {
+            detectHorizontalDragGestures(
+                onDragEnd = {
+                    if (kotlin.math.abs(offsetX) > 250f) onRemove() else offsetX = 0f
+                }) { _, drag -> offsetX += drag }
+        }) { content() }
 }

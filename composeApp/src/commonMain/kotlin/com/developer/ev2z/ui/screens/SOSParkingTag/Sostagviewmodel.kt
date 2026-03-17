@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.developer.ev2z.data.local.UserPrefs
 import com.developer.ev2z.network.ApiService
+import io.ktor.client.plugins.ResponseException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -88,6 +89,7 @@ class SosTagViewModel(
 
     // ── Load All Alerts ───────────────────────────────────────────
 
+
     fun loadAlertList() {
         viewModelScope.launch {
             _alertListState.value = SosAlertListUiState.Loading
@@ -98,8 +100,16 @@ class SosTagViewModel(
                         response.data ?: emptyList()
                     )
                 } else {
+                    // ✅ status false = no alerts
+                    _alertListState.value = SosAlertListUiState.Success(emptyList())
+                }
+            } catch (e: ResponseException) {
+                if (e.response.status.value == 404) {
+                    // ✅ 404 = koi alert nahi
+                    _alertListState.value = SosAlertListUiState.Success(emptyList())
+                } else {
                     _alertListState.value = SosAlertListUiState.Error(
-                        response.message ?: "Failed to load alerts."
+                        "Server error: ${e.response.status.value}"
                     )
                 }
             } catch (e: Exception) {

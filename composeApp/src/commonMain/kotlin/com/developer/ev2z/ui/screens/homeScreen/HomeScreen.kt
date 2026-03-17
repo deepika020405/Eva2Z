@@ -109,14 +109,17 @@ fun HomeScreen(
                     onOpenDeviceReport = onOpenDeviceReport,
                     onCriminalVerification = onCriminalVerification,   // ✅ ADD
                     onOpenAddDevice = onOpenAddDevice,
-                    onOpenCommunity = onOpenCommunity
+                    onOpenCommunity = onOpenCommunity,
+                    onParking     = onParking,         // ✅ CHANGED — pass through
+                    onSosTag      = onSosTag    // ✅ NEW — pass karo
+
                 )
             }
 
             item { ModernFeaturesSection(
                 onDriverScore = onDriverScore,  // ✅ NEW — pass karo
-                onParking     = onParking,         // ✅ CHANGED — pass through
-                onSosTag      = onSosTag    // ✅ NEW — pass karo
+//                onParking     = onParking,         // ✅ CHANGED — pass through
+//                onSosTag      = onSosTag    // ✅ NEW — pass karo
 
 
             ) }
@@ -263,7 +266,10 @@ fun HomeQuickActionsSection(
     onOpenDeviceReport: () -> Unit,
     onCriminalVerification: () -> Unit,   // ✅ ADD
     onOpenAddDevice:  () -> Unit,
-    onOpenCommunity: () -> Unit
+    onOpenCommunity: () -> Unit,
+    onParking: () -> Unit,            // ✅ CHANGED — new param
+    onSosTag: () -> Unit              // ✅ NEW — SOS Tag param
+
 
 ) {
 
@@ -275,6 +281,8 @@ fun HomeQuickActionsSection(
         QuickActionItem("Document Vault", Icons.Default.Folder, onOpenDocuments),
         QuickActionItem("Device Report", Icons.Default.Assessment, onOpenDeviceReport),
         QuickActionItem("Add Device", Icons.Default.Add, onOpenAddDevice) ,
+        QuickActionItem("Parking",Icons.Default.LocalParking,   onParking),  // ✅ CHANGED
+        QuickActionItem("SOS Parking Alert",Icons.Default.Warning,onSosTag),  // ✅ WIRED
         QuickActionItem(
             "Criminal Verification",
             Icons.Default.VerifiedUser,
@@ -330,8 +338,8 @@ fun HomeQuickActionsSection(
 @Composable
 fun ModernFeaturesSection(
     onDriverScore: () -> Unit,
-    onParking: () -> Unit,            // ✅ CHANGED — new param
-    onSosTag: () -> Unit              // ✅ NEW — SOS Tag param
+//    onParking: () -> Unit,            // ✅ CHANGED — new param
+//    onSosTag: () -> Unit              // ✅ NEW — SOS Tag param
 
 
 ) {
@@ -341,8 +349,8 @@ fun ModernFeaturesSection(
         QuickActionItem("Service Market", Icons.Default.Build) {},
         QuickActionItem("Repair Market", Icons.Default.DirectionsCar) {},
         QuickActionItem("Charging", Icons.Default.EvStation) {},
-        QuickActionItem("Parking",Icons.Default.LocalParking,   onParking),  // ✅ CHANGED
-        QuickActionItem("SOS",Icons.Default.Warning,onSosTag),  // ✅ WIRED
+//        QuickActionItem("Parking",Icons.Default.LocalParking,   onParking),  // ✅ CHANGED
+//        QuickActionItem("SOS Parking Tag",Icons.Default.Warning,onSosTag),  // ✅ WIRED
         QuickActionItem("Background Verification", Icons.Default.Badge) {}
     )
 

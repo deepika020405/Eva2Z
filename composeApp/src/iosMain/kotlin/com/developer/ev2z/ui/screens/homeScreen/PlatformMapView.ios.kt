@@ -1,11 +1,28 @@
 // iosMain/ui/screens/homeScreen/PlatformMapView.ios.kt
 package com.developer.ev2z.ui.screens.homeScreen
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.interop.UIKitView
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.developer.ev2z.data.local.model.Device
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.CoreLocation.CLLocationCoordinate2DMake
@@ -20,16 +37,22 @@ actual fun PlatformMapView(
     onMarkerClick: (Device) -> Unit
 ) {
     val mapView = remember { MKMapView() }
+    var isHybrid by remember { mutableStateOf(false) } // ✅ ADD
 
-    UIKitView(
-        modifier = modifier,
-        factory = {
-            mapView.setShowsUserLocation(false)
-            mapView
-        },
-        update = { view ->
-            // Clear existing annotations
-            view.removeAnnotations(view.annotations())
+
+    Box(modifier = modifier) {
+
+        UIKitView(
+            modifier = Modifier.fillMaxSize(),
+            factory = {
+                mapView.setShowsUserLocation(false)
+                mapView
+            },
+            update = { view ->
+                // ✅ mapType update
+                view.setMapType(
+                    if (isHybrid) MKMapTypeHybrid else MKMapTypeStandard
+                )
 
             // Add markers for all devices
             devices.forEach { device ->
@@ -86,4 +109,24 @@ actual fun PlatformMapView(
             }
         }
     )
+
+
+        // ✅ Toggle Button
+        // ✅ Small toggle button — iOS
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 110.dp, end = 10.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color.White)
+                .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(8.dp))
+                .clickable { isHybrid = !isHybrid }
+                .padding(8.dp)
+        ) {
+            Text(
+                text = if (!isHybrid) "🛰️" else "🗺️",
+                fontSize = 18.sp
+            )
+        }
+    }
 }

@@ -143,6 +143,18 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
+                // ✅ ADD — Product detail deeplinks
+            uri.host == "go.eva2z.com" && uri.path?.startsWith("/product") == true -> {
+                val value = uri.path?.removePrefix("/product/") ?: ""
+                Log.d("DeepLink", "📦 Product detail deep link: $value")
+                when (value) {
+                    "wireless" -> DeepLinkBus.navigateTo("product_detail_10")
+                    "wired"    -> DeepLinkBus.navigateTo("product_detail_11")
+                    "sos-tag"  -> DeepLinkBus.navigateTo("product_detail_26")
+                    else       -> DeepLinkBus.navigateTo("shop")
+                }
+            }
+
             uri.scheme == "ev2z" && uri.host == "payment" -> {
                 Log.d("PhonePe", "🔗 Payment callback: $uri")
                 val status = uri.getQueryParameter("status")

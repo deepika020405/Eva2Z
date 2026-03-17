@@ -1,8 +1,26 @@
 // androidMain/ui/screens/homeScreen/PlatformMapView.android.kt
 package com.developer.ev2z.ui.screens.homeScreen
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.developer.ev2z.data.local.model.Device
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
@@ -18,6 +36,7 @@ actual fun PlatformMapView(
     onMarkerClick: (Device) -> Unit
 ) {
     var isMapLoaded by remember { mutableStateOf(false) }
+    var mapType by remember { mutableStateOf(MapType.NORMAL) } // ✅ ADD
     val cameraPositionState = rememberCameraPositionState()
     val indiaLatLng = LatLng(22.9734, 78.6569)
 
@@ -90,16 +109,19 @@ actual fun PlatformMapView(
         }
     }
 
-    GoogleMap(
-        modifier = modifier,
-        cameraPositionState = cameraPositionState,
-        properties = MapProperties(isMyLocationEnabled = false),
-        uiSettings = MapUiSettings(zoomControlsEnabled = true),
-        onMapLoaded = {
-            println("✅ Google Map loaded successfully")
-            isMapLoaded = true
-        }
-    ) {
+
+    Box(modifier = modifier) {  // ✅ Box mein wrap karo
+
+        GoogleMap(
+            modifier = Modifier.fillMaxSize(),
+            cameraPositionState = cameraPositionState,
+            properties = MapProperties(
+                isMyLocationEnabled = false,
+                mapType = mapType  // ✅ dynamic
+            ),
+            uiSettings = MapUiSettings(zoomControlsEnabled = true),
+            onMapLoaded = { isMapLoaded = true }
+        ) {
         devices.forEach { device ->
             device.getLatitudeDouble()?.let { lat ->
                 device.getLongitudeDouble()?.let { lng ->
@@ -124,4 +146,28 @@ actual fun PlatformMapView(
             }
         }
     }
-}
+
+
+
+// ✅ Professional Map Type Toggle Button
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 110.dp, end = 10.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(Color.White)
+                .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(8.dp))
+                .clickable {
+                    mapType = if (mapType == MapType.NORMAL) MapType.HYBRID
+                    else MapType.NORMAL
+                }
+                .padding(8.dp)
+        ) {
+            Text(
+                text = if (mapType == MapType.NORMAL) "🛰️" else "🗺️",
+                fontSize = 18.sp
+            )
+        }
+            }
+        }
+
