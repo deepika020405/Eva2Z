@@ -1,31 +1,19 @@
 package com.developer.ev2z.ui.screens.CriminalVerification
 
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.listSaver
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import com.developer.ev2z.data.local.UserPrefs
+import com.developer.ev2z.data.local.createStorageManager
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.network.ApiService
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlin.collections.listOf
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,11 +21,19 @@ fun CriminalVerificationFlow(
     apiService: ApiService,
     onBack: () -> Unit
 ) {
-    val vm = remember { CriminalVerificationViewModel(apiService) }
-    val scope = rememberCoroutineScope()
+    val userPrefs = remember { UserPrefs(createStorageManager()) }
+    val vm        = remember { CriminalVerificationViewModel(apiService, userPrefs) }
+    val scope     = rememberCoroutineScope()
 
-    PlatformBackHandler(true){
-        onBack()
+    LaunchedEffect(Unit) {
+        vm.loadPersistedState()
+    }
+
+    PlatformBackHandler(true) {
+        when (vm.step) {
+            VerificationStep.SUCCESS -> vm.reset()
+            else -> onBack()
+        }
     }
 
     Scaffold(
@@ -45,9 +41,19 @@ fun CriminalVerificationFlow(
             TopAppBar(
                 title = { Text("Criminal Verification") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(
+                        onClick = {
+                            when (vm.step) {
+                                VerificationStep.SUCCESS -> vm.reset()
+                                else -> onBack()
+                            }
+                        }
+                    ) {
                         Icon(
-                            imageVector = Icons.Default.ArrowBack,
+                            imageVector = if (vm.step == VerificationStep.SUCCESS)
+                                Icons.Default.Close
+                            else
+                                Icons.Default.ArrowBack,
                             contentDescription = "Back"
                         )
                     }
@@ -59,39 +65,28 @@ fun CriminalVerificationFlow(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding) // ✅ prevents overlap
+                .padding(padding)
         ) {
-
             when (vm.step) {
 
-                VerificationStep.FORM -> {
-                    CriminalVerificationFormScreen(
-                        isLoading = vm.loading,
-                        onBack = onBack,
-                        onSubmit = { form ->
-                            scope.launch { vm.submitForm(form) }
+                VerificationStep.FORM ->
+                    CriminalVerificationEntryScreen(
+                        isLoading      = vm.loading,
+                        onSubmitNew    = { form -> scope.launch { vm.submitForm(form) } },
+                        onSearchStatus = { candidateId, name ->
+                            scope.launch { vm.searchByCandidate(candidateId, name) }
                         }
                     )
-                }
 
                 VerificationStep.CREATING_ORDER ->
-                    ProcessingScreen("Initializing payment...")
+                    ProcessingScreen("Creating payment order...")
 
-                VerificationStep.VERIFYING_PAYMENT ->
-                    ProcessingScreen("Verifying payment...")
-
-                VerificationStep.CREATING_CANDIDATE ->
-                    ProcessingScreen("Creating candidate...")
-
-                VerificationStep.SUBMITTING_BGV ->
-                    ProcessingScreen("Submitting verification...")
-
-                VerificationStep.PAYMENT -> {
+                VerificationStep.PAYMENT ->
                     vm.paymentToken?.let { token ->
                         CriminalPaymentScreen(
                             paymentToken = token,
-                            amount = vm.amount,
-                            onSuccess = { txnId ->
+                            amount       = vm.amount,
+                            onSuccess    = { txnId ->
                                 scope.launch { vm.onPaymentSuccess(txnId ?: "") }
                             },
                             onFailure = { error ->
@@ -101,20 +96,33 @@ fun CriminalVerificationFlow(
                             onBack = { vm.reset() }
                         )
                     }
-                }
+
+                VerificationStep.VERIFYING_PAYMENT ->
+                    ProcessingScreen("Verifying payment...")
+
+                VerificationStep.CREATING_CANDIDATE ->
+                    ProcessingScreen("Creating candidate profile...")
+
+                VerificationStep.SUBMITTING_BGV ->
+                    ProcessingScreen("Submitting background verification...")
 
                 VerificationStep.SUCCESS -> {
+                    // ✅ Sirf ek baar status check karo — screen open hone par
+                    // Polling nahi — bas latest status fetch karo
                     LaunchedEffect(vm.createdCandidateId) {
-                        vm.createdCandidateId?.let {
-                            vm.startStatusPolling(this)
+                        if (vm.createdCandidateId != null) {
+                            vm.checkVerificationStatus()
                         }
                     }
 
                     CriminalSuccessScreen(
-                        form = vm.cachedForm,
-                        candidateId = vm.createdCandidateId,
-                        status = vm.bgvStatus,
-                        onDone = onBack
+                        form              = vm.cachedForm,
+                        candidateId       = vm.createdCandidateId,
+                        status            = vm.bgvStatus,
+                        reportUrl         = vm.reportUrl,
+                        candidateName     = vm.searchedCandidateName,
+                        onDone            = onBack,
+                        onNewVerification = { vm.reset() }
                     )
                 }
 
@@ -122,7 +130,7 @@ fun CriminalVerificationFlow(
                     CriminalErrorScreen(
                         message = vm.errorMessage,
                         onRetry = { vm.reset() },
-                        onBack = onBack
+                        onBack  = onBack
                     )
             }
         }

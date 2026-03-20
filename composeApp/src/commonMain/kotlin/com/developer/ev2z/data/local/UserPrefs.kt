@@ -36,12 +36,18 @@ class UserPrefs(private val storage: StorageManager) {  // ✅ Storage → Stora
 
     fun clear() = storage.clear()
 
+
+    fun getString(key: String, default: String): String =
+        storage.getString(key, default) ?: default
+
+    fun saveString(key: String, value: String) =
+        storage.saveString(key, value)
+
     fun getUserPhone(): String? {
         // ✅ storage.getString use karo, not Compose getString
         val phone = storage.getString("phone", "")
         return if (phone.isNullOrBlank()) null else phone
     }
-
 
 
     // ── PARKING HISTORY ──────────────────────────────────────────────

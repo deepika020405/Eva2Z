@@ -460,9 +460,14 @@ class ApiService {
     //create candidate id
 
     suspend fun createCandidateWithPackage(form: CriminalForm): CandidateResult {
-        println("🌐 API: Creating candidate...")
-
         val token = AppTokenProvider.getToken()
+        println("🔑 TOKEN CHECK = '$token'")  // ← add karo
+        println("🔑 TOKEN LENGTH = ${token.length}")
+
+        if (token.isBlank()) {
+            println("❌ TOKEN IS EMPTY — AppTokenProvider not initialized!")
+            return CandidateResult(error = "Session expired. Please login again.")
+        }
         val url = "${baseUrl}candidate"
 
         // ✅ DTO instead of manual JSON
@@ -476,9 +481,11 @@ class ApiService {
                 is_consent_undertaking_letter = form.consent,
                 category_id = 200
             ),
+            // ✅ Naya — CORRECT IDs
+            // ✅ REPLACE WITH — yeh karo
             `package` = PackageDto(
-                package_id = 2289,
-                subtype_id = 3542
+                package_id = 7642,
+                subtype_id = 8860
             )
         )
 
