@@ -26,10 +26,10 @@ fun CriminalSuccessScreen(
     status: BgvStatus,
     reportUrl: String?,
     candidateName: String?,
+    courtResult: CourtCheckResult?,   // ← new param
     onDone: () -> Unit,
     onNewVerification: () -> Unit
 ) {
-    val uriHandler  = LocalUriHandler.current
     val displayName = form?.name ?: candidateName
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
@@ -40,10 +40,10 @@ fun CriminalSuccessScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(20.dp)
         ) {
-            Text("Verification Submitted", style = MaterialTheme.typography.headlineSmall)
+            Text("Verification Result", style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(4.dp))
             Text(
-                "Your background verification has been submitted.",
+                "Background verification report",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -54,27 +54,30 @@ fun CriminalSuccessScreen(
             VerificationTimeline(status)
             Spacer(Modifier.height(20.dp))
 
+            // ── Criminal Check Result Card ──────────────────────
+            if (status == BgvStatus.COMPLETED && courtResult != null) {
+                CriminalCheckCard(courtResult = courtResult, candidateName = displayName)
+                Spacer(Modifier.height(16.dp))
+            }
+
+            // ── Candidate Details ───────────────────────────────
             ElevatedCard(
                 shape = RoundedCornerShape(20.dp),
                 elevation = CardDefaults.cardElevation(4.dp)
             ) {
                 Column(Modifier.padding(20.dp)) {
-
-                    // ── Candidate Details ─────────────────────
                     SectionTitle("Candidate Details")
                     candidateId?.let { InfoRow("Candidate ID", it.toString()) }
                     displayName?.let { InfoRow("Name", it) }
-                    Spacer(Modifier.height(16.dp))
 
-                    // ── Personal Info — only own verification ─
                     form?.let {
+                        Spacer(Modifier.height(16.dp))
                         SectionTitle("Personal Information")
                         InfoRow("Email", it.email)
                         InfoRow("Phone", it.phone)
                         InfoRow("Employee ID", it.employeeId)
 
                         Spacer(Modifier.height(16.dp))
-
                         SectionTitle("Address Details")
                         InfoRow("House No.", it.houseNo)
                         InfoRow("Colony", it.colony)
@@ -83,32 +86,15 @@ fun CriminalSuccessScreen(
                         InfoRow("Pincode", it.pincode)
                         if (it.landmark.isNotBlank()) InfoRow("Landmark", it.landmark)
                         InfoRow("Staying Period", it.stayingPeriod)
-
                         Spacer(Modifier.height(24.dp))
                     }
 
-                    // ── View Report — only when completed ─────
-                    if (status == BgvStatus.COMPLETED && !reportUrl.isNullOrBlank()) {
-                        OutlinedButton(
-                            onClick  = { uriHandler.openUri(reportUrl) },
-                            modifier = Modifier.fillMaxWidth().height(52.dp),
-                            shape    = RoundedCornerShape(14.dp)
-                        ) {
-                            Icon(Icons.Default.OpenInBrowser, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("View Full Report")
-                        }
-                        Spacer(Modifier.height(12.dp))
-                    }
-
-                    // ── Back to Dashboard ─────────────────────
                     Button(
                         onClick  = onDone,
                         modifier = Modifier.fillMaxWidth().height(52.dp),
                         shape    = RoundedCornerShape(14.dp)
                     ) { Text("Back to Dashboard") }
 
-                    // ── Start New — only terminal state ───────
                     if (status == BgvStatus.COMPLETED || status == BgvStatus.FAILED) {
                         Spacer(Modifier.height(12.dp))
                         OutlinedButton(
@@ -124,6 +110,106 @@ fun CriminalSuccessScreen(
                 }
             }
         }
+    }
+}
+
+// ── Main Result Card ──────────────────────────────────────────
+@Composable
+fun CriminalCheckCard(courtResult: CourtCheckResult, candidateName: String?) {
+    val isClean    = courtResult.checkStatusCode == 1
+    val mainColor  = if (isClean) Color(0xFF16A34A) else Color(0xFFDC2626)
+    val bgColor    = mainColor.copy(alpha = 0.08f)
+    val verdict    = if (isClean) "No Criminal Record Found" else "Criminal Record Detected"
+    val icon       = if (isClean) "✅" else "🚨"
+    val subtext    = if (isClean)
+        "This individual has no criminal history on record."
+    else
+        "A criminal or court record has been found for this individual."
+
+    ElevatedCard(
+        shape     = RoundedCornerShape(20.dp),
+        elevation = CardDefaults.cardElevation(6.dp)
+    ) {
+        Column(
+            modifier            = Modifier
+                .fillMaxWidth()
+                .background(bgColor)
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // ── Big verdict icon ──
+            Text(
+                text  = icon,
+                style = MaterialTheme.typography.displayMedium
+            )
+            Spacer(Modifier.height(12.dp))
+
+            // ── Verdict text ──
+            Text(
+                text  = verdict,
+                style = MaterialTheme.typography.titleLarge.copy(
+                    color      = mainColor,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
+                )
+            )
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text  = subtext,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+
+            Spacer(Modifier.height(20.dp))
+            HorizontalDivider(color = mainColor.copy(alpha = 0.2f))
+            Spacer(Modifier.height(16.dp))
+
+            // ── Details grid ──
+            candidateName?.let {
+                ResultDetailRow(label = "Candidate", value = it)
+            }
+            ResultDetailRow(label = "Verification Type", value = "Court Record Check")
+            ResultDetailRow(label = "Address Verified",  value = "${courtResult.city}, ${courtResult.state}")
+            if (courtResult.completionDate.isNotBlank()) {
+                ResultDetailRow(label = "Verified On", value = courtResult.completionDate)
+            }
+            ResultDetailRow(
+                label = "Status",
+                value = courtResult.checkStatus,
+                valueColor = mainColor
+            )
+        }
+    }
+}
+
+@Composable
+fun ResultDetailRow(
+    label: String,
+    value: String,
+    valueColor: Color = MaterialTheme.colorScheme.onSurface
+) {
+    Row(
+        modifier            = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment   = Alignment.CenterVertically
+    ) {
+        Text(
+            text  = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text  = value,
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold
+            ),
+            color    = valueColor,
+            modifier = Modifier.weight(1.5f),
+            textAlign = androidx.compose.ui.text.style.TextAlign.End
+        )
     }
 }
 

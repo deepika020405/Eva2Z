@@ -7,6 +7,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -49,9 +50,18 @@ enum class BgvStatus {
     VERIFICATION_STARTED, COMPLETED, FAILED
 }
 
+data class CourtCheckResult(
+    val checkStatus: String,
+    val checkStatusCode: Int,
+    val city: String,
+    val state: String,
+    val address: String,
+    val completionDate: String
+)
+
 class CriminalVerificationViewModel(
     private val api: ApiService,
-    private val prefs: UserPrefs          // ✅ UserPrefs inject karo
+    private val prefs: UserPrefs
 ) {
     var step               by mutableStateOf(VerificationStep.FORM)
     var loading            by mutableStateOf(false)
@@ -63,16 +73,50 @@ class CriminalVerificationViewModel(
     var amount             by mutableStateOf(1)
     var reportUrl          by mutableStateOf<String?>(null)
     var searchedCandidateName by mutableStateOf<String?>(null)
+    var courtCheckResult   by mutableStateOf<CourtCheckResult?>(null)
+        private set
 
     var cachedForm by mutableStateOf<CriminalForm?>(null)
         private set
+
+    // ─────────────────────────────────────────────
+    // Helper — court array parse karo (reusable)
+    // ─────────────────────────────────────────────
+    private fun parseCourtResult(data: kotlinx.serialization.json.JsonObject?) {
+        val courtArray = data
+            ?.get("check_details")
+            ?.jsonObject
+            ?.get("court")
+            ?.let { kotlinx.serialization.json.Json.parseToJsonElement(it.toString()) }
+            ?.jsonArray
+
+        val firstCourt = courtArray?.firstOrNull()?.jsonObject
+
+        if (firstCourt != null) {
+            courtCheckResult = CourtCheckResult(
+                checkStatus     = firstCourt["check_status"]?.jsonPrimitive?.content ?: "Pending",
+                checkStatusCode = firstCourt["check_status_code"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0,
+                city            = firstCourt["city"]?.jsonPrimitive?.content ?: "",
+                state           = firstCourt["state"]?.jsonPrimitive?.content ?: "",
+                address         = buildString {
+                    firstCourt["address_1"]?.jsonPrimitive?.content?.let { append(it) }
+                    firstCourt["address_2"]?.jsonPrimitive?.content?.let { append(", $it") }
+                },
+                completionDate  = firstCourt["completion_date"]?.jsonPrimitive?.content?.take(10) ?: ""
+            )
+            println("⚖️ Court Result = $courtCheckResult")
+        } else {
+            println("⚖️ No court records found")
+            courtCheckResult = null
+        }
+    }
 
     // ─────────────────────────────────────────────
     // Load persisted state — screen open hone par
     // ─────────────────────────────────────────────
     fun loadPersistedState() {
         val savedId = prefs.getString(KEY_CANDIDATE_ID, "")
-            .toIntOrNull() ?: return   // kuch nahi hai — form dikhao
+            .toIntOrNull() ?: return
 
         createdCandidateId = savedId
         merchantOrderId    = prefs.getString(KEY_MERCHANT_ORDER, "").ifBlank { null }
@@ -105,10 +149,13 @@ class CriminalVerificationViewModel(
             reportUrl             = url
 
             bgvStatus = when (statusCode) {
-                20   -> BgvStatus.COMPLETED
-                30   -> BgvStatus.FAILED
+                1    -> BgvStatus.COMPLETED
+                2    -> BgvStatus.FAILED
                 else -> BgvStatus.VERIFICATION_STARTED
             }
+
+            // ✅ Court result parse karo
+            parseCourtResult(data)
 
             prefs.saveString(KEY_CANDIDATE_ID, id.toString())
             prefs.saveString(KEY_BGV_STATUS, bgvStatus.name)
@@ -125,7 +172,7 @@ class CriminalVerificationViewModel(
     }
 
     // ─────────────────────────────────────────────
-    // Existing flow — unchanged logic
+    // Existing flow
     // ─────────────────────────────────────────────
     suspend fun submitForm(form: CriminalForm) {
         cachedForm = form
@@ -182,7 +229,7 @@ class CriminalVerificationViewModel(
             result.candidateId != null -> {
                 val id = result.candidateId.toInt()
                 createdCandidateId = id
-                prefs.saveString(KEY_CANDIDATE_ID, id.toString())  // ✅ persist
+                prefs.saveString(KEY_CANDIDATE_ID, id.toString())
                 submitBGV(id)
             }
             result.isDuplicate -> {
@@ -215,8 +262,8 @@ class CriminalVerificationViewModel(
             }
 
             val newStatus = when (statusCode) {
-                20   -> BgvStatus.COMPLETED
-                30   -> BgvStatus.FAILED
+                1    -> BgvStatus.COMPLETED
+                2    -> BgvStatus.FAILED
                 else -> BgvStatus.VERIFICATION_STARTED
             }
 
@@ -224,6 +271,9 @@ class CriminalVerificationViewModel(
                 bgvStatus = newStatus
                 prefs.saveString(KEY_BGV_STATUS, newStatus.name)
             }
+
+            // ✅ Court result parse karo
+            parseCourtResult(data)
 
         } catch (e: Exception) {
             println("❌ Status check failed: ${e.message}")
@@ -272,6 +322,7 @@ class CriminalVerificationViewModel(
         bgvStatus             = BgvStatus.FORM_SUBMITTED
         reportUrl             = null
         searchedCandidateName = null
+        courtCheckResult      = null   // ✅ reset
         amount                = 1
     }
 
@@ -284,4 +335,3 @@ class CriminalVerificationViewModel(
         else                   -> BgvStatus.VERIFICATION_STARTED
     }
 }
-

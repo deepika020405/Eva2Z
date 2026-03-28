@@ -25,6 +25,7 @@ import com.developer.ev2z.ui.screens.SOSParkingTag.SosReplyResponse
 import com.developer.ev2z.ui.screens.VechicleParkingTag.ParkingData
 import com.developer.ev2z.ui.screens.VechicleParkingTag.ParkingRequest
 import com.developer.ev2z.ui.screens.VechicleParkingTag.ParkingResponse
+import com.developer.ev2z.ui.screens.VechicleParkingTag.UserParkingListResponse
 import com.developer.ev2z.util.AppTokenProvider
 import io.ktor.client.call.*
 import io.ktor.client.plugins.ClientRequestException
@@ -1229,6 +1230,55 @@ class ApiService {
     }
 
 
+    // ---------------- GET USER PARKING DETAILS ----------------
+    suspend fun getUserParkingDetails(): UserParkingListResponse {
+        val token = AppTokenProvider.getToken()
+        val url   = "${baseUrl}get-User-Details"
+
+        println("🌐 getUserParkingDetails → GET $url")
+
+        return try {
+            val response = client.get(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                contentType(ContentType.Application.Json)
+            }
+
+            val raw = response.bodyAsText()
+            println("📥 getUserParkingDetails ${response.status}: $raw")
+
+            Json {
+                ignoreUnknownKeys = true
+                isLenient         = true
+                coerceInputValues = true
+            }.decodeFromString(UserParkingListResponse.serializer(), raw)
+
+        } catch (e: Exception) {
+            println("❌ getUserParkingDetails: ${e.message}")
+            UserParkingListResponse(status = false, message = e.message)
+        }
+    }
+
+
+    // ---------------- DELETE VEHICLE ----------------
+    suspend fun deleteVehicle(vehicleId: Int): JsonObject {
+        val token = AppTokenProvider.getToken()
+        val url   = "${baseUrl}delete-Vehicle/$vehicleId"
+
+        println("🌐 deleteVehicle → DELETE $url")
+
+        return try {
+            val response = client.delete(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                contentType(ContentType.Application.Json)
+            }
+            val raw = response.bodyAsText()
+            println("📥 deleteVehicle ${response.status}: $raw")
+            Json { ignoreUnknownKeys = true }.parseToJsonElement(raw).jsonObject
+        } catch (e: Exception) {
+            println("❌ deleteVehicle: ${e.message}")
+            throw e
+        }
+    }
 
 
     // ─────────────────────────────────────────────────────────────────

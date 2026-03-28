@@ -116,12 +116,13 @@ fun CriminalVerificationFlow(
                     }
 
                     CriminalSuccessScreen(
-                        form              = vm.cachedForm,
-                        candidateId       = vm.createdCandidateId,
-                        status            = vm.bgvStatus,
-                        reportUrl         = vm.reportUrl,
-                        candidateName     = vm.searchedCandidateName,
-                        onDone            = onBack,
+                        form            = vm.cachedForm,
+                        candidateId     = vm.createdCandidateId,
+                        status          = vm.bgvStatus,
+                        reportUrl       = vm.reportUrl,
+                        candidateName   = vm.searchedCandidateName,
+                        courtResult     = vm.courtCheckResult,   // ← yeh add karo
+                        onDone          = { /* navigate back */ },
                         onNewVerification = { vm.reset() }
                     )
                 }

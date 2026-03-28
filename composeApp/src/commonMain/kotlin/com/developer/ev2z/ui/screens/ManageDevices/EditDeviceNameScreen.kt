@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.data.local.UserPrefs
+import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.network.ApiService
 
 private val primaryContainerLight = Color(0xFF00C853)
@@ -42,6 +43,8 @@ fun EditDeviceNameScreen(
 
     val userPrefs = remember { UserPrefs(storageManager) }
     val token = remember { userPrefs.getToken() ?: "" }
+
+    PlatformBackHandler(enabled = true) { onBackPressed() }
 
     var newDeviceName by remember { mutableStateOf(deviceName) }
 

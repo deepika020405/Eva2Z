@@ -26,6 +26,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.developer.ev2z.navigation.PlatformBackHandler
+import kotlinx.coroutines.launch
 
 // ─────────────────────────────────────────────────────────────────
 // Design tokens
@@ -45,6 +47,8 @@ private val SuccessBg       = Color(0xFFECFDF5)
 private val SuccessText     = Color(0xFF059669)
 private val WarningBg       = Color(0xFFFEF3C7)
 private val WarningText     = Color(0xFFD97706)
+private val DeleteRed       = Color(0xFFDC2626)
+private val DeleteRedLight  = Color(0xFFFEF2F2)
 
 // ─────────────────────────────────────────────────────────────────
 // ParkingScreen — entry point
@@ -56,6 +60,7 @@ fun ParkingScreen(
     viewModel: ParkingViewModel,
     onBackPressed: () -> Unit
 ) {
+
     val vehicleType         by viewModel.vehicleType.collectAsState()
     val vehicleNumber       by viewModel.vehicleNumber.collectAsState()
     val phone               by viewModel.phone.collectAsState()
@@ -66,12 +71,31 @@ fun ParkingScreen(
     val alternatePhoneError by viewModel.alternatePhoneError.collectAsState()
     val uiState             by viewModel.uiState.collectAsState()
     val history             by viewModel.history.collectAsState()
+    val registeredPhone     by viewModel.registeredPhone.collectAsState()
     val focusManager        = LocalFocusManager.current
+
+    // ── Delete confirmation state ─────────────────────────────────
+    var deleteTargetId   by remember { mutableStateOf<Int?>(null) }
+    var deleteTargetName by remember { mutableStateOf("") }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope             = rememberCoroutineScope()
+
+
+    // ✅ Success hone par form clear karo
+    LaunchedEffect(uiState) {
+        if (uiState is ParkingUiState.Success) {
+            viewModel.clearFormFields()
+            focusManager.clearFocus()
+        }
+    }
+
+    PlatformBackHandler(enabled = true) { onBackPressed() }
 
     LaunchedEffect(Unit) { viewModel.loadHistory() }
 
     Scaffold(
         containerColor = BackgroundColor,
+        snackbarHost   = { SnackbarHost(snackbarHostState) },
         topBar         = { ParkingTopBar(onBackPressed = onBackPressed) }
     ) { padding ->
         Column(
@@ -79,34 +103,94 @@ fun ParkingScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                // ParkingScreen mein
-                .padding(horizontal = 12.dp, vertical = 12.dp),  // ← 16,14 se kam
-            verticalArrangement = Arrangement.spacedBy(12.dp)  // ← 16 se 12
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            SectionLabel("Park a Vehicle")
+            SectionLabel("Register a Vehicle")
 
-            ParkingFormCard(
-                vehicleType         = vehicleType,
-                vehicleNumber       = vehicleNumber,
-                phone               = phone,
-                alternatePhone      = alternatePhone,
-                vehicleTypeError    = vehicleTypeError,
-                vehicleNumberError  = vehicleNumberError,
-                phoneError          = phoneError,
-                alternatePhoneError = alternatePhoneError,
-                isLoading           = uiState is ParkingUiState.Loading,
-                isFormValid         = viewModel.isFormValid,
-                onVehicleTypeChange    = viewModel::onVehicleTypeChange,
-                onVehicleNumberChange  = viewModel::onVehicleNumberChange,
-                onPhoneChange          = viewModel::onPhoneChange,
-                onAlternatePhoneChange = viewModel::onAlternatePhoneChange,
-                onChipSelect           = viewModel::selectVehicleType,
-                onSubmit = {
-                    focusManager.clearFocus()
-                    viewModel.submitParking()
-                },
-                onImeNext = { focusManager.moveFocus(FocusDirection.Down) }
-            )
+            // ── Registered Number Banner ──────────────────────────
+            if (registeredPhone.isNotBlank()) {
+                Surface(
+                    shape    = RoundedCornerShape(12.dp),
+                    color    = Color(0xFFF0FDF4),
+                    border   = BorderStroke(1.dp, Color(0xFFBBF7D0)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(GreenLight),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.Person, null, tint = BrandGreen, modifier = Modifier.size(16.dp))
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Your Registered Number",
+                                fontSize      = 10.sp,
+                                fontWeight    = FontWeight.SemiBold,
+                                color         = Color(0xFF15803D),
+                                letterSpacing = 0.3.sp
+                            )
+                            Text(
+                                "+91 ${registeredPhone.chunked(5).joinToString(" ")}",
+                                fontSize   = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color      = BrandGreen
+                            )
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(6.dp),
+                            color = Color(0xFFDCFCE7)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Icon(Icons.Default.Lock, null, tint = BrandGreen, modifier = Modifier.size(10.dp))
+                                Text("Protected", fontSize = 9.sp, color = BrandGreen, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ✅ Form sirf tab dikhao jab success nahi hai
+            AnimatedVisibility(
+                visible = uiState !is ParkingUiState.Success,
+                enter   = fadeIn() + expandVertically(),
+                exit    = fadeOut() + shrinkVertically()
+            ) {
+                ParkingFormCard(
+                    vehicleType         = vehicleType,
+                    vehicleNumber       = vehicleNumber,
+                    phone               = phone,
+                    alternatePhone      = alternatePhone,
+                    vehicleTypeError    = vehicleTypeError,
+                    vehicleNumberError  = vehicleNumberError,
+                    phoneError          = phoneError,
+                    alternatePhoneError = alternatePhoneError,
+                    isLoading           = uiState is ParkingUiState.Loading,
+                    isFormValid         = viewModel.isFormValid,
+                    onVehicleTypeChange    = viewModel::onVehicleTypeChange,
+                    onVehicleNumberChange  = viewModel::onVehicleNumberChange,
+                    onPhoneChange          = viewModel::onPhoneChange,
+                    onAlternatePhoneChange = viewModel::onAlternatePhoneChange,
+                    onChipSelect           = viewModel::selectVehicleType,
+                    onSubmit = {
+                        focusManager.clearFocus()
+                        viewModel.submitParking()
+                    },
+                    onImeNext = { focusManager.moveFocus(FocusDirection.Down) }
+                )
+            }
 
             // ── Success / Error Banners ───────────────────────
             AnimatedVisibility(
@@ -116,7 +200,14 @@ fun ParkingScreen(
             ) {
                 when (val s = uiState) {
                     is ParkingUiState.Success ->
-                        ParkingSuccessBanner(response = s.response, onParkAnother = viewModel::clearForm)
+                        // ✅ onGoHome callback added
+                        ParkingSuccessBanner(
+                            response      = s.response,
+                            onParkAnother = {
+                                viewModel.clearForm()
+                            },
+                            onGoHome      = onBackPressed  // ✅ home pe jaao
+                        )
                     is ParkingUiState.Error ->
                         ParkingErrorBanner(message = s.message, onDismiss = viewModel::resetState)
                     else -> Unit
@@ -129,14 +220,79 @@ fun ParkingScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment     = Alignment.CenterVertically
             ) {
-                SectionLabel("Recent Parkings")
+                SectionLabel("Recent SOS Registration")
                 Text("View All", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = BrandGreen)
             }
 
-            RecentParkingsCard(history = history)
+            RecentParkingsCard(
+                history  = history,
+                onDelete = { id, name ->
+                    deleteTargetId   = id
+                    deleteTargetName = name
+                }
+            )
 
             Spacer(Modifier.height(16.dp))
         }
+    }
+
+    // ── Delete Confirmation Dialog ────────────────────────────────
+    if (deleteTargetId != null) {
+        AlertDialog(
+            onDismissRequest = { deleteTargetId = null },
+            shape = RoundedCornerShape(20.dp),
+            icon = {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(DeleteRedLight),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Delete, null, tint = DeleteRed, modifier = Modifier.size(24.dp))
+                }
+            },
+            title = {
+                Text("Delete Registration", fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+            },
+            text = {
+                Text(
+                    "Remove \"$deleteTargetName\" from your registered vehicles? This cannot be undone.",
+                    fontSize  = 14.sp,
+                    color     = TextSecondary,
+                    textAlign = TextAlign.Center
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val id = deleteTargetId ?: return@Button
+                        viewModel.deleteVehicle(
+                            vehicleId = id,
+                            onSuccess = {
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("Vehicle removed successfully")
+                                }
+                            },
+                            onError = { msg ->
+                                scope.launch {
+                                    snackbarHostState.showSnackbar(msg)
+                                }
+                            }
+                        )
+                        deleteTargetId = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = DeleteRed),
+                    shape  = RoundedCornerShape(10.dp)
+                ) { Text("Delete") }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { deleteTargetId = null },
+                    shape   = RoundedCornerShape(10.dp)
+                ) { Text("Cancel") }
+            }
+        )
     }
 }
 
@@ -168,8 +324,8 @@ private fun ParkingTopBar(onBackPressed: () -> Unit) {
                 )
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text("Vehicle Parking", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                Text("Register your parking slot", fontSize = 12.sp, color = TextSecondary)
+                Text("Vehicle SOS Registration", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Text("Register your SOS parking Tag", fontSize = 12.sp, color = TextSecondary)
             }
         }
     }
@@ -221,8 +377,6 @@ private fun ParkingFormCard(
             modifier            = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-
-            // ── Vehicle Type ──────────────────────────────────
             Eva2zInputField(
                 value           = vehicleType,
                 onValueChange   = onVehicleTypeChange,
@@ -236,7 +390,6 @@ private fun ParkingFormCard(
 
             Divider(color = BorderColor)
 
-            // ── Vehicle Number ────────────────────────────────
             Eva2zInputField(
                 value           = vehicleNumber,
                 onValueChange   = onVehicleNumberChange,
@@ -251,11 +404,10 @@ private fun ParkingFormCard(
 
             Divider(color = BorderColor)
 
-            // ── Phone (required) ──────────────────────────────
             Eva2zInputField(
                 value           = phone,
                 onValueChange   = onPhoneChange,
-                label           = "MOBILE NUMBER *",
+                label           = "ALTERNATE NUMBER 1 *",
                 placeholder     = "e.g. 9876543210",
                 icon            = Icons.Outlined.Phone,
                 errorText       = phoneError,
@@ -267,11 +419,10 @@ private fun ParkingFormCard(
 
             Divider(color = BorderColor)
 
-            // ── Alternate Phone (optional) ────────────────────
             Eva2zInputField(
                 value           = alternatePhone,
                 onValueChange   = onAlternatePhoneChange,
-                label           = "ALTERNATE MOBILE NUMBER (Optional)",
+                label           = "ALTERNATE NUMBER 2",
                 placeholder     = "e.g. 9876543210",
                 icon            = Icons.Outlined.PhoneAndroid,
                 errorText       = alternatePhoneError,
@@ -283,7 +434,6 @@ private fun ParkingFormCard(
                 })
             )
 
-            // ── Tip row ───────────────────────────────────────
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -299,7 +449,6 @@ private fun ParkingFormCard(
                 )
             }
 
-            // ── Submit Button ─────────────────────────────────
             Button(
                 onClick  = onSubmit,
                 enabled  = isFormValid && !isLoading,
@@ -312,13 +461,11 @@ private fun ParkingFormCard(
                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
             ) {
                 if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp
-                    )
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
                     Spacer(Modifier.width(10.dp))
                     Text("Registering…", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 } else {
-                    Text(" Register Parking Slot", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text("Register SOS Parking Slot", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 }
             }
         }
@@ -344,22 +491,17 @@ private fun Eva2zInputField(
     keyboardActions: KeyboardActions       = KeyboardActions.Default
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-
         Text(
             label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
             color = TextSecondary, letterSpacing = 0.4.sp
         )
-
         OutlinedTextField(
             value         = value,
             onValueChange = onValueChange,
             placeholder   = { Text(placeholder, fontSize = 14.sp, color = TextTertiary) },
             leadingIcon = {
                 Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(RoundedCornerShape(9.dp))
-                        .background(GreenLight),
+                    modifier = Modifier.size(32.dp).clip(RoundedCornerShape(9.dp)).background(GreenLight),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(icon, null, tint = BrandGreen, modifier = Modifier.size(16.dp))
@@ -393,7 +535,6 @@ private fun Eva2zInputField(
                 fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary
             )
         )
-
         errorText?.let { err ->
             Row(
                 verticalAlignment     = Alignment.CenterVertically,
@@ -407,7 +548,7 @@ private fun Eva2zInputField(
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Quick-select chip (ready to uncomment)
+// Quick-select chip
 // ─────────────────────────────────────────────────────────────────
 
 @Composable
@@ -429,11 +570,15 @@ private fun VehicleTypeChip(label: String, selected: Boolean, onClick: () -> Uni
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Success Banner
+// Success Banner — ✅ onGoHome added + form hidden
 // ─────────────────────────────────────────────────────────────────
 
 @Composable
-private fun ParkingSuccessBanner(response: ParkingResponse, onParkAnother: () -> Unit) {
+private fun ParkingSuccessBanner(
+    response: ParkingResponse,
+    onParkAnother: () -> Unit,
+    onGoHome: () -> Unit          // ✅ NEW
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape    = RoundedCornerShape(16.dp),
@@ -445,38 +590,74 @@ private fun ParkingSuccessBanner(response: ParkingResponse, onParkAnother: () ->
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(
-                verticalAlignment     = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            // ── Success icon + title ──
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color(0xFFDCFCE7)),
+                contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.CheckCircle, null, tint = SuccessText, modifier = Modifier.size(24.dp))
-                Text("Vehicle Parked Successfully!", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = SuccessText)
+                Icon(Icons.Default.CheckCircle, null, tint = SuccessText, modifier = Modifier.size(36.dp))
             }
 
-            response.data?.let { data ->
-                Divider(color = GreenMid)
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    data.vehicle_type?.let   { BannerRow("Type",           it) }
-                    data.vehicle_number?.let { BannerRow("Number",         it) }
-                    data.phone?.let          { BannerRow("Mobile",         it) }
-                    data.alternate_phone?.let{ BannerRow("Alternate Mobile", it) }
-                    data.parked_at?.let      { BannerRow("Parked At",      it) }
-                    data.status?.let         { BannerRow("Status",         it) }
-                    data.id?.let             { BannerRow("Ticket #",       "#$it") }
-                }
-            }
+            Text(
+                "Vehicle Registered Successfully!",
+                fontSize   = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color      = SuccessText,
+                textAlign  = TextAlign.Center
+            )
 
             response.message?.let {
                 Text(it, fontSize = 13.sp, color = TextSecondary, textAlign = TextAlign.Center)
             }
 
+            // ── Registration details ──
+            response.data?.let { data ->
+                Divider(color = GreenMid)
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFFF0FDF4))
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    data.vehicle_type?.let    { BannerRow("Vehicle Type",      it) }
+                    data.vehicle_number?.let  { BannerRow("Vehicle Number",    it) }
+                    data.phone?.let           { BannerRow("Mobile",            it) }
+                    data.alternate_phone?.let { BannerRow("Alternate Mobile",  it) }
+                    data.status?.let          { BannerRow("Status",            it) }
+                    data.id?.let              { BannerRow("Ticket #",          "#$it") }
+                }
+            }
+
+            Divider(color = GreenMid)
+
+            // ✅ Back to Homepage button
+            Button(
+                onClick  = onGoHome,
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                shape    = RoundedCornerShape(50),
+                colors   = ButtonDefaults.buttonColors(containerColor = BrandGreen),
+                elevation = ButtonDefaults.buttonElevation(4.dp)
+            ) {
+                Icon(Icons.Default.Home, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Back to Homepage", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            }
+
+            // Register Another button
             OutlinedButton(
                 onClick  = onParkAnother,
                 shape    = RoundedCornerShape(50),
                 border   = BorderStroke(1.5.dp, BrandGreen),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().height(46.dp)
             ) {
-                Text("Park Another Vehicle", color = BrandGreen, fontWeight = FontWeight.SemiBold)
+                Icon(Icons.Default.Add, null, tint = BrandGreen, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Register Another Vehicle", color = BrandGreen, fontWeight = FontWeight.SemiBold)
             }
         }
     }
@@ -517,40 +698,39 @@ private fun ParkingErrorBanner(message: String, onDismiss: () -> Unit) {
 // ─────────────────────────────────────────────────────────────────
 
 @Composable
-private fun RecentParkingsCard(history: List<ParkingData>) {
+private fun RecentParkingsCard(
+    history: List<ParkingData>,
+    onDelete: (id: Int, name: String) -> Unit
+) {
     Card(
         modifier  = Modifier.fillMaxWidth(),
-        shape     = RoundedCornerShape(20.dp),  // ← 24 se 20
+        shape     = RoundedCornerShape(20.dp),
         elevation = CardDefaults.cardElevation(4.dp),
         colors    = CardDefaults.cardColors(containerColor = CardColor)
     ) {
         Column(
-            modifier            = Modifier.padding(12.dp),  // ← 16 se 12
-            verticalArrangement = Arrangement.spacedBy(8.dp)  // ← 10 se 8
+            modifier            = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             if (history.isEmpty()) {
                 Row(
-                    modifier              = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 12.dp),  // ← 16 se 12
+                    modifier              = Modifier.fillMaxWidth().padding(vertical = 12.dp),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment     = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        Icons.Outlined.DirectionsCar, null,
-                        tint     = TextTertiary,
-                        modifier = Modifier.size(18.dp)  // ← 20 se 18
-                    )
+                    Icon(Icons.Outlined.DirectionsCar, null, tint = TextTertiary, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text("No recent parkings", fontSize = 12.sp, color = TextTertiary)
+                    Text("No recent registration", fontSize = 12.sp, color = TextTertiary)
                 }
             } else {
                 history.take(5).forEachIndexed { i, item ->
-                    if (i > 0) Divider(
-                        color     = BorderColor,
-                        thickness = 0.5.dp
+                    if (i > 0) Divider(color = BorderColor, thickness = 0.5.dp)
+                    ParkingHistoryRow(
+                        item     = item,
+                        onDelete = {
+                            item.id?.let { id -> onDelete(id, item.vehicle_type ?: "Vehicle") }
+                        }
                     )
-                    ParkingHistoryRow(item = item)
                 }
             }
         }
@@ -562,114 +742,92 @@ private fun RecentParkingsCard(history: List<ParkingData>) {
 // ─────────────────────────────────────────────────────────────────
 
 @Composable
-private fun ParkingHistoryRow(item: ParkingData) {
+private fun ParkingHistoryRow(
+    item: ParkingData,
+    onDelete: () -> Unit = {}
+) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        // ── Row 1: Icon + Vehicle info + Status ──
         Row(
             modifier              = Modifier.fillMaxWidth(),
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Icon
             Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(GreenLight),
+                modifier = Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(GreenLight),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    Icons.Default.LocalParking, null,
-                    tint     = BrandGreen,
-                    modifier = Modifier.size(20.dp)
-                )
+                Icon(Icons.Default.LocalParking, null, tint = BrandGreen, modifier = Modifier.size(20.dp))
             }
-
-            // Vehicle type + number
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     item.vehicle_type ?: "Unknown",
-                    fontSize   = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color      = TextPrimary,
-                    maxLines   = 1,
-                    overflow   = TextOverflow.Ellipsis
+                    fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                    color = TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    item.vehicle_number ?: "–",
-                    fontSize = 11.sp,
-                    color    = TextSecondary,
-                    maxLines = 1
-                )
+                Text(item.vehicle_number ?: "–", fontSize = 11.sp, color = TextSecondary, maxLines = 1)
             }
 
-            // Status badge
-            val isActive = item.status?.lowercase() == "active"
+            // ✅ FIXED — status null ho toh "Registered" + green dikhao
+            val isActive     = item.status?.lowercase() == "active"
+            val isNullStatus = item.status.isNullOrBlank()
+
+            val statusLabel = when {
+                isNullStatus -> "Registered"
+                isActive     -> "Active"
+                else         -> item.status!!
+            }
+            val statusBg    = if (isNullStatus || isActive) GreenLight else WarningBg
+            val statusColor = if (isNullStatus || isActive) BrandGreen else WarningText
+
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(8.dp))
-                    .background(if (isActive) GreenLight else WarningBg)
+                    .background(statusBg)
                     .padding(horizontal = 8.dp, vertical = 3.dp)
             ) {
                 Text(
-                    if (isActive) "Active" else (item.status ?: "–"),
+                    statusLabel,
                     fontSize   = 10.sp,
                     fontWeight = FontWeight.Bold,
-                    color      = if (isActive) BrandGreen else WarningText
+                    color      = statusColor
                 )
+            }
+
+            // Delete button
+            IconButton(
+                onClick  = onDelete,
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(DeleteRedLight)
+            ) {
+                Icon(Icons.Default.Delete, null, tint = DeleteRed, modifier = Modifier.size(14.dp))
             }
         }
 
-        // ── Row 2: Phone numbers + Date ──
         Row(
-            modifier              = Modifier
-                .fillMaxWidth()
-                .padding(start = 50.dp), // icon width + gap
+            modifier              = Modifier.fillMaxWidth().padding(start = 50.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment     = Alignment.CenterVertically
         ) {
-            // Phone numbers
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 item.phone?.let {
-                    Text(
-                        "📞 $it",
-                        fontSize = 11.sp,
-                        color    = TextTertiary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Text("📞 $it", fontSize = 11.sp, color = TextTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 item.alternate_phone?.let {
-                    Text(
-                        "📞 $it",
-                        fontSize = 11.sp,
-                        color    = TextTertiary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Text("📞 $it", fontSize = 11.sp, color = TextTertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
-
-            // Date — right aligned
             Text(
-                // ✅ Date short format
                 (item.parked_at ?: item.created_at ?: "–").take(10),
-                fontSize = 10.sp,
-                color    = TextTertiary,
-                maxLines = 1
+                fontSize = 10.sp, color = TextTertiary, maxLines = 1
             )
         }
     }
 }
-
 // ─────────────────────────────────────────────────────────────────
 // Banner Row helper
 // ─────────────────────────────────────────────────────────────────

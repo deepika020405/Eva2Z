@@ -4,10 +4,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.developer.ev2z.data.local.UserPrefs
 import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.util.ApiProvider
+import com.developer.ev2z.util.ApiProvider.apiService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.jsonPrimitive
 
 class ParkingViewModel(
     private val apiService: ApiService,
@@ -27,6 +31,18 @@ class ParkingViewModel(
 
     private val _alternatePhone = MutableStateFlow("")
     val alternatePhone: StateFlow<String> = _alternatePhone.asStateFlow()
+
+    // ── Registered phone ──────────────────────────────────────────
+    private val _registeredPhone = MutableStateFlow("")
+    val registeredPhone: StateFlow<String> = _registeredPhone.asStateFlow()
+
+    // ── init ──────────────────────────────────────────────────────
+    init {
+        val phone = userPrefs.getUserPhone()
+            ?.filter { it.isDigit() }
+            ?.takeLast(10) ?: ""
+        _registeredPhone.value = phone
+    }
 
     // ── Field errors ──────────────────────────────────────────────
 
@@ -98,8 +114,6 @@ class ParkingViewModel(
 
     // ── Submit ────────────────────────────────────────────────────
 
-    // ── Submit ────────────────────────────────────────────────────
-
     fun submitParking() {
         if (_uiState.value is ParkingUiState.Loading) return
 
@@ -122,7 +136,7 @@ class ParkingViewModel(
             valid = false
         }
 
-        // ✅ Same number check — frontend par
+        // ✅ Same number check
         if (
             _phone.value.length == 10 &&
             _alternatePhone.value.isNotBlank() &&
@@ -132,10 +146,8 @@ class ParkingViewModel(
             valid = false
         }
 
-        // ✅ Registered number check — frontend par
-        val registeredPhone = userPrefs.getUserPhone()
-            ?.filter { it.isDigit() }
-            ?.takeLast(10) ?: ""
+        // ✅ Registered number check
+        val registeredPhone = _registeredPhone.value
 
         if (registeredPhone.isNotBlank()) {
             val enteredPhone = _phone.value.filter { it.isDigit() }.takeLast(10)
@@ -164,7 +176,6 @@ class ParkingViewModel(
             )
 
             if (!response.status) {
-                // ✅ Backend error bhi properly handle karo
                 val msg = response.message ?: "Something went wrong."
 
                 when {
@@ -174,7 +185,6 @@ class ParkingViewModel(
                         _alternatePhoneError.value = "Both phone numbers cannot be same"
                     }
                     msg.contains("registered", ignoreCase = true) -> {
-                        // Dono fields check karo
                         if (_phone.value == registeredPhone) {
                             _phoneError.value = "Cannot use your registered number"
                         } else {
@@ -182,9 +192,9 @@ class ParkingViewModel(
                         }
                     }
                     else -> {
-                        response.errors?.vehicle_type?.firstOrNull()?.let  { _vehicleTypeError.value = it }
-                        response.errors?.vehicle_number?.firstOrNull()?.let { _vehicleNumberError.value = it }
-                        response.errors?.phone?.firstOrNull()?.let          { _phoneError.value = it }
+                        response.errors?.vehicle_type?.firstOrNull()?.let   { _vehicleTypeError.value = it }
+                        response.errors?.vehicle_number?.firstOrNull()?.let  { _vehicleNumberError.value = it }
+                        response.errors?.phone?.firstOrNull()?.let           { _phoneError.value = it }
                         response.errors?.alternate_phone?.firstOrNull()?.let { _alternatePhoneError.value = it }
                     }
                 }
@@ -203,11 +213,25 @@ class ParkingViewModel(
         }
     }
 
-    // ── History ───────────────────────────────────────────────────
-
+    // ── History — local + API ─────────────────────────────────────
     fun loadHistory() {
+        // Pehle local dikhao (instant)
         val saved = userPrefs.getParkingHistory()
         if (saved.isNotEmpty()) _history.value = saved
+
+        // API se fresh data fetch karo
+        viewModelScope.launch {
+            try {
+                val response = apiService.getUserParkingDetails()
+                if (response.status && !response.data.isNullOrEmpty()) {
+                    _history.value = response.data
+                    println("✅ Loaded ${response.data.size} parking records from API")
+                }
+            } catch (e: Exception) {
+                println("❌ loadHistory API failed: ${e.message}")
+                // Local data already shown — no crash
+            }
+        }
     }
 
     // ── Helpers ───────────────────────────────────────────────────
@@ -229,4 +253,41 @@ class ParkingViewModel(
     private fun clearErrorState() {
         if (_uiState.value is ParkingUiState.Error) _uiState.value = ParkingUiState.Idle
     }
+
+    // ── clearFormFields — sirf fields clear, uiState preserve ────────
+    fun clearFormFields() {
+        _vehicleType.value         = ""
+        _vehicleNumber.value       = ""
+        _phone.value               = ""
+        _alternatePhone.value      = ""
+        _vehicleTypeError.value    = null
+        _vehicleNumberError.value  = null
+        _phoneError.value          = null
+        _alternatePhoneError.value = null
+    }
+
+
+    // ── Delete Vehicle ────────────────────────────────────────────
+    fun deleteVehicle(vehicleId: Int, onSuccess: () -> Unit, onError: (String) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val response = ApiProvider.apiService.deleteVehicle(vehicleId)
+                val status   = response["status"]?.jsonPrimitive?.boolean ?: false
+                if (status) {
+                    // List se remove karo
+                    _history.value = _history.value.filter { it.id != vehicleId }
+                    println("✅ Vehicle $vehicleId deleted")
+                    onSuccess()
+                } else {
+                    val msg = response["message"]?.jsonPrimitive?.content ?: "Delete failed"
+                    onError(msg)
+                }
+            } catch (e: Exception) {
+                println("❌ deleteVehicle: ${e.message}")
+                onError(e.message ?: "Something went wrong")
+            }
+        }
+    }
 }
+
+

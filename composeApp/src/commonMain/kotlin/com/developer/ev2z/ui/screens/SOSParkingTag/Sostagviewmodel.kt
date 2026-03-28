@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.developer.ev2z.data.local.UserPrefs
 import com.developer.ev2z.network.ApiService
 import io.ktor.client.plugins.ResponseException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -43,6 +44,10 @@ class SosTagViewModel(
     private val _currentAlert = MutableStateFlow<SosAlert?>(null)
     val currentAlert: StateFlow<SosAlert?> = _currentAlert.asStateFlow()
 
+    // ── Active jobs — cancel on back ─────────────────────────────
+    private var loadDetailJob: Job? = null
+    private var loadListJob: Job? = null
+
     // ── Load Alert Detail ─────────────────────────────────────────
 
     fun loadAlertDetail(alertId: Int) {
@@ -51,7 +56,8 @@ class SosTagViewModel(
             return
         }
 
-        viewModelScope.launch {
+        loadDetailJob?.cancel()
+        loadDetailJob = viewModelScope.launch {
             _alertDetailState.value = SosAlertUiState.Loading
 
             // ✅ Retry 5 baar, 3 second gap se
@@ -91,7 +97,8 @@ class SosTagViewModel(
 
 
     fun loadAlertList() {
-        viewModelScope.launch {
+        loadListJob?.cancel()
+        loadListJob = viewModelScope.launch {
             _alertListState.value = SosAlertListUiState.Loading
             try {
                 val response = apiService.getSosAlerts()
@@ -196,9 +203,11 @@ class SosTagViewModel(
     }
 
     fun resetAll() {
+        loadDetailJob?.cancel()
+        loadListJob?.cancel()
         resetReplyState()
         _alertDetailState.value = SosAlertUiState.Idle
-        _alertListState.value   = SosAlertListUiState.Idle  // ✅ yeh missing tha
+        _alertListState.value   = SosAlertListUiState.Idle
         _currentAlert.value     = null
     }
 }

@@ -21,6 +21,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.developer.ev2z.navigation.PlatformBackHandler
 
 // ─────────────────────────────────────────────────────────────────
 // QuickReplyScreen — Screen 2
@@ -33,6 +34,8 @@ fun QuickReplyScreen(
     onConfirmed: () -> Unit,   // Navigate to ConfirmationScreen on success
     onBackPressed: () -> Unit
 ) {
+    PlatformBackHandler(enabled = true) { onBackPressed() }
+
     val selectedReply  by viewModel.selectedReply.collectAsState()
     val customMessage  by viewModel.customMessage.collectAsState()
     val replyState     by viewModel.replyState.collectAsState()

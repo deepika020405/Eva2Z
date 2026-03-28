@@ -7,6 +7,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.response.GeoFenceDto
 
 @Composable
@@ -15,6 +16,8 @@ fun GeoFencingScreenWrapper(
     storageManager: StorageManager,
     onBackPressed: () -> Unit
 ) {
+    PlatformBackHandler(enabled = true) { onBackPressed() }
+
     var showAddGeoFence by remember { mutableStateOf(false) }
     var editingGeoFence by remember { mutableStateOf<GeoFenceDto?>(null) }
 

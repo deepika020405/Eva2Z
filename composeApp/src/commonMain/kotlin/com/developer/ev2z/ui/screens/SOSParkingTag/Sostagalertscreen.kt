@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.developer.ev2z.navigation.PlatformBackHandler
 
 // ─────────────────────────────────────────────────────────────────
 // Design Tokens — Orange theme for SOS Tag (separate from BrandGreen)
@@ -50,6 +51,9 @@ fun SosTagAlertScreen(
     onIgnore: () -> Unit,
     onBackPressed: () -> Unit
 ) {
+
+    PlatformBackHandler(enabled = true) { onBackPressed() }
+
     val alertState    by viewModel.alertDetailState.collectAsState()
     val alertListState by viewModel.alertListState.collectAsState()  // ✅ ADD
 

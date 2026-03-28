@@ -7,6 +7,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.phonepe.PaymentState
 import com.developer.ev2z.phonepe.openPhonePeSdk
@@ -18,6 +19,8 @@ import com.developer.ev2z.ui.screens.market_screen.PaymentResultScreen
 fun ChangePlanScreenHost(
     onBack: () -> Unit
 ) {
+    PlatformBackHandler(enabled = true) { onBack() }
+
     val planViewModel = remember { ChangePlanViewModel() }
     val planState by planViewModel.state.collectAsState()
 

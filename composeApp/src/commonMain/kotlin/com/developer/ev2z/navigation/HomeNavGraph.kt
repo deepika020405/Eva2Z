@@ -190,14 +190,13 @@ class HomeTab(
                 },
 
 
-
                 onOpenDeviceReport = {
                     onNavigateToDeviceReport()  // 📊 Today Device Report
                 },
 
                 onOpenCommunity = onOpenCommunity,
 
-                        onCriminalVerification = onNavigateToCriminalVerification // ✅ NEW
+                onCriminalVerification = onNavigateToCriminalVerification // ✅ NEW
 
             )
         }
@@ -236,7 +235,7 @@ class DocumentsTab(
     private val onUnlock: () -> Unit
 ) : Tab {
 
-//    @Composable
+    //    @Composable
 //    override fun Content() {
 //        when (documentsGateState) {
 //            DocumentsGateState.LOCKED -> {
@@ -253,19 +252,20 @@ class DocumentsTab(
 //            else -> Unit
 //        }
 //    }
-@Composable
-override fun Content() {
-    when (documentsGateState) {
-        DocumentsGateState.LOCKED -> {
-            LockedDocumentsPlaceholder(
-                onUnlockClick = onUnlock
-            )
-        }
-        else -> {
-            Box(modifier = Modifier.fillMaxSize())
+    @Composable
+    override fun Content() {
+        when (documentsGateState) {
+            DocumentsGateState.LOCKED -> {
+                LockedDocumentsPlaceholder(
+                    onUnlockClick = onUnlock
+                )
+            }
+
+            else -> {
+                Box(modifier = Modifier.fillMaxSize())
+            }
         }
     }
-}
 
     override val options: TabOptions
         @Composable get() = TabOptions(
@@ -348,7 +348,7 @@ class ProfileTab(
             onLogout = onLogout,
             onOpenDocumentsVault = onNavigateToDocuments,
             onNavigateMyAccount = onNavigateToMyAccount, // ✅ OK NOW
-            )
+        )
     }
 
     override val options: TabOptions
@@ -380,7 +380,6 @@ fun HomeNavGraph(
     SetupStatusBar()
 
 
-
     // ✅ CREATE pagerState and coroutineScope HERE (at parent level)
     val pagerState = rememberPagerState(pageCount = { 4 })
     val coroutineScope = rememberCoroutineScope()
@@ -399,28 +398,33 @@ fun HomeNavGraph(
                 coroutineScope.launch { pagerState.animateScrollToPage(2) }
                 DeepLinkBus.clear()
             }
+
             dest.startsWith("product_detail_11") -> {
                 pendingProductId = 11
                 shopCategory = null
                 coroutineScope.launch { pagerState.animateScrollToPage(2) }
                 DeepLinkBus.clear()
             }
+
             dest.startsWith("product_detail_26") -> {
                 pendingProductId = 26
                 shopCategory = null
                 coroutineScope.launch { pagerState.animateScrollToPage(2) }
                 DeepLinkBus.clear()
             }
+
             dest.startsWith("shop_wired") -> {
                 shopCategory = "wired"
                 coroutineScope.launch { pagerState.animateScrollToPage(2) }
                 DeepLinkBus.clear()
             }
+
             dest.startsWith("shop_wireless") -> {
                 shopCategory = "wireless"
                 coroutineScope.launch { pagerState.animateScrollToPage(2) }
                 DeepLinkBus.clear()
             }
+
             dest.startsWith("shop") -> {
                 shopCategory = null
                 coroutineScope.launch { pagerState.animateScrollToPage(2) }
@@ -461,12 +465,12 @@ fun HomeNavGraph(
 
 
     var showDriverScore by remember { mutableStateOf(false) }
-    var showParking     by remember { mutableStateOf(false) }  // ✅ CHANGED — add
+    var showParking by remember { mutableStateOf(false) }  // ✅ CHANGED — add
 
 
     // ✅ SOS Tag — 3 screen states + alertId
-    var showSosTagAlert     by remember { mutableStateOf(false) }
-    var showSosQuickReply   by remember { mutableStateOf(false) }
+    var showSosTagAlert by remember { mutableStateOf(false) }
+    var showSosQuickReply by remember { mutableStateOf(false) }
     var showSosConfirmation by remember { mutableStateOf(false) }
     var currentSosAlertId by remember { mutableStateOf<Int?>(null) }
     val sosTagViewModel = remember {
@@ -474,6 +478,10 @@ fun HomeNavGraph(
             apiService = apiService,
             userPrefs = userPrefs
         )
+    }
+
+    val parkingViewModel = remember {
+        ParkingViewModel(apiService = apiService, userPrefs = userPrefs)
     }
 
     // ✅ Notification automatic redirect
@@ -507,8 +515,6 @@ fun HomeNavGraph(
     }
 
 
-
-
     // Edit device state
     var editDeviceId by remember { mutableStateOf("") }
     var editDeviceName by remember { mutableStateOf("") }
@@ -537,7 +543,7 @@ fun HomeNavGraph(
                 storageManager = storageManager,
                 token = token,
                 pendingProductId = pendingProductId,         // ✅ ADD
-                onProductConsumed = { pendingProductId = null } ,// ✅ ADD
+                onProductConsumed = { pendingProductId = null },// ✅ ADD
                 profileRefreshTrigger = profileRefresh,
                 pagerState = pagerState,
                 shopCategory = shopCategory,
@@ -571,7 +577,7 @@ fun HomeNavGraph(
                 },
                 onOpenCommunity = { showCommunity = true },
                 onNavigateToDriverScore = { showDriverScore = true },  // ✅ ADD
-                onNavigateToParking     = { showParking = true },    // ✅ CHANGED
+                onNavigateToParking = { showParking = true },    // ✅ CHANGED
                 // ✅ SOS Tag — notification se alertId milega, yahan set karo
                 onNavigateToSosTag = { alertId ->
                     // Notification se (alertId real hoga)
@@ -587,50 +593,44 @@ fun HomeNavGraph(
             )
         }
     }
-        val addDeviceViewModel = remember {
-            AddDeviceViewModel()
+    val addDeviceViewModel = remember {
+        AddDeviceViewModel()
+    }
+
+
+    // ✅ Central handler — ONLY active when no overlay screen is open
+    // Each overlay screen has its own PlatformBackHandler that takes priority
+    val isAnyOverlayOpen = showSosConfirmation || showSosQuickReply || showSosTagAlert ||
+            showCreatePost || showCreateStory || showStoryViewer || showCommunity ||
+            showDocumentViewer || showUploadDocument || showDocuments ||
+            showWarranty || showBillDetails || showChangePlan || showMyAccount ||
+            showEditDeviceName || showManageDevice || showAddDevice || showGPSData ||
+            showGeoFencing || showHistoryPlayback || showGeneralSettings ||
+            showAccountActivity || showReferAndEarn || showChangePassword ||
+            showAboutApp || showPrivacyPolicy || showTermsConditions ||
+            showRefundPolicy || showShippingPolicy || showCriminalVerification ||
+            showDriverScore || showParking || showEditProfile
+
+    PlatformBackHandler(enabled = !isAnyOverlayOpen) {
+        // ── Root tabs — no overlay is open ──
+        when (pagerState.currentPage) {
+            0 -> showExitDialog = true
+            1, 2, 3 -> coroutineScope.launch { pagerState.animateScrollToPage(0) }
         }
+    }
 
 
-        val isOnRootTabs =
-            !showEditProfile &&
-                    !showManageDevice &&
-                    !showGPSData &&
-                    !showEditDeviceName &&
-                    !showPrivacyPolicy &&
-                    !showTermsConditions &&
-                    !showRefundPolicy &&
-                    !showShippingPolicy &&
-                    !showGeoFencing &&
-                    !showHistoryPlayback &&
-                    !showGeneralSettings &&
-                    !showAccountActivity &&
-                    !showReferAndEarn &&
-                    !showAboutApp
-
-        PlatformBackHandler(enabled = isOnRootTabs) {
-            when (pagerState.currentPage) {
-                0 -> showExitDialog = true
-                1, 2, 3 -> {
-                    coroutineScope.launch {
-                        pagerState.animateScrollToPage(0)
-                    }
-                }
+    // Edit Profile Screen
+    if (showEditProfile) {
+        EditProfileScreen(
+            apiService = apiService,
+            storageManager = storageManager,
+            onBackPressed = {
+                showEditProfile = false
+                profileRefresh++
             }
-        }
-
-
-        // Edit Profile Screen
-        if (showEditProfile) {
-            EditProfileScreen(
-                apiService = apiService,
-                storageManager = storageManager,
-                onBackPressed = {
-                    showEditProfile = false
-                    profileRefresh++
-                }
-            )
-        }
+        )
+    }
 
 //        if (showCommunity) {
 //            Box(modifier = Modifier.fillMaxSize()) {
@@ -645,211 +645,211 @@ fun HomeNavGraph(
 //            }
 //        }
 
-        if (showCommunity) {
-            CommunityScreenRoot(
-                onBack = { showCommunity = false },
+    if (showCommunity) {
+        CommunityScreenRoot(
+            onBack = { showCommunity = false },
 
-                onOpenCreatePost = {
-                    showCreatePost = true
-                },
+            onOpenCreatePost = {
+                showCreatePost = true
+            },
 
-                onOpenCreateStory = {
-                    showCreateStory = true
-                },
+            onOpenCreateStory = {
+                showCreateStory = true
+            },
 
-                onOpenStoryViewer = {
-                    showStoryViewer = true
-                }
-            )
-        }
+            onOpenStoryViewer = {
+                showStoryViewer = true
+            }
+        )
+    }
 
-        if (showCreatePost) {
-           CreatePostScreen  (
-               onBack = {
-                   showCreatePost = false
-               }
-           )
-        }
+    if (showCreatePost) {
+        CreatePostScreen(
+            onBack = {
+                showCreatePost = false
+            }
+        )
+    }
 
-        if (showCreateStory) {
-            CreateStoryScreen(
-                onBack = {
-                    showCreateStory = false
-                }
-            )
-        }
+    if (showCreateStory) {
+        CreateStoryScreen(
+            onBack = {
+                showCreateStory = false
+            }
+        )
+    }
 
-        if (showStoryViewer) {
-            StoryViewerScreen(
-                onBack = {
-                    showStoryViewer = false   // 🔥 THIS IS THE KEY
-                }
-            )
-        }
+    if (showStoryViewer) {
+        StoryViewerScreen(
+            onBack = {
+                showStoryViewer = false   // 🔥 THIS IS THE KEY
+            }
+        )
+    }
 
-        if (showDocuments) {
-            DocumentsScreen(
-                apiService = apiService,
-                storageManager = storageManager,
+    if (showDocuments) {
+        DocumentsScreen(
+            apiService = apiService,
+            storageManager = storageManager,
 
-                onBack = {
-                    showDocuments = false
-                    documentsGateState = DocumentsGateState.LOCKED
-                },
+            onBack = {
+                showDocuments = false
+                documentsGateState = DocumentsGateState.LOCKED
+            },
 
-                onOpenViewer = { bytes, fileName ->
-                    viewerBytes = bytes
-                    viewerFileName = fileName
-                    showDocuments = false
-                    showDocumentViewer = true
-                },
+            onOpenViewer = { bytes, fileName ->
+                viewerBytes = bytes
+                viewerFileName = fileName
+                showDocuments = false
+                showDocumentViewer = true
+            },
 
-                onOpenUpload = {
-                    showDocuments = false
-                    showUploadDocument = true
-                }
-            )
-        }
+            onOpenUpload = {
+                showDocuments = false
+                showUploadDocument = true
+            }
+        )
+    }
 
-        if (showUploadDocument) {
-            UploadDocumentScreen(
-                apiService = apiService,
-                storageManager = storageManager,
-                onBack = {
-                    showUploadDocument = false
-                    showDocuments = true
-                }
-            )
-        }
+    if (showUploadDocument) {
+        UploadDocumentScreen(
+            apiService = apiService,
+            storageManager = storageManager,
+            onBack = {
+                showUploadDocument = false
+                showDocuments = true
+            }
+        )
+    }
 
-        if (showDocumentViewer && viewerBytes != null) {
+    if (showDocumentViewer && viewerBytes != null) {
 
-            val androidContext = getAppContext()  // ✅ REAL Context
+        val androidContext = getAppContext()  // ✅ REAL Context
 
-            DocumentViewerScreen(
-                fileName = viewerFileName,
-                bytes = viewerBytes!!,
-                onBack = {
-                    showDocumentViewer = false
-                    showDocuments = true
-                },
-                onDownload = {
-                    platformDownloadFile(
-                        context = androidContext,   // ✅ FIXED
-                        bytes = viewerBytes!!,
-                        fileName = viewerFileName
-                    )
-                }
-            )
-        }
+        DocumentViewerScreen(
+            fileName = viewerFileName,
+            bytes = viewerBytes!!,
+            onBack = {
+                showDocumentViewer = false
+                showDocuments = true
+            },
+            onDownload = {
+                platformDownloadFile(
+                    context = androidContext,   // ✅ FIXED
+                    bytes = viewerBytes!!,
+                    fileName = viewerFileName
+                )
+            }
+        )
+    }
 
-        // Manage Device Screen
-        if (showManageDevice) {
-            ManageDeviceScreen(
-                apiService = apiService,
-                storageManager = storageManager,
-                refreshTrigger = manageDeviceRefresh,
-                onBackClick = { showManageDevice = false },
-                onProfileClick = { showManageDevice = false },
-                onAddDeviceClick = {
-                    showManageDevice = false
-                    onNavigateToAddDevice()
-                },
-                onEditDeviceClick = { deviceId, deviceName, simNumber ->
-                    editDeviceId = deviceId
-                    editDeviceName = deviceName
-                    editSimNumber = simNumber
-                    showEditDeviceName = true
-                }
-            )
-        }
+    // Manage Device Screen
+    if (showManageDevice) {
+        ManageDeviceScreen(
+            apiService = apiService,
+            storageManager = storageManager,
+            refreshTrigger = manageDeviceRefresh,
+            onBackClick = { showManageDevice = false },
+            onProfileClick = { showManageDevice = false },
+            onAddDeviceClick = {
+                showManageDevice = false
+                onNavigateToAddDevice()
+            },
+            onEditDeviceClick = { deviceId, deviceName, simNumber ->
+                editDeviceId = deviceId
+                editDeviceName = deviceName
+                editSimNumber = simNumber
+                showEditDeviceName = true
+            }
+        )
+    }
 //         GPS Data Screen
-        if (showGPSData) {
-            GPSDataScreen(
-                apiService = apiService,
-                storageManager = storageManager,
+    if (showGPSData) {
+        GPSDataScreen(
+            apiService = apiService,
+            storageManager = storageManager,
 //                onBackClick = {showGPSData = false },
-                onBackPressed = { showGPSData = false }
-            )
-        }
+            onBackPressed = { showGPSData = false }
+        )
+    }
 
-        if (showChangePassword) {
-            ChangePasswordScreen(
-                apiService = apiService,
-                storageManager = storageManager,
-                onBackPressed = {
-                    showChangePassword = false
+    if (showChangePassword) {
+        ChangePasswordScreen(
+            apiService = apiService,
+            storageManager = storageManager,
+            onBackPressed = {
+                showChangePassword = false
 
-                    // ✅ FORCE Profile tab
-                    coroutineScope.launch {
-                        pagerState.animateScrollToPage(3)
-                    }
-                }
-            )
-        }
-
-        LaunchedEffect(showMyAccount) {
-            if (showMyAccount && selectedWarrantyDeviceId.isEmpty()) {
-                try {
-                    val devices = apiService.getUserDevices()
-                    val firstId = devices.data.firstOrNull()?.device_id?.toString() ?: ""
-                    println("🔵 Setting default deviceId = $firstId")
-                    selectedWarrantyDeviceId = firstId
-                } catch (e: Exception) {
-                    println("❌ Failed to set default device: ${e.message}")
+                // ✅ FORCE Profile tab
+                coroutineScope.launch {
+                    pagerState.animateScrollToPage(3)
                 }
             }
-        }
+        )
+    }
 
-        if (showMyAccount) {
-            MyAccountScreen(
-                selectedDeviceId = selectedWarrantyDeviceId,                onBack = {
-                    showMyAccount = false
-                },
-                onChangePlan = {
-                    showMyAccount = false
-                    showChangePlan = true
-                },
-                onBillDetails = {
-                    showMyAccount = false
-                    showBillDetails = true
-                },
-                onWarranty = { deviceId ->
-                    selectedWarrantyDeviceId = deviceId
-                    showMyAccount = false
-                    showWarranty = true
-                }
-            )
-        }
-
-
-        if (showChangePlan) {
-            ChangePlanScreenHost(
-                onBack = {
-                    showChangePlan = false
-                    showMyAccount = true
-                }
-            )
-        }
-
-        if (showBillDetails) {
-
-            val vm = remember {
-                BillDetailsViewModel(apiService, storageManager)
+    LaunchedEffect(showMyAccount) {
+        if (showMyAccount && selectedWarrantyDeviceId.isEmpty()) {
+            try {
+                val devices = apiService.getUserDevices()
+                val firstId = devices.data.firstOrNull()?.device_id?.toString() ?: ""
+                println("🔵 Setting default deviceId = $firstId")
+                selectedWarrantyDeviceId = firstId
+            } catch (e: Exception) {
+                println("❌ Failed to set default device: ${e.message}")
             }
-
-            LaunchedEffect(Unit) {
-                vm.loadBills()
-            }
-
-            BillDetailsScreen(
-                bills = vm.bills,
-                onBack = {
-                    showBillDetails = false
-                    showMyAccount = true
-                }
-            )
         }
+    }
+
+    if (showMyAccount) {
+        MyAccountScreen(
+            selectedDeviceId = selectedWarrantyDeviceId, onBack = {
+                showMyAccount = false
+            },
+            onChangePlan = {
+                showMyAccount = false
+                showChangePlan = true
+            },
+            onBillDetails = {
+                showMyAccount = false
+                showBillDetails = true
+            },
+            onWarranty = { deviceId ->
+                selectedWarrantyDeviceId = deviceId
+                showMyAccount = false
+                showWarranty = true
+            }
+        )
+    }
+
+
+    if (showChangePlan) {
+        ChangePlanScreenHost(
+            onBack = {
+                showChangePlan = false
+                showMyAccount = true
+            }
+        )
+    }
+
+    if (showBillDetails) {
+
+        val vm = remember {
+            BillDetailsViewModel(apiService, storageManager)
+        }
+
+        LaunchedEffect(Unit) {
+            vm.loadBills()
+        }
+
+        BillDetailsScreen(
+            bills = vm.bills,
+            onBack = {
+                showBillDetails = false
+                showMyAccount = true
+            }
+        )
+    }
 
     if (showWarranty) {
         WarrantyRoute(
@@ -868,21 +868,21 @@ fun HomeNavGraph(
         )
     }
 
-        // Edit Device Name Screen
-        if (showEditDeviceName) {
-            EditDeviceNameScreen(
-                apiService = apiService,
-                storageManager = storageManager,
-                deviceId = editDeviceId,
-                deviceName = editDeviceName,
-                simNumber = editSimNumber,
-                onBackPressed = { showEditDeviceName = false },
-                onUpdateSuccess = {
-                    showEditDeviceName = false
-                    manageDeviceRefresh++
-                }
-            )
-        }
+    // Edit Device Name Screen
+    if (showEditDeviceName) {
+        EditDeviceNameScreen(
+            apiService = apiService,
+            storageManager = storageManager,
+            deviceId = editDeviceId,
+            deviceName = editDeviceName,
+            simNumber = editSimNumber,
+            onBackPressed = { showEditDeviceName = false },
+            onUpdateSuccess = {
+                showEditDeviceName = false
+                manageDeviceRefresh++
+            }
+        )
+    }
 
 
 
@@ -895,16 +895,11 @@ fun HomeNavGraph(
 
 // Parking
     if (showParking) {
-        // ✅ NAYA — variable mein assign karo
-        val parkingViewModel = remember {
-            ParkingViewModel(apiService = apiService, userPrefs = userPrefs)
-        }
         ParkingScreen(
-            viewModel     = parkingViewModel,
+            viewModel = parkingViewModel,
             onBackPressed = { showParking = false }
         )
     }
-
 
 
     // ✅ Screen 1 — dono cases handle
@@ -961,128 +956,127 @@ fun HomeNavGraph(
     }
 
 
+    // Privacy Policy
+    if (showPrivacyPolicy) {
+        PrivacyPolicy_TandCScreen(
+            type = WebViewType.PRIVACY_POLICY,
+            onBackPressed = { showPrivacyPolicy = false }
+        )
+    }
 
-        // Privacy Policy
-        if (showPrivacyPolicy) {
-            PrivacyPolicy_TandCScreen(
-                type = WebViewType.PRIVACY_POLICY,
-                onBackPressed = { showPrivacyPolicy = false }
-            )
-        }
+    // Terms & Conditions
+    if (showTermsConditions) {
+        PrivacyPolicy_TandCScreen(
+            type = WebViewType.TERMS_CONDITIONS,
+            onBackPressed = { showTermsConditions = false }
+        )
+    }
 
-        // Terms & Conditions
-        if (showTermsConditions) {
-            PrivacyPolicy_TandCScreen(
-                type = WebViewType.TERMS_CONDITIONS,
-                onBackPressed = { showTermsConditions = false }
-            )
-        }
+    // Refund Policy
+    if (showRefundPolicy) {
+        PrivacyPolicy_TandCScreen(
+            type = WebViewType.REFUND_POLICY,
+            onBackPressed = { showRefundPolicy = false }
+        )
+    }
 
-        // Refund Policy
-        if (showRefundPolicy) {
-            PrivacyPolicy_TandCScreen(
-                type = WebViewType.REFUND_POLICY,
-                onBackPressed = { showRefundPolicy = false }
-            )
-        }
+    // Shipping Policy
+    if (showShippingPolicy) {
+        PrivacyPolicy_TandCScreen(
+            type = WebViewType.SHIPPING_POLICY,
+            onBackPressed = { showShippingPolicy = false }
+        )
+    }
 
-        // Shipping Policy
-        if (showShippingPolicy) {
-            PrivacyPolicy_TandCScreen(
-                type = WebViewType.SHIPPING_POLICY,
-                onBackPressed = { showShippingPolicy = false }
-            )
-        }
+    // Geo Fencing
+    if (showGeoFencing) {
+        GeoFencingScreenWrapper(
+            apiService = apiService,
+            storageManager = storageManager,
+            onBackPressed = { showGeoFencing = false }
+        )
+    }
 
-        // Geo Fencing
-        if (showGeoFencing) {
-            GeoFencingScreenWrapper(
-                apiService = apiService,
-                storageManager = storageManager,
-                onBackPressed = { showGeoFencing = false }
-            )
-        }
+    // History Playback
+    if (showHistoryPlayback) {
+        HistoryPlaybackScreen(
+            apiService = apiService,
+            storageManager = storageManager,
+            onBackPressed = { showHistoryPlayback = false }
+        )
+    }
 
-        // History Playback
-        if (showHistoryPlayback) {
-            HistoryPlaybackScreen(
-                apiService = apiService,
-                storageManager = storageManager,
-                onBackPressed = { showHistoryPlayback = false }
-            )
-        }
+    // General Settings
+    if (showGeneralSettings) {
+        GeneralSettingsScreen(
+            onBackPressed = { showGeneralSettings = false }
+        )
+    }
 
-        // General Settings
-        if (showGeneralSettings) {
-            GeneralSettingsScreen(
-                onBackPressed = { showGeneralSettings = false }
-            )
-        }
+    // Account Activity
+    if (showAccountActivity) {
+        AccountActivityScreen(
+            apiService = apiService,
+            storageManager = storageManager,
+            onBackPressed = { showAccountActivity = false },
+            onAccountDeleted = {
+                showAccountActivity = false
+                onLogout()
+            }
+        )
+    }
 
-        // Account Activity
-        if (showAccountActivity) {
-            AccountActivityScreen(
-                apiService = apiService,
-                storageManager = storageManager,
-                onBackPressed = { showAccountActivity = false },
-                onAccountDeleted = {
-                    showAccountActivity = false
-                    onLogout()
+    // ✅ Refer And Earn - WITH SHOP NAVIGATION
+    if (showReferAndEarn) {
+        ReferAndEarnScreen(
+            token = token,
+            apiService = apiService,
+            onBackPressed = { showReferAndEarn = false },
+            onNavigateToShop = {
+                println("🛒 Navigating to Shop tab...")
+                showReferAndEarn = false
+                // ✅ Navigate to shop tab (index 2)
+                coroutineScope.launch {
+                    pagerState.animateScrollToPage(2)
+                    println("✅ Shop tab navigation complete")
                 }
-            )
-        }
+            },
+            onNavigateToAddDevice = {
+                showReferAndEarn = false
+                showAddDevice = true
+            }
 
-        // ✅ Refer And Earn - WITH SHOP NAVIGATION
-        if (showReferAndEarn) {
-            ReferAndEarnScreen(
-                token = token,
-                apiService = apiService,
-                onBackPressed = { showReferAndEarn = false },
-                onNavigateToShop = {
-                    println("🛒 Navigating to Shop tab...")
-                    showReferAndEarn = false
-                    // ✅ Navigate to shop tab (index 2)
-                    coroutineScope.launch {
-                        pagerState.animateScrollToPage(2)
-                        println("✅ Shop tab navigation complete")
+        )
+    }
+
+    var vaultError by remember { mutableStateOf<String?>(null) }
+    val profileViewModel = remember {
+        ProfileViewModel(apiService, storageManager)
+    }
+    val profileState by profileViewModel.state.collectAsState()
+
+
+    if (showVaultPasswordDialog) {
+        VaultPasswordDialog(
+            errorMessage = profileState.error,
+
+            onSubmit = { password ->
+                profileViewModel.unlockDocumentsVault(
+                    password = password,
+                    onSuccess = {
+                        documentsGateState = DocumentsGateState.UNLOCKED
+                        showVaultPasswordDialog = false
+                        showDocuments = true
                     }
-                },
-                onNavigateToAddDevice = {
-                    showReferAndEarn = false
-                    showAddDevice = true
-                }
+                )
+            },
 
-            )
-        }
-
-        var vaultError by remember { mutableStateOf<String?>(null) }
-        val profileViewModel = remember {
-            ProfileViewModel(apiService, storageManager)
-        }
-        val profileState by profileViewModel.state.collectAsState()
-
-
-        if (showVaultPasswordDialog) {
-            VaultPasswordDialog(
-                errorMessage = profileState.error,
-
-                onSubmit = { password ->
-                    profileViewModel.unlockDocumentsVault(
-                        password = password,
-                        onSuccess = {
-                            documentsGateState = DocumentsGateState.UNLOCKED
-                            showVaultPasswordDialog = false
-                            showDocuments = true
-                        }
-                    )
-                },
-
-                onDismiss = {
-                    showVaultPasswordDialog = false
-                    documentsGateState = DocumentsGateState.LOCKED
-                }
-            )
-        }
+            onDismiss = {
+                showVaultPasswordDialog = false
+                documentsGateState = DocumentsGateState.LOCKED
+            }
+        )
+    }
 
 
 //        if (
@@ -1098,73 +1092,59 @@ fun HomeNavGraph(
 //            )
 //        }
 
-        if (showAddDevice) {
-
-            // 🔙 System back enable
-            PlatformBackHandler(enabled = true) {
-                showAddDevice = false
-            }
-
-            AddDeviceDetailsCommon(
-                viewModel = addDeviceViewModel,
-                onNavigate = { route ->
-                    when (route) {
-                        "back", "home" -> {
-                            showAddDevice = false
-                        }
-                    }
+    // ✅ SIRF YE RAKHO
+    if (showAddDevice) {
+        AddDeviceDetailsCommon(
+            viewModel = addDeviceViewModel,
+            onNavigate = { route ->
+                when (route) {
+                    "back", "home" -> showAddDevice = false
                 }
-            )
-        }
-
-
-        LaunchedEffect(showVaultPasswordDialog) {
-            if (showVaultPasswordDialog) {
-                profileViewModel.clearError()
             }
-        }
+        )
+    }
 
-        // About App
-        if (showAboutApp) {
-            AboutAppScreen(
-                onBackClick = { showAboutApp = false }
-            )
-        }
 
-        //Criminal Verification
-        if (showCriminalVerification) {
-            CriminalVerificationFlow(
-                apiService = ApiService(),
-                onBack = { showCriminalVerification = false }
-            )
-        }
-
-        if (showExitDialog) {
-            val activity = LocalPlatformActivity.current
-            AlertDialog(
-                onDismissRequest = { showExitDialog = false },
-                title = { Text("Exit App") },
-                text = { Text("Are you sure you want to exit?") },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            showExitDialog = false
-
-                            // ✅ KMP-safe exit
-                            exitApp(activity)
-                        }
-                    ) {
-                        Text("Yes")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showExitDialog = false }) {
-                        Text("No")
-                    }
-                }
-            )
+    LaunchedEffect(showVaultPasswordDialog) {
+        if (showVaultPasswordDialog) {
+            profileViewModel.clearError()
         }
     }
+
+    // About App
+    if (showAboutApp) {
+        AboutAppScreen(
+            onBackClick = { showAboutApp = false }
+        )
+    }
+
+
+    if (showExitDialog) {
+        val activity = LocalPlatformActivity.current
+        AlertDialog(
+            onDismissRequest = { showExitDialog = false },
+            title = { Text("Exit App") },
+            text = { Text("Are you sure you want to exit?") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showExitDialog = false
+
+                        // ✅ KMP-safe exit
+                        exitApp(activity)
+                    }
+                ) {
+                    Text("Yes")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExitDialog = false }) {
+                    Text("No")
+                }
+            }
+        )
+    }
+}
 
 @Composable
 fun LockedDocumentsPlaceholder(
@@ -1397,7 +1377,7 @@ fun HomeNavGraphContent(
             onNavigateToDocuments,
             onLogout,
 
-        )
+            )
     }
 
     val ordersTab = remember(shopCategory) {

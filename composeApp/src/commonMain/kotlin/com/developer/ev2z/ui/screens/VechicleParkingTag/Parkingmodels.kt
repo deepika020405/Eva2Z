@@ -27,6 +27,14 @@ data class ParkingResponse(
     val errors: ParkingFieldErrors? = null
 )
 
+// ─── Get User Details Response ────────────────────────────────
+@Serializable
+data class UserParkingListResponse(
+    val status: Boolean          = false,
+    val message: String?         = null,
+    val data: List<ParkingData>? = null
+)
+
 @Serializable
 data class ParkingData(
     val id: Int?                                             = null,

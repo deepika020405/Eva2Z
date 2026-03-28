@@ -1,41 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-<dict>
-	<key>CADisableMinimumFrameDurationOnPhone</key>
-	<true/>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>eva2zgps</string>
-			</array>
-		</dict>
-	</array>
-	<key>LSApplicationQueriesSchemes</key>
-	<array>
-		<string>phonepe</string>
-		<string>ppemerchantsdkv1</string>
-		<string>ppemerchantsdkv2</string>
-		<string>ppemerchantsdkv3</string>
-		<string>ppemerchantsdkv4</string>
-		<string>ppemerchantsdkv5</string>
-		<string>paytmmp</string>
-		<string>gpay</string>
-		<string>credpay</string>
-		<string>amazonpay</string>
-		<string>bhim</string>
-		<string>supermoney</string>
-	</array>
-	<key>UILaunchScreen</key>
-	<dict/>
-</dict>
-</plist>
-=======
     <dict>
+
         <key>CFBundleDevelopmentRegion</key>
         <string>$(DEVELOPMENT_LANGUAGE)</string>
 
@@ -48,7 +15,6 @@
         <key>CFBundleInfoDictionaryVersion</key>
         <string>6.0</string>
 
-        <!-- ✅ HOME SCREEN PE YE NAAM DIKHEGA -->
         <key>CFBundleDisplayName</key>
         <string>EVA2Z Connect</string>
 
@@ -58,7 +24,6 @@
         <key>CFBundlePackageType</key>
         <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 
-        <!-- ✅ VERSION UPDATED - Android ke saath match -->
         <key>CFBundleShortVersionString</key>
         <string>4.9.1</string>
 
@@ -68,12 +33,18 @@
         <key>CADisableMinimumFrameDurationOnPhone</key>
         <true/>
 
+        <!-- PRIVACY PERMISSIONS -->
         <key>NSCameraUsageDescription</key>
-        <string>Camera access is required to scan device barcodes and SIM QR codes</string>
+        <string>Camera access is required to scan device barcodes and SIM QR codes for vehicle setup.</string>
 
         <key>NSPhotoLibraryUsageDescription</key>
-        <string>Photo library access is required to scan barcodes from images</string>
+        <string>Photo library access is required to upload profile images and scan barcodes from saved images.</string>
 
+        <!-- ATT - Apple Rejection Fix -->
+        <key>NSUserTrackingUsageDescription</key>
+        <string>We use anonymised interaction data to improve app performance and deliver a better experience. No personal or location data is shared with third parties for advertising.</string>
+
+        <!-- FACEBOOK SDK -->
         <key>FacebookAppID</key>
         <string>904528742747351</string>
 
@@ -83,9 +54,20 @@
         <key>FacebookDisplayName</key>
         <string>EVA2Z Connect</string>
 
+        <!-- URL SCHEMES - single merged entry -->
         <key>CFBundleURLTypes</key>
         <array>
             <dict>
+                <key>CFBundleTypeRole</key>
+                <string>Editor</string>
+                <key>CFBundleURLSchemes</key>
+                <array>
+                    <string>eva2zgps</string>
+                </array>
+            </dict>
+            <dict>
+                <key>CFBundleTypeRole</key>
+                <string>Editor</string>
                 <key>CFBundleURLSchemes</key>
                 <array>
                     <string>fb904528742747351</string>
@@ -93,16 +75,11 @@
             </dict>
         </array>
 
+        <!-- APP QUERIES - single merged entry -->
         <key>LSApplicationQueriesSchemes</key>
         <array>
             <string>fbapi</string>
             <string>fb-messenger-share-api</string>
-        </array>
-
-
-        <!-- ✅ PhonePe URL Query Schemes -->
-        <key>LSApplicationQueriesSchemes</key>
-        <array>
             <string>phonepe</string>
             <string>ppemerchantsdkv1</string>
             <string>ppemerchantsdkv2</string>
@@ -117,28 +94,9 @@
             <string>supermoney</string>
         </array>
 
-
-
-
-        <key>CFBundleURLTypes</key>
-        <array>
-            <dict>
-                <key>CFBundleTypeRole</key>
-                <string>Editor</string>
-                <key>CFBundleURLSchemes</key>
-                <array>
-                    <string>eva2zgps</string>
-                </array>
-            </dict>
-        </array>
-
+        <!-- UI CONFIG -->
         <key>UILaunchScreen</key>
         <dict/>
-
-        <key>UIRequiredDeviceCapabilities</key>
-        <array>
-            <string>armv7</string>
-        </array>
 
         <key>UISupportedInterfaceOrientations</key>
         <array>
@@ -155,21 +113,5 @@
             <string>UIInterfaceOrientationLandscapeRight</string>
         </array>
 
-        <key>NSUserTrackingUsageDescription</key>
-        <string>We need to read SMS to auto-fill OTP</string>
-
-        <key>NSContactsUsageDescription</key>
-        <string>To autofill OTP from SMS</string>
-
-
-        <key>NSPhotoLibraryUsageDescription</key>
-        <string>Photo access is required to upload profile images</string>
-
-
-        <key>NSPhotoLibraryUsageDescription</key>
-        <string>Allow access to photos</string>
-
-        <key>NSCameraUsageDescription</key>
-        <string>Allow camera access</string>
     </dict>
 </plist>

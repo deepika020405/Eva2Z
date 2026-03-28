@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.developer.ev2z.navigation.PlatformBackHandler
 
 // ─────────────────────────────────────────────────────────────────
 // ConfirmationScreen — Screen 3: Response Sent
@@ -32,6 +33,8 @@ fun ConfirmationScreen(
     onViewAlertDetails: () -> Unit,
     onClose: () -> Unit
 ) {
+    PlatformBackHandler(enabled = true) { onClose() }
+
     val replyState by viewModel.replyState.collectAsState()
     val successMessage = (replyState as? SosReplyUiState.Success)?.message
         ?: "Response sent successfully!"
