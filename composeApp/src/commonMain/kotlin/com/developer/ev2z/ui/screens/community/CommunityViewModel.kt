@@ -29,8 +29,10 @@ class CommunityViewModel(
     private val repository: CommunityRepository
 ) {
 
-    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private val supervisorJob = SupervisorJob()
+    private val scope = CoroutineScope(Dispatchers.Main + supervisorJob)
     private val loadMutex = Mutex()
+    private var loadPostsJob: Job? = null
 
     private var _state by mutableStateOf(CommunityUiState())
     val state: CommunityUiState get() = _state
@@ -102,7 +104,8 @@ class CommunityViewModel(
     }
 
     fun loadPosts() {
-        scope.launch {
+        loadPostsJob?.cancel()
+        loadPostsJob = scope.launch {
             loadMutex.withLock {
                 if (_state.loading) return@withLock
 
@@ -408,6 +411,11 @@ class CommunityViewModel(
         storyIndex = 0
         storyProgress = 0f
         storyPaused = false
+    }
+
+    fun cancelActiveJobs() {
+        loadPostsJob?.cancel()
+        storyJob?.cancel()
     }
 
 

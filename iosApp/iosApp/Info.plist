@@ -33,6 +33,14 @@
         <key>CADisableMinimumFrameDurationOnPhone</key>
         <true/>
 
+        <!-- Disable Firebase Analytics (pulled in transitively by Firebase/Messaging) -->
+        <key>FirebaseAnalyticsCollectionEnabled</key>
+        <false/>
+        <key>FirebaseAutomaticScreenReportingEnabled</key>
+        <false/>
+        <key>FIREBASE_ANALYTICS_COLLECTION_DEACTIVATED</key>
+        <true/>
+
         <!-- PRIVACY PERMISSIONS -->
         <key>NSCameraUsageDescription</key>
         <string>Camera access is required to scan device barcodes and SIM QR codes for vehicle setup.</string>
@@ -40,21 +48,7 @@
         <key>NSPhotoLibraryUsageDescription</key>
         <string>Photo library access is required to upload profile images and scan barcodes from saved images.</string>
 
-        <!-- ATT - Apple Rejection Fix -->
-        <key>NSUserTrackingUsageDescription</key>
-        <string>We use anonymised interaction data to improve app performance and deliver a better experience. No personal or location data is shared with third parties for advertising.</string>
-
-        <!-- FACEBOOK SDK -->
-        <key>FacebookAppID</key>
-        <string>904528742747351</string>
-
-        <key>FacebookClientToken</key>
-        <string>97617580c70d19600529c603676857c2</string>
-
-        <key>FacebookDisplayName</key>
-        <string>EVA2Z Connect</string>
-
-        <!-- URL SCHEMES - single merged entry -->
+        <!-- URL SCHEMES -->
         <key>CFBundleURLTypes</key>
         <array>
             <dict>
@@ -65,21 +59,11 @@
                     <string>eva2zgps</string>
                 </array>
             </dict>
-            <dict>
-                <key>CFBundleTypeRole</key>
-                <string>Editor</string>
-                <key>CFBundleURLSchemes</key>
-                <array>
-                    <string>fb904528742747351</string>
-                </array>
-            </dict>
         </array>
 
-        <!-- APP QUERIES - single merged entry -->
+        <!-- APP QUERIES -->
         <key>LSApplicationQueriesSchemes</key>
         <array>
-            <string>fbapi</string>
-            <string>fb-messenger-share-api</string>
             <string>phonepe</string>
             <string>ppemerchantsdkv1</string>
             <string>ppemerchantsdkv2</string>

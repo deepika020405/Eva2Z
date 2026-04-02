@@ -9,13 +9,10 @@ class IOSStorageManager : StorageManager {
     override fun saveString(key: String, value: String) {
         userDefaults.setObject(value, forKey = key)
         userDefaults.synchronize()
-        println("💾 iOS SAVE: key=$key value=${value.take(30)}")
     }
 
     override fun getString(key: String, defaultValue: String): String {
-        val result = userDefaults.stringForKey(key) ?: defaultValue
-        println("🔑 iOS GET: key=$key result=${result.take(30)}")
-        return result
+        return userDefaults.stringForKey(key) ?: defaultValue
     }
 
     override fun saveBoolean(key: String, value: Boolean) {

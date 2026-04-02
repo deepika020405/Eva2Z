@@ -40,8 +40,9 @@ object PaymentBus {
     }
 
     fun notify(success: Boolean, txnId: String?, reason: String?) {
-        listener?.invoke(success, txnId, reason)
+        val currentListener = listener
         listener = null
+        currentListener?.invoke(success, txnId, reason)
     }
 
     fun clear() {

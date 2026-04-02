@@ -39,41 +39,35 @@ import ComposeApp
     }
 
     private func openPaymentWithSDK(token: String) {
-        print("🚀 Initializing PhonePe SDK")
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
 
-        // ✅ CHANGE: Use .sandbox instead of .production
-        ppPayment = PPPayment(
-            // environment: .sandbox,  // ✅ THIS IS THE ONLY CHANGE
-            environment: .production,  // ✅ THIS IS THE ONLY CHANGE
-            flowId: "ABCDEFGHIJK12",
-            merchantId: "M22VRDGEOVBYAUAT"
-        )
+            self.ppPayment = PPPayment(
+                environment: .production,
+                flowId: "ABCDEFGHIJK12",
+                merchantId: "M22VRDGEOVBYAUAT"
+            )
 
-        PPPayment.enableDebugLogs = true
+            PPPayment.enableDebugLogs = false
 
-        let orderId = "OMO\(Int(Date().timeIntervalSince1970 * 1000))"
+            let orderId = "OMO\(Int(Date().timeIntervalSince1970 * 1000))"
 
-        print("🔑 Order ID: \(orderId)")
-        print("🔑 Token: \(token.prefix(50))...")
+            guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                  let rootViewController = windowScene.windows.first?.rootViewController else {
+                PaymentBus.shared.notify(success: false, txnId: nil, reason: "UI not available")
+                return
+            }
 
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let rootViewController = windowScene.windows.first?.rootViewController else {
-            print("❌ Failed to get root view controller")
-            PaymentBus.shared.notify(success: false, txnId: nil, reason: "UI not available")
-            return
+            self.ppPayment?.startCheckoutFlow(
+                merchantId: "M22VRDGEOVBYAUAT",
+                orderId: orderId,
+                token: token,
+                appSchema: "eva2zgps",
+                on: rootViewController
+            ) { [weak self] _, resultState in
+                self?.handlePaymentResult(resultState: resultState)
+            }
         }
-
-        ppPayment?.startCheckoutFlow(
-            merchantId: "M22VRDGEOVBYAUAT",
-            orderId: orderId,
-            token: token,
-            appSchema: "eva2zgps",
-            on: rootViewController
-        ) { [weak self] _, resultState in
-            self?.handlePaymentResult(resultState: resultState)
-        }
-
-        print("✅ PhonePe SDK checkout started")
     }
 
     private func handlePaymentResult(resultState: PPResultState) {

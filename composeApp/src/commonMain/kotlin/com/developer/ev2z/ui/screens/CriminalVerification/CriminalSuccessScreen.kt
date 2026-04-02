@@ -125,7 +125,6 @@ fun CriminalCheckCard(courtResult: CourtCheckResult, candidateName: String?) {
         "This individual has no criminal history on record."
     else
         "A criminal or court record has been found for this individual."
-
     ElevatedCard(
         shape     = RoundedCornerShape(20.dp),
         elevation = CardDefaults.cardElevation(6.dp)

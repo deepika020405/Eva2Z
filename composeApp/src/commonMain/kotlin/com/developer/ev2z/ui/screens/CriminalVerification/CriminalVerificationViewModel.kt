@@ -70,7 +70,7 @@ class CriminalVerificationViewModel(
     var merchantOrderId    by mutableStateOf<String?>(null)
     var paymentToken       by mutableStateOf<String?>(null)
     var errorMessage       by mutableStateOf("")
-    var amount             by mutableStateOf(1)
+    var amount             by mutableStateOf(499)
     var reportUrl          by mutableStateOf<String?>(null)
     var searchedCandidateName by mutableStateOf<String?>(null)
     var courtCheckResult   by mutableStateOf<CourtCheckResult?>(null)
@@ -323,7 +323,7 @@ class CriminalVerificationViewModel(
         reportUrl             = null
         searchedCandidateName = null
         courtCheckResult      = null   // ✅ reset
-        amount                = 1
+        amount                = 499
     }
 
     private fun parseBgvStatus(s: String) = when (s) {

@@ -37,31 +37,22 @@ fun SplashScreen(
     onNavigateToProduct: (String) -> Unit,
 ) {
     LaunchedEffect(Unit) {
-        delay(2000)
+        delay(1000)
 
         // ✅ Main thread par callback ensure karo
         withContext(Dispatchers.Main) {
             fetchReferrerIfNeeded {
                 val token = userPrefs.getToken()
-                println("🔍 SplashScreen token: '$token'")
-
                 val pendingLink = DeepLinkManager.consumePendingDeepLink()
-                println("🔍 pendingLink: '$pendingLink'")
 
                 when {
-                    token.isEmpty() -> {
-                        println("🔍 → Login")
-                        onNavigateToLogin()
-                    }
+                    token.isEmpty() -> onNavigateToLogin()
                     pendingLink?.startsWith("/shop/product/") == true -> {
                         val id = pendingLink.removePrefix("/shop/product/")
                         onNavigateToProduct(id)
                     }
                     pendingLink?.startsWith("/shop") == true -> onNavigateToShop()
-                    else -> {
-                        println("🔍 → Home")
-                        onNavigateToHome()
-                    }
+                    else -> onNavigateToHome()
                 }
             }
         }

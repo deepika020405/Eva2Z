@@ -26,7 +26,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.developer.ev2z.navigation.PlatformBackHandler
 import kotlinx.coroutines.launch
 
 // ─────────────────────────────────────────────────────────────────
@@ -60,7 +59,6 @@ fun ParkingScreen(
     viewModel: ParkingViewModel,
     onBackPressed: () -> Unit
 ) {
-
     val vehicleType         by viewModel.vehicleType.collectAsState()
     val vehicleNumber       by viewModel.vehicleNumber.collectAsState()
     val phone               by viewModel.phone.collectAsState()
@@ -74,14 +72,21 @@ fun ParkingScreen(
     val registeredPhone     by viewModel.registeredPhone.collectAsState()
     val focusManager        = LocalFocusManager.current
 
-    // ── Delete confirmation state ─────────────────────────────────
     var deleteTargetId   by remember { mutableStateOf<Int?>(null) }
     var deleteTargetName by remember { mutableStateOf("") }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope             = rememberCoroutineScope()
 
+    // No PlatformBackHandler here — HomeNavGraph registers it AFTER this
+    // composable so it wins LIFO priority over Voyager's internal handler.
 
-    // ✅ Success hone par form clear karo
+    // Clear stale state every time screen is (re)opened
+    LaunchedEffect(Unit) {
+        viewModel.resetState()
+        viewModel.loadHistory()
+    }
+
+    // Auto-clear form fields when submission succeeds
     LaunchedEffect(uiState) {
         if (uiState is ParkingUiState.Success) {
             viewModel.clearFormFields()
@@ -89,14 +94,10 @@ fun ParkingScreen(
         }
     }
 
-    PlatformBackHandler(enabled = true) { onBackPressed() }
-
-    LaunchedEffect(Unit) { viewModel.loadHistory() }
-
     Scaffold(
         containerColor = BackgroundColor,
         snackbarHost   = { SnackbarHost(snackbarHostState) },
-        topBar         = { ParkingTopBar(onBackPressed = onBackPressed) }
+        topBar = { ParkingTopBar(onBackPressed = onBackPressed) }
     ) { padding ->
         Column(
             modifier = Modifier
@@ -162,7 +163,7 @@ fun ParkingScreen(
                 }
             }
 
-            // ✅ Form sirf tab dikhao jab success nahi hai
+            // Form — hidden when submission was successful
             AnimatedVisibility(
                 visible = uiState !is ParkingUiState.Success,
                 enter   = fadeIn() + expandVertically(),
@@ -192,7 +193,7 @@ fun ParkingScreen(
                 )
             }
 
-            // ── Success / Error Banners ───────────────────────
+            // ── Success / Error Banners ───────────────────────────
             AnimatedVisibility(
                 visible = uiState !is ParkingUiState.Idle && uiState !is ParkingUiState.Loading,
                 enter   = fadeIn() + expandVertically(),
@@ -200,13 +201,10 @@ fun ParkingScreen(
             ) {
                 when (val s = uiState) {
                     is ParkingUiState.Success ->
-                        // ✅ onGoHome callback added
                         ParkingSuccessBanner(
                             response      = s.response,
-                            onParkAnother = {
-                                viewModel.clearForm()
-                            },
-                            onGoHome      = onBackPressed  // ✅ home pe jaao
+                            onParkAnother = { viewModel.clearForm() },
+                            onGoHome      = onBackPressed
                         )
                     is ParkingUiState.Error ->
                         ParkingErrorBanner(message = s.message, onDismiss = viewModel::resetState)
@@ -214,7 +212,7 @@ fun ParkingScreen(
                 }
             }
 
-            // ── Recent Parkings header ────────────────────────
+            // ── Recent Parkings header ────────────────────────────
             Row(
                 modifier              = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -324,8 +322,8 @@ private fun ParkingTopBar(onBackPressed: () -> Unit) {
                 )
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text("Vehicle SOS Registration", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                Text("Register your SOS parking Tag", fontSize = 12.sp, color = TextSecondary)
+                Text("Vehicle TAG Registration", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                Text("Register your Tag", fontSize = 12.sp, color = TextSecondary)
             }
         }
     }
@@ -465,7 +463,7 @@ private fun ParkingFormCard(
                     Spacer(Modifier.width(10.dp))
                     Text("Registering…", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 } else {
-                    Text("Register SOS Parking Slot", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text("Register", fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 }
             }
         }
@@ -570,14 +568,14 @@ private fun VehicleTypeChip(label: String, selected: Boolean, onClick: () -> Uni
 }
 
 // ─────────────────────────────────────────────────────────────────
-// Success Banner — ✅ onGoHome added + form hidden
+// Success Banner
 // ─────────────────────────────────────────────────────────────────
 
 @Composable
 private fun ParkingSuccessBanner(
     response: ParkingResponse,
     onParkAnother: () -> Unit,
-    onGoHome: () -> Unit          // ✅ NEW
+    onGoHome: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -590,7 +588,6 @@ private fun ParkingSuccessBanner(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // ── Success icon + title ──
             Box(
                 modifier = Modifier
                     .size(64.dp)
@@ -613,7 +610,6 @@ private fun ParkingSuccessBanner(
                 Text(it, fontSize = 13.sp, color = TextSecondary, textAlign = TextAlign.Center)
             }
 
-            // ── Registration details ──
             response.data?.let { data ->
                 Divider(color = GreenMid)
                 Column(
@@ -635,7 +631,6 @@ private fun ParkingSuccessBanner(
 
             Divider(color = GreenMid)
 
-            // ✅ Back to Homepage button
             Button(
                 onClick  = onGoHome,
                 modifier = Modifier.fillMaxWidth().height(50.dp),
@@ -648,7 +643,6 @@ private fun ParkingSuccessBanner(
                 Text("Back to Homepage", fontWeight = FontWeight.Bold, fontSize = 14.sp)
             }
 
-            // Register Another button
             OutlinedButton(
                 onClick  = onParkAnother,
                 shape    = RoundedCornerShape(50),
@@ -770,7 +764,6 @@ private fun ParkingHistoryRow(
                 Text(item.vehicle_number ?: "–", fontSize = 11.sp, color = TextSecondary, maxLines = 1)
             }
 
-            // ✅ FIXED — status null ho toh "Registered" + green dikhao
             val isActive     = item.status?.lowercase() == "active"
             val isNullStatus = item.status.isNullOrBlank()
 
@@ -788,15 +781,9 @@ private fun ParkingHistoryRow(
                     .background(statusBg)
                     .padding(horizontal = 8.dp, vertical = 3.dp)
             ) {
-                Text(
-                    statusLabel,
-                    fontSize   = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    color      = statusColor
-                )
+                Text(statusLabel, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = statusColor)
             }
 
-            // Delete button
             IconButton(
                 onClick  = onDelete,
                 modifier = Modifier
@@ -828,6 +815,7 @@ private fun ParkingHistoryRow(
         }
     }
 }
+
 // ─────────────────────────────────────────────────────────────────
 // Banner Row helper
 // ─────────────────────────────────────────────────────────────────

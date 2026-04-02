@@ -38,8 +38,9 @@ class MainActivity : ComponentActivity() {
             // ✅ Step 1: Storage init karo
             initStorageManager(this)
 
-            // ✅ Step 2: DeepLinkManager init karo
-            DeepLinkManager.init(createStorageManager())
+            // ✅ Step 2: DeepLinkManager init — reuse same storage instance
+            val storage = createStorageManager()
+            DeepLinkManager.init(storage)
 
             // ✅ Step 3: Context set karo
             AppContextHolder.context = applicationContext

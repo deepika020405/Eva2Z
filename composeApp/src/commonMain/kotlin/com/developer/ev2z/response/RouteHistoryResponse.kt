@@ -22,11 +22,13 @@ data class RouteHistoryResponse(
 data class RoutePoint(
     @SerialName("latitude") val latitude: String,
     @SerialName("longitude") val longitude: String,
+    @SerialName("speed") val speed: String? = null,
     @SerialName("created_at") val createdAt: String,
     @SerialName("movement") val movement: String
 ) {
     fun getLatDouble(): Double? = latitude.toDoubleOrNull()
     fun getLngDouble(): Double? = longitude.toDoubleOrNull()
+    fun getSpeedInt(): Int = speed?.toDoubleOrNull()?.toInt() ?: 0
 
     fun isValid(): Boolean {
         val lat = getLatDouble() ?: return false

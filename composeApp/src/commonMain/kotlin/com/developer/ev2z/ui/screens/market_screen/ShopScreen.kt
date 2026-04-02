@@ -724,8 +724,6 @@ fun ShopScreenHost(category: String? = null) {
     val viewModel = ShopViewModelProvider.viewModel
     val state by viewModel.state.collectAsState()
     val navigator = LocalNavigator.current
-    val deepLinkDestination by DeepLinkBus.navigateTo.collectAsState()
-
     val filteredProducts = state.products.filter { dto ->
         when (category) {
             "wired"    -> dto.device_type?.lowercase() == "wired"
@@ -741,32 +739,34 @@ fun ShopScreenHost(category: String? = null) {
         viewModel.loadData()
     }
 
-    // Deep link handling
-    LaunchedEffect(deepLinkDestination, state.products) {
-        val dest = deepLinkDestination ?: return@LaunchedEffect
-        if (!dest.startsWith("open_product_") && !dest.startsWith("product_detail_")) return@LaunchedEffect
-        val pid = when {
-            dest.startsWith("open_product_")   -> dest.removePrefix("open_product_").substringBefore("_").toIntOrNull()
-            dest.startsWith("product_detail_") -> dest.removePrefix("product_detail_").substringBefore("_").toIntOrNull()
-            else -> null
-        } ?: return@LaunchedEffect
-        if (state.products.isEmpty()) { viewModel.loadData(); return@LaunchedEffect }
-        val dto = state.products.firstOrNull { it.id == pid } ?: return@LaunchedEffect
-        val product = ShopProduct(
-            id = dto.id, title = dto.name ?: "", subtitle = dto.device_type ?: "",
-            price = dto.sale_price?.toDoubleOrNull() ?: 0.0,
-            rechargePrice = dto.recharge_price?.toDoubleOrNull() ?: 0.0,
-            promoAmount = dto.promo_amt?.toDoubleOrNull() ?: 0.0,
-            promoCode = dto.promo_code ?: "", imageUrl = dto.image ?: "",
-            description = dto.description ?: "",
-            features = listOfNotNull(dto.features1, dto.features2, dto.features3,
-                dto.features4, dto.features5, dto.features6, dto.features7),
-            deviceType = dto.device_type ?: "", rating = getRating(dto.id),
-            ratingCount = getRatingCount(dto.id), isFavorite = viewModel.isFavorite(dto.id)
-        )
-        DeepLinkBus.clear()
-        navigator?.push(ProductDetailsScreen(product = product,
-            onToggleFavorite = { p -> viewModel.toggleWishlist(p.id) }))
+    // Deep link handling via SharedFlow collection
+    LaunchedEffect(Unit) {
+        DeepLinkBus.navigateTo.collect { dest ->
+            if (!dest.startsWith("open_product_") && !dest.startsWith("product_detail_")) return@collect
+            val pid = when {
+                dest.startsWith("open_product_")   -> dest.removePrefix("open_product_").substringBefore("_").toIntOrNull()
+                dest.startsWith("product_detail_") -> dest.removePrefix("product_detail_").substringBefore("_").toIntOrNull()
+                else -> null
+            } ?: return@collect
+            val currentProducts = viewModel.state.value.products
+            if (currentProducts.isEmpty()) { viewModel.loadData(); return@collect }
+            val dto = currentProducts.firstOrNull { it.id == pid } ?: return@collect
+            val product = ShopProduct(
+                id = dto.id, title = dto.name ?: "", subtitle = dto.device_type ?: "",
+                price = dto.sale_price?.toDoubleOrNull() ?: 0.0,
+                rechargePrice = dto.recharge_price?.toDoubleOrNull() ?: 0.0,
+                promoAmount = dto.promo_amt?.toDoubleOrNull() ?: 0.0,
+                promoCode = dto.promo_code ?: "", imageUrl = dto.image ?: "",
+                description = dto.description ?: "",
+                features = listOfNotNull(dto.features1, dto.features2, dto.features3,
+                    dto.features4, dto.features5, dto.features6, dto.features7),
+                deviceType = dto.device_type ?: "", rating = getRating(dto.id),
+                ratingCount = getRatingCount(dto.id), isFavorite = viewModel.isFavorite(dto.id)
+            )
+            DeepLinkBus.clear()
+            navigator?.push(ProductDetailsScreen(product = product,
+                onToggleFavorite = { p -> viewModel.toggleWishlist(p.id) }))
+        }
     }
 
     if (state.loading) {

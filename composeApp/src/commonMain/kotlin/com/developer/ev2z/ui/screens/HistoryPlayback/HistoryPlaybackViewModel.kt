@@ -73,6 +73,9 @@ class HistoryPlaybackViewModel(
     private val _showDeviceDropdown = MutableStateFlow(false)
     val showDeviceDropdown: StateFlow<Boolean> = _showDeviceDropdown.asStateFlow()
 
+    private val _currentSpeed = MutableStateFlow(0)
+    val currentSpeed: StateFlow<Int> = _currentSpeed.asStateFlow()
+
     private val _showNoDataDialog = MutableStateFlow(false)
     val showNoDataDialog: StateFlow<Boolean> = _showNoDataDialog.asStateFlow()
 
@@ -218,6 +221,7 @@ class HistoryPlaybackViewModel(
         _routePoints.value = emptyList()
         _totalDistance.value = 0.0
         _averageSpeed.value = 0.0
+        _currentSpeed.value = 0
     }
 
     private fun haversineDistance(
@@ -246,6 +250,7 @@ class HistoryPlaybackViewModel(
             while (_isPlaying.value && _currentPlaybackIndex.value < _routePoints.value.size - 1) {
                 delay(500)
                 _currentPlaybackIndex.value += 1
+                _currentSpeed.value = _routePoints.value.getOrNull(_currentPlaybackIndex.value)?.getSpeedInt() ?: 0
             }
             _isPlaying.value = false
         }

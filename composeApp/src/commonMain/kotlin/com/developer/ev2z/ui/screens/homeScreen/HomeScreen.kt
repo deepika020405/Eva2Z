@@ -82,7 +82,6 @@ fun HomeScreen(
     onSosTag: () -> Unit,              // ✅ NEW — SOS Tag
     onOpenCommunity: () -> Unit
 
-
 ) {
     Scaffold(containerColor = BackgroundColor) { padding ->
 
@@ -112,7 +111,6 @@ fun HomeScreen(
                     onOpenCommunity = onOpenCommunity,
                     onParking     = onParking,         // ✅ CHANGED — pass through
                     onSosTag      = onSosTag    // ✅ NEW — pass karo
-
                 )
             }
 
@@ -270,7 +268,6 @@ fun HomeQuickActionsSection(
     onParking: () -> Unit,            // ✅ CHANGED — new param
     onSosTag: () -> Unit              // ✅ NEW — SOS Tag param
 
-
 ) {
 
     val features = listOf(
@@ -281,7 +278,7 @@ fun HomeQuickActionsSection(
         QuickActionItem("Document Vault", Icons.Default.Folder, onOpenDocuments),
         QuickActionItem("Device Report", Icons.Default.Assessment, onOpenDeviceReport),
         QuickActionItem("Add Device", Icons.Default.Add, onOpenAddDevice) ,
-        QuickActionItem("SOS Registration",Icons.Default.LocalParking,   onParking),  // ✅ CHANGED
+        QuickActionItem("TAG Registration",Icons.Default.LocalParking,   onParking),  // ✅ CHANGED
         QuickActionItem("SOS Parking Alert",Icons.Default.Warning,onSosTag),  // ✅ WIRED
         QuickActionItem(
             "Criminal Verification",
@@ -294,7 +291,6 @@ fun HomeQuickActionsSection(
             Icons.Default.Groups,
             onOpenCommunity   // ✅ connect
         )
-
        )
 
     val columns = 3
@@ -349,6 +345,7 @@ fun ModernFeaturesSection(
         QuickActionItem("Service Market", Icons.Default.Build) {},
         QuickActionItem("Repair Market", Icons.Default.DirectionsCar) {},
         QuickActionItem("Charging", Icons.Default.EvStation) {},
+        QuickActionItem("Installation Support", Icons.Default.Build) {},
 //        QuickActionItem("Parking",Icons.Default.LocalParking,   onParking),  // ✅ CHANGED
 //        QuickActionItem("SOS Parking Tag",Icons.Default.Warning,onSosTag),  // ✅ WIRED
         QuickActionItem("Background Verification", Icons.Default.Badge) {}

@@ -462,11 +462,7 @@ class ApiService {
 
     suspend fun createCandidateWithPackage(form: CriminalForm): CandidateResult {
         val token = AppTokenProvider.getToken()
-        println("🔑 TOKEN CHECK = '$token'")  // ← add karo
-        println("🔑 TOKEN LENGTH = ${token.length}")
-
         if (token.isBlank()) {
-            println("❌ TOKEN IS EMPTY — AppTokenProvider not initialized!")
             return CandidateResult(error = "Session expired. Please login again.")
         }
         val url = "${baseUrl}candidate"
@@ -1859,8 +1855,6 @@ class ApiService {
         println("➡️ lat=$latitude")
         println("➡️ lng=$longitude")
         println("➡️ radius=$radius")
-        println("➡️ token=$token")
-
         return client.submitForm(
             url = url,
             formParameters = Parameters.build {

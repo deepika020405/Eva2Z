@@ -45,8 +45,8 @@ import platform.Foundation.NSURL
 import platform.UIKit.UIApplication
 
 actual fun openCall(phoneNumber: String) {
-    val url = NSURL(string = "tel://$phoneNumber")
-    UIApplication.sharedApplication.openURL(url!!)
+    val url = NSURL(string = "tel://$phoneNumber") ?: return
+    UIApplication.sharedApplication.openURL(url)
 }
 
 actual fun openWhatsApp(phoneNumber: String, message: String) {
@@ -55,6 +55,6 @@ actual fun openWhatsApp(phoneNumber: String, message: String) {
 
     val url = NSURL(
         string = "https://wa.me/$phoneNumber?text=$encodedMessage"
-    )
-    UIApplication.sharedApplication.openURL(url!!)
+    ) ?: return
+    UIApplication.sharedApplication.openURL(url)
 }

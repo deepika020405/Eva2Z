@@ -4,8 +4,6 @@ import PhonePePayment
 import FirebaseCore
 import FirebaseMessaging
 import UserNotifications
-import FBSDKCoreKit
-import AppTrackingTransparency  // ✅ ADD THIS
 
 class AppDelegate: NSObject,
                    UIApplicationDelegate,
@@ -17,16 +15,9 @@ class AppDelegate: NSObject,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil
     ) -> Bool {
 
-        // ✅ Firebase
+        // ✅ Firebase (Messaging only — no Analytics/tracking)
         FirebaseApp.configure()
-        print("✅ Firebase initialized")
-
-        // ✅ Meta / Facebook SDK
-        ApplicationDelegate.shared.application(
-            application,
-            didFinishLaunchingWithOptions: launchOptions
-        )
-        print("✅ Facebook SDK initialized")
+        print("✅ Firebase initialized (Messaging only)")
 
         // ✅ Notifications
         UNUserNotificationCenter.current().delegate = self
@@ -42,27 +33,6 @@ class AppDelegate: NSObject,
         Messaging.messaging().delegate = self
 
         return true
-    }
-
-    // ✅ ATT REQUEST — applicationDidBecomeActive mein karo
-    // (Apple requirement: request after app is fully visible)
-    func applicationDidBecomeActive(_ application: UIApplication) {
-        if #available(iOS 14, *) {
-            ATTrackingManager.requestTrackingAuthorization { status in
-                switch status {
-                case .authorized:
-                    print("✅ ATT: Tracking authorized")
-                case .denied:
-                    print("❌ ATT: Tracking denied")
-                case .restricted:
-                    print("⚠️ ATT: Tracking restricted")
-                case .notDetermined:
-                    print("⏳ ATT: Not determined")
-                @unknown default:
-                    break
-                }
-            }
-        }
     }
 
     // 🔥 FCM TOKEN
@@ -85,21 +55,12 @@ class AppDelegate: NSObject,
         completionHandler()
     }
 
-    // 🔗 Deep link (Facebook + PhonePe + CMP)
+    // 🔗 Deep link (PhonePe + CMP)
     func application(
         _ app: UIApplication,
         open url: URL,
         options: [UIApplication.OpenURLOptionsKey : Any] = [:]
     ) -> Bool {
-
-        // ✅ Facebook deep link
-        if ApplicationDelegate.shared.application(
-            app,
-            open: url,
-            options: options
-        ) {
-            return true
-        }
 
         // ✅ PhonePe
         if PPPayment.checkDeeplink(url) {

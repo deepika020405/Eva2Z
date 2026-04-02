@@ -21,9 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.Navigator
-import cafe.adriel.voyager.navigator.currentOrThrow
 import cafe.adriel.voyager.navigator.tab.*
 import com.developer.ev2z.LocalPlatformActivity
 import com.developer.ev2z.data.local.StorageManager
@@ -50,15 +48,11 @@ import com.developer.ev2z.ui.screens.AddDevice.AddDeviceViewModel
 import com.developer.ev2z.ui.screens.BillDetails.BillDetailsScreen
 import com.developer.ev2z.ui.screens.BillDetails.BillDetailsViewModel
 import com.developer.ev2z.ui.screens.ChangePassword.ChangePasswordScreen
-import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanScreen
 import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanScreenHost
 //import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanRoute
 //import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanScreen
-import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanViewModel
-import com.developer.ev2z.ui.screens.ChangePlan.DevicePlanUi
 import com.developer.ev2z.ui.screens.CriminalVerification.CriminalVerificationFlow
 //import com.developer.ev2z.ui.screens.CriminalVerification.CriminalVerificationScreen
-import com.developer.ev2z.ui.screens.CriminalVerification.CriminalVerificationViewModel
 import com.developer.ev2z.ui.screens.DriverScore.DriverScoreFlowScreen
 import com.developer.ev2z.ui.screens.GPSData.GPSDataScreen
 import com.developer.ev2z.ui.screens.MyAccount.MyAccountScreen
@@ -67,10 +61,7 @@ import com.developer.ev2z.ui.screens.Profile.AboutAppScreen
 import com.developer.ev2z.ui.screens.Profile.ProfileViewModel
 import com.developer.ev2z.ui.screens.Profile.VaultPasswordDialog
 import com.developer.ev2z.ui.screens.ReferAndEarn.ReferAndEarnScreen
-import com.developer.ev2z.ui.screens.SupportAndWarrenty.SupportWarrantyScreen
-import com.developer.ev2z.ui.screens.SupportAndWarrenty.SupportWarrantyUi
 import com.developer.ev2z.ui.screens.SupportAndWarrenty.WarrantyRoute
-import com.developer.ev2z.ui.screens.SupportAndWarrenty.WarrantyStatus
 import com.developer.ev2z.ui.screens.VechicleParkingTag.ParkingScreen
 import com.developer.ev2z.ui.screens.VechicleParkingTag.ParkingViewModel
 import com.developer.ev2z.ui.screens.community.CommunityScreenRoot
@@ -82,7 +73,6 @@ import com.developer.ev2z.ui.screens.documents.DocumentsScreen
 import com.developer.ev2z.ui.screens.documents.UploadDocumentScreen
 import com.developer.ev2z.ui.screens.homeScreen.HomeUiState
 import com.developer.ev2z.ui.screens.homeScreen.LiveLocationScreen
-import com.developer.ev2z.ui.screens.social_media.openUrl
 import com.developer.ev2z.util.BottomBarController
 import com.developer.ev2z.util.DeepLinkBus
 import com.developer.ev2z.util.platformDownloadFile
@@ -98,7 +88,6 @@ import com.developer.ev2z.ui.screens.SOSParkingTag.SosTagAlertScreen
 import com.developer.ev2z.ui.screens.SOSParkingTag.SosTagViewModel
 import com.developer.ev2z.ui.screens.market_screen.ShopProduct
 import com.developer.ev2z.util.SosNotificationHandler
-import kotlinx.coroutines.flow.collectLatest
 
 
 // ------------------ TABS -------------------
@@ -197,7 +186,6 @@ class HomeTab(
                 onOpenCommunity = onOpenCommunity,
 
                 onCriminalVerification = onNavigateToCriminalVerification // ✅ NEW
-
             )
         }
     }
@@ -384,52 +372,41 @@ fun HomeNavGraph(
     val pagerState = rememberPagerState(pageCount = { 4 })
     val coroutineScope = rememberCoroutineScope()
 
-    val deepLinkDestination by DeepLinkBus.navigateTo.collectAsState()
     var shopCategory by remember { mutableStateOf<String?>(null) }
     var pendingProductId by remember { mutableStateOf<Int?>(null) }
 
-    LaunchedEffect(deepLinkDestination) {
-        val dest = deepLinkDestination ?: return@LaunchedEffect
-
-        when {
-            dest.startsWith("product_detail_10") -> {
-                pendingProductId = 10
-                shopCategory = null
-                coroutineScope.launch { pagerState.animateScrollToPage(2) }
-                DeepLinkBus.clear()
+    LaunchedEffect(Unit) {
+        DeepLinkBus.navigateTo.collect { dest ->
+            when {
+                dest.startsWith("product_detail_10") -> {
+                    pendingProductId = 10
+                    shopCategory = null
+                    pagerState.animateScrollToPage(2)
+                }
+                dest.startsWith("product_detail_11") -> {
+                    pendingProductId = 11
+                    shopCategory = null
+                    pagerState.animateScrollToPage(2)
+                }
+                dest.startsWith("product_detail_26") -> {
+                    pendingProductId = 26
+                    shopCategory = null
+                    pagerState.animateScrollToPage(2)
+                }
+                dest.startsWith("shop_wired") -> {
+                    shopCategory = "wired"
+                    pagerState.animateScrollToPage(2)
+                }
+                dest.startsWith("shop_wireless") -> {
+                    shopCategory = "wireless"
+                    pagerState.animateScrollToPage(2)
+                }
+                dest.startsWith("shop") -> {
+                    shopCategory = null
+                    pagerState.animateScrollToPage(2)
+                }
             }
-
-            dest.startsWith("product_detail_11") -> {
-                pendingProductId = 11
-                shopCategory = null
-                coroutineScope.launch { pagerState.animateScrollToPage(2) }
-                DeepLinkBus.clear()
-            }
-
-            dest.startsWith("product_detail_26") -> {
-                pendingProductId = 26
-                shopCategory = null
-                coroutineScope.launch { pagerState.animateScrollToPage(2) }
-                DeepLinkBus.clear()
-            }
-
-            dest.startsWith("shop_wired") -> {
-                shopCategory = "wired"
-                coroutineScope.launch { pagerState.animateScrollToPage(2) }
-                DeepLinkBus.clear()
-            }
-
-            dest.startsWith("shop_wireless") -> {
-                shopCategory = "wireless"
-                coroutineScope.launch { pagerState.animateScrollToPage(2) }
-                DeepLinkBus.clear()
-            }
-
-            dest.startsWith("shop") -> {
-                shopCategory = null
-                coroutineScope.launch { pagerState.animateScrollToPage(2) }
-                DeepLinkBus.clear()
-            }
+            DeepLinkBus.clear()
         }
     }
 
@@ -598,9 +575,10 @@ fun HomeNavGraph(
     }
 
 
-    // ✅ Central handler — ONLY active when no overlay screen is open
-    // Each overlay screen has its own PlatformBackHandler that takes priority
-    val isAnyOverlayOpen = showSosConfirmation || showSosQuickReply || showSosTagAlert ||
+    // isAnyOverlayOpen — memoized to avoid recomputation on every recomposition
+    val isAnyOverlayOpen by remember {
+        derivedStateOf {
+            showSosConfirmation || showSosQuickReply || showSosTagAlert ||
             showCreatePost || showCreateStory || showStoryViewer || showCommunity ||
             showDocumentViewer || showUploadDocument || showDocuments ||
             showWarranty || showBillDetails || showChangePlan || showMyAccount ||
@@ -610,12 +588,6 @@ fun HomeNavGraph(
             showAboutApp || showPrivacyPolicy || showTermsConditions ||
             showRefundPolicy || showShippingPolicy || showCriminalVerification ||
             showDriverScore || showParking || showEditProfile
-
-    PlatformBackHandler(enabled = !isAnyOverlayOpen) {
-        // ── Root tabs — no overlay is open ──
-        when (pagerState.currentPage) {
-            0 -> showExitDialog = true
-            1, 2, 3 -> coroutineScope.launch { pagerState.animateScrollToPage(0) }
         }
     }
 
@@ -901,7 +873,6 @@ fun HomeNavGraph(
         )
     }
 
-
     // ✅ Screen 1 — dono cases handle
     if (showSosTagAlert) {
         SosTagAlertScreen(
@@ -1143,6 +1114,51 @@ fun HomeNavGraph(
                 }
             }
         )
+    }
+
+    // ── Overlay back handlers — one per screen so system back works instantly ──
+    PlatformBackHandler(enabled = showEditProfile)       { showEditProfile = false; profileRefresh++ }
+    PlatformBackHandler(enabled = showManageDevice)      { showManageDevice = false }
+    PlatformBackHandler(enabled = showGPSData)           { showGPSData = false }
+    PlatformBackHandler(enabled = showEditDeviceName)    { showEditDeviceName = false }
+    PlatformBackHandler(enabled = showGeoFencing)        { showGeoFencing = false }
+    PlatformBackHandler(enabled = showHistoryPlayback)   { showHistoryPlayback = false }
+    PlatformBackHandler(enabled = showGeneralSettings)   { showGeneralSettings = false }
+    PlatformBackHandler(enabled = showAccountActivity)   { showAccountActivity = false }
+    PlatformBackHandler(enabled = showReferAndEarn)      { showReferAndEarn = false }
+    PlatformBackHandler(enabled = showAboutApp)          { showAboutApp = false }
+    PlatformBackHandler(enabled = showChangePassword)    { showChangePassword = false }
+    PlatformBackHandler(enabled = showPrivacyPolicy)     { showPrivacyPolicy = false }
+    PlatformBackHandler(enabled = showTermsConditions)   { showTermsConditions = false }
+    PlatformBackHandler(enabled = showRefundPolicy)      { showRefundPolicy = false }
+    PlatformBackHandler(enabled = showShippingPolicy)    { showShippingPolicy = false }
+    PlatformBackHandler(enabled = showCriminalVerification) { showCriminalVerification = false }
+    PlatformBackHandler(enabled = showDriverScore)       { showDriverScore = false }
+    PlatformBackHandler(enabled = showParking)           { showParking = false }
+    PlatformBackHandler(enabled = showMyAccount)         { showMyAccount = false }
+    PlatformBackHandler(enabled = showChangePlan)        { showChangePlan = false; showMyAccount = true }
+    PlatformBackHandler(enabled = showBillDetails)       { showBillDetails = false; showMyAccount = true }
+    PlatformBackHandler(enabled = showWarranty)          { showWarranty = false; showMyAccount = true }
+    PlatformBackHandler(enabled = showDocuments)         { showDocuments = false }
+    PlatformBackHandler(enabled = showUploadDocument)    { showUploadDocument = false; showDocuments = true }
+    PlatformBackHandler(enabled = showDocumentViewer)    { showDocumentViewer = false; showDocuments = true }
+    PlatformBackHandler(enabled = showAddDevice)         { showAddDevice = false }
+    PlatformBackHandler(enabled = showVaultPasswordDialog) { showVaultPasswordDialog = false }
+    PlatformBackHandler(enabled = showSosTagAlert)       { showSosTagAlert = false; sosTagViewModel.resetAll() }
+    PlatformBackHandler(enabled = showSosQuickReply)     { showSosQuickReply = false; showSosTagAlert = true }
+    PlatformBackHandler(enabled = showSosConfirmation)   { showSosConfirmation = false; currentSosAlertId = null; sosTagViewModel.resetAll() }
+    PlatformBackHandler(enabled = showStoryViewer)       { showStoryViewer = false }
+    PlatformBackHandler(enabled = showCreateStory)       { showCreateStory = false }
+    PlatformBackHandler(enabled = showCreatePost)        { showCreatePost = false }
+    PlatformBackHandler(enabled = showCommunity)         { showCommunity = false }
+
+    // ── Root back handler — composed LAST so it has highest LIFO priority.
+    // Disabled when any overlay is open (overlay-specific handlers above take over).
+    PlatformBackHandler(enabled = !isAnyOverlayOpen) {
+        when (pagerState.currentPage) {
+            0 -> showExitDialog = true
+            1, 2, 3 -> coroutineScope.launch { pagerState.animateScrollToPage(0) }
+        }
     }
 }
 

@@ -56,6 +56,7 @@ fun HistoryPlaybackScreen(
     val averageSpeed by viewModel.averageSpeed.collectAsState()
     val showDeviceDropdown by viewModel.showDeviceDropdown.collectAsState()
     val showNoDataDialog by viewModel.showNoDataDialog.collectAsState()
+    val currentSpeed by viewModel.currentSpeed.collectAsState()
 
     var showDatePicker by remember { mutableStateOf(false) }
 
@@ -133,6 +134,7 @@ fun HistoryPlaybackScreen(
             endDate = endDate,
             totalDistance = totalDistance,
             averageSpeed = averageSpeed,
+            currentSpeed = currentSpeed,
             isPlaying = isPlaying,
             onPreviousDate = { viewModel.navigateToPreviousDate() },
             onNextDate = { viewModel.navigateToNextDate() },
@@ -408,6 +410,7 @@ fun BoxScope.HistoryPlaybackBottomSheet(
     endDate: String,
     totalDistance: Double,
     averageSpeed: Double,
+    currentSpeed: Int = 0,
     isPlaying: Boolean,
     onPreviousDate: () -> Unit,
     onNextDate: () -> Unit,
@@ -528,13 +531,35 @@ fun BoxScope.HistoryPlaybackBottomSheet(
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Average Speed", fontSize = 11.sp, color = Color.Gray)
+                        Text("Avg Speed", fontSize = 11.sp, color = Color.Gray)
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = if (hasData) "${averageSpeed.toInt()} km" else "0 km",
+                            text = if (hasData) "${averageSpeed.toInt()} km/h" else "0 km/h",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.Black
+                        )
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(72.dp)
+                        .background(
+                            if (isPlaying && currentSpeed > 0) Color(0xFFFFF3E0) else Color(0xFFF3F6F1),
+                            RoundedCornerShape(14.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Speed", fontSize = 11.sp, color = Color.Gray)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (isPlaying) "$currentSpeed km/h" else "0 km/h",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isPlaying && currentSpeed > 0) Color(0xFFE65100) else Color.Black
                         )
                     }
                 }

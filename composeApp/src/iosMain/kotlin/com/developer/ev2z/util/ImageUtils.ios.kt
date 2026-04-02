@@ -22,7 +22,7 @@ actual fun fixAndCompressImage(
         compression -= 0.05
     } while (
         outputData != null &&
-        outputData!!.length.toInt() / 1024 > maxSizeKB &&
+        (outputData?.length?.toInt() ?: 0) / 1024 > maxSizeKB &&
         compression > 0.4
     )
 
@@ -45,7 +45,7 @@ actual fun compressStoryImage(
         compression -= 0.05
     } while (
         outputData != null &&
-        outputData!!.length.toInt() / 1024 > maxSizeKB &&
+        (outputData?.length?.toInt() ?: 0) / 1024 > maxSizeKB &&
         compression > 0.45
     )
 

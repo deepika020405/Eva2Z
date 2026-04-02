@@ -107,10 +107,7 @@ fun App() {
     val addDeviceResult by addDeviceViewModel.addDeviceResult.collectAsState()
     var forgetPasswordPhone by remember { mutableStateOf("") }
 
-    LaunchedEffect(Unit) {
-        println("🚀 App: Starting initial load")
-
-    }
+    LaunchedEffect(Unit) { }
 
     // Login success handler
 //    LaunchedEffect(loginSuccess) {
@@ -124,7 +121,7 @@ fun App() {
 
     LaunchedEffect(loginSuccess) {
         if (loginSuccess) {
-            delay(300) // Storage complete hone ka wait
+            delay(100)
 
             val token = userPrefs.getToken() ?: ""
             val name = userPrefs.getName() ?: "User"
@@ -134,14 +131,8 @@ fun App() {
                 username = name
                 isLoggedIn = true
                 AppTokenProvider.getToken = { token }
-
-                println("✅ Login state updated - Token: $authToken, Username: $username")
-
-                // ✅ Now reset after state is updated
                 authViewModel.resetLoginSuccess()
             }
-
-
         }
     }
 
@@ -150,26 +141,14 @@ fun App() {
    ---------------------------------------- */
     LaunchedEffect(isLoggedIn, authToken) {
         if (isLoggedIn && authToken.isNotEmpty()) {
-
-            println("🔔 Registering FCM Bridge (user logged in)")
-
             FcmBridge.register { fcmToken ->
-
                 val lastSent = userPrefs.getLastFcmToken()
-
-                if (lastSent == fcmToken) {
-                    println("🟡 FCM token unchanged, skipping server call")
-                    return@register
-                }
-
-                println("📤 Sending NEW FCM token to server: $fcmToken")
+                if (lastSent == fcmToken) return@register
 
                 FcmRegistrar.registerFcmToServer(
                     authTokenNullable = "Bearer $authToken",
                     fcmToken = fcmToken
                 )
-
-                // ✅ persist after sending
                 userPrefs.saveLastFcmToken(fcmToken)
             }
         }
@@ -180,7 +159,6 @@ fun App() {
     LaunchedEffect(addDeviceResult) {
         when (val result = addDeviceResult) {
             is AddDeviceResult.Success -> {
-                println("✅ Device added successfully, showing success screen")
                 successDeviceName = result.deviceName
                 successDeviceId = result.deviceId
                 successSimNumber = result.simNumber
@@ -188,9 +166,8 @@ fun App() {
                 showAddDevice = false
                 showAddDeviceSuccess = true
             }
-            is AddDeviceResult.Error -> {
-                println("❌ Device add error: ${result.message}")
-            }
+            is AddDeviceResult.Error -> { }
+
             null -> { /* No result */ }
         }
     }
@@ -237,12 +214,10 @@ fun App() {
 
             // UPDATE showChangePassword rendering
             showChangePassword -> {
-                println("📱 Rendering: Change Password Screen")
                 ChangePasswordScreen(
                     apiService = apiService,
                     storageManager = storage,
                     onBackPressed = {
-                        println("🔙 Back from Change Password")
                         showChangePassword = false
                     }
                 )
@@ -250,17 +225,14 @@ fun App() {
 
             // Forget Password Flow
             showForgetPassword -> {
-                println("📱 Rendering: Forget Password Flow")
                 ForgetPasswordFlow(
                     authViewModel = authViewModel,
                     preFilledPhone = forgetPasswordPhone,
                     onBack = {
-                        println("🔙 Back to Auth from Forget Password")
                         showForgetPassword = false
                         forgetPasswordPhone = ""
                     },
                     onSuccess = {
-                        println("✅ Password reset successful")
                         showForgetPassword = false
                         forgetPasswordPhone = ""
                     }
@@ -269,30 +241,26 @@ fun App() {
 
             // Registration Flow
             showRegistration -> {
-                println("📱 Rendering: Registration Flow")
                 RegistrationFlow(
                     authViewModel = authViewModel,
                     name = registrationName,
                     phone = registrationPhone,
                     email = registrationEmail,
                     onBack = {
-                        println("🔙 Back to Auth from Registration")
                         showRegistration = false
                     },
                     onSuccess = {
-                        println("✅ Registration successful")
                         showRegistration = false
                     }
                 )
             }
 
             showAddDeviceSuccess -> {
-                println("📱 Rendering: Success Screen")
                 AddDeviceSuccessScreen(
                     onNavigate = { route ->
                         when (route) {
                             "home" -> {
-                                println("🏠 Navigating back to home from success")
+
                                 showAddDeviceSuccess = false
                                 addDeviceViewModel.clearData()
                                 homeViewModel.loadDevices(authToken)
@@ -307,17 +275,16 @@ fun App() {
             }
 
             showAddDevice -> {
-                println("📱 Rendering: Add Device Screen")
                 BottomSheet(
                     onNavigate = { route ->
                         when (route) {
                             "home" -> {
-                                println("🏠 Navigating back to home from add device")
+
                                 showAddDevice = false
                                 addDeviceViewModel.clearData()
                             }
                             "addDeviceDeteails" -> {
-                                println("📝 Staying on add device details")
+
                             }
                         }
                     },
@@ -326,7 +293,6 @@ fun App() {
             }
 
             showDeviceReport -> {
-                println("📱 Rendering: Device Report Screen")
                 DeviceReportScreen(
                     viewModel = deviceReportViewModel,
                     token = authToken,
@@ -342,7 +308,7 @@ fun App() {
                         showDeviceStatus = true
                     },
                     onBack = {
-                        println("🔙 Back from Device Report to Home")
+
                         showDeviceReport = false
                     }
                 )
@@ -350,7 +316,6 @@ fun App() {
 
 
             showDeviceStatus -> {
-                println("📱 Rendering: Device Status Screen")
                 DeviceStatusScreen(
                     onBack = {
                         showDeviceStatus = false
@@ -362,7 +327,6 @@ fun App() {
                 )
             }
              showTrackTrace -> {
-                println("📱 Rendering: Track Trace Screen")
                 TrackTraceScreen  (
                     onBack = {
                         showTrackTrace = false
@@ -377,7 +341,6 @@ fun App() {
 
 
             isLoggedIn && authToken.isNotEmpty() -> {
-                println("📱 Rendering: Home Screen")
                 HomeNavGraph(
                     viewModel = homeViewModel,
                     apiService = apiService,
@@ -385,15 +348,12 @@ fun App() {
                     userPrefs = userPrefs,        // ✅ add karo
                     token = authToken,
                     onNavigateToAddDevice = {
-                        println("➕ Navigate to Add Device triggered")
                         showAddDevice = true
                     },
                     onNavigateToDeviceReport = {
-                        println("➕ Navigate to Device Report triggered")
                         showDeviceReport = true
                     },
                     onNavigateToChangePassword = {
-                        println("🔑 Navigate to Change Password triggered")
                         showChangePassword = true
                     },
                     onOpenDeviceStatus = {
@@ -406,47 +366,30 @@ fun App() {
                     },
 
                     onLogout = {
-                        println("🚪 Logging out...")
-
-                        // ✅ Clear all user data
                         userPrefs.clear()
                         storage.clear()
-
-                        // ✅ Reset all states
                         isLoggedIn = false
                         authToken = ""
                         username = ""
-
-                        // ✅ Reset ViewModel states
                         authViewModel.resetLoginSuccess()
                         authViewModel.clearError()
-
-                        // ✅ Clear AppTokenProvider
                         AppTokenProvider.getToken = { "" }
-
-                        println("✅ Logout complete - redirecting to login")
                         FcmBridge.clear()
                     }
                 )
             }
 
             else -> {
-                println("📱 Rendering: Auth Screen")
                 AuthPagerScreen(
                     viewModel = authViewModel,
                     onLoginSuccess = {
-                        println("🎉 onLoginSuccess triggered")
-//                            authViewModel.resetLoginSuccess()
-//                            authViewModel.clearError()
                         authViewModel.setLoginSuccess(true)
                     },
                     onForgetPasswordClick = { phone ->
-                        println("🔑 Forget Password clicked with phone: $phone")
                         forgetPasswordPhone = phone
                         showForgetPassword = true
                     },
                     onSignupOTPClick = { name, phone, email ->
-                        println("📧 Signup OTP clicked: $name, $phone, $email")
                         registrationName = name
                         registrationPhone = phone
                         registrationEmail = email

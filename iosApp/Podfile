@@ -4,16 +4,12 @@ platform :ios, '14.0'
 target 'iosApp' do
   use_frameworks!
 
-  # ✅ Firebase
-  pod 'Firebase/Analytics'
+  # ✅ Firebase (Messaging only — no Analytics/tracking)
   pod 'Firebase/Core'
   pod 'Firebase/Messaging'
 
   # ✅ PhonePe Payment SDK
   pod 'PhonePePayment'
-
-  # Meta
-  pod 'FBSDKCoreKit'
 end
 
 post_install do |installer|

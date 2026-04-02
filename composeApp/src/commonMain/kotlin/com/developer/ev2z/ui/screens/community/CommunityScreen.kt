@@ -44,6 +44,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -67,7 +68,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.navigator.Navigator
 import coil3.compose.AsyncImage
-import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.response.Comment
 import com.developer.ev2z.response.Post
 import com.developer.ev2z.response.Story
@@ -1089,9 +1089,12 @@ fun CommunityScreenRoot(
 
     var openCommentsPostId by remember { mutableStateOf<Int?>(null) }
 
-    PlatformBackHandler(enabled = true) {
-        onBack()
+    DisposableEffect(Unit) {
+        onDispose { viewModel.cancelActiveJobs() }
     }
+
+    // No PlatformBackHandler here — HomeNavGraph registers it at the end
+    // for correct LIFO priority. cancelActiveJobs() fires via DisposableEffect above.
 
     LaunchedEffect(Unit) {
         if (state.posts.isEmpty()) {
@@ -1104,7 +1107,10 @@ fun CommunityScreenRoot(
             TopAppBar(
                 title = { Text("Community", fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = {
+                        viewModel.cancelActiveJobs()
+                        onBack()
+                    }) {
                         Icon(Icons.Default.ArrowBack, contentDescription = null)
                     }
                 }
