@@ -1,10 +1,18 @@
 package com.developer.ev2z.ui.screens.device_Report
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -14,30 +22,35 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.developer.ev2z.BackPressHandler
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
 import com.developer.ev2z.response.Device
 import com.developer.ev2z.response.DeviceAnalyticsData
-import com.developer.ev2z.ui.components.FloatingContactButton
 import com.developer.ev2z.util.Analytics
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
@@ -48,14 +61,39 @@ import kotlin.math.min
 data class DeviceItem(
     val name: String,
     val deviceId: String,
-    val status: String // Running, Idle, Stopped
+    val status: String
 )
 
+// ── Theme Colors (Light Green) ───────────────────────────────────
+private val DR_Primary = Color(0xFF6A9F50)
+private val DR_PrimaryDark = Color(0xFF4A7D39)
+private val DR_PrimaryBg = Color(0xFFF0F7EC)
+private val DR_Background = Color(0xFFF8FAF0)
+private val DR_Surface = Color(0xFFFFFFFF)
+private val DR_SectionBg = Color(0xFFF3F6F0)
+private val DR_Border = Color(0xFFE2E8DD)
+private val DR_TextPrimary = Color(0xFF1C2418)
+private val DR_TextSec = Color(0xFF5D6858)
+private val DR_TextHint = Color(0xFFA0A99B)
+private val DR_Running = Color(0xFF85B070)
+private val DR_Idle = Color(0xFFF4C44E)
+private val DR_Stopped = Color(0xFFE5565B)
+private val DR_CardShadow = Color(0x12000000)
+
 fun statusColor(status: String) = when (status) {
-    "on", "moving" -> Color(0xFF6DBD6D)
-    "Idle", "idle" -> Color(0xFFE8A93A)
-    "off", "parked", "offline" -> Color(0xFFE35E5E)
+    "on", "moving" -> DR_Running
+    "Idle", "idle" -> DR_Idle
+    "off", "parked", "offline" -> DR_Stopped
     else -> Color.Gray
+}
+
+fun statusLabel(status: String) = when (status) {
+    "on", "moving" -> "Running"
+    "Idle", "idle" -> "Idle"
+    "off" -> "Stopped"
+    "parked" -> "Parked"
+    "offline" -> "Offline"
+    else -> status.replaceFirstChar { it.uppercase() }
 }
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -74,8 +112,6 @@ fun DeviceReportScreen(
     val liveLocation by viewModel.liveLocation.collectAsState()
     val totalDevices by viewModel.totalDevices.collectAsState()
 
-
-
     BackPressHandler { onBack() }
 
     LaunchedEffect(Unit) {
@@ -89,23 +125,75 @@ fun DeviceReportScreen(
         viewModel.fetchMyDevices(token)
     }
 
-
     when (uiState) {
         is DeviceReportUiState.Loading -> {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(DR_Background),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(
+                        color = DR_Primary,
+                        strokeWidth = 3.dp,
+                        modifier = Modifier.size(40.dp)
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        "Loading devices...",
+                        fontSize = 14.sp,
+                        color = DR_TextHint
+                    )
+                }
             }
         }
+
         is DeviceReportUiState.Error -> {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text((uiState as DeviceReportUiState.Error).message)
-                    Button(onClick = { viewModel.refreshData(token) }) {
-                        Text("Retry")
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(DR_Background),
+                contentAlignment = Alignment.Center
+            ) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth(0.85f)
+                        .padding(16.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = DR_Surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(
+                        Modifier.padding(28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            "Something went wrong",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = DR_TextPrimary
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            (uiState as DeviceReportUiState.Error).message,
+                            fontSize = 14.sp,
+                            color = DR_TextSec,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(Modifier.height(20.dp))
+                        Button(
+                            onClick = { viewModel.refreshData(token) },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = DR_Primary)
+                        ) {
+                            Text("Try Again", modifier = Modifier.padding(horizontal = 16.dp))
+                        }
                     }
                 }
             }
         }
+
         is DeviceReportUiState.Success -> {
             DeviceReportContent(
                 devices = myDevices,
@@ -118,7 +206,7 @@ fun DeviceReportScreen(
                 onTodayReport = onTodayReport,
                 onTrackTrace = onTrackTrace,
                 token = token,
-                viewModel = viewModel// 👈 NEW
+                viewModel = viewModel
             )
         }
     }
@@ -145,10 +233,9 @@ fun DeviceReportContent(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFEFF3EF))
+            .background(DR_Background)
     ) {
-        // Map Area (You can integrate Google Maps here later)
-//        MapArea()
+        // Map
         val lat = liveLocation?.data?.latestLocation?.latitude?.toDoubleOrNull()
         val lng = liveLocation?.data?.latestLocation?.longitude?.toDoubleOrNull()
 
@@ -161,32 +248,34 @@ fun DeviceReportContent(
             )
         }
 
-        // TOP BAR
+        // Top Bar
         TopDeviceBoxWithData(
-            userName = username, // You can pass actual user name from preferences
+            userName = username,
             deviceCount = totalDevices,
             selectedDevice = selectedDevice?.device_name,
             onBackClick = onBack,
             onDropdownClick = { isDropdownOpen = true },
-            onAddClick = { /* Navigate to Add Device Screen */ }
+            onAddClick = { }
         )
 
-        // FULL SCREEN DROPDOWN PANEL
-        if (isDropdownOpen) {
+        // Device Selector Overlay
+        AnimatedVisibility(
+            visible = isDropdownOpen,
+            enter = fadeIn() + slideInVertically { -it / 3 },
+            exit = fadeOut() + slideOutVertically { -it / 3 }
+        ) {
             DeviceSelectorPanelWithData(
                 devices = devices,
                 onDeviceSelected = {
                     onDeviceSelected(it)
                     isDropdownOpen = false
                 },
-                onAddDevice = { /* Navigate to Add Device */ },
+                onAddDevice = { },
                 onDismiss = { isDropdownOpen = false }
             )
         }
 
-
-
-        // BOTTOM SHEET
+        // Bottom Sheet
         if (selectedDevice != null) {
             DeviceReportBottomSheetWithData(
                 device = selectedDevice,
@@ -208,26 +297,35 @@ fun BoxScope.MapMarkerChipWithData(
     speed: String
 ) {
     Surface(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(20.dp),
         color = Color.White,
-        shadowElevation = 4.dp,
+        shadowElevation = 6.dp,
         modifier = Modifier
             .align(Alignment.Center)
             .padding(bottom = 100.dp)
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(14.dp)
-                    .background(Color(0xFF3EBB3E), RoundedCornerShape(50))
+                    .size(10.dp)
+                    .background(DR_Primary, CircleShape)
             )
             Spacer(Modifier.width(8.dp))
-            Text(deviceName, fontSize = 13.sp)
-            Spacer(Modifier.width(6.dp))
-            Text("$speed km/h", fontSize = 13.sp, color = Color.Gray)
+            Text(
+                deviceName,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = DR_TextPrimary
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "$speed km/h",
+                fontSize = 12.sp,
+                color = DR_TextHint
+            )
         }
     }
 }
@@ -249,70 +347,72 @@ fun TopDeviceBoxWithData(
             .padding(
                 top = WindowInsets.statusBars
                     .asPaddingValues()
-                    .calculateTopPadding() + 12.dp,
-                start = 16.dp,
-                end = 16.dp,
-                bottom = 16.dp
+                    .calculateTopPadding() + 8.dp,
+                start = 14.dp,
+                end = 14.dp
             ),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = DR_Surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-
-            // 🔹 TOP ROW (Responsive)
+            // Top Row
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(
-                    Icons.Default.ArrowBack,
-                    contentDescription = "Back",
-                    modifier = Modifier.clickable { onBackClick() }
-                )
+                // Back button
+                Surface(
+                    shape = CircleShape,
+                    color = DR_SectionBg,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clickable { onBackClick() }
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            contentDescription = "Back",
+                            modifier = Modifier.size(18.dp),
+                            tint = DR_TextPrimary
+                        )
+                    }
+                }
 
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(12.dp))
 
                 val firstName = remember(userName) { extractFirstName(userName) }
 
-                // ✅ Responsive username
-                Text(
-                    text = firstName,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-
-                Spacer(Modifier.width(8.dp))
-
-                // ✅ Responsive device count
-                Text(
-                    text = "$deviceCount Devices",
-                    fontSize = 13.sp,
-                    color = Color.Gray,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = firstName,
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = DR_TextPrimary
+                    )
+                    Text(
+                        text = "$deviceCount ${if (deviceCount == 1) "Device" else "Devices"}",
+                        fontSize = 12.sp,
+                        color = DR_TextHint
+                    )
+                }
             }
 
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(12.dp))
 
-            // 🔹 DEVICE ROW (Responsive + Rules)
-            Row(
+            // Device Selector Row
+            Surface(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(Color(0xFFF5F5F5), RoundedCornerShape(12.dp))
-                    .clickable(enabled = !isSingleDevice) { onDropdownClick() }
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .clickable(enabled = !isSingleDevice) { onDropdownClick() },
+                shape = RoundedCornerShape(14.dp),
+                color = DR_SectionBg
             ) {
-
-                // 🔹 Device Name Section
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Image(
                         painter = painterResource(Res.drawable.app_logo),
@@ -330,29 +430,20 @@ fun TopDeviceBoxWithData(
 
                     Text(
                         text = deviceText,
-                        fontSize = 15.sp,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        color = DR_TextPrimary,
+                        modifier = Modifier.weight(1f)
                     )
-                }
 
-                // 🔹 ACTION ICONS (Only when multiple devices)
-                if (!isSingleDevice) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-
+                    if (!isSingleDevice) {
                         Icon(
                             Icons.Default.ArrowDropDown,
                             contentDescription = "Select Device",
-                            tint = Color.Gray
-                        )
-
-                        Spacer(Modifier.width(8.dp))
-
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Add Device",
-                            tint = Color.Gray,
-                            modifier = Modifier.clickable { onAddClick() }
+                            tint = DR_TextHint,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
@@ -364,9 +455,9 @@ fun TopDeviceBoxWithData(
 fun extractFirstName(fullName: String): String {
     return fullName
         .trim()
-        .substringBefore("(")   // remove bracket part
+        .substringBefore("(")
         .trim()
-        .split(" ")             // split by space
+        .split(" ")
         .firstOrNull()
         ?: fullName
 }
@@ -383,78 +474,135 @@ fun DeviceSelectorPanelWithData(
             .fillMaxSize()
             .background(Color(0x55000000))
             .zIndex(999f)
-            .clickable { onDismiss() },
+            .clickable(
+                indication = null,
+                interactionSource = remember { MutableInteractionSource() }
+            ) { onDismiss() },
         contentAlignment = Alignment.TopCenter
     ) {
-        Surface(
+        Card(
             modifier = Modifier
                 .fillMaxWidth(0.92f)
-                .padding(top = 80.dp)
+                .padding(
+                    top = WindowInsets.statusBars
+                        .asPaddingValues()
+                        .calculateTopPadding() + 80.dp
+                )
                 .clickable(enabled = false) {},
-            shape = RoundedCornerShape(18.dp),
-            color = Color.White,
-            shadowElevation = 8.dp
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = DR_Surface),
+            elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
         ) {
-            Column(
-                Modifier
-                    .padding(18.dp)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                Text("Select Device", fontSize = 16.sp, color = Color.Gray)
-                Spacer(Modifier.height(16.dp))
-
-                devices.forEach { device ->
-                    Row(
+            Column(Modifier.padding(20.dp)) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        "Select Device",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = DR_TextPrimary
+                    )
+                    Surface(
+                        shape = CircleShape,
+                        color = DR_SectionBg,
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onDeviceSelected(device) }
-                            .padding(vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .size(32.dp)
+                            .clickable { onDismiss() }
                     ) {
-                        Box(
-                            Modifier
-                                .size(10.dp)
-                                .background(
-                                    statusColor(device.engine_status ?: "Stopped"),
-                                    RoundedCornerShape(50)
-                                )
-                        )
-
-                        Spacer(Modifier.width(12.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(device.device_name, fontSize = 16.sp)
-                            Text(
-                                "Device ID: ${device.device_id}",
-                                fontSize = 12.sp,
-                                color = Color.Gray,
-                                maxLines = 1
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Close",
+                                modifier = Modifier.size(16.dp),
+                                tint = DR_TextSec
                             )
                         }
-
-//                        Text(
-//                            device.engine_status ?: "Unknown",
-//                            color = statusColor(device.status ?: "Stopped"),
-//                            fontSize = 14.sp,
-//                            fontWeight = FontWeight.Medium
-//                        )
                     }
                 }
 
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "${devices.size} devices available",
+                    fontSize = 12.sp,
+                    color = DR_TextHint
+                )
 
-//                Button(
-//                    onClick = onAddDevice,
-//                    modifier = Modifier
-//                        .fillMaxWidth()
-//                        .height(48.dp),
-//                    shape = RoundedCornerShape(50),
-//                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3EBB3E))
-//                ) {
-//                    Icon(Icons.Default.Add, contentDescription = null, tint = Color.White)
-//                    Spacer(Modifier.width(8.dp))
-//                    Text("Add Device", color = Color.White)
-//                }
+                Spacer(Modifier.height(16.dp))
+
+                HorizontalDivider(color = DR_Border, thickness = 0.5.dp)
+
+                Spacer(Modifier.height(8.dp))
+
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    devices.forEach { device ->
+                        val statusClr = statusColor(device.engine_status ?: "offline")
+
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                                .clickable { onDeviceSelected(device) },
+                            shape = RoundedCornerShape(14.dp),
+                            color = DR_SectionBg
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(
+                                    horizontal = 14.dp,
+                                    vertical = 14.dp
+                                ),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Status indicator
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .background(statusClr, CircleShape)
+                                )
+
+                                Spacer(Modifier.width(12.dp))
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        device.device_name,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = DR_TextPrimary
+                                    )
+                                    Spacer(Modifier.height(2.dp))
+                                    Text(
+                                        "ID: ${device.device_id}",
+                                        fontSize = 11.sp,
+                                        color = DR_TextHint,
+                                        maxLines = 1
+                                    )
+                                }
+
+                                // Status badge
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = statusClr.copy(alpha = 0.12f)
+                                ) {
+                                    Text(
+                                        text = statusLabel(
+                                            device.engine_status ?: "offline"
+                                        ),
+                                        color = statusClr,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        modifier = Modifier.padding(
+                                            horizontal = 8.dp,
+                                            vertical = 3.dp
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
 
                 Spacer(Modifier.height(8.dp))
             }
@@ -467,18 +615,18 @@ fun BoxScope.DeviceReportBottomSheetWithData(
     device: Device,
     liveLocation: LiveLocationResponse?,
     isExpanded: Boolean,
-    token : String,
+    token: String,
     onExpandToggle: () -> Unit,
     onTodayReport: () -> Unit,
     onTrackTrace: () -> Unit,
     viewModel: DeviceReportViewModel
 ) {
-    val sheetHeight = if (isExpanded) 0.90f else 0.40f
+    val sheetHeight = if (isExpanded) 0.90f else 0.42f
 
     Surface(
         modifier = Modifier
             .align(Alignment.BottomCenter)
-            .padding(horizontal = 12.dp)
+            .padding(horizontal = 10.dp)
             .padding(
                 bottom = WindowInsets.navigationBars
                     .asPaddingValues()
@@ -486,12 +634,35 @@ fun BoxScope.DeviceReportBottomSheetWithData(
             )
             .fillMaxWidth()
             .fillMaxHeight(sheetHeight)
-            .animateContentSize(),
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        color = Color.White,
-        tonalElevation = 6.dp
+            .animateContentSize(
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow
+                )
+            ),
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        color = DR_Surface,
+        shadowElevation = 16.dp
     ) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
+            // Drag Handle
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(40.dp)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(DR_Border)
+                )
+            }
+
+            Spacer(Modifier.height(8.dp))
+
             // Report Header
             ReportHeaderWithData(
                 deviceName = device.device_name,
@@ -506,117 +677,137 @@ fun BoxScope.DeviceReportBottomSheetWithData(
                 device = device,
                 viewModel = viewModel
             )
+
             Spacer(Modifier.height(16.dp))
 
+            // Action Buttons
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 18.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-
-                // 🔹 Secondary
-                Button(
+                // Today's Report
+                OutlinedButton(
                     onClick = { onTodayReport() },
                     modifier = Modifier
                         .weight(1f)
-                        .height(52.dp),
-                    shape = RoundedCornerShape(12.dp)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    border = ButtonDefaults.outlinedButtonBorder.copy(
+                        brush = Brush.linearGradient(
+                            colors = listOf(DR_Primary, DR_PrimaryDark)
+                        )
+                    ),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = DR_Primary
+                    )
                 ) {
                     Text(
                         text = "Today's Report",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
 
-                // 🔹 Primary
+                // Track & Trace
                 Button(
                     onClick = { onTrackTrace() },
                     modifier = Modifier
                         .weight(1f)
-                        .height(52.dp),
-                    shape = RoundedCornerShape(12.dp)
+                        .height(48.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = DR_Primary
+                    )
                 ) {
                     Text(
                         text = "Track & Trace",
-                        fontSize = 15.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(16.dp))
 
-            HorizontalDivider(Modifier.padding(horizontal = 18.dp))
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 18.dp),
+                color = DR_Border,
+                thickness = 0.5.dp
+            )
 
-//            Row(
-//                modifier = Modifier
-//                    .fillMaxWidth()
-//                    .clickable { onExpandToggle() }
-//                    .padding(18.dp),
-//                verticalAlignment = Alignment.CenterVertically
-//            ) {
-//                Text("Device Analysis", fontSize = 16.sp, fontWeight = FontWeight.Medium)
-//                Spacer(Modifier.weight(1f))
-//                Text(if (isExpanded) "Hide" else "View", color = Color(0xFF3EBB3E))
-//                Icon(
-//                    if (isExpanded) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-//                    contentDescription = null,
-//                    tint = Color(0xFF3EBB3E)
-//                )
-//            }
-
+            // Device Analysis Toggle
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(18.dp),
+                    .clickable { onExpandToggle() }
+                    .padding(horizontal = 18.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-
-                // 🔙 BACK ARROW — ONLY WHEN HIDE (Expanded)
                 if (isExpanded) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Back",
+                    Surface(
+                        shape = CircleShape,
+                        color = DR_SectionBg,
                         modifier = Modifier
-                            .size(22.dp)
-                            .clickable { onExpandToggle() }, // Hide pe collapse
-                        tint = Color.Black
-                    )
-
+                            .size(28.dp)
+                            .clickable { onExpandToggle() }
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            Icon(
+                                Icons.Default.ArrowBack,
+                                contentDescription = "Collapse",
+                                modifier = Modifier.size(14.dp),
+                                tint = DR_TextPrimary
+                            )
+                        }
+                    }
                     Spacer(Modifier.width(10.dp))
                 }
 
                 Text(
                     text = "Device Analysis",
                     fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.SemiBold,
+                    color = DR_TextPrimary
                 )
 
                 Spacer(Modifier.weight(1f))
 
-                // VIEW / HIDE ACTION
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (isExpanded) DR_PrimaryBg else DR_SectionBg,
                     modifier = Modifier.clickable { onExpandToggle() }
                 ) {
-                    Text(
-                        text = if (isExpanded) "Hide" else "View",
-                        color = Color(0xFF3EBB3E)
-                    )
-                    Icon(
-                        imageVector =
-                            if (isExpanded) Icons.Default.KeyboardArrowDown
-                            else Icons.Default.KeyboardArrowUp,
-                        contentDescription = null,
-                        tint = Color(0xFF3EBB3E)
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (isExpanded) "Hide" else "View",
+                            color = DR_Primary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Spacer(Modifier.width(2.dp))
+                        Icon(
+                            imageVector = if (isExpanded)
+                                Icons.Default.KeyboardArrowDown
+                            else
+                                Icons.Default.KeyboardArrowUp,
+                            contentDescription = null,
+                            tint = DR_Primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
             }
 
             if (isExpanded) {
-                DeviceAnalysisContentWithData(liveLocation,viewModel,token)
+                DeviceAnalysisContentWithData(liveLocation, viewModel, token)
             }
         }
     }
@@ -628,57 +819,73 @@ fun ReportHeaderWithData(
     speed: String,
     status: String
 ) {
-
     val color = statusColor(status)
 
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(18.dp),
+            .padding(horizontal = 18.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-
-        Column {
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-
-                Text(
-                    text = "• $deviceName",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-
-                Spacer(Modifier.width(10.dp))
-
-                // Status chip
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = color.copy(alpha = 0.15f)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = deviceName,
+                fontSize = 19.sp,
+                fontWeight = FontWeight.Bold,
+                color = DR_TextPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(Modifier.height(6.dp))
+            // Status badge
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = color.copy(alpha = 0.12f)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Box(
+                        Modifier
+                            .size(7.dp)
+                            .background(color, CircleShape)
+                    )
+                    Spacer(Modifier.width(6.dp))
                     Text(
-                        text = status.replaceFirstChar { it.uppercase() },
+                        text = statusLabel(status),
                         color = color,
                         fontSize = 12.sp,
-                        modifier = Modifier.padding(
-                            horizontal = 10.dp,
-                            vertical = 4.dp
-                        )
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }
         }
 
-        Spacer(Modifier.weight(1f))
-
-        Text(
-            "$speed km/h",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Medium
-        )
+        // Speed display
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = DR_SectionBg
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    speed,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = DR_TextPrimary
+                )
+                Text(
+                    "km/h",
+                    fontSize = 11.sp,
+                    color = DR_TextHint
+                )
+            }
+        }
     }
 }
-
-
 
 
 @Composable
@@ -691,7 +898,6 @@ fun DeviceBasicInfoWithData(
     val latest = liveLocation?.data?.latestLocation
     val currentStatus = latest?.status ?: ""
 
-    // jab bhi location change ho, address fetch karo
     LaunchedEffect(latest?.latitude, latest?.longitude) {
         latest?.let {
             viewModel.getAddressFromLatLng(
@@ -703,117 +909,143 @@ fun DeviceBasicInfoWithData(
 
     val address by viewModel.address.collectAsState()
 
-    Text(
-        "Live Location\n${address ?: "Fetching..."}",
-        fontSize = 14.sp,
-        modifier = Modifier.padding(horizontal = 18.dp),
-        color = Color.DarkGray
-    )
-
-    Spacer(Modifier.height(10.dp))
-
-    // --------- BUTTON STATE LOGIC ----------
-    // backend se initial status
-    val backendIsOn = currentStatus == "moving" || currentStatus == "Running"
-
-    // local UI state (optimistic) – status change hone par reset
-    var isOnState by remember(currentStatus) { mutableStateOf(backendIsOn) }
-
-    val isTurnOnEnabled = !isOnState   // OFF hai → Turn On enable
-    val isTurnOffEnabled = isOnState   // ON hai → Turn Off enable
-
-    Row(
-        Modifier
+    // Location card
+    Surface(
+        modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 18.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp)
+        shape = RoundedCornerShape(14.dp),
+        color = DR_SectionBg
     ) {
-
-        // TURN ON → restore
-        OutlinedButton(
-            onClick = {
-                viewModel.openMobilizeDialog("restore", device.device_id)
-            },
-            enabled = isTurnOnEnabled,
-            modifier = Modifier.weight(1f),
-            colors =
-                if (isTurnOnEnabled) {
-                    // Enabled: Green text
-                    ButtonDefaults.outlinedButtonColors(
-                        contentColor = Color(0xFF3EBB3E)
-                    )
-                } else {
-                    // Disabled: default Material color (no custom color)
-                    ButtonDefaults.outlinedButtonColors()
-                }
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.Top
         ) {
-            Text("Engine On")
-        }
-
-        // TURN OFF → cut
-        Button(
-            onClick = {
-                viewModel.openMobilizeDialog("cut", device.device_id)
-            },
-            enabled = isTurnOffEnabled,
-            modifier = Modifier.weight(1f),
-            colors =
-                if (isTurnOffEnabled) {
-                    // Enabled: Red background
-                    ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFFF4E4E)
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = DR_PrimaryBg
+            ) {
+                Box(
+                    modifier = Modifier.padding(8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Default.LocationOn,
+                        contentDescription = null,
+                        tint = DR_Primary,
+                        modifier = Modifier.size(18.dp)
                     )
-                } else {
-                    // Disabled: default Material colors
-                    ButtonDefaults.buttonColors()
                 }
-        ) {
-            Text("Engine Off", color = Color.White)
+            }
+            Spacer(Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Live Location",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = DR_TextHint
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    address ?: "Fetching address...",
+                    fontSize = 13.sp,
+                    color = DR_TextPrimary,
+                    lineHeight = 18.sp
+                )
+            }
         }
     }
 
     Spacer(Modifier.height(12.dp))
 
-    val activeTime = latest?.timestamp ?: "N/A"
-    val lastSeenMinutes = latest?.lastSeenMinutesAgo
-    val displayTime = if (lastSeenMinutes != null) {
-        when {
-            lastSeenMinutes == 0 -> "Just now"
-            lastSeenMinutes < 60 -> "$lastSeenMinutes minutes ago"
-            else -> "${lastSeenMinutes / 60} hours ago"
+    // Engine controls
+    val backendIsOn = currentStatus == "moving" || currentStatus == "Running"
+    var isOnState by remember(currentStatus) { mutableStateOf(backendIsOn) }
+    val isTurnOnEnabled = !isOnState
+    val isTurnOffEnabled = isOnState
+
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 18.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        // Engine On
+        OutlinedButton(
+            onClick = {
+                viewModel.openMobilizeDialog("restore", device.device_id)
+            },
+            enabled = isTurnOnEnabled,
+            modifier = Modifier
+                .weight(1f)
+                .height(44.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = if (isTurnOnEnabled) {
+                ButtonDefaults.outlinedButtonColors(contentColor = DR_Running)
+            } else {
+                ButtonDefaults.outlinedButtonColors(
+                    contentColor = DR_TextHint,
+                    disabledContentColor = DR_TextHint.copy(alpha = 0.5f)
+                )
+            }
+        ) {
+            Icon(
+                Icons.Default.PowerSettingsNew,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(Modifier.width(6.dp))
+            Text("Engine On", fontSize = 13.sp, fontWeight = FontWeight.Medium)
         }
-    } else activeTime
 
-//    Text(
-//        "Active from: $displayTime",
-//        color = Color.Gray,
-//        fontSize = 12.sp,
-//        modifier = Modifier.padding(horizontal = 18.dp)
-//    )
+        // Engine Off
+        Button(
+            onClick = {
+                viewModel.openMobilizeDialog("cut", device.device_id)
+            },
+            enabled = isTurnOffEnabled,
+            modifier = Modifier
+                .weight(1f)
+                .height(44.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = if (isTurnOffEnabled) {
+                ButtonDefaults.buttonColors(containerColor = DR_Stopped)
+            } else {
+                ButtonDefaults.buttonColors(
+                    containerColor = DR_TextHint.copy(alpha = 0.2f),
+                    disabledContainerColor = DR_TextHint.copy(alpha = 0.12f),
+                    disabledContentColor = DR_TextHint.copy(alpha = 0.5f)
+                )
+            }
+        ) {
+            Icon(
+                Icons.Default.PowerSettingsNew,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+                tint = if (isTurnOffEnabled) Color.White else DR_TextHint.copy(alpha = 0.5f)
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                "Engine Off",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = if (isTurnOffEnabled) Color.White else DR_TextHint.copy(alpha = 0.5f)
+            )
+        }
+    }
 
-    // --------- DIALOG HANDLING ----------
+    // Dialog Handling
     val dialogData by viewModel.showConfirmationDialog.collectAsState()
 
     dialogData?.let { data ->
         MobilizeConfirmationDialog(
             command = data.command,
             onConfirm = { cmd ->
-                // API call
-                viewModel.sendMobilizeCommand(
-                    token,
-                    data.terminalId,
-                    cmd
-                )
-
-                // Optimistic UI update:
-                // restore => ON, cut => OFF
+                viewModel.sendMobilizeCommand(token, data.terminalId, cmd)
                 isOnState = cmd == "restore"
-
                 viewModel.closeMobilizeDialog()
             },
-            onCancel = {
-                viewModel.closeMobilizeDialog()
-            }
+            onCancel = { viewModel.closeMobilizeDialog() }
         )
     }
 }
@@ -827,8 +1059,6 @@ fun DeviceAnalysisContentWithData(
     val selectedRange by viewModel.selectedAnalyticsRange.collectAsState()
     val analytics by viewModel.deviceAnalytics.collectAsState()
     val isLoading by viewModel.isAnalyticsLoading.collectAsState()
-
-
     val selectedDevice by viewModel.selectedDevice.collectAsState()
 
     LaunchedEffect(selectedDevice, selectedRange) {
@@ -838,7 +1068,7 @@ fun DeviceAnalysisContentWithData(
         }
     }
 
-    Spacer(Modifier.height(8.dp))
+    Spacer(Modifier.height(4.dp))
 
     FilterChipsBar(
         selectedRange = selectedRange,
@@ -847,59 +1077,58 @@ fun DeviceAnalysisContentWithData(
         }
     )
 
-    Spacer(Modifier.height(16.dp))
+    Spacer(Modifier.height(14.dp))
 
-    TotalDistanceCard(
-        totalKm = analytics?.totalDistanceKm ?: 0.0
-    )
+    if (isLoading) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(32.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(
+                color = DR_Primary,
+                strokeWidth = 2.dp,
+                modifier = Modifier.size(28.dp)
+            )
+        }
+    } else {
+        TotalDistanceCard(totalKm = analytics?.totalDistanceKm ?: 0.0)
 
-    Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(12.dp))
 
-    HeadingGraphCardWithData(
-        analytics = analytics
-    )
+        HeadingGraphCardWithData(analytics = analytics)
 
-    Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(20.dp))
+    }
 }
-
-
-
 
 
 @Composable
 fun HeadingGraphCardWithData(
     analytics: DeviceAnalyticsData?
 ) {
-    Surface(
-        Modifier
+    Card(
+        modifier = Modifier
             .padding(horizontal = 18.dp)
             .fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
-        color = Color(0xFFF2F4F2)
+        colors = CardDefaults.cardColors(containerColor = DR_SectionBg),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(Modifier.padding(18.dp)) {
-            Text("Heading", fontSize = 18.sp, fontWeight = FontWeight.Medium)
+            Text(
+                "Activity Overview",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = DR_TextPrimary
+            )
 
-            Spacer(Modifier.height(8.dp))
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Total Activity :", color = Color.Gray)
-                Spacer(Modifier.weight(1f))
-//                Text(
-//                    analytics?.totalActivityFormatted ?: "0 hr",
-//                    fontSize = 16.sp,
-//                    fontWeight = FontWeight.SemiBold
-//                )
-            }
-
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(18.dp))
 
             Box(
                 Modifier
-                    .size(160.dp)
+                    .size(150.dp)
                     .align(Alignment.CenterHorizontally)
             ) {
                 if (analytics != null) {
@@ -910,38 +1139,44 @@ fun HeadingGraphCardWithData(
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    Text(
-                        "Loading...",
-                        modifier = Modifier.align(Alignment.Center),
-                        fontSize = 12.sp,
-                        color = Color.Gray
-                    )
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "No data",
+                            fontSize = 13.sp,
+                            color = DR_TextHint
+                        )
+                    }
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(18.dp))
 
             analytics?.let { data ->
                 LegendRow(
                     label = "Running",
-                    color = Color(0xFF4CAF50),
+                    color = DR_Running,
                     hours = data.running.hours,
                     percent = data.running.percent
                 )
+                Spacer(Modifier.height(6.dp))
                 LegendRow(
                     label = "Stopped",
-                    color = Color(0xFFF44336),
+                    color = DR_Stopped,
                     hours = data.stopped.hours,
                     percent = data.stopped.percent
                 )
+                Spacer(Modifier.height(6.dp))
                 LegendRow(
                     label = "Parked",
-                    color = Color(0xFFFFC107),
+                    color = DR_Idle,
                     hours = data.parked.hours,
                     percent = data.parked.percent
                 )
             } ?: run {
-                Text("No analytics data", color = Color.Gray)
+                Text("No analytics data available", color = DR_TextHint, fontSize = 13.sp)
             }
         }
     }
@@ -954,128 +1189,54 @@ private fun LegendRow(
     hours: Double,
     percent: Int
 ) {
-    Row(
-        modifier = Modifier.padding(top = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = color.copy(alpha = 0.08f),
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .background(color, CircleShape)
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(label, fontSize = 14.sp)
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .background(color, CircleShape)
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(
+                label,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = DR_TextPrimary
+            )
 
-        Spacer(Modifier.weight(1f))
+            Spacer(Modifier.weight(1f))
 
-        // 1.07 hr jaisa dikhane ke liye
-//        val hoursText = String.format("%.2f hr", hours)
-        val hoursText =  hours
-        Text(
-            "$hoursText ($percent%)",
-            fontSize = 13.sp,
-            color = Color.Gray
-        )
+            Text(
+                "$hours hr",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = DR_TextSec
+            )
+
+            Spacer(Modifier.width(8.dp))
+
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = color.copy(alpha = 0.15f)
+            ) {
+                Text(
+                    "$percent%",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = color,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                )
+            }
+        }
     }
 }
-
-//@Composable
-//fun DonutChart(
-//    runningPercent: Int,
-//    stoppedPercent: Int,
-//    parkedPercent: Int,
-//    modifier: Modifier = Modifier
-//) {
-//    val total = (runningPercent + stoppedPercent + parkedPercent)
-//        .takeIf { it > 0 } ?: 1
-//
-//    val runningSweep = 360f * runningPercent / total
-//    val stoppedSweep = 360f * stoppedPercent / total
-//    val parkedSweep = 360f * parkedPercent / total
-//
-//    Box(
-//        modifier = modifier,
-//        contentAlignment = Alignment.Center
-//    ) {
-//        Canvas(Modifier.fillMaxSize()) {
-//            val strokeWidth = size.minDimension * 0.18f
-//            val radius = min(size.width, size.height) / 2f - strokeWidth / 2f
-//
-//            val topLeft = Offset(
-//                x = center.x - radius,
-//                y = center.y - radius
-//            )
-//            val arcSize = Size(radius * 2, radius * 2)
-//
-//            // background ring
-//            drawArc(
-//                color = Color(0xFFE0E0E0),
-//                startAngle = 0f,
-//                sweepAngle = 360f,
-//                useCenter = false,
-//                style = Stroke(width = strokeWidth)
-//            )
-//
-//            var startAngle = -90f
-//
-//            // Running (green)
-//            drawArc(
-//                color = Color(0xFF4CAF50),
-//                startAngle = startAngle,
-//                sweepAngle = runningSweep,
-//                useCenter = false,
-//                style = Stroke(width = strokeWidth),
-//                topLeft = topLeft,
-//                size = arcSize
-//            )
-//            startAngle += runningSweep
-//
-//            // Stopped (red)
-//            drawArc(
-//                color = Color(0xFFF44336),
-//                startAngle = startAngle,
-//                sweepAngle = stoppedSweep,
-//                useCenter = false,
-//                style = Stroke(width = strokeWidth),
-//                topLeft = topLeft,
-//                size = arcSize
-//            )
-//            startAngle += stoppedSweep
-//
-//            // Parked (yellow)
-//            drawArc(
-//                color = Color(0xFFFFC107),
-//                startAngle = startAngle,
-//                sweepAngle = parkedSweep,
-//                useCenter = false,
-//                style = Stroke(width = strokeWidth),
-//                topLeft = topLeft,
-//                size = arcSize
-//            )
-//        }
-//
-//        // Percentage labels around chart (approx positions)
-//        Box(Modifier.fillMaxSize()) {
-//            androidx.compose.material3.Text(
-//                "${parkedPercent}%",
-//                modifier = Modifier.align(Alignment.TopCenter),
-//                fontSize = 12.sp
-//            )
-//            androidx.compose.material3.Text(
-//                "${runningPercent}%",
-//                modifier = Modifier.align(Alignment.CenterStart),
-//                fontSize = 12.sp
-//            )
-//            androidx.compose.material3.Text(
-//                "${stoppedPercent}%",
-//                modifier = Modifier.align(Alignment.CenterEnd),
-//                fontSize = 12.sp
-//            )
-//        }
-//    }
-//}
-
-
 
 
 @Composable
@@ -1096,19 +1257,20 @@ fun DonutChart(
         modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
-
         Canvas(Modifier.fillMaxSize()) {
-            val strokeWidth = size.minDimension * 0.16f
+            val strokeWidth = size.minDimension * 0.14f
             val radius = size.minDimension / 2f - strokeWidth / 2f
+            val gap = 3f
 
             var startAngle = -90f
 
             fun drawSlice(color: Color, sweep: Float) {
                 if (sweep <= 0f) return
+                val actualSweep = if (sweep > gap * 2) sweep - gap else sweep
                 drawArc(
                     color = color,
-                    startAngle = startAngle,
-                    sweepAngle = sweep,
+                    startAngle = startAngle + gap / 2,
+                    sweepAngle = actualSweep,
                     useCenter = false,
                     style = Stroke(
                         width = strokeWidth,
@@ -1120,29 +1282,30 @@ fun DonutChart(
 
             // Background ring
             drawArc(
-                color = Color(0xFFE6E6E6),
+                color = Color(0xFFE8EDE4),
                 startAngle = 0f,
                 sweepAngle = 360f,
                 useCenter = false,
                 style = Stroke(width = strokeWidth)
             )
 
-            drawSlice(Color(0xFF4CAF50), runningSweep) // Running
-            drawSlice(Color(0xFFF44336), stoppedSweep) // Stopped
-            drawSlice(Color(0xFFFFC107), parkedSweep)  // Parked
+            drawSlice(DR_Running, runningSweep)
+            drawSlice(DR_Stopped, stoppedSweep)
+            drawSlice(DR_Idle, parkedSweep)
         }
 
-        // 🎯 CENTER TEXT
+        // Center text
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = "${runningPercent + parkedPercent}%",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.SemiBold
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = DR_TextPrimary
             )
             Text(
                 text = "Active",
-                fontSize = 12.sp,
-                color = Color.Gray
+                fontSize = 11.sp,
+                color = DR_TextHint
             )
         }
     }
@@ -1154,24 +1317,23 @@ fun FilterChipsBar(
     onRangeSelected: (AnalyticsRange) -> Unit
 ) {
     Row(
-        Modifier.padding(horizontal = 18.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 18.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Chip(
-            text = "Today",
-            selected = selectedRange == AnalyticsRange.TODAY,
-            onClick = { onRangeSelected(AnalyticsRange.TODAY) }
-        )
-        Chip(
-            text = "Week",
-            selected = selectedRange == AnalyticsRange.WEEK,
-            onClick = { onRangeSelected(AnalyticsRange.WEEK) }
-        )
-        Chip(
-            text = "Month",
-            selected = selectedRange == AnalyticsRange.MONTH,
-            onClick = { onRangeSelected(AnalyticsRange.MONTH) }
-        )
+        AnalyticsRange.entries.forEach { range ->
+            val label = when (range) {
+                AnalyticsRange.TODAY -> "Today"
+                AnalyticsRange.WEEK -> "Week"
+                AnalyticsRange.MONTH -> "Month"
+            }
+            Chip(
+                text = label,
+                selected = selectedRange == range,
+                onClick = { onRangeSelected(range) }
+            )
+        }
     }
 }
 
@@ -1182,15 +1344,16 @@ fun Chip(
     onClick: () -> Unit
 ) {
     Surface(
-        color = if (selected) Color(0xFF3EBB3E) else Color(0xFFDBF2D9),
-        shape = RoundedCornerShape(50),
+        color = if (selected) DR_Primary else DR_SectionBg,
+        shape = RoundedCornerShape(10.dp),
         modifier = Modifier.clickable { onClick() }
     ) {
         Text(
             text,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp),
             fontSize = 13.sp,
-            color = if (selected) Color.White else Color.Black
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (selected) Color.White else DR_TextSec
         )
     }
 }
@@ -1198,18 +1361,57 @@ fun Chip(
 
 @Composable
 fun TotalDistanceCard(totalKm: Double) {
-
-    Surface(
-        Modifier
+    Card(
+        modifier = Modifier
             .padding(horizontal = 18.dp)
             .fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
-        color = Color(0xFFF2F4F2)
+        colors = CardDefaults.cardColors(containerColor = DR_PrimaryBg),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
-        Column(Modifier.padding(18.dp)) {
-            Text("Total Distance", color = Color.Gray)
-            Spacer(Modifier.height(4.dp))
-            Text("${(totalKm)} km", fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
+        Row(
+            modifier = Modifier.padding(18.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = DR_Primary.copy(alpha = 0.12f)
+            ) {
+                Box(modifier = Modifier.padding(10.dp)) {
+                    Icon(
+                        Icons.Default.Speed,
+                        contentDescription = null,
+                        tint = DR_Primary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+
+            Spacer(Modifier.width(14.dp))
+
+            Column {
+                Text(
+                    "Total Distance",
+                    color = DR_TextHint,
+                    fontSize = 12.sp
+                )
+                Spacer(Modifier.height(2.dp))
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        "${totalKm}",
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = DR_TextPrimary
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        "km",
+                        fontSize = 14.sp,
+                        color = DR_TextSec,
+                        modifier = Modifier.padding(bottom = 3.dp)
+                    )
+                }
+            }
         }
     }
 }
@@ -1222,55 +1424,80 @@ fun MobilizeConfirmationDialog(
     onCancel: () -> Unit
 ) {
     val isCut = command == "cut"
+    val accentColor = if (isCut) DR_Stopped else DR_Running
 
     AlertDialog(
         onDismissRequest = { onCancel() },
         icon = {
-            Icon(
-                imageVector = Icons.Default.PowerSettingsNew,
-                contentDescription = null
-            )
+            Surface(
+                shape = CircleShape,
+                color = accentColor.copy(alpha = 0.12f),
+                modifier = Modifier.size(52.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    Icon(
+                        imageVector = Icons.Default.PowerSettingsNew,
+                        contentDescription = null,
+                        tint = accentColor,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
+            }
         },
         title = {
             Text(
                 text = if (isCut) "Turn Off Engine?" else "Turn On Engine?",
                 fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
             )
         },
         text = {
-            Column {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = if (isCut)
-                        "Do you really want to turn off this Engine?"
+                        "This will remotely cut the engine power for this vehicle."
                     else
-                        "Do you want to restore engine power for this Vehicle?"
+                        "This will restore engine power for this vehicle.",
+                    textAlign = TextAlign.Center,
+                    fontSize = 14.sp,
+                    color = DR_TextSec
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "You can change this later from the device report screen.",
+                    text = "You can change this later from the device report.",
                     fontSize = 12.sp,
-                    color = Color.Gray
+                    color = DR_TextHint,
+                    textAlign = TextAlign.Center
                 )
             }
         },
         confirmButton = {
             Button(
                 onClick = { onConfirm(command) },
+                shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isCut) Color(0xFFFF4E4E) else Color(0xFF3EBB3E)
-                )
+                    containerColor = accentColor
+                ),
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = if (isCut) "Yes, Turn Off" else "Yes, Turn On"
+                    text = if (isCut) "Yes, Turn Off" else "Yes, Turn On",
+                    fontWeight = FontWeight.SemiBold
                 )
             }
         },
         dismissButton = {
-            OutlinedButton(onClick = onCancel) {
-                Text("Cancel")
+            OutlinedButton(
+                onClick = onCancel,
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Cancel", color = DR_TextSec)
             }
         },
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(24.dp),
+        containerColor = DR_Surface
     )
 }

@@ -313,7 +313,8 @@ fun BoxScope.TopDeviceBoxWithData(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 35.dp, start = 16.dp, end = 16.dp, bottom = 16.dp)
+            .statusBarsPadding()
+            .padding(top = 8.dp, start = 16.dp, end = 16.dp, bottom = 16.dp)
             .align(Alignment.TopCenter),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
@@ -422,7 +423,7 @@ fun BoxScope.HistoryPlaybackBottomSheet(
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
             .navigationBarsPadding()
-            .padding(12.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         color = Color.White,
         tonalElevation = 6.dp
@@ -431,11 +432,11 @@ fun BoxScope.HistoryPlaybackBottomSheet(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 16.dp)
+                .padding(bottom = 12.dp)
         ) {
             Box(
                 Modifier
-                    .padding(top = 12.dp, bottom = 16.dp)
+                    .padding(top = 10.dp, bottom = 12.dp)
                     .width(40.dp)
                     .height(4.dp)
                     .clip(RoundedCornerShape(50))
@@ -445,13 +446,13 @@ fun BoxScope.HistoryPlaybackBottomSheet(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp),
+                    .padding(horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 IconButton(
                     onClick = onPreviousDate,
-                    modifier = Modifier.size(40.dp),
+                    modifier = Modifier.size(36.dp),
                     enabled = hasData && selectedDevice != null
                 ) {
                     Icon(
@@ -467,17 +468,24 @@ fun BoxScope.HistoryPlaybackBottomSheet(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = Color.Gray,
-                        fontSize = 18.sp,
-                        modifier = Modifier.padding(horizontal = 8.dp)
+                        fontSize = 16.sp,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 4.dp),
+                        maxLines = 1
                     )
                 } else {
-                    TextButton(onClick = onDateClick) {
+                    TextButton(
+                        onClick = onDateClick,
+                        modifier = Modifier.weight(1f)
+                    ) {
                         Text(
                             text = formatDateRange(startDate, endDate),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = Color.Black,
-                            fontSize = 18.sp
+                            fontSize = 15.sp,
+                            maxLines = 1
                         )
                         Icon(Icons.Default.ArrowDropDown, "selector")
                     }
@@ -485,7 +493,7 @@ fun BoxScope.HistoryPlaybackBottomSheet(
 
                 IconButton(
                     onClick = onNextDate,
-                    modifier = Modifier.size(40.dp),
+                    modifier = Modifier.size(36.dp),
                     enabled = hasData && selectedDevice != null
                 ) {
                     Icon(
@@ -496,102 +504,93 @@ fun BoxScope.HistoryPlaybackBottomSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
+            // Stats row — 3 stat boxes
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    .padding(horizontal = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(72.dp)
-                        .background(Color(0xFFF3F6F1), RoundedCornerShape(14.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Total Distance", fontSize = 11.sp, color = Color.Gray)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = if (hasData) "${totalDistance.toInt()}km" else "0km",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Black
-                        )
-                    }
-                }
+                StatBox(
+                    label = "Distance",
+                    value = if (hasData) "${totalDistance.toInt()} km" else "0 km",
+                    bgColor = Color(0xFFF3F6F1),
+                    modifier = Modifier.weight(1f)
+                )
 
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(72.dp)
-                        .background(Color(0xFFF3F6F1), RoundedCornerShape(14.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Avg Speed", fontSize = 11.sp, color = Color.Gray)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = if (hasData) "${averageSpeed.toInt()} km/h" else "0 km/h",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Black
-                        )
-                    }
-                }
+                StatBox(
+                    label = "Avg Speed",
+                    value = if (hasData) "${averageSpeed.toInt()} km/h" else "0 km/h",
+                    bgColor = Color(0xFFF3F6F1),
+                    modifier = Modifier.weight(1f)
+                )
 
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(72.dp)
-                        .background(
-                            if (isPlaying && currentSpeed > 0) Color(0xFFFFF3E0) else Color(0xFFF3F6F1),
-                            RoundedCornerShape(14.dp)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Speed", fontSize = 11.sp, color = Color.Gray)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = if (isPlaying) "$currentSpeed km/h" else "0 km/h",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isPlaying && currentSpeed > 0) Color(0xFFE65100) else Color.Black
-                        )
-                    }
-                }
-
-                Button(
-                    onClick = onPlayClick,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (hasData) Color(0xFF7CB342) else Color.Gray
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(72.dp),
-                    enabled = hasData
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        var statePlay = if (!isPlaying) "Play History" else "Pause "
-                        Text(statePlay, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("1X", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            Spacer(modifier = Modifier.width(2.dp))
-                            Icon(
-                                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                contentDescription = "Play",
-                                tint = Color.White,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                }
+                StatBox(
+                    label = "Speed",
+                    value = if (isPlaying) "$currentSpeed km/h" else "0 km/h",
+                    bgColor = if (isPlaying && currentSpeed > 0) Color(0xFFFFF3E0) else Color(0xFFF3F6F1),
+                    valueColor = if (isPlaying && currentSpeed > 0) Color(0xFFE65100) else Color.Black,
+                    modifier = Modifier.weight(1f)
+                )
             }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Play button — full width
+            Button(
+                onClick = onPlayClick,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (hasData) Color(0xFF7CB342) else Color.Gray
+                ),
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+                    .height(48.dp),
+                enabled = hasData
+            ) {
+                val statePlay = if (!isPlaying) "Play History" else "Pause"
+                Icon(
+                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = "Play",
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(statePlay, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Spacer(modifier = Modifier.width(6.dp))
+                Text("1X", color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatBox(
+    label: String,
+    value: String,
+    bgColor: Color,
+    valueColor: Color = Color.Black,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .height(64.dp)
+            .background(bgColor, RoundedCornerShape(14.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(label, fontSize = 10.sp, color = Color.Gray, maxLines = 1)
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = value,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = valueColor,
+                maxLines = 1
+            )
         }
     }
 }

@@ -94,7 +94,7 @@ fun PaymentScreenContent() {
         Card(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(Color(0xFFEFF7F0))
+            colors = CardDefaults.cardColors(P_GreenSurface)
         ) {
             Column(
                 modifier = Modifier.padding(20.dp),
@@ -106,7 +106,7 @@ fun PaymentScreenContent() {
                     "₹${state.finalAmount ?: state.totalPrice ?: "0"}",
                     fontSize = 32.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1B9F4A)
+                    color = P_Green
                 )
             }
         }
@@ -174,7 +174,7 @@ fun PaymentScreenContent() {
         if (paymentState is PaymentState.Failed) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(Color(0xFFFFEBEE)),
+                colors = CardDefaults.cardColors(Color(0xFFFEF2F2)),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Column(
@@ -195,7 +195,7 @@ fun PaymentScreenContent() {
                             viewModel.resetPaymentState()
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(Color(0xFF1B9F4A))
+                        colors = ButtonDefaults.buttonColors(P_Green)
                     ) {
                         Text("Try Again")
                     }
@@ -250,7 +250,7 @@ fun PaymentMethodCard(
             }
 
             if (enabled) {
-                Text("→", fontSize = 24.sp, color = Color(0xFF1B9F4A))
+                Text("→", fontSize = 24.sp, color = P_Green)
             }
         }
     }

@@ -231,7 +231,7 @@ fun PaymentResultContent(
                         modifier = Modifier
                             .size(100.dp)
                             .background(
-                                color = Color(0xFFE53935),
+                                color = Color(0xFFE5565B),
                                 shape = CircleShape
                             ),
                         contentAlignment = Alignment.Center
@@ -251,7 +251,7 @@ fun PaymentResultContent(
                         text = "Payment Failed",
                         fontSize = 24.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFFE53935)
+                        color = Color(0xFFE5565B)
                     )
 
                     Spacer(Modifier.height(12.dp))
@@ -280,7 +280,7 @@ fun PaymentResultContent(
                         ) {
                             Text(
                                 text = reason ?: "Payment cancelled or failed",
-                                color = Color(0xFFE53935),
+                                color = Color(0xFFE5565B),
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Medium,
                                 textAlign = TextAlign.Center
@@ -303,7 +303,7 @@ fun PaymentResultContent(
                             },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(Color(0xFFE53935))
+                            colors = ButtonDefaults.buttonColors(Color(0xFFE5565B))
                         ) {
                             Text("Retry Payment", fontSize = 16.sp)
                         }

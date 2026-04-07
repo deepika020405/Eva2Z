@@ -45,16 +45,23 @@ import platform.Foundation.NSURL
 import platform.UIKit.UIApplication
 
 actual fun openCall(phoneNumber: String) {
-    val url = NSURL(string = "tel://$phoneNumber") ?: return
-    UIApplication.sharedApplication.openURL(url)
+    val url = NSURL(string = "tel:$phoneNumber") ?: return
+    UIApplication.sharedApplication.openURL(url, emptyMap<Any?, Any>(), null)
 }
 
 actual fun openWhatsApp(phoneNumber: String, message: String) {
     val encodedMessage =
         message.replace(" ", "%20").replace("\n", "%0A")
 
-    val url = NSURL(
-        string = "https://wa.me/$phoneNumber?text=$encodedMessage"
-    ) ?: return
-    UIApplication.sharedApplication.openURL(url)
+    // Try WhatsApp app first
+    val appUrl = NSURL(string = "whatsapp://send?phone=$phoneNumber&text=$encodedMessage")
+    val app = UIApplication.sharedApplication
+
+    if (appUrl != null && app.canOpenURL(appUrl)) {
+        app.openURL(appUrl, emptyMap<Any?, Any>(), null)
+    } else {
+        // Fallback to WhatsApp web
+        val webUrl = NSURL(string = "https://wa.me/$phoneNumber?text=$encodedMessage") ?: return
+        app.openURL(webUrl, emptyMap<Any?, Any>(), null)
+    }
 }

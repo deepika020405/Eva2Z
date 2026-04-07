@@ -27,20 +27,20 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import coil3.compose.AsyncImage
 import com.developer.ev2z.util.VideoPlayerView
 
-// ── Light premium green palette ────────────────────────────────
-private val Hero_Green       = Color(0xFF00875A)
-private val Hero_GreenLight  = Color(0xFF00A86B)
-private val Hero_GreenSoft   = Color(0xFFE8F5EE)   // very light mint
-private val Hero_GreenMint   = Color(0xFFF0FAF5)   // almost white-green
-private val Hero_GreenBorder = Color(0xFFB7E4CC)
-private val Hero_Teal        = Color(0xFF00796B)
-private val Hero_Dark        = Color(0xFF0A0F0D)
-private val Hero_Mid         = Color(0xFF4A5568)
-private val Hero_Light       = Color(0xFF9AA5B1)
-private val Hero_Border      = Color(0xFFE8ECF0)
-private val Hero_Bg          = Color(0xFFF4FBF7)   // light green-tinted bg
-private val Hero_Orange      = Color(0xFFFF6B35)
-private val Hero_Gold        = Color(0xFFF59E0B)
+// ── Light green + white theme palette ──────────────────────────
+private val Hero_Green       = Color(0xFF6A9F50)
+private val Hero_GreenLight  = Color(0xFF85B070)
+private val Hero_GreenSoft   = Color(0xFFF0F7EC)
+private val Hero_GreenMint   = Color(0xFFF6FAF3)
+private val Hero_GreenBorder = Color(0xFFD4E4CD)
+private val Hero_Teal        = Color(0xFF6A9F50)
+private val Hero_Dark        = Color(0xFF1C2418)
+private val Hero_Mid         = Color(0xFF5D6858)
+private val Hero_Light       = Color(0xFFA0A99B)
+private val Hero_Border      = Color(0xFFECF0E8)
+private val Hero_Bg          = Color(0xFFF9FBF7)
+private val Hero_Orange      = Color(0xFFEA8C00)
+private val Hero_Gold        = Color(0xFFF4C44E)
 
 
 class GpsHeroScreen(
@@ -638,10 +638,10 @@ class GpsHeroScreen(
 // ═══════════════════════════════════════════════════════════════
 @Composable
 private fun VideoPlaceholder() {
-    val Hero_Green      = Color(0xFF00875A)
-    val Hero_GreenSoft  = Color(0xFFE8F5EE)
-    val Hero_GreenBorder= Color(0xFFB7E4CC)
-    val Hero_GreenLight = Color(0xFF00A86B)
+    val Hero_Green      = Color(0xFF6A9F50)
+    val Hero_GreenSoft  = Color(0xFFF0F7EC)
+    val Hero_GreenBorder= Color(0xFFD4E4CD)
+    val Hero_GreenLight = Color(0xFF85B070)
 
     Box(
         modifier         = Modifier.fillMaxSize(),

@@ -68,7 +68,7 @@ fun InstallationSupportScreen(
                 subtitle = "Bike, Scooter, Electric 2W",
                 icon = Icons.Default.TwoWheeler,
                 onClick = {
-                    openUrl("https://youtu.be/ZQwBFwKTRSA")
+                    openUrl("https://youtu.be/sYjUGsugOtY?si=aP8lZJ4Lg5RPeo3f")
                 }
             )
 
@@ -77,7 +77,7 @@ fun InstallationSupportScreen(
                 subtitle = "Car, SUV, Truck, Bus",
                 icon = Icons.Default.DirectionsCar,
                 onClick = {
-                    openUrl("https://youtu.be/ZQwBFwKTRSA")
+                    openUrl("https://youtu.be/KrQRf6XZ-Ok?si=iODpWPEVbBtl1Ev5")
                 }
             )
         }

@@ -1,6 +1,11 @@
 package com.developer.ev2z.navigation
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
@@ -13,6 +18,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -68,8 +74,8 @@ import com.developer.ev2z.ui.screens.community.CommunityScreenRoot
 import com.developer.ev2z.ui.screens.community.CreatePostScreen
 import com.developer.ev2z.ui.screens.community.CreateStoryScreen
 import com.developer.ev2z.ui.screens.community.StoryViewerScreen
-import com.developer.ev2z.ui.screens.documents.DocumentViewerScreen
 import com.developer.ev2z.ui.screens.documents.DocumentsScreen
+import com.developer.ev2z.ui.screens.documents.DocumentViewerScreen
 import com.developer.ev2z.ui.screens.documents.UploadDocumentScreen
 import com.developer.ev2z.ui.screens.homeScreen.HomeUiState
 import com.developer.ev2z.ui.screens.homeScreen.LiveLocationScreen
@@ -86,6 +92,7 @@ import com.developer.ev2z.ui.screens.SOSParkingTag.ConfirmationScreen
 import com.developer.ev2z.ui.screens.SOSParkingTag.QuickReplyScreen
 import com.developer.ev2z.ui.screens.SOSParkingTag.SosTagAlertScreen
 import com.developer.ev2z.ui.screens.SOSParkingTag.SosTagViewModel
+import com.developer.ev2z.ui.screens.InstallationSupport.InstallationSupportScreen
 import com.developer.ev2z.ui.screens.market_screen.ShopProduct
 import com.developer.ev2z.util.SosNotificationHandler
 
@@ -111,6 +118,7 @@ class HomeTab(
     private val onNavigateToParking: () -> Unit,
     private val onNavigateToSosTag: (Int) -> Unit,
     private val onSosTagManual: () -> Unit,   // ✅ NEW — manual button ke liye
+    private val onNavigateToInstallationSupport: () -> Unit,
 ) : Tab {
 
     @Composable
@@ -185,7 +193,8 @@ class HomeTab(
 
                 onOpenCommunity = onOpenCommunity,
 
-                onCriminalVerification = onNavigateToCriminalVerification // ✅ NEW
+                onCriminalVerification = onNavigateToCriminalVerification, // ✅ NEW
+                onInstallationSupport = onNavigateToInstallationSupport
             )
         }
     }
@@ -412,6 +421,7 @@ fun HomeNavGraph(
 
     var selectedWarrantyDeviceId by remember { mutableStateOf("") }
     var showCriminalVerification by remember { mutableStateOf(false) }
+    var showInstallationSupport by remember { mutableStateOf(false) }
     // Screen visibility states
     var showEditProfile by remember { mutableStateOf(false) }
     var showManageDevice by remember { mutableStateOf(false) }
@@ -433,7 +443,7 @@ fun HomeNavGraph(
     var showDocumentViewer by remember { mutableStateOf(false) }
     var viewerBytes by remember { mutableStateOf<ByteArray?>(null) }
     var viewerFileName by remember { mutableStateOf("") }
-    var showUploadDocument by remember { mutableStateOf(false) } // 🔹 add state
+    var showUploadDocument by remember { mutableStateOf(false) }
     var showVaultPasswordDialog by remember { mutableStateOf(false) }
     var showCommunity by remember { mutableStateOf(false) }
     var showCreatePost by remember { mutableStateOf(false) }
@@ -505,7 +515,13 @@ fun HomeNavGraph(
 
     Box(modifier = Modifier.fillMaxSize()) {
 
-        if (showCriminalVerification) {
+        if (showInstallationSupport) {
+
+            InstallationSupportScreen(
+                onBack = { showInstallationSupport = false }
+            )
+
+        } else if (showCriminalVerification) {
 
             CriminalVerificationFlow(
                 apiService = apiService,
@@ -545,6 +561,7 @@ fun HomeNavGraph(
                 onNavigateToReferAndEarn = { showReferAndEarn = true },
                 onNavigateToAboutApp = { showAboutApp = true },
                 onNavigateToCriminalVerification = { showCriminalVerification = true },
+                onNavigateToInstallationSupport = { showInstallationSupport = true },
                 onNavigateToMyAccount = { showMyAccount = true },
                 onNavigateToDocuments = { showCommunity = true },
                 onRequestDocumentsWithPassword = { showVaultPasswordDialog = true },
@@ -587,7 +604,8 @@ fun HomeNavGraph(
             showAccountActivity || showReferAndEarn || showChangePassword ||
             showAboutApp || showPrivacyPolicy || showTermsConditions ||
             showRefundPolicy || showShippingPolicy || showCriminalVerification ||
-            showDriverScore || showParking || showEditProfile
+            showDriverScore || showParking || showEditProfile ||
+            showInstallationSupport
         }
     }
 
@@ -659,6 +677,7 @@ fun HomeNavGraph(
         )
     }
 
+    // ── Vehicle & Document Flow ────────────────────────────────────
     if (showDocuments) {
         DocumentsScreen(
             apiService = apiService,
@@ -696,7 +715,7 @@ fun HomeNavGraph(
 
     if (showDocumentViewer && viewerBytes != null) {
 
-        val androidContext = getAppContext()  // ✅ REAL Context
+        val androidContext = getAppContext()
 
         DocumentViewerScreen(
             fileName = viewerFileName,
@@ -707,7 +726,7 @@ fun HomeNavGraph(
             },
             onDownload = {
                 platformDownloadFile(
-                    context = androidContext,   // ✅ FIXED
+                    context = androidContext,
                     bytes = viewerBytes!!,
                     fileName = viewerFileName
                 )
@@ -1133,12 +1152,14 @@ fun HomeNavGraph(
     PlatformBackHandler(enabled = showRefundPolicy)      { showRefundPolicy = false }
     PlatformBackHandler(enabled = showShippingPolicy)    { showShippingPolicy = false }
     PlatformBackHandler(enabled = showCriminalVerification) { showCriminalVerification = false }
+    PlatformBackHandler(enabled = showInstallationSupport)  { showInstallationSupport = false }
     PlatformBackHandler(enabled = showDriverScore)       { showDriverScore = false }
     PlatformBackHandler(enabled = showParking)           { showParking = false }
     PlatformBackHandler(enabled = showMyAccount)         { showMyAccount = false }
     PlatformBackHandler(enabled = showChangePlan)        { showChangePlan = false; showMyAccount = true }
     PlatformBackHandler(enabled = showBillDetails)       { showBillDetails = false; showMyAccount = true }
     PlatformBackHandler(enabled = showWarranty)          { showWarranty = false; showMyAccount = true }
+    // Document flow back handlers
     PlatformBackHandler(enabled = showDocuments)         { showDocuments = false }
     PlatformBackHandler(enabled = showUploadDocument)    { showUploadDocument = false; showDocuments = true }
     PlatformBackHandler(enabled = showDocumentViewer)    { showDocumentViewer = false; showDocuments = true }
@@ -1292,6 +1313,7 @@ fun HomeNavGraphContent(
     onRequestDocumentsWithPassword: () -> Unit,
     onDocumentsTabSelected: () -> Unit,   // ✅ ADD
     onNavigateToCriminalVerification: () -> Unit,   // ✅ ADD HERE
+    onNavigateToInstallationSupport: () -> Unit,
     onOpenCommunity: () -> Unit,
     onNavigateToDriverScore: () -> Unit,  // ✅ ADD THIS LINE
     onNavigateToParking: () -> Unit,    // ✅ CHANGED — add after onNavigateToDriverScore
@@ -1367,6 +1389,7 @@ fun HomeNavGraphContent(
             onNavigateToParking = onNavigateToParking,
             onNavigateToSosTag = { alertId -> latestOnSosTag(alertId) },  // ✅ fresh lambda
             onSosTagManual = { latestOnSosTagManual() },                   // ✅ fresh lambda
+            onNavigateToInstallationSupport = onNavigateToInstallationSupport,
         )
     }
 
@@ -1462,39 +1485,98 @@ fun CustomBottomNavBar(
     selectedIndex: Int,
     onTabSelected: (Int) -> Unit
 ) {
-    val green = Color(0xFF4CAF50)
-    val lightGreen = Color(0x1A4CAF50)
+    val primary = Color(0xFF6A9F50)
+    val unselected = Color(0xFF9CA3AF)
+    val bgColor = Color(0xFFFFFFFF)
+    val borderColor = Color(0xFFF0F2ED)
 
-    NavigationBar(
-        containerColor = Color.White,
-        tonalElevation = 0.dp
+    Surface(
+        color = bgColor,
+        shadowElevation = 8.dp,
+        modifier = Modifier.fillMaxWidth()
     ) {
-        tabs.forEachIndexed { index, tab ->
-            val selected = selectedIndex == index
-
-            NavigationBarItem(
-                selected = selected,
-                onClick = { onTabSelected(index) },
-                colors = NavigationBarItemDefaults.colors(
-                    selectedIconColor = green,
-                    selectedTextColor = green,
-                    indicatorColor = lightGreen,
-                    unselectedIconColor = Color.Gray,
-                    unselectedTextColor = Color.Gray
-                ),
-                icon = {
-                    Icon(
-                        painter = tab.options.icon!!,
-                        contentDescription = tab.options.title
-                    )
-                },
-                label = {
-                    Text(
-                        text = tab.options.title,
-                        color = if (selected) green else Color.Gray
-                    )
-                }
+        Column {
+            // Top divider line
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(0.5.dp)
+                    .background(borderColor)
             )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .height(64.dp)
+                    .padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                tabs.forEachIndexed { index, tab ->
+                    val selected = selectedIndex == index
+
+                    val iconTint by animateColorAsState(
+                        targetValue = if (selected) primary else unselected,
+                        animationSpec = tween(250),
+                        label = "navIconColor"
+                    )
+
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null
+                            ) { onTabSelected(index) }
+                    ) {
+                        // Active indicator pill
+                        Box(
+                            modifier = Modifier
+                                .width(if (selected) 48.dp else 0.dp)
+                                .height(3.dp)
+                                .clip(RoundedCornerShape(bottomStart = 2.dp, bottomEnd = 2.dp))
+                                .background(if (selected) primary else Color.Transparent)
+                        )
+
+                        Spacer(Modifier.height(6.dp))
+
+                        // Icon with subtle background when selected
+                        Box(
+                            modifier = Modifier
+                                .size(if (selected) 40.dp else 36.dp)
+                                .background(
+                                    if (selected) primary.copy(alpha = 0.1f) else Color.Transparent,
+                                    RoundedCornerShape(12.dp)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = tab.options.icon!!,
+                                contentDescription = tab.options.title,
+                                tint = iconTint,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
+                        Spacer(Modifier.height(2.dp))
+
+                        Text(
+                            text = tab.options.title,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontSize = 10.sp,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                color = iconTint,
+                                letterSpacing = 0.1.sp
+                            )
+                        )
+                    }
+                }
+            }
         }
     }
 }

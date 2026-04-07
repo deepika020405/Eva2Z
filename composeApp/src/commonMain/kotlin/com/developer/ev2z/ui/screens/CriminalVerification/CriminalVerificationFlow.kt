@@ -1,19 +1,43 @@
 package com.developer.ev2z.ui.screens.CriminalVerification
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.developer.ev2z.data.local.UserPrefs
 import com.developer.ev2z.data.local.createStorageManager
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.network.ApiService
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+
+// ── Theme Colors ─────────────────────────────────────────────────
+internal val CV_Primary = Color(0xFF6A9F50)
+internal val CV_PrimaryDark = Color(0xFF4A7D39)
+internal val CV_PrimaryBg = Color(0xFFF0F7EC)
+internal val CV_Background = Color(0xFFF8FAF0)
+internal val CV_Surface = Color(0xFFFFFFFF)
+internal val CV_SectionBg = Color(0xFFF3F6F0)
+internal val CV_Border = Color(0xFFE2E8DD)
+internal val CV_TextPrimary = Color(0xFF1C2418)
+internal val CV_TextSec = Color(0xFF5D6858)
+internal val CV_TextHint = Color(0xFFA0A99B)
+internal val CV_Success = Color(0xFF4A9F3A)
+internal val CV_Error = Color(0xFFE5565B)
+internal val CV_Warning = Color(0xFFF4C44E)
+internal val CV_Info = Color(0xFF4A90D9)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -22,8 +46,8 @@ fun CriminalVerificationFlow(
     onBack: () -> Unit
 ) {
     val userPrefs = remember { UserPrefs(createStorageManager()) }
-    val vm        = remember { CriminalVerificationViewModel(apiService, userPrefs) }
-    val scope     = rememberCoroutineScope()
+    val vm = remember { CriminalVerificationViewModel(apiService, userPrefs) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
         vm.loadPersistedState()
@@ -36,43 +60,84 @@ fun CriminalVerificationFlow(
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Criminal Verification") },
-                navigationIcon = {
-                    IconButton(
-                        onClick = {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(CV_Background)
+    ) {
+        // Custom top bar
+        Surface(
+            color = CV_Surface,
+            shadowElevation = 2.dp
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        top = WindowInsets.statusBars
+                            .asPaddingValues()
+                            .calculateTopPadding() + 12.dp,
+                        bottom = 12.dp,
+                        start = 14.dp,
+                        end = 14.dp
+                    ),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = CircleShape,
+                    color = CV_SectionBg,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clickable {
                             when (vm.step) {
                                 VerificationStep.SUCCESS -> vm.reset()
                                 else -> onBack()
                             }
                         }
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize()
                     ) {
                         Icon(
                             imageVector = if (vm.step == VerificationStep.SUCCESS)
                                 Icons.Default.Close
                             else
                                 Icons.Default.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = "Back",
+                            modifier = Modifier.size(18.dp),
+                            tint = CV_TextPrimary
                         )
                     }
                 }
-            )
+
+                Spacer(Modifier.width(12.dp))
+
+                Icon(
+                    Icons.Default.Shield,
+                    contentDescription = null,
+                    tint = CV_Primary,
+                    modifier = Modifier.size(22.dp)
+                )
+
+                Spacer(Modifier.width(8.dp))
+
+                Text(
+                    "Criminal Verification",
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = CV_TextPrimary
+                )
+            }
         }
-    ) { padding ->
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
+        // Content
+        Box(modifier = Modifier.fillMaxSize()) {
             when (vm.step) {
-
                 VerificationStep.FORM ->
                     CriminalVerificationEntryScreen(
-                        isLoading      = vm.loading,
-                        onSubmitNew    = { form -> scope.launch { vm.submitForm(form) } },
+                        isLoading = vm.loading,
+                        onSubmitNew = { form -> scope.launch { vm.submitForm(form) } },
                         onSearchStatus = { candidateId, name ->
                             scope.launch { vm.searchByCandidate(candidateId, name) }
                         }
@@ -85,8 +150,8 @@ fun CriminalVerificationFlow(
                     vm.paymentToken?.let { token ->
                         CriminalPaymentScreen(
                             paymentToken = token,
-                            amount       = vm.amount,
-                            onSuccess    = { txnId ->
+                            amount = vm.amount,
+                            onSuccess = { txnId ->
                                 scope.launch { vm.onPaymentSuccess(txnId ?: "") }
                             },
                             onFailure = { error ->
@@ -107,8 +172,6 @@ fun CriminalVerificationFlow(
                     ProcessingScreen("Submitting background verification...")
 
                 VerificationStep.SUCCESS -> {
-                    // ✅ Sirf ek baar status check karo — screen open hone par
-                    // Polling nahi — bas latest status fetch karo
                     LaunchedEffect(vm.createdCandidateId) {
                         if (vm.createdCandidateId != null) {
                             vm.checkVerificationStatus()
@@ -116,13 +179,13 @@ fun CriminalVerificationFlow(
                     }
 
                     CriminalSuccessScreen(
-                        form            = vm.cachedForm,
-                        candidateId     = vm.createdCandidateId,
-                        status          = vm.bgvStatus,
-                        reportUrl       = vm.reportUrl,
-                        candidateName   = vm.searchedCandidateName,
-                        courtResult     = vm.courtCheckResult,   // ← yeh add karo
-                        onDone          = { /* navigate back */ },
+                        form = vm.cachedForm,
+                        candidateId = vm.createdCandidateId,
+                        status = vm.bgvStatus,
+                        reportUrl = vm.reportUrl,
+                        candidateName = vm.searchedCandidateName,
+                        courtResult = vm.courtCheckResult,
+                        onDone = { },
                         onNewVerification = { vm.reset() }
                     )
                 }
@@ -131,7 +194,7 @@ fun CriminalVerificationFlow(
                     CriminalErrorScreen(
                         message = vm.errorMessage,
                         onRetry = { vm.reset() },
-                        onBack  = onBack
+                        onBack = onBack
                     )
             }
         }

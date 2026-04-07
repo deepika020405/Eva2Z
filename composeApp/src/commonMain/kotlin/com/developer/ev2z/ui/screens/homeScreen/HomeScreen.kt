@@ -80,8 +80,8 @@ fun HomeScreen(
     onDriverScore: () -> Unit ,            // ✅ NEW — Driver Score navigation
     onParking: () -> Unit,           // ✅ CHANGED — new param
     onSosTag: () -> Unit,              // ✅ NEW — SOS Tag
-    onOpenCommunity: () -> Unit
-
+    onOpenCommunity: () -> Unit,
+    onInstallationSupport: () -> Unit = {}
 ) {
     Scaffold(containerColor = BackgroundColor) { padding ->
 
@@ -110,7 +110,8 @@ fun HomeScreen(
                     onOpenAddDevice = onOpenAddDevice,
                     onOpenCommunity = onOpenCommunity,
                     onParking     = onParking,         // ✅ CHANGED — pass through
-                    onSosTag      = onSosTag    // ✅ NEW — pass karo
+                    onSosTag      = onSosTag,    // ✅ NEW — pass karo
+                    onInstallationSupport = onInstallationSupport
                 )
             }
 
@@ -266,8 +267,8 @@ fun HomeQuickActionsSection(
     onOpenAddDevice:  () -> Unit,
     onOpenCommunity: () -> Unit,
     onParking: () -> Unit,            // ✅ CHANGED — new param
-    onSosTag: () -> Unit              // ✅ NEW — SOS Tag param
-
+    onSosTag: () -> Unit,              // ✅ NEW — SOS Tag param
+    onInstallationSupport: () -> Unit = {}
 ) {
 
     val features = listOf(
@@ -290,6 +291,11 @@ fun HomeQuickActionsSection(
             "Community",
             Icons.Default.Groups,
             onOpenCommunity   // ✅ connect
+        ),
+        QuickActionItem(
+            "Installation Support",
+            Icons.Default.Build,
+            onInstallationSupport
         )
        )
 
@@ -345,7 +351,6 @@ fun ModernFeaturesSection(
         QuickActionItem("Service Market", Icons.Default.Build) {},
         QuickActionItem("Repair Market", Icons.Default.DirectionsCar) {},
         QuickActionItem("Charging", Icons.Default.EvStation) {},
-        QuickActionItem("Installation Support", Icons.Default.Build) {},
 //        QuickActionItem("Parking",Icons.Default.LocalParking,   onParking),  // ✅ CHANGED
 //        QuickActionItem("SOS Parking Tag",Icons.Default.Warning,onSosTag),  // ✅ WIRED
         QuickActionItem("Background Verification", Icons.Default.Badge) {}

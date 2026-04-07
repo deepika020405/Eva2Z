@@ -1,5 +1,6 @@
 package com.developer.ev2z.ui.screens.CriminalVerification
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -12,8 +13,11 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,11 +38,8 @@ fun CriminalVerificationFormScreen(
     var landmark by rememberSaveable { mutableStateOf("") }
     var stayingPeriod by rememberSaveable { mutableStateOf("") }
     var consent by rememberSaveable { mutableStateOf(false) }
-
-    // 🔥 NEW FIELDS
     var uanNumber by rememberSaveable { mutableStateOf("") }
     var rented by rememberSaveable { mutableStateOf(false) }
-
     var expanded by remember { mutableStateOf(false) }
 
     val stayingOptions = listOf(
@@ -67,7 +68,9 @@ fun CriminalVerificationFormScreen(
                 consent
 
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(CV_Background),
         contentAlignment = Alignment.TopCenter
     ) {
         Column(
@@ -79,7 +82,6 @@ fun CriminalVerificationFormScreen(
         ) {
 
             SectionCard("Personal Details") {
-
                 InputField("Full Name", name) { name = it.trimStart() }
 
                 InputField(
@@ -104,7 +106,6 @@ fun CriminalVerificationFormScreen(
                     employeeId = it.uppercase()
                 }
 
-                // 🔥 NEW → UAN (optional)
                 InputField(
                     label = "UAN Number (optional)",
                     value = uanNumber,
@@ -114,10 +115,9 @@ fun CriminalVerificationFormScreen(
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(14.dp))
 
             SectionCard("Address Details") {
-
                 InputField("House No", houseNo) { houseNo = it }
                 InputField("Colony", colony) { colony = it }
                 InputField("City", city) { city = it }
@@ -135,17 +135,36 @@ fun CriminalVerificationFormScreen(
 
                 InputField("Landmark", landmark) { landmark = it }
 
-                // 🔥 Rented Toggle
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(
-                        checked = rented,
-                        onCheckedChange = { rented = it }
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("This is a rented property")
+                // Rented Toggle
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = CV_SectionBg,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = rented,
+                            onCheckedChange = { rented = it },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = CV_Primary,
+                                uncheckedColor = CV_TextHint
+                            )
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "This is a rented property",
+                            fontSize = 14.sp,
+                            color = CV_TextPrimary
+                        )
+                    }
                 }
 
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(6.dp))
 
                 // Staying Period Dropdown
                 ExposedDropdownMenuBox(
@@ -158,13 +177,22 @@ fun CriminalVerificationFormScreen(
                         readOnly = true,
                         label = { Text("Staying Period") },
                         trailingIcon = {
-                            Icon(Icons.Outlined.KeyboardArrowDown, null)
+                            Icon(
+                                Icons.Outlined.KeyboardArrowDown,
+                                null,
+                                tint = CV_TextHint
+                            )
                         },
                         modifier = Modifier
                             .menuAnchor()
                             .fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        isError = stayingPeriod.isBlank()
+                        shape = RoundedCornerShape(14.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = CV_Primary,
+                            unfocusedBorderColor = CV_Border,
+                            focusedLabelColor = CV_Primary,
+                            cursorColor = CV_Primary
+                        )
                     )
 
                     ExposedDropdownMenu(
@@ -173,7 +201,13 @@ fun CriminalVerificationFormScreen(
                     ) {
                         stayingOptions.forEach { option ->
                             DropdownMenuItem(
-                                text = { Text(option) },
+                                text = {
+                                    Text(
+                                        option,
+                                        fontSize = 14.sp,
+                                        color = CV_TextPrimary
+                                    )
+                                },
                                 onClick = {
                                     stayingPeriod = option
                                     expanded = false
@@ -184,29 +218,36 @@ fun CriminalVerificationFormScreen(
                 }
             }
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(14.dp))
 
             // Consent
             Card(
                 shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                )
+                colors = CardDefaults.cardColors(containerColor = CV_PrimaryBg),
+                elevation = CardDefaults.cardElevation(0.dp)
             ) {
                 Row(
-                    modifier = Modifier.padding(16.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Checkbox(
                         checked = consent,
-                        onCheckedChange = { consent = it }
+                        onCheckedChange = { consent = it },
+                        colors = CheckboxDefaults.colors(
+                            checkedColor = CV_Primary,
+                            uncheckedColor = CV_TextHint
+                        )
                     )
-                    Spacer(Modifier.width(8.dp))
-                    Text("I confirm the information is accurate.")
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "I confirm the information is accurate.",
+                        fontSize = 14.sp,
+                        color = CV_TextPrimary
+                    )
                 }
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(20.dp))
 
             Button(
                 onClick = {
@@ -224,8 +265,6 @@ fun CriminalVerificationFormScreen(
                             pincode,
                             landmark.trim(),
                             stayingPeriod,
-
-                            // 🔥 NEW FIELDS
                             uanNumber = uanNumber,
                             uanNotAvailable = uanNumber.isBlank(),
                             rented = rented
@@ -234,16 +273,25 @@ fun CriminalVerificationFormScreen(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(54.dp),
-                enabled = !isLoading && isFormValid
+                    .height(52.dp),
+                enabled = !isLoading && isFormValid,
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = CV_Primary,
+                    disabledContainerColor = CV_Primary.copy(alpha = 0.4f)
+                )
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(
                         strokeWidth = 2.dp,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(20.dp),
+                        color = Color.White
                     )
                 } else {
-                    Text("Proceed to Payment")
+                    Text(
+                        "Proceed to Payment",
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
 
@@ -259,10 +307,16 @@ fun SectionCard(
 ) {
     Card(
         shape = RoundedCornerShape(18.dp),
-        elevation = CardDefaults.cardElevation(3.dp)
+        colors = CardDefaults.cardColors(containerColor = CV_Surface),
+        elevation = CardDefaults.cardElevation(2.dp)
     ) {
         Column(Modifier.padding(16.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(
+                title,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = CV_TextPrimary
+            )
             Spacer(Modifier.height(12.dp))
             content()
         }
@@ -284,19 +338,26 @@ fun InputField(
             onValueChange = onChange,
             label = { Text(label) },
             singleLine = true,
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(14.dp),
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             isError = isError,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 6.dp)
+                .padding(vertical = 5.dp),
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedBorderColor = CV_Primary,
+                unfocusedBorderColor = CV_Border,
+                focusedLabelColor = CV_Primary,
+                cursorColor = CV_Primary,
+                errorBorderColor = CV_Error
+            )
         )
 
         if (isError) {
             Text(
                 text = errorText,
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall,
+                color = CV_Error,
+                fontSize = 12.sp,
                 modifier = Modifier.padding(start = 12.dp)
             )
         }

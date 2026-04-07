@@ -32,8 +32,8 @@ import coil3.compose.AsyncImage
 import com.developer.ev2z.util.Analytics
 import kotlinx.coroutines.delay
 
-private val P_Orange    = Color(0xFFFF6B35)
-private val P_DarkGreen = Color(0xFF0A2E1A)
+private val P_Orange    = Color(0xFFEA8C00)    // app-aligned orange
+private val P_DarkGreen = Color(0xFF3A6330)    // medium-dark green for toast
 
 private data class CRow(
     val criteria:  String,

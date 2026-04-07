@@ -21,7 +21,9 @@ import kotlinx.cinterop.*
 import platform.CoreLocation.CLLocationCoordinate2D
 import platform.CoreLocation.CLLocationCoordinate2DMake
 import platform.MapKit.*
+import platform.UIKit.UIColor
 import platform.UIKit.UIEdgeInsetsMake
+import platform.darwin.NSObject
 
 @OptIn(ExperimentalForeignApi::class)
 @Composable
@@ -34,51 +36,85 @@ actual fun HistoryMapView(
 
     var isHybrid by remember { mutableStateOf(false) }
 
+    // Track which routePoints list we've drawn the polyline for
+    var drawnRouteId by remember { mutableStateOf(0) }
+    val currentRouteId = remember(routePoints) { drawnRouteId + 1 }
+
+    // Create delegate inline and hold strong reference
+    val mapDelegate = remember {
+        object : NSObject(), MKMapViewDelegateProtocol {
+            override fun mapView(
+                mapView: MKMapView,
+                rendererForOverlay: MKOverlayProtocol
+            ): MKOverlayRenderer {
+                val polylineOverlay = rendererForOverlay as? MKPolyline
+                if (polylineOverlay != null) {
+                    return MKPolylineRenderer(polyline = polylineOverlay).apply {
+                        strokeColor = UIColor(red = 0.298, green = 0.686, blue = 0.314, alpha = 1.0)
+                        lineWidth = 5.0
+                    }
+                }
+                return MKOverlayRenderer(overlay = rendererForOverlay)
+            }
+        }
+    }
+
     Box(modifier = modifier) {
         UIKitView(
             modifier = Modifier.fillMaxSize(),
             factory = {
                 val mapView = MKMapView()
                 mapView.setShowsUserLocation(false)
-
-                val coordinates = routePoints.mapNotNull { point ->
-                    val lat = point.getLatDouble()
-                    val lng = point.getLngDouble()
-                    if (lat != null && lng != null) {
-                        CLLocationCoordinate2DMake(lat, lng)
-                    } else null
-                }
-
-                if (coordinates.isNotEmpty()) {
-                    memScoped {
-                        val coordArray = allocArray<CLLocationCoordinate2D>(coordinates.size)
-                        coordinates.forEachIndexed { index, coord ->
-                            coordArray[index].latitude = coord.useContents { latitude }
-                            coordArray[index].longitude = coord.useContents { longitude }
-                        }
-
-                        val polyline = MKPolyline.polylineWithCoordinates(
-                            coords = coordArray,
-                            count = coordinates.size.toULong()
-                        )
-                        mapView.addOverlay(polyline)
-
-                        val padding = UIEdgeInsetsMake(50.0, 50.0, 50.0, 50.0)
-                        mapView.setVisibleMapRect(
-                            polyline.boundingMapRect,
-                            edgePadding = padding,
-                            animated = false
-                        )
-                    }
-                }
-
+                mapView.delegate = mapDelegate
                 mapView
             },
             update = { mapView ->
+                mapView.delegate = mapDelegate
+
                 mapView.setMapType(
                     if (isHybrid) MKMapTypeHybrid else MKMapTypeStandard
                 )
 
+                // Redraw polyline when routePoints change
+                if (currentRouteId != drawnRouteId) {
+                    drawnRouteId = currentRouteId
+
+                    // Remove old overlays
+                    mapView.removeOverlays(mapView.overlays)
+
+                    val coordinates = routePoints.mapNotNull { point ->
+                        val lat = point.getLatDouble()
+                        val lng = point.getLngDouble()
+                        if (lat != null && lng != null) {
+                            CLLocationCoordinate2DMake(lat, lng)
+                        } else null
+                    }
+
+                    if (coordinates.isNotEmpty()) {
+                        memScoped {
+                            val coordArray = allocArray<CLLocationCoordinate2D>(coordinates.size)
+                            coordinates.forEachIndexed { index, coord ->
+                                coordArray[index].latitude = coord.useContents { latitude }
+                                coordArray[index].longitude = coord.useContents { longitude }
+                            }
+
+                            val polyline = MKPolyline.polylineWithCoordinates(
+                                coords = coordArray,
+                                count = coordinates.size.toULong()
+                            )
+                            mapView.addOverlay(polyline as MKOverlayProtocol)
+
+                            val padding = UIEdgeInsetsMake(60.0, 60.0, 60.0, 60.0)
+                            mapView.setVisibleMapRect(
+                                polyline.boundingMapRect,
+                                edgePadding = padding,
+                                animated = true
+                            )
+                        }
+                    }
+                }
+
+                // Update marker position
                 if (currentIndex in routePoints.indices) {
                     val point = routePoints[currentIndex]
                     val lat = point.getLatDouble() ?: return@UIKitView
