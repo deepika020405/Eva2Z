@@ -19,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
@@ -47,7 +48,6 @@ fun EditProfileScreen(
     val state by viewModel.state.collectAsState()
 
     var showImageZoom by remember { mutableStateOf(false) }
-//    var showSuccessDialog by remember { mutableStateOf(false) }
 
     var emailError by remember(state.userEmail) {
         mutableStateOf(
@@ -59,7 +59,6 @@ fun EditProfileScreen(
         val nameChanged = state.userName.trim() != state.originalName
         val emailChanged = state.userEmail.trim() != state.originalEmail
         val imageChanged = state.userImageBytes != null
-
         nameChanged || emailChanged || imageChanged
     }
 
@@ -72,17 +71,14 @@ fun EditProfileScreen(
         }
     }
 
-    // ✅ Reload data when screen is opened
     LaunchedEffect(Unit) {
         viewModel.loadUserData()
     }
-    // ✅ System back = same as top back
+
     PlatformBackHandler(enabled = true) {
         onBackPressed()
     }
 
-
-    // ✅ Image Picker Launcher - NO auto upload
     val imagePickerLauncher = rememberImagePicker { imageBytes ->
         if (imageBytes != null) {
             println("✅ Image selected: ${imageBytes.size} bytes (waiting for Update button)")
@@ -90,7 +86,6 @@ fun EditProfileScreen(
         }
     }
 
-    // ✅ Handle update success with delay
     LaunchedEffect(state.updateSuccess) {
         if (state.updateSuccess) {
             viewModel.resetUpdateSuccess()
@@ -114,7 +109,6 @@ fun EditProfileScreen(
         onDismissError = { viewModel.clearError() }
     )
 
-    // ✅ Image Zoom Dialog
     if (showImageZoom) {
         when {
             state.userImageBytes != null -> {
@@ -135,12 +129,9 @@ fun EditProfileScreen(
                     imageUrl = image,
                     onDismiss = { showImageZoom = false }
                 )
-
             }
         }
     }
-
-
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -157,8 +148,8 @@ fun EditProfileScreenContent(
     onUpdateProfile: () -> Unit = {},
     onDismissError: () -> Unit = {}
 ) {
-    Scaffold(    modifier = Modifier.statusBarsPadding(), // 👈🔥 ADD THIS
-
+    Scaffold(
+        modifier = Modifier.statusBarsPadding(),
         topBar = {
             TopAppBar(
                 title = {
@@ -166,12 +157,13 @@ fun EditProfileScreenContent(
                         Text(
                             text = "Edit Profile",
                             fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF222222)
                         )
                         Text(
                             text = "Change your personal info.",
                             fontSize = 12.sp,
-                            color = Color.Gray
+                            color = Color(0xFF999999)
                         )
                     }
                 },
@@ -179,7 +171,8 @@ fun EditProfileScreenContent(
                     IconButton(onClick = onBackPressed) {
                         Icon(
                             imageVector = Icons.Default.ArrowBack,
-                            contentDescription = "Back"
+                            contentDescription = "Back",
+                            tint = Color(0xFF333333)
                         )
                     }
                 },
@@ -188,13 +181,8 @@ fun EditProfileScreenContent(
                 )
             )
         },
-        contentWindowInsets = WindowInsets(0) // 🔥 IMPORTANT
-
+        contentWindowInsets = WindowInsets(0)
     ) { paddingValues ->
-//        Box(
-//            modifier = Modifier
-//                .fillMaxSize()
-//                .padding(paddingValues)
         val scrollState = rememberScrollState()
         val focusManager = LocalFocusManager.current
 
@@ -204,7 +192,7 @@ fun EditProfileScreenContent(
             }
         }
 
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
@@ -212,69 +200,90 @@ fun EditProfileScreenContent(
                     indication = null,
                     interactionSource = remember { MutableInteractionSource() }
                 ) {
-                    focusManager.clearFocus() // 👈 KEYBOARD CLOSE
+                    focusManager.clearFocus()
                 }
         ) {
+            val screenWidth = maxWidth
+            val screenHeight = maxHeight
+            val isCompact = screenHeight < 700.dp
+
+            // Responsive sizes
+            val horizontalPad = (screenWidth * 0.06f).coerceIn(16.dp, 32.dp)
+            val avatarSize = if (isCompact) 100.dp else 120.dp
+            val avatarInitialSize = (avatarSize.value * 0.4f).sp
+            val editIconSize = if (isCompact) 32.dp else 36.dp
+            val editInnerIconSize = if (isCompact) 18.dp else 20.dp
+            val nameSize = if (isCompact) 18.sp else 20.sp
+            val labelSize = if (isCompact) 13.sp else 14.sp
+            val buttonHeight = if (isCompact) 48.dp else 52.dp
+            val buttonTextSize = if (isCompact) 15.sp else 16.sp
+            val fieldGap = if (isCompact) 16.dp else 20.dp
+
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.White)
                     .verticalScroll(scrollState)
-                    .padding(24.dp),
+                    .padding(horizontal = horizontalPad, vertical = if (isCompact) 16.dp else 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(if (isCompact) 20.dp else 32.dp))
 
                 // Profile Image with Edit Button
                 Box(
-                    modifier = Modifier.size(120.dp),
+                    modifier = Modifier.size(avatarSize + 6.dp),
                     contentAlignment = Alignment.BottomEnd
                 ) {
-
-
+                    // Green gradient ring
                     Box(
                         modifier = Modifier
-                            .size(120.dp)
+                            .size(avatarSize + 6.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFFE0E0E0))
-                            .border(2.dp, Color(0xFF4CAF50), CircleShape)
-                            .clickable { onImageClick() },
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(Color(0xFF6A9F50), Color(0xFF8BC34A))
+                                )
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
-                        when {
-                            state.userImageBytes != null -> {
-//                                val = state.userIma
-                                AsyncImage(
-                                    model = state.userImageBytes,
-                                    contentDescription = "Profile Picture",
-                                    modifier = Modifier.fillMaxSize().clip(CircleShape),
-                                    contentScale = ContentScale.Crop
-                                )
-                            }
-                            !state.userImage.isNullOrEmpty() -> {
-                                val image = if (state.userImage.startsWith("https")) {
-                                    state.userImage
-                                } else {
-                                    BASE_IMAGE_URL + state.userImage
+                        Box(
+                            modifier = Modifier
+                                .size(avatarSize)
+                                .clip(CircleShape)
+                                .background(Color(0xFFF0F0F0))
+                                .clickable { onImageClick() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            when {
+                                state.userImageBytes != null -> {
+                                    AsyncImage(
+                                        model = state.userImageBytes,
+                                        contentDescription = "Profile Picture",
+                                        modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                        contentScale = ContentScale.Crop
+                                    )
                                 }
-                                AsyncImage(
-                                    model = image,
-                                    contentDescription = "Profile Picture",
-                                    modifier = Modifier.fillMaxSize().clip(CircleShape),
-                                    contentScale = ContentScale.Crop
-                                )
-                                println("User ki pehle se Image : " + state.userImage)
-                                println("User ki recent se Image size: ${state.userImageBytes?.size} bytes")
-                                println("User ki recent se Image :" +BASE_IMAGE_URL +state.userImageBytes)
-
-                            }
-                            else -> {
-                                Text(
-                                    text = state.userName.firstOrNull()?.uppercase() ?: "U",
-                                    fontSize = 48.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.Gray
-                                )
+                                !state.userImage.isNullOrEmpty() -> {
+                                    val image = if (state.userImage.startsWith("https")) {
+                                        state.userImage
+                                    } else {
+                                        BASE_IMAGE_URL + state.userImage
+                                    }
+                                    AsyncImage(
+                                        model = image,
+                                        contentDescription = "Profile Picture",
+                                        modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                }
+                                else -> {
+                                    Text(
+                                        text = state.userName.firstOrNull()?.uppercase() ?: "U",
+                                        fontSize = avatarInitialSize,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF6A9F50)
+                                    )
+                                }
                             }
                         }
                     }
@@ -282,9 +291,9 @@ fun EditProfileScreenContent(
                     // Edit Icon Button
                     Box(
                         modifier = Modifier
-                            .size(36.dp)
+                            .size(editIconSize)
                             .clip(CircleShape)
-                            .background(Color(0xFF4CAF50))
+                            .background(Color(0xFF6A9F50))
                             .clickable { onImageEditClick() },
                         contentAlignment = Alignment.Center
                     ) {
@@ -292,44 +301,46 @@ fun EditProfileScreenContent(
                             imageVector = Icons.Default.Edit,
                             contentDescription = "Edit Photo",
                             tint = Color.White,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(editInnerIconSize)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 Text(
                     text = state.userName,
-                    fontSize = 20.sp,
+                    fontSize = nameSize,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF333333)
+                    color = Color(0xFF222222)
                 )
 
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(if (isCompact) 24.dp else 32.dp))
 
-                // Full Name Field (Required)
+                // Full Name Field
                 ProfileInputField(
                     label = "Full Name *",
                     value = state.userName,
                     onValueChange = onNameChange,
-                    placeholder = "Enter your name (required)"
+                    placeholder = "Enter your name (required)",
+                    labelSize = labelSize
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(fieldGap))
 
-
-
+                // Email Field
                 ProfileInputField(
                     label = "Email *",
                     value = state.userEmail,
                     onValueChange = onEmailChange,
-                    placeholder = "Enter your email ",
+                    placeholder = "Enter your email",
                     keyboardType = KeyboardType.Email,
                     isError = emailError,
-                    errorText = if (emailError) "Please enter a valid email address" else null
+                    errorText = if (emailError) "Please enter a valid email address" else null,
+                    labelSize = labelSize
                 )
-                Spacer(modifier = Modifier.height(20.dp))
+
+                Spacer(modifier = Modifier.height(fieldGap))
 
                 // Phone Number Field (Disabled)
                 ProfileInputField(
@@ -337,47 +348,46 @@ fun EditProfileScreenContent(
                     value = state.userPhone,
                     onValueChange = {},
                     placeholder = "Phone number",
-                    enabled = false
+                    enabled = false,
+                    labelSize = labelSize
                 )
 
-                Spacer(modifier = Modifier.height(48.dp))
+                Spacer(modifier = Modifier.height(if (isCompact) 36.dp else 48.dp))
 
                 // Update Button
                 Button(
                     onClick = onUpdateProfile,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(50.dp),
-                    shape = RoundedCornerShape(25.dp),
+                        .height(buttonHeight),
+                    shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF4CAF50)
+                        containerColor = Color(0xFF6A9F50),
+                        contentColor = Color.White,
+                        disabledContainerColor = Color(0xFFB5D4A5),
+                        disabledContentColor = Color.White
                     ),
-//                    enabled = !state.isLoading &&
-//                            state.userName.isNotEmpty() &&
-//                            !emailError
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 2.dp,
+                        pressedElevation = 4.dp
+                    ),
                     enabled = !state.isLoading &&
                             hasChanges &&
                             state.userName.isNotBlank() &&
                             !emailError
-
                 ) {
                     if (state.isLoading) {
                         CircularProgressIndicator(
                             color = Color.White,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(22.dp),
+                            strokeWidth = 2.dp
                         )
                     } else {
-//                        Text(
-//                            text = "Update Profile",
-//                            fontSize = 16.sp,
-//                            fontWeight = FontWeight.SemiBold
-//                        )
                         Text(
                             text = if (hasChanges) "Update Profile" else "No Changes",
-                            fontSize = 16.sp,
+                            fontSize = buttonTextSize,
                             fontWeight = FontWeight.SemiBold
                         )
-
                     }
                 }
 
@@ -390,6 +400,7 @@ fun EditProfileScreenContent(
                     .align(Alignment.BottomEnd)
                     .padding(end = 20.dp, bottom = 20.dp)
             )
+
             // Loading Overlay
             if (state.isLoading) {
                 Box(
@@ -398,13 +409,13 @@ fun EditProfileScreenContent(
                         .background(Color.Black.copy(alpha = 0.3f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = Color.White)
+                    CircularProgressIndicator(color = Color(0xFF6A9F50))
                 }
             }
         }
     }
 
-    // Error Snackbar
+    // Error Toast
     state.error?.let { error ->
         LaunchedEffect(error) {
             println("❌ Error: $error")
@@ -412,7 +423,6 @@ fun EditProfileScreenContent(
             onDismissError()
         }
 
-        // Show error at bottom
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -421,14 +431,15 @@ fun EditProfileScreenContent(
         ) {
             Card(
                 colors = CardDefaults.cardColors(
-                    containerColor = Color(0xFFF44336)
+                    containerColor = MaterialTheme.colorScheme.errorContainer
                 ),
-                shape = RoundedCornerShape(8.dp)
+                shape = RoundedCornerShape(14.dp),
+                elevation = CardDefaults.cardElevation(4.dp)
             ) {
                 Text(
                     text = error,
-                    color = Color.White,
-                    modifier = Modifier.padding(16.dp),
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
                     fontSize = 14.sp
                 )
             }
@@ -457,7 +468,6 @@ fun ProfileImageZoomDialog(
                 .clickable { onDismiss() },
             contentAlignment = Alignment.Center
         ) {
-
             when {
                 imageBytes != null -> {
                     AsyncImage(
@@ -466,7 +476,7 @@ fun ProfileImageZoomDialog(
                         modifier = Modifier
                             .fillMaxWidth(0.9f)
                             .aspectRatio(1f)
-                            .clip(RoundedCornerShape(16.dp)),
+                            .clip(RoundedCornerShape(20.dp)),
                         contentScale = ContentScale.Crop
                     )
                 }
@@ -478,7 +488,7 @@ fun ProfileImageZoomDialog(
                         modifier = Modifier
                             .fillMaxWidth(0.9f)
                             .aspectRatio(1f)
-                            .clip(RoundedCornerShape(16.dp)),
+                            .clip(RoundedCornerShape(20.dp)),
                         contentScale = ContentScale.Crop
                     )
                 }
@@ -486,8 +496,6 @@ fun ProfileImageZoomDialog(
         }
     }
 }
-
-
 
 @Composable
 fun ProfileInputField(
@@ -498,14 +506,16 @@ fun ProfileInputField(
     keyboardType: KeyboardType = KeyboardType.Text,
     enabled: Boolean = true,
     isError: Boolean = false,
-    errorText: String? = null
+    errorText: String? = null,
+    labelSize: androidx.compose.ui.unit.TextUnit = 14.sp
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = label,
-            fontSize = 14.sp,
-            color = Color(0xFF666666),
-            modifier = Modifier.padding(bottom = 8.dp)
+            fontSize = labelSize,
+            fontWeight = FontWeight.Medium,
+            color = Color(0xFF555555),
+            modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
         )
 
         OutlinedTextField(
@@ -515,7 +525,8 @@ fun ProfileInputField(
             placeholder = {
                 Text(
                     text = placeholder,
-                    color = Color(0xFFBBBBBB)
+                    color = Color(0xFFAAAAAA),
+                    fontSize = labelSize
                 )
             },
             enabled = enabled,
@@ -523,22 +534,23 @@ fun ProfileInputField(
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color(0xFF4CAF50),
+                focusedBorderColor = Color(0xFF6A9F50),
                 unfocusedBorderColor = Color(0xFFE0E0E0),
-                disabledBorderColor = Color(0xFFE0E0E0),
+                disabledBorderColor = Color(0xFFE8E8E8),
                 disabledTextColor = Color(0xFF999999),
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White,
-                disabledContainerColor = Color(0xFFF5F5F5)
+                focusedContainerColor = Color(0xFFF8FAF7),
+                unfocusedContainerColor = Color(0xFFF8FAF7),
+                disabledContainerColor = Color(0xFFF5F5F5),
+                cursorColor = Color(0xFF6A9F50)
             ),
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(14.dp),
             trailingIcon = if (enabled && label != "Password") {
                 {
                     Icon(
                         imageVector = Icons.Default.Edit,
                         contentDescription = "Edit",
-                        tint = Color(0xFF999999),
-                        modifier = Modifier.size(20.dp)
+                        tint = Color(0xFFCCCCCC),
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             } else null
@@ -547,16 +559,16 @@ fun ProfileInputField(
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 text = errorText,
-                color = Color(0xFFD32F2F),
+                color = MaterialTheme.colorScheme.error,
                 fontSize = 12.sp,
-                modifier = Modifier.padding(start = 4.dp)
+                modifier = Modifier.padding(start = 6.dp)
             )
         }
     }
 }
 
 fun isValidEmail(email: String): Boolean {
-    if (email.isBlank()) return true // ✅ optional email allowed
+    if (email.isBlank()) return true
 
     val emailRegex = Regex(
         "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$"

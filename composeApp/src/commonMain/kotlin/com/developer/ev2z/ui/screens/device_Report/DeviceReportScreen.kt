@@ -80,19 +80,20 @@ private val DR_Idle = Color(0xFFF4C44E)
 private val DR_Stopped = Color(0xFFE5565B)
 private val DR_CardShadow = Color(0x12000000)
 
-fun statusColor(status: String) = when (status) {
+fun statusColor(status: String) = when (status.lowercase()) {
     "on", "moving" -> DR_Running
-    "Idle", "idle" -> DR_Idle
-    "off", "parked", "offline" -> DR_Stopped
+    "idle" -> DR_Idle
+    "off", "parked", "offline", "no_data" -> DR_Stopped
     else -> Color.Gray
 }
 
-fun statusLabel(status: String) = when (status) {
+fun statusLabel(status: String) = when (status.lowercase()) {
     "on", "moving" -> "Running"
-    "Idle", "idle" -> "Idle"
+    "idle" -> "Idle"
     "off" -> "Stopped"
     "parked" -> "Parked"
     "offline" -> "Offline"
+    "no_data" -> "No Data"
     else -> status.replaceFirstChar { it.uppercase() }
 }
 
@@ -910,47 +911,61 @@ fun DeviceBasicInfoWithData(
     val address by viewModel.address.collectAsState()
 
     // Location card
-    Surface(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 18.dp),
-        shape = RoundedCornerShape(14.dp),
-        color = DR_SectionBg
+            .padding(horizontal = 18.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            verticalAlignment = Alignment.Top
+        val isCompact = maxWidth < 360.dp
+        val labelSize = if (isCompact) 12.sp else 13.sp
+        val addressSize = if (isCompact) 14.sp else 15.sp
+        val iconBoxSize = if (isCompact) 7.dp else 8.dp
+        val iconSize = if (isCompact) 16.dp else 20.dp
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp),
+            color = DR_SectionBg
         ) {
-            Surface(
-                shape = RoundedCornerShape(10.dp),
-                color = DR_PrimaryBg
-            ) {
-                Box(
-                    modifier = Modifier.padding(8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Default.LocationOn,
-                        contentDescription = null,
-                        tint = DR_Primary,
-                        modifier = Modifier.size(18.dp)
+            Column(modifier = Modifier.padding(14.dp)) {
+                // Top row: Icon + "Live Location" label
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = DR_PrimaryBg
+                    ) {
+                        Box(
+                            modifier = Modifier.padding(iconBoxSize),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.LocationOn,
+                                contentDescription = null,
+                                tint = DR_Primary,
+                                modifier = Modifier.size(iconSize)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        "Live Location",
+                        fontSize = labelSize,
+                        fontWeight = FontWeight.SemiBold,
+                        color = DR_TextHint
                     )
                 }
-            }
-            Spacer(Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "Live Location",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = DR_TextHint
-                )
-                Spacer(Modifier.height(2.dp))
+
+                Spacer(Modifier.height(8.dp))
+
+                // Address text — full width, starts from left
                 Text(
                     address ?: "Fetching address...",
-                    fontSize = 13.sp,
+                    fontSize = addressSize,
+                    fontWeight = FontWeight.Normal,
                     color = DR_TextPrimary,
-                    lineHeight = 18.sp
+                    lineHeight = (addressSize.value * 1.4f).sp,
+                    textAlign = TextAlign.Start,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }

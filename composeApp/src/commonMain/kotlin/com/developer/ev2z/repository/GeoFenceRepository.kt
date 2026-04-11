@@ -4,7 +4,8 @@ import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.response.Device
 import com.developer.ev2z.response.GeoFenceDto
 import com.developer.ev2z.util.AppTokenProvider
-import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
 class GeoFenceRepository(
@@ -14,10 +15,14 @@ class GeoFenceRepository(
     suspend fun fetchGeoFences(): Result<List<GeoFenceDto>> {
         return try {
             val res = apiService.getGeoFences()
-            if (res.success) {
+            // Treat as success if flag is true OR we got a data list back
+            // (some backends omit the success flag on empty lists).
+            if (res.success || res.data.isNotEmpty()) {
                 Result.success(res.data)
             } else {
-                Result.failure(Exception("Failed to load geofences"))
+                Result.failure(
+                    Exception(res.message ?: "Failed to load geofences")
+                )
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -57,11 +62,18 @@ class GeoFenceRepository(
                 radius = radius
             )
 
-            if (res["success"]?.jsonPrimitive?.boolean == true) {
+            val successFlag = res["success"]?.jsonPrimitive?.booleanOrNull
+            val statusStr = res["status"]?.jsonPrimitive?.contentOrNull
+            val ok = successFlag == true ||
+                    statusStr.equals("success", ignoreCase = true) ||
+                    res["data"] != null ||
+                    res["geofence"] != null
+
+            if (ok) {
                 Result.success(Unit)
             } else {
                 Result.failure(
-                    Exception(res["message"]?.jsonPrimitive?.content ?: "Save failed")
+                    Exception(res["message"]?.jsonPrimitive?.contentOrNull ?: "Save failed")
                 )
             }
 

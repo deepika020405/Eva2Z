@@ -7,32 +7,26 @@ import kotlinx.serialization.Serializable
 // Alert — backend response se match karta hai
 // ─────────────────────────────────────────────────────────────────
 
+// Backend now returns a chat-list shape (one entry per visitor thread, like WhatsApp's chat list).
+// Fields: chat_id, vehicle_number, visitor_name, visitor_phone, last_message, time
 @Serializable
 data class SosAlert(
-    val id: Int?                                     = null,
-    val status: String?                              = null,
-
-    // ✅ Backend actual fields
-    @SerialName("vehicle_id")    val vehicle_id: Int?       = null,
-    @SerialName("owner_id")      val owner_id: Int?         = null,
-    @SerialName("visitor_name")  val visitor_name: String?  = null,
-    @SerialName("visitor_phone") val visitor_phone: String? = null,
-    val reason: String?                              = null,
-    @SerialName("created_at")    val created_at: String?    = null,
-    @SerialName("updated_at")    val updated_at: String?    = null,
-
-    // Legacy / future fields — null aayenge abhi
-    @SerialName("tag_id")        val tag_id: String?        = null,
-    @SerialName("alert_type")    val alert_type: String?    = null,
-    @SerialName("alert_message") val alert_message: String? = null,
-    @SerialName("reported_at")   val reported_at: String?   = null,
-    @SerialName("vehicle_number")val vehicle_number: String? = null,
-    @SerialName("vehicle_type")  val vehicle_type: String?  = null,
-    @SerialName("vehicle_color") val vehicle_color: String? = null,
-    @SerialName("vehicle_image") val vehicle_image: String? = null,
-    @SerialName("reporter_name") val reporter_name: String? = null,
-    @SerialName("user_id")       val user_id: Int?          = null
-)
+    @SerialName("chat_id")        val chat_id: Int?         = null,
+    @SerialName("vehicle_number") val vehicle_number: String? = null,
+    @SerialName("visitor_name")   val visitor_name: String?  = null,
+    @SerialName("visitor_phone")  val visitor_phone: String? = null,
+    @SerialName("last_message")   val last_message: String?  = null,
+    val time: String?                                       = null
+) {
+    // Backwards-compat aliases so existing call sites in Quickreplyscreen keep working.
+    val id: Int? get() = chat_id
+    val reason: String? get() = last_message
+    val created_at: String? get() = time
+    // Fields no longer present in the new payload — kept as null getters for compile compatibility.
+    val alert_message: String? get() = null
+    val vehicle_color: String? get() = null
+    val vehicle_type: String? get() = null
+}
 
 // ─────────────────────────────────────────────────────────────────
 // Alert List Response  — GET /visitor-notifications
@@ -62,9 +56,43 @@ data class SosAlertDetailResponse(
 
 @Serializable
 data class OwnerReplyRequest(
-    @SerialName("notification_id")
-    val notification_id: Int,
+    @SerialName("chat_id")
+    val chat_id: Int,
     val message: String
+)
+
+// ─────────────────────────────────────────────────────────────────
+// Per-chat messages — GET /chat-messages/{chatId}
+// Actual server shape:
+//   { "status": true,
+//     "closed": false,
+//     "data": [
+//       { "id": 21, "message": "Please move your vehicle",
+//         "sender_id": null,        // null = visitor, owner_user_id = owner reply
+//         "type": "received",       // "received" | "sent"
+//         "time": "12:06 PM",
+//         "timestamp": "2026-04-09T12:06:21.000000Z" },
+//       ...
+//     ] }
+// Note: visitor name/phone are NOT in this response.
+// ─────────────────────────────────────────────────────────────────
+
+@Serializable
+data class ChatMessagesResponse(
+    val status: Boolean                 = false,
+    val message: String?                = null,
+    val closed: Boolean                 = false,
+    val data: List<ChatMessageDto>      = emptyList()
+)
+
+@Serializable
+data class ChatMessageDto(
+    val id: Int?           = null,
+    val message: String?   = null,
+    @SerialName("sender_id") val sender_id: Int? = null,
+    val type: String?      = null,   // "sent" (owner) | "received" (visitor)
+    val time: String?      = null,   // pre-formatted display, e.g. "05:13 AM"
+    val timestamp: String? = null    // ISO-8601 for ordering
 )
 
 // ─────────────────────────────────────────────────────────────────
@@ -115,7 +143,8 @@ enum class QuickReplyOption(
     val subtitle: String
 ) {
     COMING_SOON("coming_soon", "Coming in 2 minutes",     "Owner is on the way"),
-    MOVING_NOW ("moving_now",  "Moving vehicle now",      "Owner is removing the vehicle"),
+    THANKS("thanks",  "Thanks for Informing me ",      "Thanking You"),
+    URGENT("urgent",  "Is it Urgent? ",      "Owner is asked for urgency"),
     SORRY      ("sorry",       "Sorry for inconvenience", "Apologize for the block"),
     CUSTOM     ("custom",      "Send Custom Message",     "Type your own response")
 }

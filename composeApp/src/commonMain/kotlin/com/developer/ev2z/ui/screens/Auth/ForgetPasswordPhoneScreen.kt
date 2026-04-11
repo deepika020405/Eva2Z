@@ -1,6 +1,5 @@
 package com.developer.ev2z.ui.screens.AuthFlows
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,38 +12,30 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.viewmodel.AuthViewModel
-import eva2z_connect_multiplatform.composeapp.generated.resources.Res
-import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.jetbrains.compose.resources.painterResource
 
 @Composable
 fun ForgetPasswordPhoneScreen(
     viewModel: AuthViewModel,
     preFilledPhone: String = "",
     onBack: () -> Unit,
-    onOtpSent: (String) -> Unit, // ✅ Pass actual phone number
+    onOtpSent: (String) -> Unit,
     onNotRegistered: (String) -> Unit = {}
 ) {
     var phoneNumber by remember(preFilledPhone) { mutableStateOf(preFilledPhone) }
-//    var showDialog by remember { mutableStateOf(false) }
-//    var dialogMessage by remember { mutableStateOf("") }
 
-    // ✅ Track if we handled the current request
     var hasHandledResult by remember { mutableStateOf(false) }
-
-    // ✅ Track if phone was auto-filled
     var wasAutoFilled by remember(preFilledPhone) {
         mutableStateOf(preFilledPhone.isNotEmpty())
     }
-
-    // ✅ Track if user manually edited
     var manuallyEdited by remember { mutableStateOf(false) }
 
     val isLoading by viewModel.loading.collectAsState()
@@ -52,11 +43,9 @@ fun ForgetPasswordPhoneScreen(
     val scrollState = rememberScrollState()
     val scope = rememberCoroutineScope()
     var phoneError by remember { mutableStateOf<String?>(null) }
-
-    // ✅ Track previous loading state
     var previousLoading by remember { mutableStateOf(false) }
 
-    // ✅ Auto-submit if pre-filled and 10 digits
+    // Auto-submit if pre-filled and 10 digits
     LaunchedEffect(preFilledPhone) {
         if (preFilledPhone.length == 10 && wasAutoFilled && !manuallyEdited) {
             hasHandledResult = false
@@ -66,17 +55,15 @@ fun ForgetPasswordPhoneScreen(
         }
     }
 
-    // ✅ Handle BOTH success and error when loading finishes
+    // Handle BOTH success and error when loading finishes
     LaunchedEffect(isLoading) {
         if (previousLoading && !isLoading && !hasHandledResult) {
             hasHandledResult = true
-
             val currentError = error
 
             when {
                 currentError != null &&
                         currentError.contains("not registered", ignoreCase = true) -> {
-
                     phoneError = "This phone number is not registered"
                     viewModel.clearError()
                 }
@@ -91,53 +78,88 @@ fun ForgetPasswordPhoneScreen(
                 }
             }
         }
-
         previousLoading = isLoading
     }
 
-//    if (showDialog) {
-//        AlertDialog(
-//            onDismissRequest = { },
-//            title = { Text("Notice", fontWeight = FontWeight.Bold) },
-//            text = { Text(dialogMessage) },
-//            confirmButton = { }
-//        )
-//    }
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val screenHeight = maxHeight
+        val screenWidth = maxWidth
+        val isCompact = screenHeight < 600.dp
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(scrollState)
-    ) {
-        // Header
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.Default.ArrowBack, "Back")
-            }
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = "Forgot Password",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
+        // Responsive sizes
+        val headerFontSize = if (isCompact) 18.sp else 20.sp
+        val titleSize = if (isCompact) 24.sp else 28.sp
+        val subtitleSize = if (isCompact) 13.sp else 14.sp
+        val labelSize = if (isCompact) 12.sp else 14.sp
+        val fieldHeight = if (isCompact) 50.dp else 56.dp
+        val buttonHeight = if (isCompact) 46.dp else 52.dp
+        val buttonTextSize = if (isCompact) 15.sp else 16.sp
+        val horizontalPad = (screenWidth * 0.06f).coerceIn(16.dp, 32.dp)
 
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 16.dp)
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(horizontal = horizontalPad)
         ) {
+            // Header
+            Spacer(modifier = Modifier.height(if (isCompact) 12.dp else 16.dp))
 
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        Icons.Default.ArrowBack,
+                        "Back",
+                        tint = Color(0xFF333333)
+                    )
+                }
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = "Forgot Password",
+                    fontSize = headerFontSize,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF222222)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(if (isCompact) 24.dp else 36.dp))
+
+            // Title
+            Text(
+                text = "Reset Your Password",
+                fontSize = titleSize,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF222222),
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Subtitle
+            Text(
+                text = "Enter your registered phone number and we'll send you an OTP to reset your password",
+                fontSize = subtitleSize,
+                color = Color(0xFF888888),
+                textAlign = TextAlign.Center,
+                lineHeight = (subtitleSize.value * 1.5f).sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            )
+
+            Spacer(modifier = Modifier.height(if (isCompact) 28.dp else 40.dp))
+
+            // Phone Number Label
             Text(
                 text = "Phone Number*",
-                fontSize = 14.sp,
-                color = Color(0xFF666666),
-                modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
+                fontSize = labelSize,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF555555),
+                modifier = Modifier.padding(start = 6.dp, bottom = 8.dp)
             )
 
             OutlinedTextField(
@@ -146,41 +168,64 @@ fun ForgetPasswordPhoneScreen(
                     if (it.length <= 10 && it.all { c -> c.isDigit() }) {
                         phoneNumber = it
                         manuallyEdited = true
-                        phoneError = null          // ✅ clear inline error
+                        phoneError = null
                     }
                 },
                 prefix = {
                     Text(
                         text = "🇮🇳 +91 ",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Black
+                        color = Color(0xFF333333)
                     )
                 },
-                placeholder = { Text("Enter Your valid Number") },
+                placeholder = {
+                    Text(
+                        "Enter Your Registered Number",
+                        color = Color(0xFFAAAAAA),
+                        fontSize = labelSize
+                    )
+                },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(120.dp),
+                    .height(fieldHeight),
+                shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedBorderColor = Color.LightGray,
-                    focusedBorderColor = Color(0xFF6A9F50)
+                    focusedContainerColor = Color(0xFFF8FAF7),
+                    unfocusedContainerColor = Color(0xFFF8FAF7),
+                    disabledContainerColor = Color(0xFFF5F5F5),
+                    unfocusedBorderColor = Color(0xFFE0E0E0),
+                    focusedBorderColor = Color(0xFF6A9F50),
+                    cursorColor = Color(0xFF6A9F50)
                 ),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Phone,
+                    autoCorrect = false
+                ),
                 singleLine = true,
-                isError = phoneNumber.isNotEmpty() && phoneNumber.length < 10
+                isError = (phoneNumber.isNotEmpty() && phoneNumber.length < 10) || phoneError != null
             )
+
+            if (phoneNumber.isNotEmpty() && phoneNumber.length < 10) {
+                Text(
+                    text = "Phone number must be 10 digits",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(start = 8.dp, top = 4.dp)
+                )
+            }
 
             if (phoneError != null) {
                 Text(
                     text = phoneError!!,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(start = 16.dp, top = 6.dp)
+                    modifier = Modifier.padding(start = 8.dp, top = 6.dp)
                 )
             }
 
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(if (isCompact) 24.dp else 32.dp))
 
+            // Send OTP Button
             Button(
                 onClick = {
                     hasHandledResult = false
@@ -189,28 +234,36 @@ fun ForgetPasswordPhoneScreen(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(30.dp),
+                    .height(buttonHeight),
+                shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF6A9F50),
-                    contentColor = Color.White
+                    contentColor = Color.White,
+                    disabledContainerColor = Color(0xFFB5D4A5),
+                    disabledContentColor = Color.White
+                ),
+                elevation = ButtonDefaults.buttonElevation(
+                    defaultElevation = 2.dp,
+                    pressedElevation = 4.dp
                 ),
                 enabled = !isLoading && phoneNumber.length == 10
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(
                         color = Color.White,
-                        modifier = Modifier.size(24.dp),
+                        modifier = Modifier.size(22.dp),
                         strokeWidth = 2.dp
                     )
                 } else {
                     Text(
                         text = "Send OTP",
-                        fontSize = 16.sp,
+                        fontSize = buttonTextSize,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }

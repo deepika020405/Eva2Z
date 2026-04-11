@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -40,8 +41,6 @@ fun LoginScreen(
     var phoneNumber by remember(preFilledPhone) { mutableStateOf(preFilledPhone) }
     var password by remember { mutableStateOf("") }
     var loginAttempts by remember { mutableStateOf(0) }
-//    var showDialog by remember { mutableStateOf(false) }
-//    var dialogMessage by remember { mutableStateOf("") }
     var phoneError by remember { mutableStateOf<String?>(null) }
     var passwordError by remember { mutableStateOf<String?>(null) }
     var generalError by remember { mutableStateOf<String?>(null) }
@@ -55,8 +54,6 @@ fun LoginScreen(
     val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
 
-
-
     LaunchedEffect(Unit) {
         Analytics.logEvent(
             name = "screen_view",
@@ -67,85 +64,27 @@ fun LoginScreen(
         )
     }
 
-
-
-    // ✅ SIMPLE 3 CASES
-//    LaunchedEffect(error) {
-//        error?.let { errorMsg ->
-//            when {
-//                // CASE 1: User not registered
-//                errorMsg.contains("not registered", ignoreCase = true) ||
-//                        errorMsg.contains("not found", ignoreCase = true) -> {
-////                    dialogMessage = "Phone number not registered!\nRedirecting to signup..."
-////                    showDialog = true
-//                    delay(2000)
-////                    showDialog = false
-//                    delay(300)
-//                    onNotRegistered(phoneNumber)
-//                }
-//
-//                // CASE 2: Wrong password
-//                errorMsg.contains("password", ignoreCase = true) ||
-//                        errorMsg.contains("incorrect", ignoreCase = true) -> {
-//                    loginAttempts++
-//
-//                    if (loginAttempts >= 3) {
-////                        dialogMessage = "Too many failed attempts.\nRedirecting to reset password..."
-////                        showDialog = true
-//                        delay(2000)
-////                        showDialog = false
-//                        delay(300)
-//                        onForgetPasswordClick(phoneNumber)
-//                    } else {
-////                        dialogMessage = "Incorrect password!\nAttempt $loginAttempts/3"
-////                        showDialog = true
-//                        delay(2000)
-////                        showDialog = false
-//                    }
-//                }
-//
-//                // CASE 3: Other errors
-//                else -> {
-////                    dialogMessage = errorMsg
-////                    showDialog = true
-//                    delay(3000)
-////                    showDialog = false
-//                }
-//            }
-//            viewModel.clearError()
-//        }
-//    }
-
     LaunchedEffect(error) {
         error?.let { errorMsg ->
-
-            // reset all
             phoneError = null
             passwordError = null
             generalError = null
 
             when {
-                // CASE 1: Phone not registered
                 errorMsg.contains("not registered", true) ||
                         errorMsg.contains("not found", true) -> {
-
                     phoneError = "This phone number is not registered"
-
                     delay(1500)
                     onNotRegistered(phoneNumber)
                 }
 
-                // CASE 2: Wrong password
                 errorMsg.contains("password", true) ||
                         errorMsg.contains("incorrect", true) -> {
-
                     loginAttempts++
-
                     passwordError =
                         if (loginAttempts >= 3)
                             "Too many failed attempts. Please reset your password…"
                         else
-//                            "Incorrect password (Attempt $loginAttempts/5)"
                             "Incorrect password "
 
                     if (loginAttempts >= 5) {
@@ -154,32 +93,31 @@ fun LoginScreen(
                     }
                 }
 
-                // CASE 3: Other / server error
                 else -> {
                     generalError = errorMsg
                 }
             }
-
             viewModel.clearError()
         }
     }
 
-//    if (showDialog) {
-//        AlertDialog(
-//            onDismissRequest = { },
-//            title = { Text("Notice", fontWeight = FontWeight.Bold) },
-//            text = { Text(dialogMessage) },
-//            confirmButton = { }
-//        )
-//    }
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val screenHeight = maxHeight
+        val screenWidth = maxWidth
+        val isCompact = screenHeight < 600.dp
+        val density = LocalDensity.current
 
-    Box(modifier = Modifier.fillMaxSize()) {
+        // Responsive sizes
+        val labelSize = if (isCompact) 12.sp else 14.sp
+        val fieldHeight = if (isCompact) 50.dp else 56.dp
+        val buttonHeight = if (isCompact) 46.dp else 52.dp
+        val buttonTextSize = if (isCompact) 15.sp else 16.sp
+        val verticalGap = if (isCompact) 12.dp else 18.dp
+        val horizontalPad = (screenWidth * 0.04f).coerceIn(12.dp, 24.dp)
 
-        // 🔹 OUTSIDE AREA (tap here → keyboard close)
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 1.dp) // 👈 important: makes it non-input layer
                 .clickable(
                     indication = null,
                     interactionSource = remember { MutableInteractionSource() }
@@ -193,38 +131,31 @@ fun LoginScreen(
                 .fillMaxSize()
                 .imePadding()
                 .verticalScroll(scrollState)
-                .padding(horizontal = 12.dp, vertical = 24.dp)
+                .padding(horizontal = horizontalPad, vertical = if (isCompact) 16.dp else 24.dp)
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(if (isCompact) 8.dp else 16.dp))
 
+            // Phone Number Label
             Text(
                 text = "Phone Number*",
-                fontSize = 14.sp,
-                color = Color(0xFF666666),
+                fontSize = labelSize,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF555555),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 4.dp, bottom = 8.dp)
+                    .padding(start = 6.dp, bottom = 8.dp)
             )
 
             OutlinedTextField(
                 value = phoneNumber,
                 onValueChange = { input ->
-
-                    // 1️⃣ sirf digits nikalo
                     val digitsOnly = input.filter { it.isDigit() }
-
-                    // 2️⃣ HARD STOP for manual typing beyond 10
                     if (digitsOnly.length > 10 && input.length > phoneNumber.length) {
                         return@OutlinedTextField
                     }
-
-                    // 3️⃣ Autofill / paste case (+91, spaces, etc.)
                     val finalNumber =
-                        if (digitsOnly.length <= 10)
-                            digitsOnly
-                        else
-                            digitsOnly.takeLast(10)
-
+                        if (digitsOnly.length <= 10) digitsOnly
+                        else digitsOnly.takeLast(10)
                     phoneNumber = finalNumber
                     phoneError = null
                     generalError = null
@@ -235,25 +166,31 @@ fun LoginScreen(
                     Text(
                         text = "🇮🇳 +91 ",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Black
+                        color = Color(0xFF333333)
                     )
                 },
-                placeholder = { Text("Enter Your Registered Number") },
+                placeholder = {
+                    Text(
+                        "Enter Your Registered Number",
+                        color = Color(0xFFAAAAAA),
+                        fontSize = labelSize
+                    )
+                },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(120.dp),
+                    .height(fieldHeight),
+                shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    disabledContainerColor = Color.Transparent,
-                    unfocusedBorderColor = Color.LightGray,
-                    focusedBorderColor = Color(0xFF6A9F50)
+                    focusedContainerColor = Color(0xFFF8FAF7),
+                    unfocusedContainerColor = Color(0xFFF8FAF7),
+                    disabledContainerColor = Color(0xFFF5F5F5),
+                    unfocusedBorderColor = Color(0xFFE0E0E0),
+                    focusedBorderColor = Color(0xFF6A9F50),
+                    cursorColor = Color(0xFF6A9F50)
                 ),
-//            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Phone,
-                    autoCorrect = false      // ❌ disable suggestions
+                    autoCorrect = false
                 ),
                 singleLine = true,
                 isError = phoneNumber.isNotEmpty() && phoneNumber.length < 10
@@ -264,7 +201,7 @@ fun LoginScreen(
                     text = "Phone number must be 10 digits",
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                    modifier = Modifier.padding(start = 8.dp, top = 4.dp)
                 )
             }
 
@@ -274,21 +211,22 @@ fun LoginScreen(
                         text = it,
                         color = MaterialTheme.colorScheme.error,
                         style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                        modifier = Modifier.padding(start = 8.dp, top = 4.dp)
                     )
                 }
             }
 
+            Spacer(modifier = Modifier.height(verticalGap))
 
-            Spacer(modifier = Modifier.height(16.dp))
-
+            // Password Label
             Text(
                 text = "Password*",
-                fontSize = 14.sp,
-                color = Color(0xFF666666),
+                fontSize = labelSize,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF555555),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 4.dp, bottom = 8.dp)
+                    .padding(start = 6.dp, bottom = 8.dp)
             )
 
             OutlinedTextField(
@@ -299,27 +237,31 @@ fun LoginScreen(
                     generalError = null
                     hasTriedLogin = false
                 },
-                placeholder = { Text("Enter Your Password") },
+                placeholder = {
+                    Text(
+                        "Enter Your Password",
+                        color = Color(0xFFAAAAAA),
+                        fontSize = labelSize
+                    )
+                },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(120.dp),
+                    .height(fieldHeight),
+                shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color.Transparent,
-                    unfocusedContainerColor = Color.Transparent,
-                    disabledContainerColor = Color.Transparent,
-                    unfocusedBorderColor = Color.LightGray,
-                    focusedBorderColor = Color(0xFF6A9F50)
+                    focusedContainerColor = Color(0xFFF8FAF7),
+                    unfocusedContainerColor = Color(0xFFF8FAF7),
+                    disabledContainerColor = Color(0xFFF5F5F5),
+                    unfocusedBorderColor = Color(0xFFE0E0E0),
+                    focusedBorderColor = Color(0xFF6A9F50),
+                    cursorColor = Color(0xFF6A9F50)
                 ),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 singleLine = true,
                 isError = password.isNotEmpty() && password.length < 6,
-
-                // 👇 PASSWORD SHOW / HIDE LOGIC
                 visualTransformation =
                     if (passwordVisible) VisualTransformation.None
                     else PasswordVisualTransformation(),
-
                 trailingIcon = {
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
                         Icon(
@@ -327,11 +269,8 @@ fun LoginScreen(
                                 Icons.Filled.VisibilityOff
                             else
                                 Icons.Filled.Visibility,
-                            contentDescription = if (passwordVisible)
-                                "Hide password"
-                            else
-                                "Show password",
-                            tint = Color.Gray
+                            contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                            tint = Color(0xFF999999)
                         )
                     }
                 }
@@ -342,7 +281,7 @@ fun LoginScreen(
                     text = "Password must be at least 6 characters",
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                    modifier = Modifier.padding(start = 8.dp, top = 4.dp)
                 )
             }
 
@@ -351,31 +290,30 @@ fun LoginScreen(
                     text = it,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                    modifier = Modifier.padding(start = 8.dp, top = 4.dp)
                 )
             }
 
+            Spacer(modifier = Modifier.height(4.dp))
 
-
-            Spacer(modifier = Modifier.height(8.dp))
-
+            // Forgot Password
             Box(
                 modifier = Modifier.fillMaxWidth(),
                 contentAlignment = Alignment.CenterEnd
             ) {
-                TextButton(onClick = {
-                    onForgetPasswordClick(phoneNumber)
-                }) {
+                TextButton(onClick = { onForgetPasswordClick(phoneNumber) }) {
                     Text(
                         text = "Forgot Password?",
-                        fontSize = 14.sp,
-                        color = Color(0xFF666666)
+                        fontSize = if (isCompact) 13.sp else 14.sp,
+                        color = Color(0xFF6A9F50),
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(if (isCompact) 16.dp else 24.dp))
 
+            // Login Button
             Button(
                 onClick = {
                     focusManager.clearFocus()
@@ -388,29 +326,37 @@ fun LoginScreen(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(30.dp),
+                    .height(buttonHeight),
+                shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF6A9F50),
-                    contentColor = Color.White
+                    contentColor = Color.White,
+                    disabledContainerColor = Color(0xFFB5D4A5),
+                    disabledContentColor = Color.White
+                ),
+                elevation = ButtonDefaults.buttonElevation(
+                    defaultElevation = 2.dp,
+                    pressedElevation = 4.dp
                 ),
                 enabled = !isLoading && phoneNumber.length == 10 && password.length >= 6
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(
                         color = Color.White,
-                        modifier = Modifier.size(24.dp),
+                        modifier = Modifier.size(22.dp),
                         strokeWidth = 2.dp
                     )
                 } else {
                     Text(
                         text = "Login",
                         color = Color.White,
-                        fontSize = 16.sp,
+                        fontSize = buttonTextSize,
                         fontWeight = FontWeight.SemiBold
                     )
                 }
             }
+
+            // General Error Banner
             generalError?.let {
                 Spacer(Modifier.height(12.dp))
                 Surface(
@@ -421,7 +367,7 @@ fun LoginScreen(
                     Text(
                         text = it,
                         color = MaterialTheme.colorScheme.onErrorContainer,
-                        fontSize = 13.sp,
+                        fontSize = if (isCompact) 12.sp else 13.sp,
                         modifier = Modifier.padding(12.dp),
                         textAlign = TextAlign.Start
                     )
@@ -431,31 +377,21 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(32.dp))
         }
 
-//    LaunchedEffect(loginSuccess) {
-//        if (loginSuccess) {
-//            onLoginSuccess()
-//            viewModel.resetLoginSuccess()
-//        }
-//    }
         LaunchedEffect(loginSuccess) {
             if (loginSuccess) {
-
                 Analytics.logEvent(
                     name = "login_success",
                     params = mapOf(
                         "login_method" to "password",
                         "country_code" to "IN",
                         "phone_masked" to maskPhone(phoneNumber),
-                        "user_name" to viewModel.userName, // ya first name
+                        "user_name" to viewModel.userName,
                     )
                 )
-
                 onLoginSuccess()
-//            viewModel.resetLoginSuccess()
             }
         }
     }
-
 }
 
 fun maskPhone(phone: String): String {

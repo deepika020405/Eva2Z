@@ -17,38 +17,26 @@ class SosTagViewModel(
     private val userPrefs: UserPrefs
 ) : ViewModel() {
 
-    // ── Alert Detail ──────────────────────────────────────────────
-
     private val _alertDetailState = MutableStateFlow<SosAlertUiState>(SosAlertUiState.Idle)
     val alertDetailState: StateFlow<SosAlertUiState> = _alertDetailState.asStateFlow()
-
-    // ── Alerts List ───────────────────────────────────────────────
 
     private val _alertListState = MutableStateFlow<SosAlertListUiState>(SosAlertListUiState.Idle)
     val alertListState: StateFlow<SosAlertListUiState> = _alertListState.asStateFlow()
 
-    // ── Quick Reply ───────────────────────────────────────────────
-
     private val _replyState = MutableStateFlow<SosReplyUiState>(SosReplyUiState.Idle)
     val replyState: StateFlow<SosReplyUiState> = _replyState.asStateFlow()
 
-    // Selected quick reply option
     private val _selectedReply = MutableStateFlow<QuickReplyOption?>(null)
     val selectedReply: StateFlow<QuickReplyOption?> = _selectedReply.asStateFlow()
 
-    // Custom message text (only used when CUSTOM is selected)
     private val _customMessage = MutableStateFlow("")
     val customMessage: StateFlow<String> = _customMessage.asStateFlow()
 
-    // Current alert being viewed / replied to
     private val _currentAlert = MutableStateFlow<SosAlert?>(null)
     val currentAlert: StateFlow<SosAlert?> = _currentAlert.asStateFlow()
 
-    // ── Active jobs — cancel on back ─────────────────────────────
     private var loadDetailJob: Job? = null
     private var loadListJob: Job? = null
-
-    // ── Load Alert Detail ─────────────────────────────────────────
 
     fun loadAlertDetail(alertId: Int) {
         if (alertId <= 0) {
@@ -60,21 +48,18 @@ class SosTagViewModel(
         loadDetailJob = viewModelScope.launch {
             _alertDetailState.value = SosAlertUiState.Loading
 
-            // ✅ Retry 5 baar, 3 second gap se
             repeat(5) { attempt ->
                 try {
                     val response = apiService.getSosAlertDetail(alertId)
 
                     if (response.status && response.data != null) {
-                        // ✅ Data mila — stop retry
                         _currentAlert.value = response.data
                         _alertDetailState.value = SosAlertUiState.Success(response.data)
-                        return@launch  // ✅ EXIT
+                        return@launch
                     } else {
                         println("⏳ Attempt ${attempt + 1}: data null, retrying...")
-                        // ✅ Data nahi mila — wait and retry
                         if (attempt < 4) {
-                            kotlinx.coroutines.delay(3000)  // 3 second wait
+                            kotlinx.coroutines.delay(3000)
                         }
                     }
 
@@ -86,15 +71,50 @@ class SosTagViewModel(
                 }
             }
 
-            // ✅ 5 attempts ke baad bhi data nahi mila
             _alertDetailState.value = SosAlertUiState.Error(
                 "Alert data not available. Please try again."
             )
         }
     }
 
-    // ── Load All Alerts ───────────────────────────────────────────
+    suspend fun fetchAlertDetail(alertId: Int): SosAlert? {
+        repeat(5) { attempt ->
+            try {
+                val response = apiService.getSosAlertDetail(alertId)
+                if (response.status && response.data != null) {
+                    return response.data
+                } else {
+                    println("⏳ fetchAlertDetail attempt ${attempt + 1}: data null")
+                    if (attempt < 4) kotlinx.coroutines.delay(3000)
+                }
+            } catch (e: Exception) {
+                println("❌ fetchAlertDetail attempt ${attempt + 1}: ${e.message}")
+                if (attempt < 4) kotlinx.coroutines.delay(3000)
+            }
+        }
+        return null
+    }
 
+    suspend fun fetchAllAlerts(): List<SosAlert>? {
+        return try {
+            val response = apiService.getSosAlerts()
+            if (response.status) response.data else null
+        } catch (e: Exception) {
+            println("❌ fetchAllAlerts: ${e.message}")
+            null
+        }
+    }
+
+    suspend fun fetchChatMessages(chatId: Int): ChatMessagesResponse? {
+        if (chatId <= 0) return null
+        return try {
+            val response = apiService.getChatMessages(chatId)
+            if (response.status) response else null
+        } catch (e: Exception) {
+            println("❌ fetchChatMessages: ${e.message}")
+            null
+        }
+    }
 
     fun loadAlertList() {
         loadListJob?.cancel()
@@ -107,12 +127,10 @@ class SosTagViewModel(
                         response.data ?: emptyList()
                     )
                 } else {
-                    // ✅ status false = no alerts
                     _alertListState.value = SosAlertListUiState.Success(emptyList())
                 }
             } catch (e: ResponseException) {
                 if (e.response.status.value == 404) {
-                    // ✅ 404 = koi alert nahi
                     _alertListState.value = SosAlertListUiState.Success(emptyList())
                 } else {
                     _alertListState.value = SosAlertListUiState.Error(
@@ -127,14 +145,11 @@ class SosTagViewModel(
         }
     }
 
-    // ── Select Quick Reply Option ─────────────────────────────────
-
     fun selectReply(option: QuickReplyOption) {
         _selectedReply.value = option
         if (option != QuickReplyOption.CUSTOM) {
             _customMessage.value = ""
         }
-        // Clear any previous error
         if (_replyState.value is SosReplyUiState.Error) {
             _replyState.value = SosReplyUiState.Idle
         }
@@ -144,13 +159,10 @@ class SosTagViewModel(
         _customMessage.value = value
     }
 
-    // ── Submit Reply ──────────────────────────────────────────────
-
     fun submitReply(alertId: Int) {
         val option = _selectedReply.value ?: return
         if (_replyState.value is SosReplyUiState.Loading) return
 
-        // Validate custom message if needed
         if (option == QuickReplyOption.CUSTOM && _customMessage.value.isBlank()) return
 
         viewModelScope.launch {
@@ -158,14 +170,15 @@ class SosTagViewModel(
             try {
                 val message = when(option) {
                     QuickReplyOption.COMING_SOON -> "Coming in 2 minutes"
-                    QuickReplyOption.MOVING_NOW -> "Moving vehicle now"
+                    QuickReplyOption.THANKS -> "Thanks for Informing me"
+                    QuickReplyOption.URGENT -> "Is it Urgent?"
                     QuickReplyOption.SORRY -> "Sorry for inconvenience"
                     QuickReplyOption.CUSTOM -> _customMessage.value.trim()
                 }
 
                 val response = apiService.sendOwnerReply(
                     OwnerReplyRequest(
-                        notification_id = alertId,
+                        chat_id = alertId,
                         message = message
                     )
                 )
@@ -187,8 +200,6 @@ class SosTagViewModel(
         }
     }
 
-    // ── Helpers ───────────────────────────────────────────────────
-
     val isReplyValid: Boolean
         get() {
             val option = _selectedReply.value ?: return false
@@ -200,6 +211,23 @@ class SosTagViewModel(
         _replyState.value    = SosReplyUiState.Idle
         _selectedReply.value = null
         _customMessage.value = ""
+    }
+
+    fun closeChat(chatId: Int, onDone: () -> Unit = {}) {
+        if (chatId <= 0) {
+            onDone()
+            return
+        }
+        viewModelScope.launch {
+            try {
+                val response = apiService.closeChat(chatId)
+                println("✅ closeChat #$chatId result: status=${response.status} msg=${response.message}")
+            } catch (e: Exception) {
+                println("❌ closeChat #$chatId error: ${e.message}")
+            } finally {
+                onDone()
+            }
+        }
     }
 
     fun resetAll() {

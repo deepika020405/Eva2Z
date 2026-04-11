@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.ui.screens.social_media.openUrl
 
 private val BrandGreen = Color(0xFF34A853)
@@ -25,6 +26,11 @@ private val BrandGreen = Color(0xFF34A853)
 fun InstallationSupportScreen(
     onBack: () -> Unit
 ) {
+    // System back → close the overlay and return to home immediately.
+    // Composed AFTER the home pager's Voyager handlers so it wins LIFO priority
+    // and a single back press is enough.
+    PlatformBackHandler(enabled = true) { onBack() }
+
     Scaffold(
         topBar = {
             TopAppBar(

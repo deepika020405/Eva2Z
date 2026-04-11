@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.developer.ev2z.navigation.PlatformBackHandler
 import kotlinx.coroutines.launch
 
 // ─────────────────────────────────────────────────────────────────
@@ -77,8 +78,10 @@ fun ParkingScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope             = rememberCoroutineScope()
 
-    // No PlatformBackHandler here — HomeNavGraph registers it AFTER this
-    // composable so it wins LIFO priority over Voyager's internal handler.
+    // System back → immediately close the overlay and return to home. This is
+    // composed AFTER the home pager's Voyager handlers, so LIFO priority puts
+    // this at the top of the dispatcher stack and a single press is enough.
+    PlatformBackHandler(enabled = true) { onBackPressed() }
 
     // Clear stale state every time screen is (re)opened
     LaunchedEffect(Unit) {
@@ -107,7 +110,7 @@ fun ParkingScreen(
                 .padding(horizontal = 12.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            SectionLabel("Register a Vehicle")
+            SectionLabel("Register Your Vehicle TAG")
 
             // ── Registered Number Banner ──────────────────────────
             if (registeredPhone.isNotBlank()) {
@@ -145,19 +148,6 @@ fun ParkingScreen(
                                 fontWeight = FontWeight.Bold,
                                 color      = BrandGreen
                             )
-                        }
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = Color(0xFFDCFCE7)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(3.dp)
-                            ) {
-                                Icon(Icons.Default.Lock, null, tint = BrandGreen, modifier = Modifier.size(10.dp))
-                                Text("Protected", fontSize = 9.sp, color = BrandGreen, fontWeight = FontWeight.SemiBold)
-                            }
                         }
                     }
                 }
@@ -378,7 +368,7 @@ private fun ParkingFormCard(
             Eva2zInputField(
                 value           = vehicleType,
                 onValueChange   = onVehicleTypeChange,
-                label           = "VEHICLE TYPE",
+                label           = "VEHICLE NAME",
                 placeholder     = "e.g. Honda City",
                 icon            = Icons.Outlined.DirectionsCar,
                 errorText       = vehicleTypeError,
@@ -390,7 +380,7 @@ private fun ParkingFormCard(
 
             Eva2zInputField(
                 value           = vehicleNumber,
-                onValueChange   = onVehicleNumberChange,
+                onValueChange   = { if (it.length <= 12) onVehicleNumberChange(it) },
                 label           = "VEHICLE NUMBER",
                 placeholder     = "e.g. DL01AB1234",
                 icon            = Icons.Outlined.Tag,
@@ -620,7 +610,7 @@ private fun ParkingSuccessBanner(
                         .padding(14.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    data.vehicle_type?.let    { BannerRow("Vehicle Type",      it) }
+                    data.vehicle_type?.let    { BannerRow("Vehicle Name",      it) }
                     data.vehicle_number?.let  { BannerRow("Vehicle Number",    it) }
                     data.phone?.let           { BannerRow("Mobile",            it) }
                     data.alternate_phone?.let { BannerRow("Alternate Mobile",  it) }

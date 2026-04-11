@@ -4,6 +4,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,7 +15,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -34,9 +39,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import cafe.adriel.voyager.core.screen.Screen
-import cafe.adriel.voyager.navigator.LocalNavigator
-import cafe.adriel.voyager.navigator.currentOrThrow
 import coil3.compose.AsyncImage
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.util.BottomBarController
@@ -51,19 +53,16 @@ fun StoryViewerScreen(
     val state = vm.state
     var showViewersSheet by remember { mutableStateOf(false) }
 
-    // 🔥 Hide bottom bar
     LaunchedEffect(Unit) {
         BottomBarController.visible = false
     }
 
-    // 🔙 SYSTEM BACK
     PlatformBackHandler(enabled = true) {
         onBack()
     }
 
     val story = vm.currentStory()
 
-    // 🧹 CLEANUP
     DisposableEffect(Unit) {
         onDispose {
             vm.resetStoryViewer()
@@ -71,7 +70,6 @@ fun StoryViewerScreen(
         }
     }
 
-    // ✅ Story finished → auto close
     LaunchedEffect(story) {
         if (story == null) {
             onBack()
@@ -80,97 +78,119 @@ fun StoryViewerScreen(
 
     if (story == null) return
 
-    Column(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onPress = {
-                        vm.pauseStory()
-                        tryAwaitRelease()
-                        vm.resumeStory()
-                    },
-                    onTap = { offset ->
-                        if (offset.x < size.width / 2)
-                            vm.prevStoryInGroup()
-                        else
-                            vm.nextStoryInGroup()
-                    }
-                )
-            }
     ) {
-        val group = vm.currentGroup!!
+        val isCompact = maxHeight < 700.dp
 
-        StoryTopBar(
-            userName = group.user.name,
-            userProfile = "https://gps.eva2z.in/storage/${group.user.photo}",
-            isMyStatus = group.user.id == state.authUserId,
-            onBack = onBack          // 🔥 IMPORTANT
-        )
-
-        Row(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 6.dp)
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onPress = {
+                            vm.pauseStory()
+                            tryAwaitRelease()
+                            vm.resumeStory()
+                        },
+                        onTap = { offset ->
+                            if (offset.x < size.width / 2)
+                                vm.prevStoryInGroup()
+                            else
+                                vm.nextStoryInGroup()
+                        }
+                    )
+                }
         ) {
-            group.stories.forEachIndexed { index, _ ->
-                LinearProgressIndicator(
-                    progress = when {
-                        index < vm.storyIndex -> 1f
-                        index == vm.storyIndex -> vm.storyProgress
-                        else -> 0f
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 2.dp)
-                        .height(3.dp),
-                    color = Color.White,
-                    trackColor = Color.White.copy(alpha = 0.3f)
-                )
-            }
-        }
+            val group = vm.currentGroup!!
 
-        Box(modifier = Modifier.fillMaxSize()) {
-            AsyncImage(
-                model = "https://gps.eva2z.in${story.media_urls.first()}",
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit
+            StoryTopBar(
+                userName = group.user.name,
+                userProfile = "https://gps.eva2z.in/storage/${group.user.photo}",
+                isMyStatus = group.user.id == state.authUserId,
+                isCompact = isCompact,
+                onBack = onBack
             )
 
-            if (group.isOwnStory) {
-                Text(
-                    text = "👁 ${story.view_count}",
-                    color = Color.White,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(16.dp)
-                        .clickable {
-                            vm.loadStoryViewers(story.id)
-                            showViewersSheet = true
-                        }
+            // Progress Bars
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 6.dp)
+            ) {
+                group.stories.forEachIndexed { index, _ ->
+                    LinearProgressIndicator(
+                        progress = when {
+                            index < vm.storyIndex -> 1f
+                            index == vm.storyIndex -> vm.storyProgress
+                            else -> 0f
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 2.dp)
+                            .height(3.dp),
+                        color = Color(0xFF6A9F50),
+                        trackColor = Color.White.copy(alpha = 0.3f)
+                    )
+                }
+            }
+
+            // Story Image
+            Box(modifier = Modifier.fillMaxSize()) {
+                AsyncImage(
+                    model = "https://gps.eva2z.in${story.media_urls.first()}",
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit
                 )
+
+                if (group.isOwnStory) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(16.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(Color.Black.copy(alpha = 0.5f))
+                            .clickable {
+                                vm.loadStoryViewers(story.id)
+                                showViewersSheet = true
+                            }
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    ) {
+                        Text(
+                            text = "${story.view_count} views",
+                            color = Color.White,
+                            fontSize = if (isCompact) 13.sp else 14.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
             }
         }
     }
+
+    // Viewers Bottom Sheet
     if (showViewersSheet) {
         ModalBottomSheet(
             onDismissRequest = {
                 showViewersSheet = false
                 vm.clearStoryViewers()
-            }
+            },
+            containerColor = Color.White,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
+                    .padding(horizontal = 20.dp, vertical = 12.dp)
             ) {
-
                 Text(
                     text = "Viewed by",
                     fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF222222)
                 )
 
                 Spacer(Modifier.height(12.dp))
@@ -178,7 +198,8 @@ fun StoryViewerScreen(
                 if (state.storyViewers.isEmpty()) {
                     Text(
                         text = "No views yet",
-                        color = Color.Gray
+                        color = Color(0xFF888888),
+                        fontSize = 14.sp
                     )
                 } else {
                     state.storyViewers.forEach { viewer ->
@@ -188,12 +209,11 @@ fun StoryViewerScreen(
                                 .padding(vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-
                             Box(
                                 modifier = Modifier
-                                    .size(36.dp)
+                                    .size(40.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFFE0E0E0)),
+                                    .background(Color(0xFFF0F7EC)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (!viewer.user.photo.isNullOrBlank()) {
@@ -209,7 +229,7 @@ fun StoryViewerScreen(
                                     Text(
                                         text = viewer.user.name.first().uppercase(),
                                         fontWeight = FontWeight.Bold,
-                                        color = Color.Gray
+                                        color = Color(0xFF6A9F50)
                                     )
                                 }
                             }
@@ -218,62 +238,64 @@ fun StoryViewerScreen(
 
                             Text(
                                 text = viewer.user.name,
-                                fontSize = 15.sp
+                                fontSize = 15.sp,
+                                color = Color(0xFF333333),
+                                fontWeight = FontWeight.Medium
                             )
                         }
                     }
                 }
+
+                Spacer(Modifier.height(16.dp))
             }
         }
     }
-
 }
-
 
 
 @Composable
 private fun StoryTopBar(
     userName: String,
     userProfile: String?,
-    isMyStatus: Boolean,   // 👈 NEW
+    isMyStatus: Boolean,
+    isCompact: Boolean = false,
     onBack: () -> Unit
 ) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 12.dp, start = 12.dp, end = 12.dp)
+            .padding(top = if (isCompact) 8.dp else 12.dp, start = 12.dp, end = 12.dp)
     ) {
-
         Row(verticalAlignment = Alignment.CenterVertically) {
-
-            Text(
-                text = "←",
-                color = Color.White,
-                fontSize = 26.sp,
+            Icon(
+                Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                tint = Color.White,
                 modifier = Modifier
-                    .padding(end = 12.dp)
+                    .size(26.dp)
                     .clickable { onBack() }
             )
+
+            Spacer(Modifier.width(12.dp))
 
             AsyncImage(
                 model = userProfile,
                 contentDescription = null,
                 modifier = Modifier
-                    .size(38.dp)
+                    .size(if (isCompact) 34.dp else 38.dp)
                     .background(Color.DarkGray, CircleShape)
                     .clip(CircleShape),
                 contentScale = ContentScale.Crop
             )
 
+            Spacer(Modifier.width(8.dp))
+
             Text(
-                text = if (isMyStatus) "My Status" else userName, // ✅ MAGIC LINE
+                text = if (isMyStatus) "My Status" else userName,
                 color = Color.White,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.padding(start = 8.dp)
+                fontSize = if (isCompact) 14.sp else 15.sp,
+                fontWeight = FontWeight.Medium
             )
         }
     }
 }
-
-

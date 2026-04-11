@@ -11,8 +11,29 @@ actual fun platformOpenUrl(url: String) {
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
         context.startActivity(intent)
     } catch (e: Exception) {
-        e.printStackTrace()
+        // Fallback: if market:// scheme fails (no Play Store app), open web URL
+        if (url.startsWith("market://")) {
+            try {
+                val webUrl = url.replace("market://details?id=", "https://play.google.com/store/apps/details?id=")
+                val context = GlobalContext.get()
+                val fallbackIntent = Intent(Intent.ACTION_VIEW, Uri.parse(webUrl))
+                fallbackIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                context.startActivity(fallbackIntent)
+            } catch (e2: Exception) {
+                e2.printStackTrace()
+            }
+        } else {
+            e.printStackTrace()
+        }
     }
+}
+
+actual fun getPlatformStoreUrl(): String {
+    return "market://details?id=com.developer.ev2z"
+}
+
+fun getPlatformStoreUrlFallback(): String {
+    return "https://play.google.com/store/apps/details?id=com.developer.ev2z"
 }
 
 // Global context holder

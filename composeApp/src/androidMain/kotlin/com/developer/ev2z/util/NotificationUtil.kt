@@ -42,7 +42,9 @@ object NotificationUtil {
         context: Context,
         title: String?,
         body: String?,
-        alertId: Int? = null
+        alertId: Int? = null,
+        visitorName: String? = null,
+        visitorPhone: String? = null
     ) {
 
         // 🔥 Intent for notification click
@@ -51,6 +53,8 @@ object NotificationUtil {
             alertId?.let {
                 putExtra("sos_alert_id", it)
             }
+            if (!visitorName.isNullOrBlank())  putExtra("sos_visitor_name", visitorName)
+            if (!visitorPhone.isNullOrBlank()) putExtra("sos_visitor_phone", visitorPhone)
         }
 
         val requestCode = alertId ?: System.currentTimeMillis().toInt()

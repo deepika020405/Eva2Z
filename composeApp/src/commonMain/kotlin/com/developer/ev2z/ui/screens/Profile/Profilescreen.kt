@@ -18,12 +18,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -61,7 +63,7 @@ fun ProfileScreen(
     onRefundPolicy: () -> Unit = {},
     onShippingPolicy: () -> Unit = {},
     onChangePassword: () -> Unit = {},
-    onNavigateMyAccount: () -> Unit,   // ✅ ADD THIS
+    onNavigateMyAccount: () -> Unit,
     onGeoFencing: () -> Unit = {},
     onHistoryPlayback: () -> Unit = {},
     onGeneralSettings: () -> Unit = {},
@@ -72,18 +74,16 @@ fun ProfileScreen(
     onOpenDocumentsVault: () -> Unit = {},
 ) {
     val viewModel = remember { ProfileViewModel(apiService, storageManager) }
-    var showVaultPasswordDialog by remember { mutableStateOf(false) } // ✅ MOVE HERE
+    var showVaultPasswordDialog by remember { mutableStateOf(false) }
     val state by viewModel.state.collectAsState()
     var showImageZoom by remember { mutableStateOf(false) }
     var webViewType by remember { mutableStateOf<WebViewType?>(null) }
 
-    // ✅ FIX: Reload data when refreshTrigger changes
     LaunchedEffect(refreshTrigger) {
         viewModel.loadUserData()
         viewModel.fetchProfilePicture()
     }
 
-    // ✅ FIX: Separate logout handler
     LaunchedEffect(state.logoutSuccess) {
         if (state.logoutSuccess) {
             onLogout()
@@ -102,7 +102,7 @@ fun ProfileScreen(
         onManageDevice = onManageDevice,
         onGPSData = onGpsData,
         onAddFence = onGeoFencing,
-        onNavigateMyAccount = onNavigateMyAccount,   // ✅ ADD THIS LINE
+        onNavigateMyAccount = onNavigateMyAccount,
         onHistoryPlayback = onHistoryPlayback,
         onRateApp = { viewModel.openPlayStore() },
         onFeedback = { viewModel.openFeedback() },
@@ -122,20 +122,19 @@ fun ProfileScreen(
             viewModel.unlockDocumentsVault(
                 password = password,
                 onSuccess = {
-                    showVaultPasswordDialog = false   // ✅ close dialog
-                    onOpenDocumentsVault()            // ➡️ next screen
+                    showVaultPasswordDialog = false
+                    onOpenDocumentsVault()
                 }
             )
         },
         onOpenDocumentsVault = {
-            onOpenDocumentsVault() // navigation
+            onOpenDocumentsVault()
         },
         storageManager = storageManager,
         showVaultPasswordDialog = showVaultPasswordDialog,
         onShowVaultPasswordDialog = { showVaultPasswordDialog = it },
     )
 
-    // Image Zoom Dialog
     if (showImageZoom && !state.userImage.isNullOrEmpty()) {
         ProfileImageZoomDialog(
             imageUrl = state.userImage!!,
@@ -166,7 +165,7 @@ fun ProfileScreenContent(
     onGPSData: () -> Unit = {},
     onAddFence: () -> Unit = {},
     onHistoryPlayback: () -> Unit = {},
-    onNavigateMyAccount: () -> Unit,   // ✅ ADD THIS
+    onNavigateMyAccount: () -> Unit,
     onRateApp: () -> Unit = {},
     onFeedback: () -> Unit = {},
     onPrivacyPolicy: () -> Unit = {},
@@ -183,9 +182,9 @@ fun ProfileScreenContent(
     onYouTube: () -> Unit,
     onUnlockDocuments: (String) -> Unit,
     onOpenDocumentsVault: () -> Unit,
-    showVaultPasswordDialog: Boolean,              // ✅ ADD
+    showVaultPasswordDialog: Boolean,
     onShowVaultPasswordDialog: (Boolean) -> Unit,
-    storageManager: StorageManager, // ✅ ADD THIS
+    storageManager: StorageManager,
 ) {
     var showLogoutDialog by remember { mutableStateOf(false) }
     var passwordError by remember { mutableStateOf<String?>(null) }
@@ -203,7 +202,8 @@ fun ProfileScreenContent(
                     Text(
                         text = "Profile",
                         fontSize = 20.sp,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF222222)
                     )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -211,160 +211,191 @@ fun ProfileScreenContent(
                 )
             )
         },
-                contentWindowInsets = WindowInsets(0) // 🔥 IMPORTANT
+        contentWindowInsets = WindowInsets(0)
     ) { paddingValues ->
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0xFFF5F5F5)),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                item {
-                    ProfileHeader(
-                        userName = state.userName,
-                        userImage = state.userImage,
-                        onImageClick = onProfileImageClick
-                    )
-                }
+            val screenWidth = maxWidth
+            val screenHeight = maxHeight
+            val isCompact = screenHeight < 700.dp
 
-                item {
-                    Text(
-                        text = "Profile Settings",
-                        fontSize = 14.sp,
-                        color = Color.Gray,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 16.dp)
-                    )
-                }
+            // Responsive sizes
+            val horizontalPad = (screenWidth * 0.05f).coerceIn(16.dp, 28.dp)
+            val cardCorner = 18.dp
+            val sectionLabelSize = if (isCompact) 12.sp else 13.sp
+            val menuTitleSize = if (isCompact) 14.sp else 15.sp
+            val menuIconSize = if (isCompact) 22.dp else 24.dp
+            val menuVerticalPad = if (isCompact) 14.dp else 16.dp
+            val avatarSize = if (isCompact) 88.dp else 100.dp
+            val nameSize = if (isCompact) 17.sp else 19.sp
+            val logoutButtonHeight = if (isCompact) 46.dp else 50.dp
 
-                item {
-                    ProfileMenuCard(
-                        items = listOf(
-                            ProfileMenuItem("Edit Profile", Icons.Rounded.Edit, onEditProfile),
-//                            ProfileMenuItem("General Settings", Icons.Rounded.Settings, onGeneralSettings),
-                            ProfileMenuItem("Account Activity", Icons.Rounded.ManageAccounts, onAccountActivity),
-                            ProfileMenuItem("Refer And Earn", Icons.Rounded.CardGiftcard, onReferAndEarn),
-                            ProfileMenuItem("Change Password", Icons.Rounded.Password, onChangePassword), // ✅ WORKING NOW
-                            ProfileMenuItem(
-                                title = "My Account",
-                                icon = Icons.Rounded.AccountBalance,
-                                onClick = onNavigateMyAccount   // ✅ CALLBACK ONLY
-                            ),
-
-//                            ProfileMenuItem(
-//                                title = "Documents",
-//                                icon = Icons.Rounded.Folder,
-//                                onClick = {
-////                                    if (isVaultSessionValid(storageManager)) {
-////                                        onOpenDocumentsVault() // 🔓 Direct open
-////                                    } else {
-////                                        onShowVaultPasswordDialog(true)
-////                                        // 🔐 Ask password
-////                                    }
-//                                    onShowVaultPasswordDialog(true)
-//                                }
-//                            )
-                            ProfileMenuItem(
-                                title = "Community",
-                                icon = Icons.Rounded.Group,
-                                onClick = {
-                                    onOpenDocumentsVault() // 🔥 actually opens Community
-                                }
-                            )
-                        )
-                    )
-                }
-
-                item {
-                    Text(
-                        text = "Device Settings",
-                        fontSize = 14.sp,
-                        color = Color.Gray,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 16.dp)
-                    )
-                }
-
-                item {
-                    ProfileMenuCard(
-                        items = listOf(
-                            ProfileMenuItem("Manage Device", Icons.Rounded.Devices, onManageDevice),
-                            ProfileMenuItem("GPS Device Data", Icons.Rounded.GpsFixed, onGPSData),
-                            ProfileMenuItem("Manage Geo Fence", Icons.Rounded.LocationOn, onAddFence),
-                            ProfileMenuItem("History Playback", Icons.Rounded.History, onHistoryPlayback)
-                        )
-                    )
-                }
-
-                item {
-                    Text(
-                        text = "About EVA2Z",
-                        fontSize = 14.sp,
-                        color = Color.Gray,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 16.dp)
-                    )
-                }
-
-                item {
-                    AboutSection(
-                        onRateApp = onRateApp,
-                        onFeedback = onFeedback,
-                        onPrivacyPolicy = onPrivacyPolicy,
-                        onTermsConditions = onTermsConditions,
-                        onRefundPolicy = onRefundPolicy,
-                        onShippingPolicy = onShippingPolicy,
-                        onContactUs = onContactUs,
-                        onAboutApp = onAboutApp,
-                        onFacebook = onFacebook,
-                        onInstagram = onInstagram,
-                        onLinkedIn = onLinkedIn,
-                        onYouTube = onYouTube
-                    )
-                }
-
-                item {
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Button(
-                        onClick = { showLogoutDialog = true },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp)
-                            .height(48.dp),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF4CAF50)
-                        )
-                    ) {
-                        Text(
-                            text = "Log Out",
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.SemiBold
+            Box(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFFF5F6F8)),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Profile Header
+                    item {
+                        ProfileHeader(
+                            userName = state.userName,
+                            userImage = state.userImage,
+                            onImageClick = onProfileImageClick,
+                            avatarSize = avatarSize,
+                            nameSize = nameSize
                         )
                     }
-                    Spacer(modifier = Modifier.height(100.dp))
+
+                    // Profile Settings Section
+                    item {
+                        Text(
+                            text = "PROFILE SETTINGS",
+                            fontSize = sectionLabelSize,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF999999),
+                            letterSpacing = 0.8.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = horizontalPad, vertical = 14.dp)
+                        )
+                    }
+
+                    item {
+                        ProfileMenuCard(
+                            items = listOf(
+                                ProfileMenuItem("Edit Profile", Icons.Rounded.Edit, onEditProfile),
+                                ProfileMenuItem("Account Activity", Icons.Rounded.ManageAccounts, onAccountActivity),
+                                ProfileMenuItem("Refer And Earn", Icons.Rounded.CardGiftcard, onReferAndEarn),
+                                ProfileMenuItem("Change Password", Icons.Rounded.Password, onChangePassword),
+                                ProfileMenuItem(
+                                    title = "My Account",
+                                    icon = Icons.Rounded.AccountBalance,
+                                    onClick = onNavigateMyAccount
+                                ),
+                                ProfileMenuItem(
+                                    title = "Community",
+                                    icon = Icons.Rounded.Group,
+                                    onClick = { onOpenDocumentsVault() }
+                                )
+                            ),
+                            horizontalPad = horizontalPad,
+                            cardCorner = cardCorner,
+                            titleSize = menuTitleSize,
+                            iconSize = menuIconSize,
+                            verticalPad = menuVerticalPad
+                        )
+                    }
+
+                    // Device Settings Section
+                    item {
+                        Text(
+                            text = "DEVICE SETTINGS",
+                            fontSize = sectionLabelSize,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF999999),
+                            letterSpacing = 0.8.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = horizontalPad, vertical = 14.dp)
+                        )
+                    }
+
+                    item {
+                        ProfileMenuCard(
+                            items = listOf(
+                                ProfileMenuItem("Manage Device", Icons.Rounded.Devices, onManageDevice),
+                                ProfileMenuItem("GPS Device Data", Icons.Rounded.GpsFixed, onGPSData),
+                                ProfileMenuItem("Manage Geo Fence", Icons.Rounded.LocationOn, onAddFence),
+                                ProfileMenuItem("History Playback", Icons.Rounded.History, onHistoryPlayback)
+                            ),
+                            horizontalPad = horizontalPad,
+                            cardCorner = cardCorner,
+                            titleSize = menuTitleSize,
+                            iconSize = menuIconSize,
+                            verticalPad = menuVerticalPad
+                        )
+                    }
+
+                    // About EVA2Z Section
+                    item {
+                        Text(
+                            text = "ABOUT EVA2Z",
+                            fontSize = sectionLabelSize,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF999999),
+                            letterSpacing = 0.8.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = horizontalPad, vertical = 14.dp)
+                        )
+                    }
+
+                    item {
+                        AboutSection(
+                            onRateApp = onRateApp,
+                            onFeedback = onFeedback,
+                            onPrivacyPolicy = onPrivacyPolicy,
+                            onTermsConditions = onTermsConditions,
+                            onRefundPolicy = onRefundPolicy,
+                            onShippingPolicy = onShippingPolicy,
+                            onContactUs = onContactUs,
+                            onAboutApp = onAboutApp,
+                            onFacebook = onFacebook,
+                            onInstagram = onInstagram,
+                            onLinkedIn = onLinkedIn,
+                            onYouTube = onYouTube,
+                            horizontalPad = horizontalPad,
+                            cardCorner = cardCorner,
+                            isCompact = isCompact
+                        )
+                    }
+
+                    // Logout Button
+                    item {
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Button(
+                            onClick = { showLogoutDialog = true },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = horizontalPad)
+                                .height(logoutButtonHeight),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = Color(0xFF6A9F50)
+                            ),
+                            elevation = ButtonDefaults.buttonElevation(
+                                defaultElevation = 2.dp,
+                                pressedElevation = 4.dp
+                            )
+                        ) {
+                            Text(
+                                text = "Log Out",
+                                fontSize = if (isCompact) 15.sp else 16.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(100.dp))
+                    }
                 }
-            }
 
-            FloatingContactButton(
-                phoneNumber = "919755273822",
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 20.dp, bottom = 20.dp)
-            )
-
-            if (state.isLoading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center)
+                FloatingContactButton(
+                    phoneNumber = "919755273822",
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 20.dp, bottom = 20.dp)
                 )
+
+                if (state.isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.Center),
+                        color = Color(0xFF6A9F50)
+                    )
+                }
             }
         }
     }
@@ -378,21 +409,27 @@ fun ProfileScreenContent(
     if (showLogoutDialog) {
         AlertDialog(
             onDismissRequest = { showLogoutDialog = false },
-            title = { Text("Logout") },
+            title = {
+                Text(
+                    "Logout",
+                    fontWeight = FontWeight.SemiBold
+                )
+            },
             text = { Text("Are you sure you want to logout?") },
             confirmButton = {
                 TextButton(onClick = {
                     showLogoutDialog = false
                     onLogout()
                 }) {
-                    Text("Yes", color = Color(0xFF4CAF50))
+                    Text("Yes", color = Color(0xFF6A9F50), fontWeight = FontWeight.SemiBold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showLogoutDialog = false }) {
-                    Text("No")
+                    Text("No", color = Color(0xFF888888))
                 }
-            }
+            },
+            shape = RoundedCornerShape(20.dp)
         )
     }
 
@@ -401,21 +438,14 @@ fun ProfileScreenContent(
             errorMessage = passwordError,
             onSubmit = { password ->
                 passwordError = null
-
                 onUnlockDocuments(password)
-
-                // 🔥 CLOSE DIALOG IMMEDIATELY
-//                showVaultPasswordDialog = false
             },
             onDismiss = {
                 onShowVaultPasswordDialog(false)
-
                 passwordError = null
             }
         )
     }
-
-
 }
 
 @Composable
@@ -433,11 +463,10 @@ fun VaultPasswordDialog(
             contentAlignment = Alignment.Center
         ) {
             Box {
-                // 🧾 Card
                 Card(
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = Color(0xFFF3F3F3)
+                        containerColor = Color.White
                     ),
                     elevation = CardDefaults.cardElevation(8.dp),
                     modifier = Modifier.fillMaxWidth()
@@ -451,12 +480,11 @@ fun VaultPasswordDialog(
                                 bottom = 16.dp
                             )
                     ) {
-
                         Text(
                             text = "Enter Your Login Password",
                             fontSize = 18.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color.Black
+                            color = Color(0xFF222222)
                         )
 
                         Spacer(modifier = Modifier.height(6.dp))
@@ -464,7 +492,7 @@ fun VaultPasswordDialog(
                         Text(
                             text = "Access Your E-Vault Documents",
                             fontSize = 13.sp,
-                            color = Color.Gray
+                            color = Color(0xFF888888)
                         )
 
                         Spacer(modifier = Modifier.height(16.dp))
@@ -472,11 +500,18 @@ fun VaultPasswordDialog(
                         OutlinedTextField(
                             value = password,
                             onValueChange = { password = it },
-                            placeholder = { Text("Password") },
+                            placeholder = { Text("Password", color = Color(0xFFAAAAAA)) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             isError = errorMessage != null,
-                            shape = RoundedCornerShape(8.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = Color(0xFFF8FAF7),
+                                unfocusedContainerColor = Color(0xFFF8FAF7),
+                                unfocusedBorderColor = Color(0xFFE0E0E0),
+                                focusedBorderColor = Color(0xFF6A9F50),
+                                cursorColor = Color(0xFF6A9F50)
+                            ),
                             visualTransformation = if (passwordVisible)
                                 VisualTransformation.None
                             else
@@ -487,10 +522,11 @@ fun VaultPasswordDialog(
                                 ) {
                                     Icon(
                                         imageVector = if (passwordVisible)
-                                            Icons.Default.Visibility
+                                            Icons.Default.VisibilityOff
                                         else
-                                            Icons.Default.VisibilityOff,
-                                        contentDescription = null
+                                            Icons.Default.Visibility,
+                                        contentDescription = null,
+                                        tint = Color(0xFF999999)
                                     )
                                 }
                             }
@@ -507,7 +543,6 @@ fun VaultPasswordDialog(
 
                         Spacer(modifier = Modifier.height(20.dp))
 
-                        // 🔘 Bottom actions
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
@@ -515,7 +550,8 @@ fun VaultPasswordDialog(
                             TextButton(onClick = onDismiss) {
                                 Text(
                                     text = "Cancel",
-                                    color = Color(0xFF7B61FF)
+                                    color = Color(0xFF888888),
+                                    fontWeight = FontWeight.Medium
                                 )
                             }
 
@@ -526,16 +562,16 @@ fun VaultPasswordDialog(
                                 Text(
                                     text = "Continue",
                                     color = if (password.isNotBlank())
-                                        Color(0xFF7B61FF)
+                                        Color(0xFF6A9F50)
                                     else
-                                        Color.Gray
+                                        Color(0xFFCCCCCC),
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             }
                         }
                     }
                 }
 
-                // 🔐 Floating lock icon
                 Box(
                     modifier = Modifier
                         .size(52.dp)
@@ -545,7 +581,7 @@ fun VaultPasswordDialog(
                 ) {
                     Surface(
                         shape = CircleShape,
-                        color = Color(0xFF7B61FF),
+                        color = Color(0xFF6A9F50),
                         shadowElevation = 6.dp
                     ) {
                         Icon(
@@ -576,53 +612,69 @@ fun isVaultSessionValid(storageManager: StorageManager): Boolean {
         false
     }
 }
+
 @Composable
 fun ProfileHeader(
     userName: String,
     userImage: String?,
-    onImageClick: () -> Unit = {}
+    onImageClick: () -> Unit = {},
+    avatarSize: androidx.compose.ui.unit.Dp = 100.dp,
+    nameSize: androidx.compose.ui.unit.TextUnit = 19.sp
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(Color.White)
-            .padding(vertical = 32.dp),
+            .padding(vertical = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Avatar with green ring
         Box(
             modifier = Modifier
-                .size(100.dp)
+                .size(avatarSize + 6.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFE0E0E0))
-                .clickable { onImageClick() },
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(Color(0xFF6A9F50), Color(0xFF8BC34A))
+                    )
+                ),
             contentAlignment = Alignment.Center
         ) {
-            if (!userImage.isNullOrEmpty()) {
-                AsyncImage(
-                    model = userImage,
-                    contentDescription = "Profile Picture",
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Text(
-                    text = userName.firstOrNull()?.uppercase() ?: "U",
-                    fontSize = 40.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.Gray
-                )
+            Box(
+                modifier = Modifier
+                    .size(avatarSize)
+                    .clip(CircleShape)
+                    .background(Color(0xFFF0F0F0))
+                    .clickable { onImageClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                if (!userImage.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = userImage,
+                        contentDescription = "Profile Picture",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Text(
+                        text = userName.firstOrNull()?.uppercase() ?: "U",
+                        fontSize = (avatarSize.value * 0.4f).sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF6A9F50)
+                    )
+                }
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         Text(
             text = userName,
-            fontSize = 18.sp,
+            fontSize = nameSize,
             fontWeight = FontWeight.Bold,
-            color = Color(0xFF333333)
+            color = Color(0xFF222222)
         )
     }
 }
@@ -657,23 +709,23 @@ fun ProfileImageZoomDialog(
                     modifier = Modifier
                         .fillMaxWidth(0.9f)
                         .aspectRatio(1f)
-                        .clip(RoundedCornerShape(16.dp)),
+                        .clip(RoundedCornerShape(20.dp)),
                     contentScale = ContentScale.Crop
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = userName,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
+                if (userName.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = userName,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                }
             }
         }
     }
 }
-
 
 data class ProfileMenuItem(
     val title: String,
@@ -682,26 +734,37 @@ data class ProfileMenuItem(
 )
 
 @Composable
-fun ProfileMenuCard(items: List<ProfileMenuItem>) {
+fun ProfileMenuCard(
+    items: List<ProfileMenuItem>,
+    horizontalPad: androidx.compose.ui.unit.Dp = 24.dp,
+    cardCorner: androidx.compose.ui.unit.Dp = 18.dp,
+    titleSize: androidx.compose.ui.unit.TextUnit = 15.sp,
+    iconSize: androidx.compose.ui.unit.Dp = 24.dp,
+    verticalPad: androidx.compose.ui.unit.Dp = 16.dp
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp),
-        shape = RoundedCornerShape(16.dp),
+            .padding(horizontal = horizontalPad),
+        shape = RoundedCornerShape(cardCorner),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column {
             items.forEachIndexed { index, item ->
                 ProfileMenuItemRow(
                     title = item.title,
                     icon = item.icon,
-                    onClick = item.onClick
+                    onClick = item.onClick,
+                    titleSize = titleSize,
+                    iconSize = iconSize,
+                    verticalPad = verticalPad
                 )
                 if (index < items.size - 1) {
                     HorizontalDivider(
                         modifier = Modifier.padding(horizontal = 16.dp),
-                        color = Color(0xFFE0E0E0)
+                        color = Color(0xFFF0F0F0),
+                        thickness = 0.8.dp
                     )
                 }
             }
@@ -713,35 +776,49 @@ fun ProfileMenuCard(items: List<ProfileMenuItem>) {
 fun ProfileMenuItemRow(
     title: String,
     icon: ImageVector,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    titleSize: androidx.compose.ui.unit.TextUnit = 15.sp,
+    iconSize: androidx.compose.ui.unit.Dp = 24.dp,
+    verticalPad: androidx.compose.ui.unit.Dp = 16.dp
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 16.dp),
+            .padding(horizontal = 16.dp, vertical = verticalPad),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = title,
-            tint = Color(0xFF4CAF50),
-            modifier = Modifier.size(24.dp)
-        )
+        // Icon with background
+        Box(
+            modifier = Modifier
+                .size(iconSize + 12.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color(0xFFF0F7EC)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                tint = Color(0xFF6A9F50),
+                modifier = Modifier.size(iconSize - 4.dp)
+            )
+        }
 
-        Spacer(modifier = Modifier.width(16.dp))
+        Spacer(modifier = Modifier.width(14.dp))
 
         Text(
             text = title,
-            fontSize = 15.sp,
+            fontSize = titleSize,
             color = Color(0xFF333333),
+            fontWeight = FontWeight.Medium,
             modifier = Modifier.weight(1f)
         )
 
         Icon(
             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = "Arrow",
-            tint = Color(0xFF999999)
+            tint = Color(0xFFCCCCCC),
+            modifier = Modifier.size(22.dp)
         )
     }
 }
@@ -759,70 +836,79 @@ fun AboutSection(
     onFacebook: () -> Unit,
     onInstagram: () -> Unit,
     onLinkedIn: () -> Unit,
-    onYouTube: () -> Unit// ✅ ADD THIS
+    onYouTube: () -> Unit,
+    horizontalPad: androidx.compose.ui.unit.Dp = 24.dp,
+    cardCorner: androidx.compose.ui.unit.Dp = 18.dp,
+    isCompact: Boolean = false
 ) {
+    val aboutTitleSize = if (isCompact) 13.sp else 14.sp
+    val aboutIconSize = if (isCompact) 15.dp else 16.dp
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp),
-        shape = RoundedCornerShape(16.dp),
+            .padding(horizontal = horizontalPad),
+        shape = RoundedCornerShape(cardCorner),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column {
-            // ✅ PLATFORM-SPECIFIC RATE APP TEXT
             AboutMenuItem(
-                title = getPlatformRateAppText(), // ✅ Platform-specific
+                title = getPlatformRateAppText(),
                 icon = Icons.Rounded.Star,
-                onClick = onRateApp
+                onClick = onRateApp,
+                titleSize = aboutTitleSize,
+                iconSize = aboutIconSize
             )
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp),
-                color = Color(0xFFE0E0E0)
+                color = Color(0xFFF0F0F0),
+                thickness = 0.8.dp
             )
 
-            // ✅ ADD ABOUT APP
             AboutMenuItem(
                 title = "About App",
                 icon = Icons.Rounded.Info,
-                onClick = onAboutApp
+                onClick = onAboutApp,
+                titleSize = aboutTitleSize,
+                iconSize = aboutIconSize
             )
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp),
-                color = Color(0xFFE0E0E0)
+                color = Color(0xFFF0F0F0),
+                thickness = 0.8.dp
             )
 
-//            AboutMenuItem("Feedback", Icons.Rounded.Feedback, onFeedback)
+            AboutMenuItem("Privacy Policy", Icons.Rounded.PrivacyTip, onPrivacyPolicy, aboutTitleSize, aboutIconSize)
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp),
-                color = Color(0xFFE0E0E0)
+                color = Color(0xFFF0F0F0),
+                thickness = 0.8.dp
             )
-            AboutMenuItem("Privacy Policy", Icons.Rounded.PrivacyTip, onPrivacyPolicy)
+            AboutMenuItem("Terms & Conditions", Icons.Rounded.Description, onTermsConditions, aboutTitleSize, aboutIconSize)
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp),
-                color = Color(0xFFE0E0E0)
+                color = Color(0xFFF0F0F0),
+                thickness = 0.8.dp
             )
-            AboutMenuItem("Terms & Conditions", Icons.Rounded.Description, onTermsConditions)
+            AboutMenuItem("Refund & Cancellation Policy", Icons.Rounded.Receipt, onRefundPolicy, aboutTitleSize, aboutIconSize)
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp),
-                color = Color(0xFFE0E0E0)
+                color = Color(0xFFF0F0F0),
+                thickness = 0.8.dp
             )
-            AboutMenuItem("Refund & Cancellation Policy", Icons.Rounded.Receipt, onRefundPolicy)
+            AboutMenuItem("Shipping & Installation Policy", Icons.Rounded.LocalShipping, onShippingPolicy, aboutTitleSize, aboutIconSize)
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp),
-                color = Color(0xFFE0E0E0)
+                color = Color(0xFFF0F0F0),
+                thickness = 0.8.dp
             )
-            AboutMenuItem("Shipping & Installation Policy", Icons.Rounded.LocalShipping, onShippingPolicy)
-            HorizontalDivider(
-                modifier = Modifier.padding(horizontal = 16.dp),
-                color = Color(0xFFE0E0E0)
-            )
-            AboutMenuItem("Contact Us", Icons.Rounded.Support, onContactUs)
+            AboutMenuItem("Contact Us", Icons.Rounded.Support, onContactUs, aboutTitleSize, aboutIconSize)
 
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp),
-                color = Color(0xFFE0E0E0)
+                color = Color(0xFFF0F0F0),
+                thickness = 0.8.dp
             )
 
             SocialLinksRow(
@@ -830,20 +916,21 @@ fun AboutSection(
                 onInstagram = { openUrl("https://www.instagram.com/eva2z_/") },
                 onLinkedIn = { openUrl("https://www.linkedin.com/company/86388029") },
                 onYouTube = { openUrl("https://youtube.com/@eva2z_connect?si=MDx3Obn2fAxwSyL7") },
-//                onTwitter = { openUrl("https://www.youtube.com/@eva2zconnect") }
+                isCompact = isCompact
             )
         }
     }
 }
 
-// ✅ ADD EXPECT FUNCTION
 expect fun getPlatformRateAppText(): String
 
 @Composable
 fun AboutMenuItem(
     title: String,
     icon: ImageVector,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    titleSize: androidx.compose.ui.unit.TextUnit = 14.sp,
+    iconSize: androidx.compose.ui.unit.Dp = 16.dp
 ) {
     Row(
         modifier = Modifier
@@ -855,23 +942,23 @@ fun AboutMenuItem(
         Icon(
             imageVector = icon,
             contentDescription = title,
-            tint = Color(0xFF4CAF50),
-            modifier = Modifier.size(16.dp)
+            tint = Color(0xFF6A9F50),
+            modifier = Modifier.size(iconSize)
         )
 
-        Spacer(modifier = Modifier.width(8.dp))
+        Spacer(modifier = Modifier.width(10.dp))
 
         Text(
             text = title,
-            fontSize = 14.sp,
-            color = Color(0xFF666666),
+            fontSize = titleSize,
+            color = Color(0xFF555555),
             modifier = Modifier.weight(1f)
         )
 
         Icon(
             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = "Arrow",
-            tint = Color(0xFF999999),
+            tint = Color(0xFFCCCCCC),
             modifier = Modifier.size(20.dp)
         )
     }
@@ -883,67 +970,69 @@ fun SocialLinksRow(
     onInstagram: () -> Unit,
     onLinkedIn: () -> Unit,
     onYouTube: () -> Unit,
-//    onTwitter: () -> Unit
+    isCompact: Boolean = false
 ) {
+    val iconBgSize = if (isCompact) 42.dp else 46.dp
+    val iconImgSize = if (isCompact) 20.dp else 22.dp
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 12.dp),
+            .padding(vertical = 14.dp),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
         SocialPngIcon(
             icon = Res.drawable.ic_facebook,
             contentDescription = "Facebook",
-            onClick = onFacebook
+            onClick = onFacebook,
+            bgSize = iconBgSize,
+            imgSize = iconImgSize
         )
-
         SocialPngIcon(
             icon = Res.drawable.ic_instagram,
             contentDescription = "Instagram",
-            onClick = onInstagram
+            onClick = onInstagram,
+            bgSize = iconBgSize,
+            imgSize = iconImgSize
         )
-
         SocialPngIcon(
             icon = Res.drawable.ic_linkedin,
             contentDescription = "LinkedIn",
-            onClick = onLinkedIn
+            onClick = onLinkedIn,
+            bgSize = iconBgSize,
+            imgSize = iconImgSize
         )
-
         SocialPngIcon(
             icon = Res.drawable.ic_youtube,
             contentDescription = "YouTube",
-            onClick = onYouTube
+            onClick = onYouTube,
+            bgSize = iconBgSize,
+            imgSize = iconImgSize
         )
-
-//        SocialPngIcon(
-//            icon = Res.drawable.ic_twitter,
-//            contentDescription = "Twitter",
-//            onClick = onTwitter
-//        )
     }
 }
-
 
 @Composable
 fun SocialPngIcon(
     icon: DrawableResource,
     contentDescription: String,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    bgSize: androidx.compose.ui.unit.Dp = 46.dp,
+    imgSize: androidx.compose.ui.unit.Dp = 22.dp
 ) {
     Box(
         modifier = Modifier
-            .size(46.dp)
+            .size(bgSize)
             .clip(CircleShape)
-            .background(Color(0xFFF1F8F1))
+            .background(Color(0xFFF0F7EC))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Image(
             painter = painterResource(icon),
             contentDescription = contentDescription,
-            modifier = Modifier.size(22.dp)
+            modifier = Modifier.size(imgSize)
         )
     }
 }
-

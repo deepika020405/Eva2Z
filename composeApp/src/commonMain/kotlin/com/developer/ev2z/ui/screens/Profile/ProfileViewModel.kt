@@ -123,11 +123,11 @@ class ProfileViewModel(
     }
 
     fun openPlayStore() {
-        openUrl("https://play.google.com/store/apps/details?id=com.developer.ev2z")
+        openUrl(getPlatformStoreUrl())
     }
 
     fun openFeedback() {
-        openUrl("https://play.google.com/store/apps/details?id=com.developer.ev2z")
+        openUrl(getPlatformStoreUrl())
     }
 
     fun openWhatsApp() {
@@ -180,3 +180,6 @@ class ProfileViewModel(
 
 // Expect function for platform-specific URL opening
 expect fun platformOpenUrl(url: String)
+
+// Expect function for platform-specific store URL
+expect fun getPlatformStoreUrl(): String

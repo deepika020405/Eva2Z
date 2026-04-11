@@ -1,7 +1,9 @@
 package com.developer.ev2z.repository
 
 import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.request.CreateOrderProduct
 import com.developer.ev2z.request.CreateOrderRequest
+import com.developer.ev2z.response.CartItemDto
 import com.developer.ev2z.response.BillingDto
 import com.developer.ev2z.response.CartResponse
 import com.developer.ev2z.response.ProductDto
@@ -128,13 +130,23 @@ class ProductRepository(
     suspend fun createPhonePeOrder(
         token: String,
         amount: Double,
-        billingId: Int
+        billingId: Int,
+        cart: List<CartItemDto>
     ): JsonObject {
 
         val body = CreateOrderRequest(
             amount = amount,
             final_amount = amount,
-            billing_id = billingId
+            billing_id = billingId,
+            products = cart.map {
+                CreateOrderProduct(
+                    product_id = it.product_id,
+                    quantity = it.quantity,
+                    price = it.price,
+                    plan_type = it.plan_type,
+                    device_type = it.device_type
+                )
+            }
         )
 
         return api.createPhonePeOrder(token, body)

@@ -11,11 +11,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.navigation.PlatformBackHandler
@@ -30,6 +29,7 @@ fun AboutAppScreen(
     PlatformBackHandler(enabled = true) {
         onBackClick()
     }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -37,12 +37,17 @@ fun AboutAppScreen(
                     Text(
                         "About EVA2Z Connect",
                         fontSize = 20.sp,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF222222)
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            null,
+                            tint = Color(0xFF333333)
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -52,87 +57,123 @@ fun AboutAppScreen(
         },
         contentWindowInsets = WindowInsets(0)
     ) { padding ->
-        Column(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(Color(0xFFF6F7F9))
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            val screenWidth = maxWidth
+            val screenHeight = maxHeight
+            val isCompact = screenHeight < 700.dp
 
-            InfoCard {
-                SectionTitle("Welcome to EVA2Z Connect")
-                SectionText(
-                    "EVA2Z Connect is an advanced GPS tracking and vehicle security platform designed to deliver real-time monitoring, safety, and complete control.\n\n" +
-                            "Ideal for individuals, families, and fleet operators looking for reliability and peace of mind."
-                )
+            val horizontalPad = (screenWidth * 0.04f).coerceIn(12.dp, 20.dp)
+            val cardCorner = 18.dp
+            val cardSpacing = if (isCompact) 12.dp else 16.dp
+            val sectionTitleSize = if (isCompact) 16.sp else 17.sp
+            val bodyTextSize = if (isCompact) 13.sp else 14.sp
+            val bodyLineHeight = (bodyTextSize.value * 1.5f).sp
+            val featureTitleSize = if (isCompact) 13.sp else 14.sp
+            val featureDescSize = if (isCompact) 12.sp else 13.sp
+            val cardInnerPad = if (isCompact) 14.dp else 18.dp
+
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFFF5F6F8))
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = horizontalPad, vertical = horizontalPad),
+                verticalArrangement = Arrangement.spacedBy(cardSpacing)
+            ) {
+                // Welcome Card
+                InfoCard(cardCorner, cardInnerPad) {
+                    SectionTitle("Welcome to EVA2Z Connect", sectionTitleSize)
+                    SectionText(
+                        "EVA2Z Connect is an advanced GPS tracking and vehicle security platform designed to deliver real-time monitoring, safety, and complete control.\n\n" +
+                                "Ideal for individuals, families, and fleet operators looking for reliability and peace of mind.",
+                        bodyTextSize,
+                        bodyLineHeight
+                    )
+                }
+
+                // Features Card
+                InfoCard(cardCorner, cardInnerPad) {
+                    SectionTitle("Key Features", sectionTitleSize)
+                    FeatureItem("Live GPS Tracking", "Real-time vehicle location", featureTitleSize, featureDescSize)
+                    FeatureItem("Remote Engine Control", "Secure vehicle instantly", featureTitleSize, featureDescSize)
+                    FeatureItem("Route History", "Complete travel logs", featureTitleSize, featureDescSize)
+                    FeatureItem("Daily Analytics", "Trips, mileage & insights", featureTitleSize, featureDescSize)
+                    FeatureItem("Smart Alerts", "Ignition, speed & geofence", featureTitleSize, featureDescSize)
+                    FeatureItem("Multi-Vehicle Support", "Cars, bikes & fleets", featureTitleSize, featureDescSize)
+                }
+
+                // Products Card
+                InfoCard(cardCorner, cardInnerPad) {
+                    SectionTitle("Available Products", sectionTitleSize)
+                    SimpleItem("Wireless GPS Tracker", bodyTextSize)
+                    SimpleItem("Wired GPS Tracker (Car / Bike)", bodyTextSize)
+                    SimpleItem("Kids & Pet Tracker", bodyTextSize)
+                    SimpleItem("Elderly Safety Tracker", bodyTextSize)
+                    SimpleItem("Smart Document Tracker", bodyTextSize)
+                }
+
+                // Why Choose Card
+                InfoCard(cardCorner, cardInnerPad) {
+                    SectionTitle("Why Choose EVA2Z", sectionTitleSize)
+                    SimpleItem("Accurate & fast tracking", bodyTextSize)
+                    SimpleItem("Reliable engine control", bodyTextSize)
+                    SimpleItem("Advanced safety alerts", bodyTextSize)
+                    SimpleItem("Trusted by thousands of users", bodyTextSize)
+                }
+
+                // Company Card
+                InfoCard(cardCorner, cardInnerPad) {
+                    SectionTitle("Company Information", sectionTitleSize)
+                    SectionText(
+                        "Evatoz Solutions Private Limited specializes in electric mobility and intelligent GPS tracking solutions.",
+                        bodyTextSize,
+                        bodyLineHeight
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    SectionSubtitle("Our Mission", if (isCompact) 14.sp else 15.sp)
+                    SectionText(
+                        "To empower users with intelligent tracking, real-time alerts, and seamless digital experience.",
+                        bodyTextSize,
+                        bodyLineHeight
+                    )
+                }
+
+                // Contact Card
+                InfoCard(cardCorner, cardInnerPad) {
+                    SectionTitle("Contact & Support", sectionTitleSize)
+                    ContactRow("Address", "B-46, Sector 57, Noida, UP 201301", featureTitleSize, featureDescSize)
+                    ContactRow("Phone", "+91 9266884678", featureTitleSize, featureDescSize)
+                    ContactRow("Email", "info@eva2z.com", featureTitleSize, featureDescSize)
+                    ContactRow("Website", "www.eva2z.com", featureTitleSize, featureDescSize)
+                }
+
+                // CTA Card
+                HighlightCard(isCompact)
+
+                Spacer(Modifier.height(12.dp))
             }
-
-            InfoCard {
-                SectionTitle("Key Features")
-                FeatureItem("Live GPS Tracking", "Real-time vehicle location")
-                FeatureItem("Remote Engine Control", "Secure vehicle instantly")
-                FeatureItem("Route History", "Complete travel logs")
-                FeatureItem("Daily Analytics", "Trips, mileage & insights")
-                FeatureItem("Smart Alerts", "Ignition, speed & geofence")
-                FeatureItem("Multi-Vehicle Support", "Cars, bikes & fleets")
-            }
-
-            InfoCard {
-                SectionTitle("Available Products")
-                SimpleItem("Wireless GPS Tracker")
-                SimpleItem("Wired GPS Tracker (Car / Bike)")
-                SimpleItem("Kids & Pet Tracker")
-                SimpleItem("Elderly Safety Tracker")
-                SimpleItem("Smart Document Tracker")
-            }
-
-            InfoCard {
-                SectionTitle("Why Choose EVA2Z")
-                SimpleItem("Accurate & fast tracking")
-                SimpleItem("Reliable engine control")
-                SimpleItem("Advanced safety alerts")
-                SimpleItem("Trusted by thousands of users")
-            }
-
-            InfoCard {
-                SectionTitle("Company Information")
-                SectionText(
-                    "Evatoz Solutions Private Limited specializes in electric mobility and intelligent GPS tracking solutions."
-                )
-                Spacer(Modifier.height(8.dp))
-                SectionSubtitle("Our Mission")
-                SectionText(
-                    "To empower users with intelligent tracking, real-time alerts, and seamless digital experience."
-                )
-            }
-
-            InfoCard {
-                SectionTitle("Contact & Support")
-                ContactRow("Address", "B-46, Sector 57, Noida, UP 201301")
-                ContactRow("Phone", "+91 9266884678")
-                ContactRow("Email", "info@eva2z.com")
-                ContactRow("Website", "www.eva2z.com")
-            }
-
-            HighlightCard()
-            Spacer(Modifier.height(12.dp))
         }
     }
 }
 
 @Composable
-private fun InfoCard(content: @Composable ColumnScope.() -> Unit) {
+private fun InfoCard(
+    cornerRadius: androidx.compose.ui.unit.Dp = 18.dp,
+    innerPadding: androidx.compose.ui.unit.Dp = 18.dp,
+    content: @Composable ColumnScope.() -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(cornerRadius),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(2.dp)
+        elevation = CardDefaults.cardElevation(1.dp)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(innerPadding),
             verticalArrangement = Arrangement.spacedBy(10.dp),
             content = content
         )
@@ -140,332 +181,145 @@ private fun InfoCard(content: @Composable ColumnScope.() -> Unit) {
 }
 
 @Composable
-private fun SectionTitle(text: String) {
+private fun SectionTitle(
+    text: String,
+    fontSize: androidx.compose.ui.unit.TextUnit = 17.sp
+) {
     Text(
         text,
-        fontSize = 17.sp,
+        fontSize = fontSize,
         fontWeight = FontWeight.Bold,
-        color = Color(0xFF1F2937)
+        color = Color(0xFF222222)
     )
 }
 
 @Composable
-private fun SectionSubtitle(text: String) {
+private fun SectionSubtitle(
+    text: String,
+    fontSize: androidx.compose.ui.unit.TextUnit = 15.sp
+) {
     Text(
         text,
-        fontSize = 15.sp,
+        fontSize = fontSize,
         fontWeight = FontWeight.SemiBold,
-        color = Color(0xFF4CAF50)
+        color = Color(0xFF6A9F50)
     )
 }
 
 @Composable
-private fun SectionText(text: String) {
+private fun SectionText(
+    text: String,
+    fontSize: androidx.compose.ui.unit.TextUnit = 14.sp,
+    lineHeight: androidx.compose.ui.unit.TextUnit = 20.sp
+) {
     Text(
         text,
-        fontSize = 14.sp,
-        lineHeight = 20.sp,
-        color = Color(0xFF6B7280)
+        fontSize = fontSize,
+        lineHeight = lineHeight,
+        color = Color(0xFF777777)
     )
 }
 
 @Composable
-private fun FeatureItem(title: String, desc: String) {
+private fun FeatureItem(
+    title: String,
+    desc: String,
+    titleSize: androidx.compose.ui.unit.TextUnit = 14.sp,
+    descSize: androidx.compose.ui.unit.TextUnit = 13.sp
+) {
     Column {
-        Text(title, fontWeight = FontWeight.Medium, fontSize = 14.sp)
-        Text(desc, fontSize = 13.sp, color = Color(0xFF6B7280))
+        Text(
+            title,
+            fontWeight = FontWeight.Medium,
+            fontSize = titleSize,
+            color = Color(0xFF333333)
+        )
+        Text(
+            desc,
+            fontSize = descSize,
+            color = Color(0xFF999999)
+        )
     }
 }
 
 @Composable
-private fun SimpleItem(text: String) {
-    Text(
-        "• $text",
-        fontSize = 14.sp,
-        color = Color(0xFF4B5563)
-    )
-}
-
-@Composable
-private fun ContactRow(label: String, value: String) {
-    Column {
-        Text(label, fontWeight = FontWeight.Medium, fontSize = 13.sp)
-        Text(value, fontSize = 14.sp, color = Color(0xFF6B7280))
+private fun SimpleItem(
+    text: String,
+    fontSize: androidx.compose.ui.unit.TextUnit = 14.sp
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .background(Color(0xFF6A9F50), RoundedCornerShape(3.dp))
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text,
+            fontSize = fontSize,
+            color = Color(0xFF555555)
+        )
     }
 }
 
 @Composable
-private fun HighlightCard() {
+private fun ContactRow(
+    label: String,
+    value: String,
+    labelSize: androidx.compose.ui.unit.TextUnit = 13.sp,
+    valueSize: androidx.compose.ui.unit.TextUnit = 13.sp
+) {
+    Column {
+        Text(
+            label,
+            fontWeight = FontWeight.Medium,
+            fontSize = labelSize,
+            color = Color(0xFF333333)
+        )
+        Text(
+            value,
+            fontSize = valueSize,
+            color = Color(0xFF888888)
+        )
+    }
+}
+
+@Composable
+private fun HighlightCard(isCompact: Boolean = false) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF4CAF50))
+        shape = RoundedCornerShape(18.dp),
+        elevation = CardDefaults.cardElevation(2.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(Color(0xFF6A9F50), Color(0xFF8BC34A))
+                    )
+                )
+                .padding(if (isCompact) 16.dp else 20.dp)
         ) {
-            Text(
-                "Protect What Matters Most",
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                color = Color.White
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                "Track smarter. Stay safer. Stay in control.",
-                fontSize = 14.sp,
-                color = Color.White
-            )
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    "Protect What Matters Most",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = if (isCompact) 15.sp else 17.sp,
+                    color = Color.White,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "Track smarter. Stay safer. Stay in control.",
+                    fontSize = if (isCompact) 13.sp else 14.sp,
+                    color = Color.White.copy(alpha = 0.9f),
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }
-
-
-//@OptIn(ExperimentalMaterial3Api::class)
-//@Composable
-//fun AboutAppScreen(
-//    onBackClick: () -> Unit
-//) {
-//    Scaffold(
-//        topBar = {
-//            TopAppBar(
-//                title = {
-//                    Text(
-//                        text = "About EVA2Z Connect",
-//                        fontSize = 20.sp,
-//                        fontWeight = FontWeight.SemiBold
-//                    )
-//                },
-//                navigationIcon = {
-//                    IconButton(onClick = onBackClick) {
-//                        Icon(
-//                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-//                            contentDescription = "Back"
-//                        )
-//                    }
-//                },
-//                colors = TopAppBarDefaults.topAppBarColors(
-//                    containerColor = Color.White
-//                )
-//            )
-//        },
-//        contentWindowInsets = WindowInsets(0) // 🔥 IMPORTANT
-//
-//    ) { paddingValues ->
-//        Column(
-//            modifier = Modifier
-//                .fillMaxSize()
-//                .padding(paddingValues)
-//                .background(Color(0xFFF5F5F5))
-//                .verticalScroll(rememberScrollState())
-//                .padding(24.dp),
-//            verticalArrangement = Arrangement.spacedBy(16.dp)
-//        ) {
-//            // Welcome
-//            SectionHeader("🚗 Welcome to EVA2Z Connect!")
-//            SectionText(
-//                "EVA2Z Connect is your all-in-one GPS tracking and vehicle security app — designed to give you " +
-//                        "total control, real-time safety, and complete peace of mind.\n\n" +
-//                        "Whether you're a personal vehicle owner, fleet manager, or someone who wants to protect loved ones " +
-//                        "and valuable assets, EVA2Z Connect gives you everything in one powerful app."
-//            )
-//
-//            Spacer(modifier = Modifier.height(8.dp))
-//
-//            // Features
-//            SectionHeader("🚀 What You Can Do")
-//            BulletPoint("📍 Live GPS Tracking", "See your vehicle location in real time.")
-//            BulletPoint("🔐 Remote Engine Control", "Instantly secure your vehicle from anywhere.")
-//            BulletPoint("🛣️ Route History", "Check every route throughout the day.")
-//            BulletPoint("📊 Daily Analytics", "Understand trips, mileage, and usage.")
-//            BulletPoint("🔔 Smart Alerts", "Ignition, speeding, battery, geofence & more.")
-//            BulletPoint("🚘 Multi-Vehicle", "Manage car, bike, truck, or fleet.")
-//            BulletPoint("🛒 In-App Shop", "Buy GPS devices directly.")
-//            BulletPoint("👤 Profile & Preferences", "Manage settings easily.")
-//            BulletPoint("🎨 Beautiful UI", "Modern & effortless navigation.")
-//
-//            Spacer(modifier = Modifier.height(8.dp))
-//
-//            // Products
-//            SectionHeader("🛍️ Products Available")
-//            BulletPoint("🔋 GPS Tracker", "Wireless")
-//            BulletPoint("🔧 GPS Tracker", "Wired (Car/Bike)")
-//            BulletPoint("🧒 Kids Tracker", "Keep children safe")
-//            BulletPoint("🐶 Pet Tracker", "Never lose your pet")
-//            BulletPoint("🧓 Elderly Tracker", "Care for loved ones")
-//            BulletPoint("📄 Document Tracker", "Smart Card Tag")
-//
-//            Spacer(modifier = Modifier.height(8.dp))
-//
-//            // Why Us
-//            SectionHeader("💡 Why EVA2Z Stands Out")
-//            SimpleList(
-//                listOf(
-//                    "Faster & accurate tracking",
-//                    "Reliable engine lock/unlock",
-//                    "Best safety alerts",
-//                    "Trusted by 1,000+ users",
-//                    "Personal & fleet management"
-//                )
-//            )
-//
-//            Spacer(modifier = Modifier.height(8.dp))
-//
-//            // Company
-//            SectionHeader("🏢 About the Company")
-//            SectionText(
-//                "Evatoz Solutions Private Limited delivers innovative electric mobility and GPS tracking solutions."
-//            )
-//
-//            SectionSubHeader("🎯 Our Mission")
-//            SectionText(
-//                "To empower users with real-time tracking, smart alerts, and seamless mobile experience."
-//            )
-//
-//            Spacer(modifier = Modifier.height(8.dp))
-//
-//            // Contact
-//            SectionHeader("📞 Contact & Support")
-//            ContactInfo("Address:", "B-46, Sector 57, Noida, UP 201301")
-//            ContactInfo("Phone:", "+91 9266884678")
-//            ContactInfo("Email:", "info@eva2z.com")
-//            ContactInfo("Website:", "https://eva2z.com")
-//
-//            Spacer(modifier = Modifier.height(8.dp))
-//
-//            // CTA
-//            Card(
-//                modifier = Modifier.fillMaxWidth(),
-//                colors = CardDefaults.cardColors(containerColor = Color(0xFF4CAF50)),
-//                shape = MaterialTheme.shapes.medium
-//            ) {
-//                Column(
-//                    modifier = Modifier.padding(16.dp),
-//                    horizontalAlignment = Alignment.CenterHorizontally
-//                ) {
-//                    Text(
-//                        text = "⏳ Don't Wait — Protect What Matters!",
-//                        fontSize = 16.sp,
-//                        fontWeight = FontWeight.Bold,
-//                        color = Color.White
-//                    )
-//                    Spacer(modifier = Modifier.height(8.dp))
-//                    Text(
-//                        text = "Every minute without tracking is a risk.",
-//                        fontSize = 14.sp,
-//                        color = Color.White
-//                    )
-//                    Spacer(modifier = Modifier.height(8.dp))
-//                    Text(
-//                        text = "🚗 Track Smarter. Live Safer. Stay in Control.",
-//                        fontSize = 14.sp,
-//                        fontWeight = FontWeight.Bold,
-//                        color = Color.White
-//                    )
-//                }
-//            }
-//
-//            Spacer(modifier = Modifier.height(32.dp))
-//        }
-//    }
-//}
-//
-//@Composable
-//private fun SectionHeader(text: String) {
-//    Text(
-//        text = text,
-//        fontSize = 18.sp,
-//        fontWeight = FontWeight.Bold,
-//        color = Color(0xFF333333)
-//    )
-//}
-//
-//@Composable
-//private fun SectionSubHeader(text: String) {
-//    Text(
-//        text = text,
-//        fontSize = 16.sp,
-//        fontWeight = FontWeight.SemiBold,
-//        color = Color(0xFF4CAF50)
-//    )
-//}
-//
-//@Composable
-//private fun SectionText(text: String) {
-//    Text(
-//        text = text,
-//        fontSize = 14.sp,
-//        color = Color(0xFF666666),
-//        lineHeight = 20.sp
-//    )
-//}
-//
-//@Composable
-//private fun BulletPoint(title: String, description: String) {
-//    Row(
-//        modifier = Modifier.fillMaxWidth(),
-//        horizontalArrangement = Arrangement.spacedBy(8.dp)
-//    ) {
-//        Text(
-//            text = "•",
-//            fontSize = 14.sp,
-//            color = Color(0xFF4CAF50),
-//            modifier = Modifier.padding(top = 2.dp)
-//        )
-//        Column {
-//            Text(
-//                text = buildAnnotatedString {
-//                    withStyle(style = SpanStyle(fontWeight = FontWeight.Bold)) {
-//                        append(title)
-//                    }
-//                },
-//                fontSize = 14.sp,
-//                color = Color(0xFF333333)
-//            )
-//            if (description.isNotEmpty()) {
-//                Text(
-//                    text = description,
-//                    fontSize = 13.sp,
-//                    color = Color(0xFF666666),
-//                    lineHeight = 18.sp
-//                )
-//            }
-//        }
-//    }
-//}
-//
-//@Composable
-//private fun SimpleList(items: List<String>) {
-//    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-//        items.forEach { item ->
-//            Row(
-//                modifier = Modifier.fillMaxWidth(),
-//                horizontalArrangement = Arrangement.spacedBy(8.dp)
-//            ) {
-//                Text(text = "•", fontSize = 14.sp, color = Color(0xFF4CAF50))
-//                Text(text = item, fontSize = 14.sp, color = Color(0xFF666666), lineHeight = 20.sp)
-//            }
-//        }
-//    }
-//}
-//
-//@Composable
-//private fun ContactInfo(label: String, value: String) {
-//    Column(
-//        modifier = Modifier.fillMaxWidth(),
-//        verticalArrangement = Arrangement.spacedBy(4.dp)
-//    ) {
-//        Text(
-//            text = label,
-//            fontSize = 14.sp,
-//            fontWeight = FontWeight.Bold,
-//            color = Color(0xFF333333)
-//        )
-//        Text(
-//            text = value,
-//            fontSize = 14.sp,
-//            color = Color(0xFF666666)
-//        )
-//    }
-//}

@@ -149,7 +149,7 @@ fun GeoFencingScreen(
 
                 is GeoFenceUiState.Error ->
                     Column(
-                        modifier = Modifier.align(Alignment.Center),
+                        modifier = Modifier.align(Alignment.Center).padding(24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Icon(
@@ -158,10 +158,15 @@ fun GeoFencingScreen(
                         )
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            "Error: No Device Id Found",
+                            (state as GeoFenceUiState.Error).message,
                             color = G.TextSecondary,
-                            fontSize = 14.sp
+                            fontSize = 14.sp,
+                            textAlign = TextAlign.Center
                         )
+                        Spacer(Modifier.height(12.dp))
+                        TextButton(onClick = { viewModel.loadGeoFencesSafely() }) {
+                            Text("Retry", color = G.Primary, fontWeight = FontWeight.SemiBold)
+                        }
                     }
             }
         }

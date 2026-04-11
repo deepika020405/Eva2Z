@@ -1,12 +1,18 @@
 package com.developer.ev2z.ui.screens.ChangePlan
 
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.phonepe.PaymentState
@@ -30,7 +36,6 @@ fun ChangePlanScreenHost(
 
     var sdkLaunched by remember { mutableStateOf(false) }
 
-    // 🔥 SAFE SDK TRIGGER
     LaunchedEffect(phonePeToken) {
         if (phonePeToken != null && !sdkLaunched) {
             sdkLaunched = true
@@ -48,11 +53,12 @@ fun ChangePlanScreenHost(
         }
     }
 
-    Surface(modifier = Modifier.fillMaxSize()) {
-
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = Color(0xFFF5F6F8)
+    ) {
         when (paymentState) {
 
-            // 🔄 PROCESSING
             is PaymentState.Processing -> {
                 Box(
                     modifier = Modifier
@@ -60,15 +66,31 @@ fun ChangePlanScreenHost(
                         .systemBarsPadding(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        CircularProgressIndicator()
-                        Spacer(Modifier.height(12.dp))
-                        Text("Redirecting to PhonePe…")
+                    Card(
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(2.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(horizontal = 40.dp, vertical = 32.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            CircularProgressIndicator(
+                                color = Color(0xFF6A9F50),
+                                strokeWidth = 3.dp
+                            )
+                            Spacer(Modifier.height(16.dp))
+                            Text(
+                                "Redirecting to PhonePe…",
+                                fontSize = 15.sp,
+                                color = Color(0xFF555555),
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
                 }
             }
 
-            // ✅ SUCCESS
             is PaymentState.Success -> {
                 val ps = paymentState as PaymentState.Success
                 PaymentPlanScreen(
@@ -82,7 +104,6 @@ fun ChangePlanScreenHost(
                 )
             }
 
-            // ⚪ CANCELLED
             is PaymentState.Cancelled -> {
                 PaymentPlanScreen(
                     state = PaymentUiState.Cancelled,
@@ -90,7 +111,6 @@ fun ChangePlanScreenHost(
                 )
             }
 
-            // ❌ FAILED
             is PaymentState.Failed -> {
                 PaymentPlanScreen(
                     state = PaymentUiState.Failed,
@@ -98,18 +118,30 @@ fun ChangePlanScreenHost(
                 )
             }
 
-            // 🟢 NORMAL FLOW
             else -> {
                 when {
                     planState.isLoading -> {
                         Box(Modifier.fillMaxSize(), Alignment.Center) {
-                            CircularProgressIndicator()
+                            CircularProgressIndicator(
+                                color = Color(0xFF6A9F50),
+                                strokeWidth = 3.dp
+                            )
                         }
                     }
 
                     planState.error != null -> {
                         Box(Modifier.fillMaxSize(), Alignment.Center) {
-                            Text(planState.error ?: "Something went wrong")
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.padding(32.dp)
+                            ) {
+                                Text(
+                                    text = planState.error ?: "Something went wrong",
+                                    fontSize = 15.sp,
+                                    color = Color(0xFF555555),
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
 

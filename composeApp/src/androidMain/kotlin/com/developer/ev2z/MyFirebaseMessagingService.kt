@@ -29,28 +29,39 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         val title = message.notification?.title ?: data["title"] ?: "Alert"
         val body  = message.notification?.body ?: data["body"] ?: ""
 
-        val alertId = data["notification_id"]?.toIntOrNull()
+        // Server now sends `chat_id` for visitor chat messages; older payloads used `notification_id`.
+        val alertId = data["chat_id"]?.toIntOrNull()
+            ?: data["notification_id"]?.toIntOrNull()
 
         println("📩 ANDROID FCM MSG")
         println("Title: $title")
         println("Body: $body")
         println("Data: $data")
 
-        // ✅ Show notification WITH alertId
+        val visitorName  = data["visitor_name"]
+        val visitorPhone = data["visitor_phone"]
+
+        // ✅ Show notification WITH alertId (+ visitor info so cold-start tap can restore it)
         NotificationUtil.show(
             context = applicationContext,
             title = title,
             body = body,
-            alertId = alertId
+            alertId = alertId,
+            visitorName = visitorName,
+            visitorPhone = visitorPhone
         )
 
         when (type) {
 
-            "vehicle_notification" -> {
+            "chat", "vehicle_notification" -> {
                 if (alertId != null) {
-                    println("🚨 SOS ALERT — App Open: $alertId")
-                    // ✅ App open ho tab bhi emit karo — HomeNavGraph sun raha hai
-                    SosNotificationHandler.onSosAlertReceived(alertId)
+                    println("🚨 SOS ALERT — App Open: $alertId (type=$type)")
+                    // App open ho tab bhi emit karo — HomeNavGraph sun raha hai
+                    SosNotificationHandler.onSosAlertReceived(
+                        alertId = alertId,
+                        visitorName = visitorName,
+                        visitorPhone = visitorPhone
+                    )
                 }
             }
 

@@ -61,19 +61,20 @@ private val TT_Running = Color(0xFF85B070)
 private val TT_Idle = Color(0xFFF4C44E)
 private val TT_Stopped = Color(0xFFE5565B)
 
-private fun ttStatusColor(status: String) = when (status) {
+private fun ttStatusColor(status: String) = when (status.lowercase()) {
     "on", "moving" -> TT_Running
-    "Idle", "idle" -> TT_Idle
-    "off", "parked", "offline" -> TT_Stopped
+    "idle" -> TT_Idle
+    "off", "parked", "offline", "no_data" -> TT_Stopped
     else -> Color.Gray
 }
 
-private fun ttStatusLabel(status: String) = when (status) {
+private fun ttStatusLabel(status: String) = when (status.lowercase()) {
     "on", "moving" -> "Running"
-    "Idle", "idle" -> "Idle"
+    "idle" -> "Idle"
     "off" -> "Stopped"
     "parked" -> "Parked"
     "offline" -> "Offline"
+    "no_data" -> "No Data"
     else -> status.replaceFirstChar { it.uppercase() }
 }
 
@@ -94,8 +95,9 @@ fun TrackTraceScreen(
 
     PlatformBackHandler(true) { onBack() }
 
-    LaunchedEffect(Unit) {
-        viewModel.loadDevices()
+    DisposableEffect(Unit) {
+        viewModel.start()
+        onDispose { viewModel.stop() }
     }
 
     Box(
@@ -176,11 +178,14 @@ fun TrackTraceScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            // Device selector card
+            // Device selector card — pass VM so it can read live-location status
+            // as the real-time source of truth for the LIVE/OFFLINE badge.
             DeviceDropdownCardSimple(
                 userName = username.ifEmpty { "User" },
                 devices = devices,
                 selectedDevice = selectedDevice,
+                selectedLiveStatus = viewModel.liveLocation
+                    .collectAsState().value?.data?.latestLocation?.status,
                 onDeviceSelect = viewModel::selectDevice
             )
         }
@@ -354,10 +359,16 @@ fun DeviceDropdownCardSimple(
     userName: String,
     devices: List<Device>,
     selectedDevice: Device?,
+    selectedLiveStatus: String?,
     onDeviceSelect: (Device) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
     val isSingleDevice = devices.size <= 1
+    // Prefer real-time live-location status for the selected device;
+    // fall back to the cached engine_status from the device list.
+    val effectiveStatus = (selectedLiveStatus ?: selectedDevice?.engine_status ?: "offline")
+        .lowercase()
+    val isLive = effectiveStatus in listOf("on", "moving", "idle")
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -389,10 +400,12 @@ fun DeviceDropdownCardSimple(
                     )
                 }
 
-                // LIVE indicator badge
+                // LIVE / OFFLINE indicator badge — driven by selected device status
+                val badgeColor = if (isLive) TT_Primary else TT_Stopped
+                val badgeBg = if (isLive) TT_PrimaryBg else TT_Stopped.copy(alpha = 0.12f)
                 Surface(
                     shape = RoundedCornerShape(8.dp),
-                    color = TT_PrimaryBg
+                    color = badgeBg
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
@@ -401,14 +414,14 @@ fun DeviceDropdownCardSimple(
                         Box(
                             Modifier
                                 .size(7.dp)
-                                .background(TT_Primary, CircleShape)
+                                .background(badgeColor, CircleShape)
                         )
                         Spacer(Modifier.width(5.dp))
                         Text(
-                            "LIVE",
+                            if (isLive) "LIVE" else "OFFLINE",
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
-                            color = TT_Primary
+                            color = badgeColor
                         )
                     }
                 }

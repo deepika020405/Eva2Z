@@ -13,7 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.launch import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import com.developer.ev2z.phonepe.openPhonePeSdk
@@ -465,10 +465,19 @@ class ShopViewModel(
         val token = tokenProvider()
         val amount = (s.finalAmount ?: s.totalPrice ?: "0").toDouble()
         val billingId = s.selectedAddress?.id
+        val cartItems = s.cart
 
         if (billingId == null) {
             _paymentState.value = PaymentState.Failed(
                 reason = "Please select delivery address",
+                amount = 0
+            )
+            return
+        }
+
+        if (cartItems.isEmpty()) {
+            _paymentState.value = PaymentState.Failed(
+                reason = "Cart is empty",
                 amount = 0
             )
             return
@@ -484,14 +493,20 @@ class ShopViewModel(
                 val resp = repo.createPhonePeOrder(
                     token = token,
                     amount = amount,
-                    billingId = billingId
+                    billingId = billingId,
+                    cart = cartItems
                 )
 
-                val orderToken = resp["orderToken"]?.jsonPrimitive?.content
-                    ?: throw Exception("orderToken missing")
-
                 val phonepeOrderId = resp["phonepeOrderId"]?.jsonPrimitive?.content
-                    ?: throw Exception("orderId missing")
+                    ?: throw Exception("phonepeOrderId missing")
+
+                val rawResponseStr = resp["order"]?.jsonObject
+                    ?.get("raw_response")?.jsonPrimitive?.content
+                    ?: throw Exception("order.raw_response missing")
+
+                val orderToken = Json.parseToJsonElement(rawResponseStr)
+                    .jsonObject["token"]?.jsonPrimitive?.content
+                    ?: throw Exception("token missing in raw_response")
 
                 println("✅ Order Created: token=${orderToken.take(50)}..., orderId=$phonepeOrderId")
 

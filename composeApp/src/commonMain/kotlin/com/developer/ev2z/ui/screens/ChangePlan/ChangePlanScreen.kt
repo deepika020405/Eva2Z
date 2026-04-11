@@ -10,17 +10,20 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.rounded.Devices
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
 import com.developer.ev2z.navigation.PlatformBackHandler
 
 /* =========================================================
-   RESPONSIVE HELPERS (CMP SAFE)
+   RESPONSIVE HELPERS
 ========================================================= */
 
 @Composable
@@ -52,60 +55,101 @@ fun ChangePlanScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Plans & Subscription") },
+                title = {
+                    Text(
+                        "Plans & Subscription",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                        color = Color(0xFF222222)
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Back")
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                            "Back",
+                            tint = Color(0xFF333333)
+                        )
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color.White
+                )
             )
-        }
+        },
+        contentWindowInsets = WindowInsets(0)
     ) { padding ->
 
         BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .background(Color(0xFFF5F6F8))
         ) {
             val pad = responsivePadding(maxWidth)
             val contentWidth = responsiveContentWidth(maxWidth)
+            val isCompact = maxHeight < 700.dp
 
-            // ✅ EMPTY STATE (NEW — safe addition)
             if (devices.isEmpty()) {
+                // Empty State
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(horizontal = 32.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(72.dp)
+                                .background(
+                                    Color(0xFFF0F7EC),
+                                    RoundedCornerShape(20.dp)
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Rounded.Devices,
+                                contentDescription = null,
+                                tint = Color(0xFF6A9F50),
+                                modifier = Modifier.size(36.dp)
+                            )
+                        }
+
+                        Spacer(Modifier.height(16.dp))
 
                         Text(
                             text = "No devices found",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
+                            fontSize = if (isCompact) 17.sp else 18.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF222222)
                         )
 
                         Spacer(Modifier.height(8.dp))
 
                         Text(
                             text = "Add a device to start using plans & subscriptions.",
-                            color = Color.Gray
+                            color = Color(0xFF888888),
+                            fontSize = if (isCompact) 13.sp else 14.sp,
+                            textAlign = TextAlign.Center
                         )
                     }
                 }
             } else {
-                // ✅ EXISTING DEVICE LIST (unchanged)
                 LazyColumn(
-
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = pad),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    contentPadding = PaddingValues(vertical = 8.dp)
                 ) {
                     items(devices) { device ->
                         DevicePlanCard(
                             device = device,
                             onRenew = { selectedDevice = device },
-                            contentWidth = contentWidth
+                            contentWidth = contentWidth,
+                            isCompact = isCompact
                         )
                     }
                 }
@@ -113,7 +157,6 @@ fun ChangePlanScreen(
         }
     }
 
-    // ✅ Bottom sheet logic (unchanged)
     selectedDevice?.let { device ->
         RenewPlanBottomSheet(
             device = device,
@@ -127,86 +170,103 @@ fun ChangePlanScreen(
 }
 
 /* =========================================================
-   DEVICE CARD (Responsive)
+   DEVICE CARD
 ========================================================= */
 
 @Composable
 fun DevicePlanCard(
     device: DevicePlanUi,
     onRenew: () -> Unit,
-    contentWidth: Dp
+    contentWidth: Dp,
+    isCompact: Boolean = false
 ) {
+    val cardPad = if (isCompact) 16.dp else 18.dp
+    val titleSize = if (isCompact) 15.sp else 16.sp
+    val labelSize = if (isCompact) 13.sp else 14.sp
+
     Card(
         modifier = Modifier
             .padding(vertical = 8.dp)
             .widthIn(max = contentWidth)
             .fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column {
-
-            // 🔹 Accent strip (modern look)
+            // Green accent strip
             Box(
                 Modifier
                     .fillMaxWidth()
                     .height(4.dp)
-                    .background(MaterialTheme.colorScheme.primary)
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(Color(0xFF6A9F50), Color(0xFF8BC34A))
+                        )
+                    )
             )
 
-            Column(Modifier.padding(18.dp)) {
-
+            Column(Modifier.padding(cardPad)) {
                 // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             device.deviceName,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
+                            fontSize = titleSize,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF222222)
                         )
 
                         Spacer(Modifier.height(2.dp))
 
                         Text(
                             "ID: ${device.imei}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            fontSize = 12.sp,
+                            color = Color(0xFF999999)
                         )
                     }
 
+                    Spacer(Modifier.width(8.dp))
                     ExpiryChip(device.daysLeft)
                 }
 
                 Spacer(Modifier.height(16.dp))
 
                 // Info Rows
-                InfoRow("Plan", device.planType)
-                InfoRow("Expiry Date", device.expiryDate)
+                InfoRow("Plan", device.planType, labelSize)
+                InfoRow("Expiry Date", device.expiryDate, labelSize)
                 InfoRow(
                     "SIM Number",
-                    device.simNumber?.takeIf { it.isNotBlank() } ?: "Not Available"
+                    device.simNumber?.takeIf { it.isNotBlank() } ?: "Not Available",
+                    labelSize
                 )
 
                 Spacer(Modifier.height(18.dp))
 
-                // 🔹 Modern Button
+                // Renew Button
                 Button(
                     onClick = onRenew,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    elevation = ButtonDefaults.buttonElevation(4.dp)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(if (isCompact) 46.dp else 48.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF6A9F50),
+                        contentColor = Color.White
+                    ),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 2.dp,
+                        pressedElevation = 4.dp
+                    )
                 ) {
                     Text(
                         "Renew Plan",
-                        style = MaterialTheme.typography.labelLarge,
-                        modifier = Modifier.padding(vertical = 4.dp)
+                        fontSize = if (isCompact) 14.sp else 15.sp,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }
@@ -215,31 +275,38 @@ fun DevicePlanCard(
 }
 
 /* =========================================================
-   RESPONSIVE INFO ROW (KEY COMPONENT)
+   INFO ROW
 ========================================================= */
 
 @Composable
-fun InfoRow(label: String, value: String) {
+fun InfoRow(
+    label: String,
+    value: String,
+    fontSize: TextUnit = 14.sp
+) {
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val isNarrow = maxWidth < 360.dp
 
-        val isCompact = maxWidth < 360.dp
-
-        if (isCompact) {
-            // 📱 Small screens → stacked layout
+        if (isNarrow) {
             Column(modifier = Modifier.padding(vertical = 6.dp)) {
-                Text(label, color = Color.Gray, fontSize = 12.sp)
+                Text(label, color = Color(0xFF999999), fontSize = (fontSize.value - 1).sp)
                 Spacer(Modifier.height(2.dp))
-                Text(value, fontWeight = FontWeight.SemiBold)
+                Text(
+                    value,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = fontSize,
+                    color = Color(0xFF333333)
+                )
             }
         } else {
-            // 📱 Normal & large screens → row layout
             Row(
                 modifier = Modifier.padding(vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     label,
-                    color = Color.Gray,
+                    color = Color(0xFF999999),
+                    fontSize = fontSize,
                     modifier = Modifier.weight(1f)
                 )
 
@@ -248,6 +315,8 @@ fun InfoRow(label: String, value: String) {
                 Text(
                     value,
                     fontWeight = FontWeight.SemiBold,
+                    fontSize = fontSize,
+                    color = Color(0xFF333333),
                     modifier = Modifier.weight(1f),
                     maxLines = 2
                 )
@@ -269,20 +338,32 @@ fun RenewPlanBottomSheet(
 ) {
     var duration by remember { mutableStateOf("1 Year") }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp)
+                .padding(horizontal = 24.dp, vertical = 16.dp)
         ) {
-
             Text(
                 text = "Renew: ${device.deviceName}",
                 fontWeight = FontWeight.Bold,
-                fontSize = 18.sp
+                fontSize = 18.sp,
+                color = Color(0xFF222222)
             )
 
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(6.dp))
+
+            Text(
+                text = "Select a plan duration to continue",
+                fontSize = 13.sp,
+                color = Color(0xFF888888)
+            )
+
+            Spacer(Modifier.height(20.dp))
 
             DurationOption(
                 text = "1 Year",
@@ -294,13 +375,27 @@ fun RenewPlanBottomSheet(
 
             Button(
                 onClick = { onConfirm(duration) },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp),
+                shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF4CAF50)
+                    containerColor = Color(0xFF6A9F50),
+                    contentColor = Color.White
+                ),
+                elevation = ButtonDefaults.buttonElevation(
+                    defaultElevation = 2.dp,
+                    pressedElevation = 4.dp
                 )
             ) {
-                Text("Proceed to Payment")
+                Text(
+                    "Proceed to Payment",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp
+                )
             }
+
+            Spacer(Modifier.height(16.dp))
         }
     }
 }
@@ -318,17 +413,33 @@ fun DurationOption(
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp)
+            .padding(vertical = 4.dp)
             .clickable { onClick() },
-        border = if (selected) BorderStroke(1.dp, Color(0xFF4CAF50)) else null
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) Color(0xFFF0F7EC) else Color.White
+        ),
+        border = if (selected) BorderStroke(1.5.dp, Color(0xFF6A9F50)) else BorderStroke(1.dp, Color(0xFFE8E8E8)),
+        elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text, Modifier.weight(1f))
+            Text(
+                text,
+                modifier = Modifier.weight(1f),
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (selected) Color(0xFF333333) else Color(0xFF777777),
+                fontSize = 15.sp
+            )
             if (selected) {
-                Icon(Icons.Default.CheckCircle, null, tint = Color(0xFF4CAF50))
+                Icon(
+                    Icons.Default.CheckCircle,
+                    null,
+                    tint = Color(0xFF6A9F50),
+                    modifier = Modifier.size(22.dp)
+                )
             }
         }
     }
@@ -336,14 +447,20 @@ fun DurationOption(
 
 @Composable
 fun ExpiryChip(daysLeft: Int) {
+    val isExpiringSoon = daysLeft <= 7
+    val bgColor = if (isExpiringSoon) Color(0xFFFFF3E0) else Color(0xFFF0F7EC)
+    val textColor = if (isExpiringSoon) Color(0xFFE65100) else Color(0xFF6A9F50)
+
     Surface(
-        shape = RoundedCornerShape(50),
-        color = if (daysLeft <= 7) Color(0xFFFFF8E1) else Color(0xFFE8F5E9)
+        shape = RoundedCornerShape(12.dp),
+        color = bgColor
     ) {
         Text(
             "$daysLeft days left",
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-            fontSize = 12.sp
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            color = textColor
         )
     }
 }

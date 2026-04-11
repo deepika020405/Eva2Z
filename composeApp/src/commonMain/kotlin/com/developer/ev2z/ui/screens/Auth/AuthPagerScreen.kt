@@ -36,7 +36,6 @@ fun AuthPagerScreen(
     val pagerState = rememberPagerState(initialPage = 0) { pageCount }
     val coroutineScope = rememberCoroutineScope()
 
-    // ✅ NEW LOGIC: Separate pre-fill states
     var preFilledPhoneLogin by remember { mutableStateOf("") }
     var preFilledPhoneSignup by remember { mutableStateOf("") }
 
@@ -51,11 +50,23 @@ fun AuthPagerScreen(
             modifier = Modifier.fillMaxSize()
         ) {
             val screenHeight = maxHeight
+            val isCompact = screenHeight < 700.dp
 
+            // Responsive header height
+            val headerFraction = if (isCompact) 0.16f else 0.20f
+            val logoSize = if (isCompact) 60.dp else 80.dp
+            val appTitleSize = if (isCompact) 20.sp else 24.sp
+            val tabTitleSize = if (isCompact) 20.sp else 24.sp
+            val tabFontSize = if (isCompact) 16.sp else 18.sp
+            val tabHeight = if (isCompact) 50.dp else 58.dp
+            val tabInnerHeight = if (isCompact) 36.dp else 42.dp
+            val contentHorizontalPad = if (isCompact) 24.dp else 32.dp
+
+            // Header with logo
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(screenHeight * 0.20f),
+                    .height(screenHeight * headerFraction),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
@@ -65,24 +76,25 @@ fun AuthPagerScreen(
                     Image(
                         painter = painterResource(Res.drawable.app_logo),
                         contentDescription = "App Logo",
-                        modifier = Modifier.size(80.dp)
+                        modifier = Modifier.size(logoSize)
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(if (isCompact) 8.dp else 12.dp))
 
                     Text(
                         text = "Eva2z Connect",
-                        fontSize = 24.sp,
+                        fontSize = appTitleSize,
                         fontWeight = FontWeight.Bold,
-                        color = Color.Black
+                        color = Color(0xFF222222)
                     )
                 }
             }
 
+            // White card content area
             Column(
                 Modifier
                     .fillMaxSize()
-                    .padding(top = screenHeight * 0.20f)
+                    .padding(top = screenHeight * headerFraction)
                     .background(
                         color = Color(0xFFFFFFFF),
                         RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
@@ -92,30 +104,30 @@ fun AuthPagerScreen(
                 Column(
                     Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 32.dp, vertical = 24.dp)
+                        .padding(horizontal = contentHorizontalPad, vertical = if (isCompact) 18.dp else 24.dp)
                 ) {
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(if (isCompact) 16.dp else 24.dp))
 
-                    // ✅ OLD DESIGN: Title
+                    // Title
                     Text(
-                        text = "Log in or Sign up ",
+                        text = "Log in or Sign up",
                         modifier = Modifier.fillMaxWidth(),
                         style = TextStyle(
-                            fontSize = 24.sp,
-                            lineHeight = 31.2.sp,
+                            fontSize = tabTitleSize,
+                            lineHeight = (tabTitleSize.value * 1.3f).sp,
                             fontWeight = FontWeight(500),
                             color = Color(0xFF252A23),
                             textAlign = TextAlign.Center,
                         )
                     )
 
-                    Spacer(modifier = Modifier.height(32.dp))
+                    Spacer(modifier = Modifier.height(if (isCompact) 20.dp else 32.dp))
 
-                    // ✅ OLD DESIGN: Custom Tab Switcher
+                    // Tab Switcher
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(58.dp)
+                            .height(tabHeight)
                             .background(
                                 color = Color(0xFFE6EDE3),
                                 shape = RoundedCornerShape(size = 40.dp)
@@ -134,7 +146,7 @@ fun AuthPagerScreen(
                                         ambientColor = Color(0x336A9F50)
                                     )
                                     .weight(1f)
-                                    .height(42.dp)
+                                    .height(tabInnerHeight)
                                     .background(
                                         color = Color(0xFFFFFFFF),
                                         shape = RoundedCornerShape(size = 40.dp)
@@ -144,7 +156,7 @@ fun AuthPagerScreen(
                                 Text(
                                     text = "Sign Up",
                                     style = TextStyle(
-                                        fontSize = 18.sp,
+                                        fontSize = tabFontSize,
                                         fontWeight = FontWeight(500),
                                         color = Color(0xFF494E47),
                                         textAlign = TextAlign.Center,
@@ -160,7 +172,7 @@ fun AuthPagerScreen(
                                 },
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(42.dp),
+                                    .height(tabInnerHeight),
                                 colors = ButtonDefaults.textButtonColors(
                                     contentColor = Color(0xFF5D6858)
                                 ),
@@ -169,7 +181,7 @@ fun AuthPagerScreen(
                                 Text(
                                     text = "Sign Up",
                                     style = TextStyle(
-                                        fontSize = 18.sp,
+                                        fontSize = tabFontSize,
                                         fontWeight = FontWeight(400),
                                         color = Color(0xFF5D6858),
                                         textAlign = TextAlign.Center,
@@ -188,7 +200,7 @@ fun AuthPagerScreen(
                                         ambientColor = Color(0x336A9F50)
                                     )
                                     .weight(1f)
-                                    .height(42.dp)
+                                    .height(tabInnerHeight)
                                     .background(
                                         color = Color(0xFFFFFFFF),
                                         shape = RoundedCornerShape(size = 40.dp)
@@ -198,7 +210,7 @@ fun AuthPagerScreen(
                                 Text(
                                     text = "Log In",
                                     style = TextStyle(
-                                        fontSize = 18.sp,
+                                        fontSize = tabFontSize,
                                         fontWeight = FontWeight(500),
                                         color = Color(0xFF494E47),
                                         textAlign = TextAlign.Center,
@@ -214,7 +226,7 @@ fun AuthPagerScreen(
                                 },
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(42.dp),
+                                    .height(tabInnerHeight),
                                 colors = ButtonDefaults.textButtonColors(
                                     contentColor = Color(0xFF5D6858)
                                 ),
@@ -223,7 +235,7 @@ fun AuthPagerScreen(
                                 Text(
                                     text = "Log In",
                                     style = TextStyle(
-                                        fontSize = 18.sp,
+                                        fontSize = tabFontSize,
                                         fontWeight = FontWeight(400),
                                         color = Color(0xFF5D6858),
                                         textAlign = TextAlign.Center,
@@ -233,9 +245,9 @@ fun AuthPagerScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(if (isCompact) 10.dp else 16.dp))
 
-                    // ✅ Pager Content with NEW LOGIC
+                    // Pager Content
                     HorizontalPager(
                         state = pagerState,
                         modifier = Modifier.fillMaxSize()

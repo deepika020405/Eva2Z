@@ -100,20 +100,7 @@ class GeoFenceViewModel(
     val editState: StateFlow<EditGeoFenceState> = _editState
 
     fun loadGeoFences() {
-        viewModelScope.launch {
-            _uiState.value = GeoFenceUiState.Loading
-
-            repository.fetchGeoFences()
-                .onSuccess {
-                    _uiState.value =
-                        if (it.isEmpty()) GeoFenceUiState.Empty
-                        else GeoFenceUiState.Success(it)
-                }
-                .onFailure {
-                    _uiState.value =
-                        GeoFenceUiState.Error(it.message ?: "Something went wrong")
-                }
-        }
+        loadGeoFencesSafely()
     }
 
     fun loadGeoFencesSafely() {

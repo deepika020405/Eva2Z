@@ -20,7 +20,8 @@ class TrackTraceViewModel(
     private val tokenProvider: () -> String
 ) : ViewModel() {
 
-    private var pollingJob: Job? = null
+    private var liveLocationJob: Job? = null
+    private var devicesPollingJob: Job? = null
 
     private val _devices = MutableStateFlow<List<Device>>(emptyList())
     val devices = _devices.asStateFlow()
@@ -31,36 +32,92 @@ class TrackTraceViewModel(
     private val _liveLocation = MutableStateFlow<LiveLocationResponse?>(null)
     val liveLocation = _liveLocation.asStateFlow()
 
-    private val _username = MutableStateFlow<String>("")
+    private val _username = MutableStateFlow("")
     val username = _username.asStateFlow()
 
-    // ✅ Trail history — max 100 points rakhenge (memory safe)
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading = _isLoading.asStateFlow()
+
+    private val _error = MutableStateFlow<String?>(null)
+    val error = _error.asStateFlow()
+
     private val _trailPoints = MutableStateFlow<List<TrailPoint>>(emptyList())
     val trailPoints = _trailPoints.asStateFlow()
 
-    fun loadDevices() {
-        viewModelScope.launch {
-            val res = repository.getMyDevices(tokenProvider())
-            if (res.success) {
-                _username.value = res.username.orEmpty()
-                if (res.devices.isNotEmpty()) {
-                    _devices.value = res.devices
-                    selectDevice(res.devices.first())
-                }
+    fun start() {
+        // First-time load shows a spinner; refreshes are silent.
+        if (_devices.value.isEmpty()) {
+            _isLoading.value = true
+        }
+        startDevicesPolling()
+    }
+
+    fun stop() {
+        liveLocationJob?.cancel()
+        devicesPollingJob?.cancel()
+        liveLocationJob = null
+        devicesPollingJob = null
+    }
+
+    fun selectDevice(device: Device) {
+        if (_selectedDevice.value?.device_id == device.device_id) return
+        _selectedDevice.value = device
+        _liveLocation.value = null
+        _trailPoints.value = emptyList()
+        startLiveLocationPolling(device.device_id)
+    }
+
+    private fun startDevicesPolling() {
+        devicesPollingJob?.cancel()
+        devicesPollingJob = viewModelScope.launch {
+            while (isActive) {
+                refreshDevices()
+                delay(15_000)
             }
         }
     }
 
-    fun selectDevice(device: Device) {
-        _selectedDevice.value = device
-        // ✅ Device change hone pe trail reset karo
-        _trailPoints.value = emptyList()
-        startPolling(device.device_id)
+    private suspend fun refreshDevices() {
+        try {
+            val res = repository.getMyDevices(tokenProvider())
+            if (!res.success) {
+                if (_devices.value.isEmpty()) {
+                    _error.value = "Failed to load devices"
+                }
+                return
+            }
+
+            _username.value = res.username.orEmpty()
+            _devices.value = res.devices
+            _error.value = null
+
+            val current = _selectedDevice.value
+            if (current == null) {
+                // First load — auto-select first device and start live polling.
+                res.devices.firstOrNull()?.let { first ->
+                    _selectedDevice.value = first
+                    startLiveLocationPolling(first.device_id)
+                }
+            } else {
+                // Refresh — preserve selection; update the Device object so
+                // engine_status stays current for the selected row.
+                val updated = res.devices.firstOrNull { it.device_id == current.device_id }
+                if (updated != null) {
+                    _selectedDevice.value = updated
+                }
+            }
+        } catch (e: Exception) {
+            if (_devices.value.isEmpty()) {
+                _error.value = e.message ?: "Failed to load devices"
+            }
+        } finally {
+            _isLoading.value = false
+        }
     }
 
-    private fun startPolling(deviceId: String) {
-        pollingJob?.cancel()
-        pollingJob = viewModelScope.launch {
+    private fun startLiveLocationPolling(deviceId: String) {
+        liveLocationJob?.cancel()
+        liveLocationJob = viewModelScope.launch {
             while (isActive) {
                 fetchLiveLocation(deviceId)
                 delay(10_000)
@@ -71,29 +128,36 @@ class TrackTraceViewModel(
     private suspend fun fetchLiveLocation(deviceId: String) {
         try {
             val res = repository.getLiveLocation(tokenProvider(), deviceId)
-            if (res.success) {
-                _liveLocation.value = res
+            if (!res.success) return
 
-                // ✅ Naya point trail mein add karo
-                val lat = res.data?.latestLocation?.latitude?.toDoubleOrNull()
-                val lng = res.data?.latestLocation?.longitude?.toDoubleOrNull()
+            _liveLocation.value = res
 
-                if (lat != null && lng != null) {
-                    val newPoint = TrailPoint(lat, lng)
-                    val current = _trailPoints.value
+            val lat = res.data?.latestLocation?.latitude?.toDoubleOrNull()
+            val lng = res.data?.latestLocation?.longitude?.toDoubleOrNull()
 
-                    // Duplicate point mat add karo (device parked ho toh)
-                    if (current.lastOrNull() != newPoint) {
-                        _trailPoints.value = (current + newPoint)
-                            .takeLast(100) // max 100 points
-                    }
+            if (lat != null && lng != null) {
+                val newPoint = TrailPoint(lat, lng)
+                val current = _trailPoints.value
+                if (current.lastOrNull() != newPoint) {
+                    _trailPoints.value = (current + newPoint).takeLast(100)
                 }
             }
         } catch (_: Exception) { }
     }
 
+    /**
+     * The authoritative status for the selected device:
+     * prefers the live location's `status` field (real-time) and
+     * falls back to the device list's `engine_status` snapshot.
+     */
+    fun effectiveSelectedStatus(): String {
+        val live = _liveLocation.value?.data?.latestLocation?.status
+        if (!live.isNullOrBlank()) return live
+        return _selectedDevice.value?.engine_status?.ifBlank { "offline" } ?: "offline"
+    }
+
     override fun onCleared() {
-        pollingJob?.cancel()
+        stop()
         super.onCleared()
     }
 }

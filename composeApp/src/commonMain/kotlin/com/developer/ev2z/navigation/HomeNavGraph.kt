@@ -90,7 +90,6 @@ import kotlinx.coroutines.launch
 
 import com.developer.ev2z.ui.screens.SOSParkingTag.ConfirmationScreen
 import com.developer.ev2z.ui.screens.SOSParkingTag.QuickReplyScreen
-import com.developer.ev2z.ui.screens.SOSParkingTag.SosTagAlertScreen
 import com.developer.ev2z.ui.screens.SOSParkingTag.SosTagViewModel
 import com.developer.ev2z.ui.screens.InstallationSupport.InstallationSupportScreen
 import com.developer.ev2z.ui.screens.market_screen.ShopProduct
@@ -455,8 +454,7 @@ fun HomeNavGraph(
     var showParking by remember { mutableStateOf(false) }  // ✅ CHANGED — add
 
 
-    // ✅ SOS Tag — 3 screen states + alertId
-    var showSosTagAlert by remember { mutableStateOf(false) }
+    // ✅ SOS Tag — chat (QuickReply) + confirmation only. Alert screen removed.
     var showSosQuickReply by remember { mutableStateOf(false) }
     var showSosConfirmation by remember { mutableStateOf(false) }
     var currentSosAlertId by remember { mutableStateOf<Int?>(null) }
@@ -471,17 +469,26 @@ fun HomeNavGraph(
         ParkingViewModel(apiService = apiService, userPrefs = userPrefs)
     }
 
-    // ✅ Notification automatic redirect
+    // ✅ Notification automatic redirect — directly open chat
     LaunchedEffect(Unit) {
         SosNotificationHandler.alertFlow.collect { alertId ->
             println("📲 Auto redirect SOS Alert $alertId")
-            // ✅ Pehle sab reset karo
-            sosTagViewModel.resetAll()
-            currentSosAlertId = alertId
-            showSosTagAlert = true
-            showSosQuickReply = false
-            showSosConfirmation = false
-            SosNotificationHandler.clear()
+
+            if (!showSosQuickReply) {
+                // Chat not open — close overlays and open fresh
+                showSosConfirmation = false
+                showInstallationSupport = false
+                showCriminalVerification = false
+                showCommunity = false
+                showParking = false
+                showDriverScore = false
+
+                sosTagViewModel.resetAll()
+                currentSosAlertId = alertId
+                showSosQuickReply = true
+                SosNotificationHandler.clear()
+            }
+            // If chat IS open — do NOT clear, let QuickReplyScreen's poll pick it up
         }
     }
 
@@ -574,14 +581,16 @@ fun HomeNavGraph(
                 onNavigateToParking = { showParking = true },    // ✅ CHANGED
                 // ✅ SOS Tag — notification se alertId milega, yahan set karo
                 onNavigateToSosTag = { alertId ->
-                    // Notification se (alertId real hoga)
+                    // Notification se — directly open chat
+                    sosTagViewModel.resetAll()
                     currentSosAlertId = alertId
-                    showSosTagAlert = true
+                    showSosQuickReply = true
                 },
                 onSosTagManual = {
-                    // Manual button tap
+                    // Manual button tap — open chat directly with latest alert (alertId=0 → fetch latest)
+                    sosTagViewModel.resetAll()
                     currentSosAlertId = null
-                    showSosTagAlert = true
+                    showSosQuickReply = true
                 },
                 onLogout = onLogout
             )
@@ -595,7 +604,7 @@ fun HomeNavGraph(
     // isAnyOverlayOpen — memoized to avoid recomputation on every recomposition
     val isAnyOverlayOpen by remember {
         derivedStateOf {
-            showSosConfirmation || showSosQuickReply || showSosTagAlert ||
+            showSosConfirmation || showSosQuickReply ||
             showCreatePost || showCreateStory || showStoryViewer || showCommunity ||
             showDocumentViewer || showUploadDocument || showDocuments ||
             showWarranty || showBillDetails || showChangePlan || showMyAccount ||
@@ -892,30 +901,10 @@ fun HomeNavGraph(
         )
     }
 
-    // ✅ Screen 1 — dono cases handle
-    if (showSosTagAlert) {
-        SosTagAlertScreen(
-            alertId = currentSosAlertId ?: 0,
-            viewModel = sosTagViewModel,
-            onRespondNow = {
-                showSosTagAlert = false
-                showSosQuickReply = true
-            },
-            onIgnore = {
-                showSosTagAlert = false
-                sosTagViewModel.resetAll()
-            },
-            onBackPressed = {
-                showSosTagAlert = false
-                sosTagViewModel.resetAll()
-            }
-        )
-    }
-
-// Screen 2 condition change karo
-    if (showSosQuickReply) {  // ← null check hata do
+// Screen 1 — Chat (main SOS screen). Notification + manual button both land here.
+    if (showSosQuickReply) {
         QuickReplyScreen(
-            alertId = currentSosAlertId ?: 0,  // ← 0 fallback
+            alertId = currentSosAlertId ?: 0,
             viewModel = sosTagViewModel,
             onConfirmed = {
                 showSosQuickReply = false
@@ -923,20 +912,17 @@ fun HomeNavGraph(
             },
             onBackPressed = {
                 showSosQuickReply = false
-                showSosTagAlert = true
+                currentSosAlertId = null
+                sosTagViewModel.resetAll()
             }
         )
     }
 
-// Screen 3 bhi fix karo
-    if (showSosConfirmation) {  // ← null check hata do
+// Screen 2 — Confirmation after sending reply
+    if (showSosConfirmation) {
         ConfirmationScreen(
             alertId = currentSosAlertId ?: 0,
             viewModel = sosTagViewModel,
-            onViewAlertDetails = {
-                showSosConfirmation = false
-                showSosTagAlert = true
-            },
             onClose = {
                 showSosConfirmation = false
                 currentSosAlertId = null
@@ -1165,8 +1151,7 @@ fun HomeNavGraph(
     PlatformBackHandler(enabled = showDocumentViewer)    { showDocumentViewer = false; showDocuments = true }
     PlatformBackHandler(enabled = showAddDevice)         { showAddDevice = false }
     PlatformBackHandler(enabled = showVaultPasswordDialog) { showVaultPasswordDialog = false }
-    PlatformBackHandler(enabled = showSosTagAlert)       { showSosTagAlert = false; sosTagViewModel.resetAll() }
-    PlatformBackHandler(enabled = showSosQuickReply)     { showSosQuickReply = false; showSosTagAlert = true }
+    PlatformBackHandler(enabled = showSosQuickReply)     { showSosQuickReply = false; currentSosAlertId = null; sosTagViewModel.resetAll() }
     PlatformBackHandler(enabled = showSosConfirmation)   { showSosConfirmation = false; currentSosAlertId = null; sosTagViewModel.resetAll() }
     PlatformBackHandler(enabled = showStoryViewer)       { showStoryViewer = false }
     PlatformBackHandler(enabled = showCreateStory)       { showCreateStory = false }

@@ -17,6 +17,7 @@ import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanScreenHost
 import com.developer.ev2z.ui.screens.ChangePlan.UserDevicesResponse
 import com.developer.ev2z.ui.screens.CriminalVerification.CandidateResult
 import com.developer.ev2z.ui.screens.CriminalVerification.CriminalForm
+import com.developer.ev2z.ui.screens.SOSParkingTag.ChatMessagesResponse
 import com.developer.ev2z.ui.screens.SOSParkingTag.OwnerReplyRequest
 import com.developer.ev2z.ui.screens.SOSParkingTag.SosAlertDetailResponse
 import com.developer.ev2z.ui.screens.SOSParkingTag.SosAlertListResponse
@@ -428,8 +429,12 @@ class ApiService {
                 header(HttpHeaders.Authorization, "Bearer $token")
             }
 
+            val raw = response.bodyAsText()
             println("✔️ My Devices Status: ${response.status}")
-            response.body()
+            println("📝 MY DEVICES RAW = $raw")
+
+            Json { ignoreUnknownKeys = true }
+                .decodeFromString(MyDevicesResponse.serializer(), raw)
 
         } catch (e: Exception) {
             println("❌ My Devices Error: ${e.message}")
@@ -448,8 +453,12 @@ class ApiService {
                 header(HttpHeaders.Authorization, "Bearer $token")
             }
 
-            println("✔️ Live Location Status: ${response.status}")
-            response.body()
+            val raw = response.bodyAsText()
+            println("✔️ Live Location Status: ${response.status} deviceId=$deviceId")
+            println("📝 LIVE LOCATION RAW = $raw")
+
+            Json { ignoreUnknownKeys = true }
+                .decodeFromString(LiveLocationResponse.serializer(), raw)
 
         } catch (e: Exception) {
             println("❌ Live Location Error: ${e.message}")
@@ -1135,18 +1144,21 @@ class ApiService {
         val token = AppTokenProvider.getToken()
         val url   = "${baseUrl}vehicle-parking"
 
+        val requestBody = ParkingRequest(
+            vehicle_type    = vehicleType.trim(),
+            vehicle_number  = vehicleNumber.trim(),
+            phone           = phone.trim(),
+            alternate_phone = alternatePhone?.trim()
+        )
+
         println("🌐 parkVehicle → POST $url")
+        println("📤 parkVehicle body: ${Json.encodeToString(ParkingRequest.serializer(), requestBody)}")
 
         return try {
             val response = client.post(url) {
                 header(HttpHeaders.Authorization, "Bearer $token")
                 contentType(ContentType.Application.Json)
-                setBody(ParkingRequest(
-                    vehicle_type    = vehicleType.trim(),
-                    vehicle_number  = vehicleNumber.trim(),
-                    phone           = phone.trim(),
-                    alternate_phone = alternatePhone?.trim()
-                ))
+                setBody(requestBody)
             }
 
             val raw = response.bodyAsText()
@@ -1281,11 +1293,54 @@ class ApiService {
 // Add these 3 functions inside your existing ApiService class
 // ─────────────────────────────────────────────────────────────────
 
-    // ---------------- GET ALL SOS ALERTS ----------------
+    // ---------------- GET MESSAGES FOR ONE CHAT ----------------
+    // New endpoint replaces /visitor-notifications which 404s now.
+    suspend fun getChatMessages(chatId: Int): ChatMessagesResponse {
+
+        val token = AppTokenProvider.getToken()
+        val url   = "${baseUrl}chat-messages/$chatId"
+
+        println("🌐 getChatMessages → GET $url")
+
+        return try {
+            val response = client.get(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                header(HttpHeaders.Accept, "application/json")
+                contentType(ContentType.Application.Json)
+            }
+
+            val raw = response.bodyAsText()
+            println("📥 getChatMessages ${response.status}: $raw")
+
+            val json = Json {
+                ignoreUnknownKeys = true
+                isLenient = true
+                coerceInputValues = true
+            }
+
+            if (response.status.isSuccess()) {
+                json.decodeFromString(ChatMessagesResponse.serializer(), raw)
+            } else {
+                ChatMessagesResponse(
+                    status = false,
+                    message = "Error: ${response.status.value}"
+                )
+            }
+        } catch (e: Exception) {
+            println("❌ getChatMessages: ${e.message}")
+            ChatMessagesResponse(
+                status = false,
+                message = "Network error: ${e.message ?: "Unknown"}"
+            )
+        }
+    }
+
+    // ---------------- GET ALL SOS ALERTS (DEPRECATED — endpoint 404s) ----------------
+    // Kept as a no-op so legacy callers compile; returns empty success.
     suspend fun getSosAlerts(): SosAlertListResponse {
 
         val token = AppTokenProvider.getToken()
-        val url   = "${baseUrl}visitor-notifications"  // ✅ SIRF YAHI CHANGE HUA
+        val url   = "${baseUrl}visitor-notifications"  // ⚠️ removed by backend; left for log only
 
         println("🌐 getSosAlerts → GET $url")
 
@@ -1395,15 +1450,26 @@ class ApiService {
     suspend fun sendOwnerReply(request: OwnerReplyRequest): SosReplyResponse {
 
         val token = AppTokenProvider.getToken()
-        val url   = "${baseUrl}owner-replies"
+        val url   = "${baseUrl}owner/send-message"
+
+        // Build the body explicitly so we know exactly what hits the wire — avoids any doubt
+        // about how a @Serializable data class is mapped to JSON.
+        val bodyJson = buildJsonObject {
+            put("chat_id", request.chat_id)
+            put("message", request.message)
+        }
+        val bodyString = Json.encodeToString(JsonObject.serializer(), bodyJson)
 
         println("🌐 sendOwnerReply → POST $url")
+        println("📦 sendOwnerReply body = $bodyString")
+        println("🔑 sendOwnerReply token preview = ${token.take(20)}…")
 
         return try {
             val response = client.post(url) {
                 header(HttpHeaders.Authorization, "Bearer $token")
+                header(HttpHeaders.Accept, "application/json")
                 contentType(ContentType.Application.Json)
-                setBody(request)
+                setBody(bodyString)
             }
 
             val raw = response.bodyAsText()
@@ -1429,6 +1495,48 @@ class ApiService {
 
         } catch (e: Exception) {
             println("❌ sendOwnerReply: ${e.message}")
+            SosReplyResponse(status = false, message = "Network error: ${e.message ?: "Unknown"}")
+        }
+    }
+
+    // ---------------- CLOSE CHAT (mark resolved) ----------------
+    suspend fun closeChat(chatId: Int): SosReplyResponse {
+
+        val token = AppTokenProvider.getToken()
+        val url   = "${baseUrl}owner/chat/$chatId/close"
+
+        println("🌐 closeChat → POST $url")
+
+        return try {
+            val response = client.post(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                header(HttpHeaders.Accept, "application/json")
+                contentType(ContentType.Application.Json)
+            }
+
+            val raw = response.bodyAsText()
+            println("✔️ closeChat ${response.status}: $raw")
+
+            val json = Json {
+                ignoreUnknownKeys = true
+                isLenient = true
+                coerceInputValues = true
+            }
+
+            when {
+                response.status == HttpStatusCode.OK ||
+                        response.status == HttpStatusCode.Created ->
+                    json.decodeFromString(SosReplyResponse.serializer(), raw)
+
+                response.status == HttpStatusCode.Unauthorized ->
+                    SosReplyResponse(status = false, message = "Session expired. Please login again.")
+
+                else ->
+                    SosReplyResponse(status = false, message = "Error: ${response.status.value}")
+            }
+
+        } catch (e: Exception) {
+            println("❌ closeChat: ${e.message}")
             SosReplyResponse(status = false, message = "Network error: ${e.message ?: "Unknown"}")
         }
     }
@@ -1602,13 +1710,20 @@ class ApiService {
     suspend fun createPhonePeOrder(token: String, req: CreateOrderRequest): JsonObject {
         val url = "${baseUrl}phonepe/create-orders"
 
+        println("🌐 POST $url")
+        println("📦 CREATE ORDER BODY = ${Json.encodeToString(CreateOrderRequest.serializer(), req)}")
+
         val response = client.post(url) {
             header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(req)
         }
 
-        return response.body()
+        val raw = response.bodyAsText()
+        println("📡 CREATE ORDER STATUS = ${response.status}")
+        println("📝 CREATE ORDER RAW = $raw")
+
+        return Json { ignoreUnknownKeys = true }.parseToJsonElement(raw).jsonObject
     }
 
 
@@ -1827,11 +1942,27 @@ class ApiService {
 
     suspend fun getGeoFences(): GeoFenceResponse {
         val token = AppTokenProvider.getToken()
+        val url = "${baseUrl}get-geofences"
 
-        return client.get("${baseUrl}get-geofences") {
-            header(HttpHeaders.Authorization, "Bearer $token")
-            contentType(ContentType.Application.Json)
-        }.body()
+        println("🌐 POST $url")
+
+        return try {
+            val response = client.post(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+            }
+
+            val raw = response.bodyAsText()
+            println("📡 GET GEOFENCES STATUS = ${response.status}")
+            println("📝 GET GEOFENCES RAW = $raw")
+
+            Json { ignoreUnknownKeys = true }
+                .decodeFromString(GeoFenceResponse.serializer(), raw)
+
+        } catch (e: Exception) {
+            println("❌ getGeoFences ERROR = ${e.message}")
+            GeoFenceResponse(success = false, message = e.message)
+        }
     }
 
 
@@ -1855,7 +1986,8 @@ class ApiService {
         println("➡️ lat=$latitude")
         println("➡️ lng=$longitude")
         println("➡️ radius=$radius")
-        return client.submitForm(
+
+        val response = client.submitForm(
             url = url,
             formParameters = Parameters.build {
                 append("device_id", deviceId)
@@ -1867,10 +1999,14 @@ class ApiService {
         ) {
             header(HttpHeaders.Authorization, "Bearer $token")
             header(HttpHeaders.Accept, ContentType.Application.Json.toString())
-        }.body()
+        }
 
+        val raw = response.bodyAsText()
+        println("📡 SAVE GEOFENCE STATUS = ${response.status}")
+        println("📝 SAVE GEOFENCE RAW = $raw")
 
-
+        return Json { ignoreUnknownKeys = true }
+            .parseToJsonElement(raw).jsonObject
     }
 
 

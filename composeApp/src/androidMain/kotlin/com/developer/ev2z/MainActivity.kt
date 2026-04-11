@@ -74,10 +74,18 @@ class MainActivity : ComponentActivity() {
             intent?.let {
                 val alertId = it.getIntExtra("sos_alert_id", -1)
                 if (alertId != -1) {
-                    Log.d("SOS", "🚨 Cold Start alertId=$alertId")
-                    SosNotificationHandler.onSosAlertReceived(alertId)
+                    val visitorName  = it.getStringExtra("sos_visitor_name")
+                    val visitorPhone = it.getStringExtra("sos_visitor_phone")
+                    Log.d("SOS", "🚨 Cold Start alertId=$alertId visitor=$visitorName")
+                    SosNotificationHandler.onSosAlertReceived(
+                        alertId = alertId,
+                        visitorName = visitorName,
+                        visitorPhone = visitorPhone
+                    )
                     // ✅ prevent duplicate trigger
                     it.removeExtra("sos_alert_id")
+                    it.removeExtra("sos_visitor_name")
+                    it.removeExtra("sos_visitor_phone")
                 }
             }
 
@@ -104,8 +112,14 @@ class MainActivity : ComponentActivity() {
         // ✅ SOS — app already open
         val alertId = intent.getIntExtra("sos_alert_id", -1)
         if (alertId != -1) {
-            Log.d("SOS", "🚨 App Open alertId=$alertId")
-            SosNotificationHandler.onSosAlertReceived(alertId)
+            val visitorName  = intent.getStringExtra("sos_visitor_name")
+            val visitorPhone = intent.getStringExtra("sos_visitor_phone")
+            Log.d("SOS", "🚨 App Open alertId=$alertId visitor=$visitorName")
+            SosNotificationHandler.onSosAlertReceived(
+                alertId = alertId,
+                visitorName = visitorName,
+                visitorPhone = visitorPhone
+            )
         }
     }
 

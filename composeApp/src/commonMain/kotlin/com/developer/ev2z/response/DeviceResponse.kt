@@ -44,27 +44,27 @@ data class DeviceItem(
 
 @Serializable
 data class MyDevicesResponse(
-    val success: Boolean,
+    val success: Boolean = false,
     @SerialName("total_devices")
-    val total_devices: Int,
-    val devices: List<Device>,
-    val username: String?
+    val total_devices: Int = 0,
+    val devices: List<Device> = emptyList(),
+    val username: String? = null
 )
 
 @Serializable
 data class Device(
-    val id: Int,
+    val id: Int = 0,
     @SerialName("device_id")
-    val device_id: String,
+    val device_id: String = "",
     @SerialName("device_name")
-    val device_name: String,
+    val device_name: String = "",
     @SerialName("sim_no")
     val sim_no: String? = null,
     @SerialName("device_type")
     val device_type: String? = null,
     @SerialName("engine_status")
-    val engine_status: String,
+    val engine_status: String = "offline",
     val status: String? = null,
     @SerialName("created_at")
-    val created_at: String
+    val created_at: String = ""
 )

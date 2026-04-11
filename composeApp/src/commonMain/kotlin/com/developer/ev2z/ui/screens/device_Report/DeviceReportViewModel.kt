@@ -23,10 +23,14 @@ enum class AnalyticsRange(val apiValue: String) {
 
 class DeviceReportViewModel(
     private val repository: DeviceReportRepository,
-    private val platformAddressProvider: PlatformAddressProvider   // 👈 NEW
+    private val platformAddressProvider: PlatformAddressProvider
 ) : ViewModel() {
 
+    // ── polling jobs ────────────────────────────────────────────────
     private var liveLocationJob: Job? = null
+    private var devicesPollingJob: Job? = null
+
+    // ── screen state ────────────────────────────────────────────────
     private val _uiState = MutableStateFlow<DeviceReportUiState>(DeviceReportUiState.Loading)
     val uiState: StateFlow<DeviceReportUiState> = _uiState.asStateFlow()
 
@@ -42,85 +46,124 @@ class DeviceReportViewModel(
     private val _totalDevices = MutableStateFlow(0)
     val totalDevices: StateFlow<Int> = _totalDevices.asStateFlow()
 
-    // 👇 NEW: address state
     private val _address = MutableStateFlow<String?>(null)
     val address: StateFlow<String?> = _address.asStateFlow()
 
-    // 👉 total milage state
+    // ── mileage + mobilize ──────────────────────────────────────────
     private val _totalMilages = MutableStateFlow<TotalMilagesData?>(null)
     val totalMilages: StateFlow<TotalMilagesData?> = _totalMilages.asStateFlow()
 
-    // 👉 engine cut/restore command state
     private val _mobilizeMessage = MutableStateFlow<String?>(null)
     val mobilizeMessage: StateFlow<String?> = _mobilizeMessage.asStateFlow()
 
     private val _showConfirmationDialog = MutableStateFlow<MobilizeDialogData?>(null)
     val showConfirmationDialog = _showConfirmationDialog.asStateFlow()
 
+    // ── analytics ───────────────────────────────────────────────────
+    private val _selectedAnalyticsRange = MutableStateFlow(AnalyticsRange.TODAY)
+    val selectedAnalyticsRange: StateFlow<AnalyticsRange> = _selectedAnalyticsRange.asStateFlow()
 
-
-    private val _selectedAnalyticsRange =
-        MutableStateFlow(AnalyticsRange.TODAY)
-    val selectedAnalyticsRange: StateFlow<AnalyticsRange> =
-        _selectedAnalyticsRange.asStateFlow()
-
-    private val _deviceAnalytics =
-        MutableStateFlow<DeviceAnalyticsData?>(null)
-    val deviceAnalytics: StateFlow<DeviceAnalyticsData?> =
-        _deviceAnalytics.asStateFlow()
+    private val _deviceAnalytics = MutableStateFlow<DeviceAnalyticsData?>(null)
+    val deviceAnalytics: StateFlow<DeviceAnalyticsData?> = _deviceAnalytics.asStateFlow()
 
     private val _isAnalyticsLoading = MutableStateFlow(false)
-    val isAnalyticsLoading: StateFlow<Boolean> =
-        _isAnalyticsLoading.asStateFlow()
+    val isAnalyticsLoading: StateFlow<Boolean> = _isAnalyticsLoading.asStateFlow()
 
     private val _analyticsError = MutableStateFlow<String?>(null)
     val analyticsError: StateFlow<String?> = _analyticsError.asStateFlow()
-
 
     data class MobilizeDialogData(
         val command: String,   // "cut" or "restore"
         val terminalId: String
     )
 
-    fun fetchMyDevices(token: String) {
-        viewModelScope.launch {
-            _uiState.value = DeviceReportUiState.Loading
-            try {
-                val response = repository.getMyDevices(token)
-                if (response.success) {
-                    _myDevices.value = response.devices
-                    _totalDevices.value = response.total_devices
-                    println(response.toString())
+    // ────────────────────────────────────────────────────────────────
+    //  DEVICES + LIVE LOCATION
+    // ────────────────────────────────────────────────────────────────
 
-                    if (response.devices.isNotEmpty()) {
-                        _selectedDevice.value = response.devices.first()
-//                        fetchDeviceLiveLocation(token, response.devices.first().device_id)
-                        // 🔥 START 10s POLLING
-                        startLiveLocationPolling(
-                            token = token,
-                            deviceId = response.devices.first().device_id
-                        )
-                    } else {
-                        _uiState.value = DeviceReportUiState.Success
-                    }
-                } else {
+    /**
+     * Entry point called from the screen on composition. Kicks off the
+     * device-list poll (which auto-selects the first device on cold start
+     * and begins live-location polling for it).
+     */
+    fun fetchMyDevices(token: String) {
+        if (_myDevices.value.isEmpty()) {
+            _uiState.value = DeviceReportUiState.Loading
+        }
+        startDevicesPolling(token)
+    }
+
+    /**
+     * Alias kept for the existing Retry button in DeviceReportScreen.
+     */
+    fun refreshData(token: String) {
+        fetchMyDevices(token)
+    }
+
+    /**
+     * Polls `getMyDevices` every 15s so the dropdown's engine_status stays
+     * in sync with real vehicle state. The first successful response flips
+     * ui state to Success immediately — we do NOT wait for live-location to
+     * return before showing the UI (that was the old bug).
+     */
+    private fun startDevicesPolling(token: String) {
+        devicesPollingJob?.cancel()
+        devicesPollingJob = viewModelScope.launch {
+            while (isActive) {
+                refreshDevices(token)
+                delay(15_000)
+            }
+        }
+    }
+
+    private suspend fun refreshDevices(token: String) {
+        try {
+            val response = repository.getMyDevices(token)
+
+            if (!response.success) {
+                if (_myDevices.value.isEmpty()) {
                     _uiState.value = DeviceReportUiState.Error("Failed to fetch devices")
                 }
-            } catch (e: Exception) {
-                _uiState.value = DeviceReportUiState.Error(e.message ?: "Unknown error occurred")
+                return
+            }
+
+            _myDevices.value = response.devices
+            _totalDevices.value = response.total_devices
+
+            val current = _selectedDevice.value
+            if (current == null) {
+                // First load — pick the first device and start live polling.
+                response.devices.firstOrNull()?.let { first ->
+                    _selectedDevice.value = first
+                    startLiveLocationPolling(token, first.device_id)
+                }
+            } else {
+                // Refresh — keep the user's selection but update its status.
+                val updated = response.devices.firstOrNull {
+                    it.device_id == current.device_id
+                }
+                if (updated != null) {
+                    _selectedDevice.value = updated
+                }
+            }
+
+            // Devices are in hand — render the screen immediately. Don't
+            // wait for the first live-location tick like we used to.
+            _uiState.value = DeviceReportUiState.Success
+
+        } catch (e: Exception) {
+            if (_myDevices.value.isEmpty()) {
+                _uiState.value = DeviceReportUiState.Error(e.message ?: "Unknown error")
             }
         }
     }
 
     private fun startLiveLocationPolling(token: String, deviceId: String) {
-
-        // 🔴 Purana polling band
         liveLocationJob?.cancel()
-
         liveLocationJob = viewModelScope.launch {
             while (isActive) {
                 fetchDeviceLiveLocation(token, deviceId)
-                delay(10_000) // ⏱ 10 seconds
+                delay(10_000)
             }
         }
     }
@@ -129,42 +172,51 @@ class DeviceReportViewModel(
         viewModelScope.launch {
             try {
                 val response = repository.getDeviceLiveLocation(token, deviceId)
-
                 if (response.success) {
                     _liveLocation.value = response
-
                     response.data?.latestLocation?.let {
                         getAddressFromLatLng(
                             it.latitude.toDouble(),
                             it.longitude.toDouble()
                         )
                     }
-                } else {
-                    // 👇 IMPORTANT: no full screen error
-                    _liveLocation.value = null
                 }
-
-                _uiState.value = DeviceReportUiState.Success
-            } catch (e: Exception) {
-                // 👇 silent fail
-                _liveLocation.value = null
-                _uiState.value = DeviceReportUiState.Success
+                // Note: we do NOT blank out _liveLocation on a failed tick —
+                // that would cause flicker. We keep the last-good location on
+                // screen until the next successful poll.
+            } catch (_: Exception) {
+                // Silent — live-location failures should never tear down the UI.
             }
         }
     }
 
+    /**
+     * User tapped a different device in the dropdown.
+     * Clears stale per-device state so the map / address / chip don't
+     * briefly show the previous vehicle's data.
+     */
     fun selectDevice(device: Device, token: String) {
+        if (_selectedDevice.value?.device_id == device.device_id) return
+
         _selectedDevice.value = device
-//        fetchDeviceLiveLocation(token, device.device_id)
+        _liveLocation.value = null
+        _address.value = null
+
         startLiveLocationPolling(token, device.device_id)
-
     }
 
-    fun refreshData(token: String) {
-        fetchMyDevices(token)
+    /**
+     * Authoritative status for the currently selected device:
+     * prefers the real-time live-location `status` and falls back to the
+     * polled `engine_status` from the device list.
+     */
+    fun effectiveSelectedStatus(): String {
+        val live = _liveLocation.value?.data?.latestLocation?.status
+        if (!live.isNullOrBlank()) return live
+        return _selectedDevice.value?.engine_status?.ifBlank { "offline" } ?: "offline"
     }
 
-    // 👇 NEW: reverse geocode helper
+    // ── address reverse geocoding ───────────────────────────────────
     fun getAddressFromLatLng(lat: Double, lng: Double) {
         viewModelScope.launch {
             platformAddressProvider.getAddress(lat, lng) { address ->
@@ -173,11 +225,9 @@ class DeviceReportViewModel(
         }
     }
 
-
-    override fun onCleared() {
-        super.onCleared()
-        liveLocationJob?.cancel()
-    }
+    // ────────────────────────────────────────────────────────────────
+    //  MILEAGE + MOBILIZE
+    // ────────────────────────────────────────────────────────────────
 
     fun fetchTotalMilages(token: String, terminalId: String) {
         viewModelScope.launch {
@@ -217,6 +267,9 @@ class DeviceReportViewModel(
         _showConfirmationDialog.value = null
     }
 
+    // ────────────────────────────────────────────────────────────────
+    //  DEVICE ANALYTICS
+    // ────────────────────────────────────────────────────────────────
 
     fun fetchDeviceAnalytics(
         token: String,
@@ -231,19 +284,17 @@ class DeviceReportViewModel(
                 val response = repository.getDeviceAnalytics(
                     token = token,
                     deviceId = deviceId,
-                    range = range.apiValue   // "today" / "week" / "month"
+                    range = range.apiValue
                 )
 
                 if (response.success && response.data != null) {
                     _deviceAnalytics.value = response.data
                     _selectedAnalyticsRange.value = range
                 } else {
-                    _analyticsError.value =
-                        response.message ?: "Failed to fetch analytics"
+                    _analyticsError.value = response.message ?: "Failed to fetch analytics"
                 }
             } catch (e: Exception) {
-                _analyticsError.value =
-                    e.message ?: "Unknown error while fetching analytics"
+                _analyticsError.value = e.message ?: "Unknown error while fetching analytics"
             } finally {
                 _isAnalyticsLoading.value = false
             }
@@ -260,6 +311,15 @@ class DeviceReportViewModel(
         fetchDeviceAnalytics(token, deviceId, _selectedAnalyticsRange.value)
     }
 
+    // ────────────────────────────────────────────────────────────────
+    //  LIFECYCLE
+    // ────────────────────────────────────────────────────────────────
+
+    override fun onCleared() {
+        liveLocationJob?.cancel()
+        devicesPollingJob?.cancel()
+        super.onCleared()
+    }
 }
 
 sealed class DeviceReportUiState {
