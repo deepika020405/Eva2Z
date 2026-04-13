@@ -9,7 +9,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.developer.ev2z</string>
+	<string>com.agastya.ev2z.connect</string>
 	<key>PROJECT_ID</key>
 	<string>ev2z-a7ba9</string>
 	<key>STORAGE_BUCKET</key>
@@ -25,6 +25,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:26586623232:ios:486f7fde2496816e8597e5</string>
+	<string>1:26586623232:ios:46c78f297c940fd08597e5</string>
 </dict>
 </plist>

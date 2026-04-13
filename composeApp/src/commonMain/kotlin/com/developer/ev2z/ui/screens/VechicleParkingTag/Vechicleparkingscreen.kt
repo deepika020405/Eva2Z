@@ -410,7 +410,7 @@ private fun ParkingFormCard(
             Eva2zInputField(
                 value           = alternatePhone,
                 onValueChange   = onAlternatePhoneChange,
-                label           = "ALTERNATE NUMBER 2",
+                label           = "ALTERNATE NUMBER 2 *",
                 placeholder     = "e.g. 9876543210",
                 icon            = Icons.Outlined.PhoneAndroid,
                 errorText       = alternatePhoneError,

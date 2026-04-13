@@ -35,6 +35,23 @@ class AppDelegate: NSObject,
         return true
     }
 
+    // 📱 APNs token → Firebase (required for iOS push delivery)
+    func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        print("📱 APNs token received (\(deviceToken.count) bytes)")
+        Messaging.messaging().apnsToken = deviceToken
+    }
+
+    // ❌ APNs registration failed
+    func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        print("❌ APNs registration FAILED: \(error.localizedDescription)")
+    }
+
     // 🔥 FCM TOKEN
     func messaging(
         _ messaging: Messaging,
@@ -42,6 +59,16 @@ class AppDelegate: NSObject,
     ) {
         print("🔥 iOS FCM TOKEN:", fcmToken ?? "")
         FcmBridge.shared.onToken(token: fcmToken ?? "")
+    }
+
+    // 📩 Show notification even when app is in foreground
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        print("📩 Foreground notification:", notification.request.content.userInfo)
+        completionHandler([.banner, .badge, .sound])
     }
 
     // 📩 Notification tap

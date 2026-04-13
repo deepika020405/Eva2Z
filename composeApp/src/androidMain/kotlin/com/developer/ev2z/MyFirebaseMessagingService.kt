@@ -23,6 +23,14 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         super.onMessageReceived(message)
 
+        // If user is logged out on this device, ignore all notifications
+        val prefs = applicationContext.getSharedPreferences("eva2z_prefs", MODE_PRIVATE)
+        val authToken = prefs.getString("token", "") ?: ""
+        if (authToken.isBlank()) {
+            println("⚠️ FCM ignored — user logged out on this device")
+            return
+        }
+
         val data = message.data
         val type = data["type"]
 

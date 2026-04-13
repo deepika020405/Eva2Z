@@ -9,6 +9,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+// import androidx.compose.material.icons.filled.DarkMode   // NEW UI
+// import androidx.compose.material.icons.filled.LightMode   // NEW UI
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -38,6 +40,7 @@ import com.developer.ev2z.ui.components.FloatingContactButton
 import com.developer.ev2z.ui.screens.MyAccount.MyAccountScreen
 import com.developer.ev2z.ui.screens.PrivacyPolicy_TandC.PrivacyPolicy_TandCScreen
 import com.developer.ev2z.ui.screens.PrivacyPolicy_TandC.WebViewType
+// import com.developer.ev2z.ui.screens.homeScreen.LocalHomeTheme  // NEW UI
 import com.developer.ev2z.ui.screens.social_media.openUrl
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.ic_facebook
@@ -354,6 +357,33 @@ fun ProfileScreenContent(
                             isCompact = isCompact
                         )
                     }
+
+                    // ============= NEW UI (COMMENTED OUT) =============
+                    // Appearance Section — Theme toggle (dark/light mode)
+                    /*
+                    item {
+                        Text(
+                            text = "APPEARANCE",
+                            fontSize = sectionLabelSize,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF999999),
+                            letterSpacing = 0.8.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = horizontalPad, vertical = 14.dp)
+                        )
+                    }
+
+                    item {
+                        ThemeToggleCard(
+                            horizontalPad = horizontalPad,
+                            cardCorner = cardCorner,
+                            titleSize = menuTitleSize,
+                            iconSize = menuIconSize,
+                            verticalPad = menuVerticalPad
+                        )
+                    }
+                    */
 
                     // Logout Button
                     item {
@@ -822,6 +852,84 @@ fun ProfileMenuItemRow(
         )
     }
 }
+
+// ============= NEW UI ThemeToggleCard (COMMENTED OUT) =============
+/*
+@Composable
+fun ThemeToggleCard(
+    horizontalPad: androidx.compose.ui.unit.Dp = 24.dp,
+    cardCorner: androidx.compose.ui.unit.Dp = 18.dp,
+    titleSize: androidx.compose.ui.unit.TextUnit = 15.sp,
+    iconSize: androidx.compose.ui.unit.Dp = 24.dp,
+    verticalPad: androidx.compose.ui.unit.Dp = 16.dp
+) {
+    val theme = LocalHomeTheme.current
+    val isDark = theme.isDark
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = horizontalPad),
+        shape = RoundedCornerShape(cardCorner),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { theme.toggle() }
+                .padding(horizontal = 16.dp, vertical = verticalPad),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(iconSize + 12.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(
+                        if (isDark) Color(0xFFE8EEFF) else Color(0xFFFFF7E0)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (isDark) Icons.Default.DarkMode
+                                  else Icons.Default.LightMode,
+                    contentDescription = "Theme",
+                    tint = if (isDark) Color(0xFF3B82F6) else Color(0xFFF59E0B),
+                    modifier = Modifier.size(iconSize - 4.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(14.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Dark Mode",
+                    fontSize = titleSize,
+                    color = Color(0xFF333333),
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = if (isDark) "Dark theme is on" else "Light theme is on",
+                    fontSize = 11.sp,
+                    color = Color(0xFF888888),
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+            }
+
+            Switch(
+                checked = isDark,
+                onCheckedChange = { theme.toggle() },
+                colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White,
+                    checkedTrackColor = Color(0xFF6A9F50),
+                    uncheckedThumbColor = Color.White,
+                    uncheckedTrackColor = Color(0xFFCCCCCC),
+                    uncheckedBorderColor = Color(0xFFCCCCCC)
+                )
+            )
+        }
+    }
+}
+*/
 
 @Composable
 fun AboutSection(

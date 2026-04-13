@@ -2173,6 +2173,7 @@ class ApiService {
         println("📡 FCM API BODY: ${response.bodyAsText()}")
     }
 
+    // TODO: Add removeFcmToken API here when server endpoint is ready
 
 
     // ---------------- VAULT UNLOCK ----------------

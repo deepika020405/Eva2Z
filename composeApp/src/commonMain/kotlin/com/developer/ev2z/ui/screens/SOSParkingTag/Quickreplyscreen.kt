@@ -479,14 +479,14 @@ private fun ChatTopBar(
                 )
             }
 
-            // Call button
-            IconButton(onClick = onCallPressed) {
-                Icon(
-                    Icons.Default.Call, "Call",
-                    tint = Color.White,
-                    modifier = Modifier.size(22.dp)
-                )
-            }
+            // Call button — hidden for now
+//            IconButton(onClick = onCallPressed) {
+//                Icon(
+//                    Icons.Default.Call, "Call",
+//                    tint = Color.White,
+//                    modifier = Modifier.size(22.dp)
+//                )
+//            }
 
             // "Mark resolved" / Close chat — appears after the owner sends their first reply.
             // Lives in the top bar so the bottom message area never gets pushed up or cropped.

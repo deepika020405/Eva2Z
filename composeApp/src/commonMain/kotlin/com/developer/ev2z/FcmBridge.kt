@@ -18,6 +18,7 @@ object FcmBridge {
 
     fun clear() {
         callback = null
+        lastToken = null
     }
 
 }

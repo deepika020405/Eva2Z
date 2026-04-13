@@ -70,6 +70,7 @@ class ParkingViewModel(
         get() = _vehicleType.value.isNotBlank()
                 && _vehicleNumber.value.isNotBlank()
                 && _phone.value.length == 10
+                && _alternatePhone.value.length == 10
 
     // ── Input handlers ────────────────────────────────────────────
 
@@ -131,7 +132,10 @@ class ParkingViewModel(
             _phoneError.value = "Enter a valid 10-digit mobile number"
             valid = false
         }
-        if (_alternatePhone.value.isNotBlank() && _alternatePhone.value.length != 10) {
+        if (_alternatePhone.value.isBlank()) {
+            _alternatePhoneError.value = "Alternate phone number is required"
+            valid = false
+        } else if (_alternatePhone.value.length != 10) {
             _alternatePhoneError.value = "Enter a valid 10-digit number"
             valid = false
         }
@@ -172,7 +176,7 @@ class ParkingViewModel(
                 vehicleType    = _vehicleType.value,
                 vehicleNumber  = _vehicleNumber.value,
                 phone          = _phone.value,
-                alternatePhone = _alternatePhone.value.ifBlank { null }
+                alternatePhone = _alternatePhone.value
             )
 
             if (!response.status) {

@@ -15,14 +15,16 @@ object FcmRegistrar {
         authTokenNullable: String,
         fcmToken: String
     ) {
+        println("📡 Registering FCM token to server...")
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 apiService.registerFcmToken(
                     authHeader = authTokenNullable,
                     fcmToken = fcmToken
                 )
+                println("✅ FCM token registered to server successfully")
             } catch (e: Exception) {
-                println("Failed FCM token registration: " + e.message)
+                println("❌ Failed FCM token registration: " + e.message)
             }
         }
     }
