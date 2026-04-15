@@ -302,7 +302,7 @@
 				ARCHS = arm64;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = iosApp/iosApp.entitlements;
+				CODE_SIGN_ENTITLEMENTS = iosApp/iosAppRelease.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\"";
@@ -316,8 +316,9 @@
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = iosApp/Info.plist;
-				INFOPLIST_KEY_NSCameraUsageDescription = "Camera access is required to scan device barcodes and SIM QR codes";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Photo library access is required to scan barcodes from images";
+				INFOPLIST_KEY_CFBundleDisplayName = "EVA2Z Connect";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Camera access is required to scan device barcodes and SIM QR codes for vehicle setup.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Photo library access is required to upload profile images and scan barcodes from saved images.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UIRequiredDeviceCapabilities = armv7;
@@ -357,8 +358,9 @@
 				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = iosApp/Info.plist;
-				INFOPLIST_KEY_NSCameraUsageDescription = "Camera access is required to scan device barcodes and SIM QR codes";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Photo library access is required to scan barcodes from images";
+				INFOPLIST_KEY_CFBundleDisplayName = "EVA2Z Connect";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Camera access is required to scan device barcodes and SIM QR codes for vehicle setup.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Photo library access is required to upload profile images and scan barcodes from saved images.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UIRequiredDeviceCapabilities = armv7;

@@ -70,7 +70,7 @@ class ParkingViewModel(
         get() = _vehicleType.value.isNotBlank()
                 && _vehicleNumber.value.isNotBlank()
                 && _phone.value.length == 10
-                && _alternatePhone.value.length == 10
+                && (_alternatePhone.value.isEmpty() || _alternatePhone.value.length == 10)
 
     // ── Input handlers ────────────────────────────────────────────
 
@@ -132,15 +132,13 @@ class ParkingViewModel(
             _phoneError.value = "Enter a valid 10-digit mobile number"
             valid = false
         }
-        if (_alternatePhone.value.isBlank()) {
-            _alternatePhoneError.value = "Alternate phone number is required"
-            valid = false
-        } else if (_alternatePhone.value.length != 10) {
+        // Alternate phone 2 is optional — only validate format if it was entered
+        if (_alternatePhone.value.isNotBlank() && _alternatePhone.value.length != 10) {
             _alternatePhoneError.value = "Enter a valid 10-digit number"
             valid = false
         }
 
-        // ✅ Same number check
+        // Same number check (only when alternate phone is provided)
         if (
             _phone.value.length == 10 &&
             _alternatePhone.value.isNotBlank() &&
@@ -161,7 +159,7 @@ class ParkingViewModel(
                 _phoneError.value = "Cannot use your registered number"
                 valid = false
             }
-            if (enteredAlt.isNotBlank() && enteredAlt == registeredPhone) {
+            if (_alternatePhone.value.isNotBlank() && enteredAlt == registeredPhone) {
                 _alternatePhoneError.value = "Cannot use your registered number"
                 valid = false
             }
@@ -173,10 +171,11 @@ class ParkingViewModel(
             _uiState.value = ParkingUiState.Loading
 
             val response = apiService.parkVehicle(
-                vehicleType    = _vehicleType.value,
-                vehicleNumber  = _vehicleNumber.value,
-                phone          = _phone.value,
-                alternatePhone = _alternatePhone.value
+                vehicleType     = _vehicleType.value,
+                vehicleNumber   = _vehicleNumber.value,
+                phone           = _registeredPhone.value,
+                alternatePhone1 = _phone.value,
+                alternatePhone2 = _alternatePhone.value.ifEmpty { null }
             )
 
             if (!response.status) {
@@ -196,10 +195,12 @@ class ParkingViewModel(
                         }
                     }
                     else -> {
-                        response.errors?.vehicle_type?.firstOrNull()?.let   { _vehicleTypeError.value = it }
-                        response.errors?.vehicle_number?.firstOrNull()?.let  { _vehicleNumberError.value = it }
-                        response.errors?.phone?.firstOrNull()?.let           { _phoneError.value = it }
-                        response.errors?.alternate_phone?.firstOrNull()?.let { _alternatePhoneError.value = it }
+                        response.errors?.vehicle_type?.firstOrNull()?.let      { _vehicleTypeError.value = it }
+                        response.errors?.vehicle_number?.firstOrNull()?.let    { _vehicleNumberError.value = it }
+                        (response.errors?.alternate_phone_1 ?: response.errors?.phone)
+                            ?.firstOrNull()?.let { _phoneError.value = it }
+                        (response.errors?.alternate_phone_2 ?: response.errors?.alternate_phone)
+                            ?.firstOrNull()?.let { _alternatePhoneError.value = it }
                     }
                 }
 

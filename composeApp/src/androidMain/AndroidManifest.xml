@@ -157,10 +157,11 @@
             android:value="true"/>
 
 
-        <!-- ✅ Stop Alarm Receiver -->
+        <!-- ── ALARM DISABLED ─────────────────────────────────────
         <receiver
             android:name=".AlarmStopReceiver"
             android:exported="false" />
+        ─────────────────────────────────────────────────────── -->
 
 
 

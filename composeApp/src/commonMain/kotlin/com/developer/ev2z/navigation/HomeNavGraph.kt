@@ -583,15 +583,6 @@ fun HomeNavGraph(
                 }
             )
 
-        } else if (showCommunity) {
-
-            CommunityScreenRoot(
-                onBack = { showCommunity = false },
-                onOpenCreatePost = { showCreatePost = true },
-                onOpenCreateStory = { showCreateStory = true },
-                onOpenStoryViewer = { showStoryViewer = true }
-            )
-
         } else if (showCreatePost) {
 
             CreatePostScreen(onBack = { showCreatePost = false })
@@ -603,6 +594,15 @@ fun HomeNavGraph(
         } else if (showStoryViewer) {
 
             StoryViewerScreen(onBack = { showStoryViewer = false })
+
+        } else if (showCommunity) {
+
+            CommunityScreenRoot(
+                onBack = { showCommunity = false },
+                onOpenCreatePost = { showCreatePost = true },
+                onOpenCreateStory = { showCreateStory = true },
+                onOpenStoryViewer = { showStoryViewer = true }
+            )
 
         } else if (showDocumentViewer && viewerBytes != null) {
 

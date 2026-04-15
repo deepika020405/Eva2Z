@@ -9,11 +9,21 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationCompat
 import java.io.File
 
@@ -23,14 +33,46 @@ actual fun PlatformDocumentViewer(
     modifier: Modifier
 ) {
     val bitmap = remember(bytes) {
+        // First attempt: decode from the beginning
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            // Second attempt: skip a leading padding byte (e.g. 0x20 prefix from server)
+            ?: if (bytes.size > 1)
+                BitmapFactory.decodeByteArray(bytes, 1, bytes.size - 1)
+            else null
     }
 
-    Image(
-        bitmap = bitmap.asImageBitmap(),
-        contentDescription = null,
-        modifier = modifier
-    )
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap.asImageBitmap(),
+            contentDescription = null,
+            modifier = modifier
+        )
+    } else {
+        val isPdf = bytes.size >= 4 &&
+                bytes[0] == 0x25.toByte() &&
+                bytes[1] == 0x50.toByte() &&
+                bytes[2] == 0x44.toByte() &&
+                bytes[3] == 0x46.toByte()
+
+        Box(modifier = modifier, contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = if (isPdf) "📄" else "⚠️",
+                    fontSize = 48.sp
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = if (isPdf)
+                        "PDF documents can be downloaded\nand viewed in your Downloads folder"
+                    else
+                        "Unable to preview this document.\nPlease download it to view.",
+                    fontSize = 14.sp,
+                    color = Color(0xFF555555),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
 }
 
 actual fun platformDownloadFile(

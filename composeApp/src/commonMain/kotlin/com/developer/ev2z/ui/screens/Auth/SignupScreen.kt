@@ -70,6 +70,15 @@ fun SignupScreen(
         }
     }
 
+    // When signup API says "already registered", show inline error and redirect to login
+    LaunchedEffect(error) {
+        if (error?.contains("already registered", ignoreCase = true) == true) {
+            phoneAlreadyRegisteredError = "This phone number is already registered!"
+            navigateToLogin = true
+            viewModel.clearError()
+        }
+    }
+
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val screenHeight = maxHeight
         val screenWidth = maxWidth
@@ -289,8 +298,6 @@ fun SignupScreen(
 
                     if (phoneNumber.length < 10) return@Button
 
-                    val fullPhone = "+91$phoneNumber"
-
                     Analytics.logEvent(
                         name = "signup_details_entered",
                         params = mapOf(
@@ -311,14 +318,9 @@ fun SignupScreen(
                         )
                     )
 
-                    viewModel.checkPhoneRegistered(fullPhone) { isRegistered ->
-                        if (isRegistered) {
-                            phoneAlreadyRegisteredError = "This phone number is already registered!"
-                            navigateToLogin = true
-                        } else {
-                            onSendOTPClick(fullName, phoneNumber, email)
-                        }
-                    }
+                    // Directly call signup; the API response determines whether we
+                    // proceed to OTP (success) or show "already registered" (error)
+                    onSendOTPClick(fullName, phoneNumber, email)
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -356,7 +358,21 @@ fun SignupScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(if (isCompact) 12.dp else 16.dp))
+            Spacer(modifier = Modifier.height(if (isCompact) 8.dp else 12.dp))
+
+            // Network / API error
+            if (error != null) {
+                Text(
+                    text = error!!,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp)
+                )
+                Spacer(modifier = Modifier.height(if (isCompact) 4.dp else 8.dp))
+            }
 
             // Terms Text
             val termsSize = if (isCompact) 11.sp else 12.sp

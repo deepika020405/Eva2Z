@@ -124,13 +124,13 @@ fun HomeScreen(
                 )
             }
 
-            item { ModernFeaturesSection(
-                onDriverScore = onDriverScore,  // ✅ NEW — pass karo
-//                onParking     = onParking,         // ✅ CHANGED — pass through
-//                onSosTag      = onSosTag    // ✅ NEW — pass karo
-
-
-            ) }
+//            item { ModernFeaturesSection(
+//                onDriverScore = onDriverScore,  // ✅ NEW — pass karo
+////                onParking     = onParking,         // ✅ CHANGED — pass through
+////                onSosTag      = onSosTag    // ✅ NEW — pass karo
+//
+//
+//            ) }
 
             item { Spacer(modifier = Modifier.height(20.dp)) }
         }

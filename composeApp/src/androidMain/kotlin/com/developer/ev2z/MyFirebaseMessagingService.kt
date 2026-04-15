@@ -5,7 +5,7 @@ import androidx.annotation.RequiresPermission
 import com.developer.ev2z.util.NotificationUtil
 import com.developer.ev2z.util.AlertPrefs
 import com.developer.ev2z.util.SmsUtil
-import com.developer.ev2z.util.AlarmPlayer
+//import com.developer.ev2z.util.AlarmPlayer  // ── ALARM DISABLED
 import com.developer.ev2z.util.SosNotificationHandler
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
@@ -82,13 +82,13 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 val playAlarm = data["play_alarm"]?.equals("1") ?: true
                 val sendSms   = data["send_sms"]?.equals("1") ?: false
 
-                println("playAlarm: $playAlarm, alarmEnabled: ${AlertPrefs.alarmEnabled}")
-                println("sendSms: $sendSms, smsEnabled: ${AlertPrefs.smsEnabled}")
-
-                if (playAlarm && AlertPrefs.alarmEnabled) {
-                    println("✅ Starting alarm")
-                    AlarmPlayer.play()
-                }
+//                println("playAlarm: $playAlarm, alarmEnabled: ${AlertPrefs.alarmEnabled}")
+//                println("sendSms: $sendSms, smsEnabled: ${AlertPrefs.smsEnabled}")
+//
+//                if (playAlarm && AlertPrefs.alarmEnabled) {
+//                    println("✅ Starting alarm")
+////                    AlarmPlayer.play()
+//                }
 
                 if (sendSms && AlertPrefs.smsEnabled) {
                     val deviceId = data["device_id"] ?: "Unknown"
@@ -101,7 +101,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             "GEOFENCE_ENTER" -> {
 
                 println("✅ GEOFENCE_ENTER — stopping alarm")
-                AlarmPlayer.stop()
+//                AlarmPlayer.stop()
             }
 
             else -> {

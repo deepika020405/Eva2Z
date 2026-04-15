@@ -23,8 +23,8 @@ import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.ui.components.FloatingContactButton
-import com.developer.ev2z.util.AlertPrefs
-import com.developer.ev2z.util.saveAlertPrefs
+import com.developer.ev2z.util.AlertPrefs    // SMS toggle still uses this
+//import com.developer.ev2z.util.saveAlertPrefs // SMS toggle still uses this
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -42,8 +42,8 @@ fun AccountActivityScreen(
     var showPasswordDialog by remember { mutableStateOf(false) }
     var password by remember { mutableStateOf("") }
 
-    // ✅ NEW — Alert toggles (no LocalContext needed)
-    var alarmEnabled by remember { mutableStateOf(AlertPrefs.alarmEnabled) }
+    // ── ALARM DISABLED ─────────────────────────────────────────────
+    // var alarmEnabled by remember { mutableStateOf(AlertPrefs.alarmEnabled) }
     var smsEnabled by remember { mutableStateOf(AlertPrefs.smsEnabled) }
 
     // ✅ UNCHANGED — Watch for delete success and trigger logout
@@ -127,29 +127,24 @@ fun AccountActivityScreen(
                     ) {
                         Column {
 
-                            // 🔊 Alarm Toggle
-                            AlertToggleItem(
-                                icon = Icons.Default.Notifications,
-                                title = "Alarm",
-                                subtitle = if (alarmEnabled)
-                                    "Alarm will ring on breach"
-                                else
-                                    "Alarm is disabled",
-                                checked = alarmEnabled,
-                                onCheckedChange = {
-                                    alarmEnabled = it
-                                    AlertPrefs.alarmEnabled = it
-                                    saveAlertPrefs(
-                                        AlertPrefs.alarmEnabled,
-                                        AlertPrefs.smsEnabled
-                                    )
-                                }
-                            )
-
-                            HorizontalDivider(
-                                modifier = Modifier.padding(horizontal = 16.dp),
-                                color = Color(0xFFE0E0E0)
-                            )
+                            // ── ALARM DISABLED ─────────────────────────────
+                            // AlertToggleItem(
+                            //     icon = Icons.Default.Notifications,
+                            //     title = "Alarm",
+                            //     subtitle = if (alarmEnabled) "Alarm will ring on breach"
+                            //                else "Alarm is disabled",
+                            //     checked = alarmEnabled,
+                            //     onCheckedChange = {
+                            //         alarmEnabled = it
+                            //         AlertPrefs.alarmEnabled = it
+                            //         saveAlertPrefs(AlertPrefs.alarmEnabled, AlertPrefs.smsEnabled)
+                            //     }
+                            // )
+                            // HorizontalDivider(
+                            //     modifier = Modifier.padding(horizontal = 16.dp),
+                            //     color = Color(0xFFE0E0E0)
+                            // )
+                            // ───────────────────────────────────────────────
 
                             // 📩 SMS Toggle
                             AlertToggleItem(
@@ -163,10 +158,10 @@ fun AccountActivityScreen(
                                 onCheckedChange = {
                                     smsEnabled = it
                                     AlertPrefs.smsEnabled = it
-                                    saveAlertPrefs(
-                                        AlertPrefs.alarmEnabled,
-                                        AlertPrefs.smsEnabled
-                                    )
+//                                    saveAlertPrefs(
+//                                        false, // alarmEnabled placeholder (alarm disabled)
+//                                        AlertPrefs.smsEnabled
+//                                    )
                                 }
                             )
                         }

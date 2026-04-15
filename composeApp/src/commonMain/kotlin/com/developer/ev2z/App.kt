@@ -104,6 +104,14 @@ fun App() {
     var successDeviceType by remember { mutableStateOf("") }
 
     val loginSuccess by authViewModel.loginSuccess.collectAsState()
+    val signupSuccess by authViewModel.signupSuccess.collectAsState()
+
+    LaunchedEffect(signupSuccess) {
+        if (signupSuccess) {
+            showRegistration = true
+            authViewModel.resetSignupSuccess()
+        }
+    }
     val addDeviceResult by addDeviceViewModel.addDeviceResult.collectAsState()
     var forgetPasswordPhone by remember { mutableStateOf("") }
 
@@ -395,7 +403,8 @@ fun App() {
                         registrationEmail = email
                         val fullPhone = "+91$phone"
                         authViewModel.signUp(name, fullPhone, "", email)
-                        showRegistration = true
+                        // showRegistration is set by LaunchedEffect(signupSuccess)
+                        // only after the OTP is confirmed sent successfully
                     }
                 )
             }

@@ -119,6 +119,17 @@ class AuthViewModel(
                 val msg = e.message?.lowercase() ?: ""
 
                 when {
+                    // Network/connectivity errors — don't treat as "registered"
+                    msg.contains("unable to resolve host") ||
+                            msg.contains("no address associated") ||
+                            msg.contains("failed to connect") ||
+                            msg.contains("econnrefused") ||
+                            msg.contains("timeout") ||
+                            msg.contains("unknownhost") ||
+                            msg.contains("no route to host") -> {
+                        _error.value = "No internet connection. Please check your connection and try again."
+                    }
+
                     msg.contains("invalid password") ||
                             msg.contains("wrong password") ||
                             msg.contains("incorrect password") -> {
@@ -131,6 +142,8 @@ class AuthViewModel(
                     }
 
                     else -> {
+                        // Any other server error (e.g. 401 with unknown message) →
+                        // assume the user exists (signup API will confirm if not)
                         onResult(true)
                     }
                 }

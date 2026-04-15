@@ -21,7 +21,7 @@ actual fun loadAlertPrefs() {
         "alert_prefs",
         android.content.Context.MODE_PRIVATE
     )
-    AlertPrefs.alarmEnabled = prefs.getBoolean("alarm_enabled", true)
+//    AlertPrefs.alarmEnabled = prefs.getBoolean("alarm_enabled", true)
     AlertPrefs.smsEnabled   = prefs.getBoolean("sms_enabled", true)
-    println("✅ AlertPrefs loaded — alarm=${AlertPrefs.alarmEnabled}, sms=${AlertPrefs.smsEnabled}")
+//    println("✅ AlertPrefs loaded — alarm=${AlertPrefs.alarmEnabled}, sms=${AlertPrefs.smsEnabled}")
 }

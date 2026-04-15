@@ -10,7 +10,7 @@ import android.os.Build
 import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import com.developer.ev2z.AlarmStopReceiver
+//import com.developer.ev2z.AlarmStopReceiver  // ── ALARM DISABLED
 import com.developer.ev2z.MainActivity
 import com.developer.ev2z.R
 
@@ -65,17 +65,15 @@ object NotificationUtil {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // 🛑 Stop Alarm PendingIntent (for geofence)
-        val stopIntent = Intent(context, AlarmStopReceiver::class.java).apply {
-            action = "STOP_ALARM"
-        }
-
-        val stopPendingIntent = PendingIntent.getBroadcast(
-            context,
-            0,
-            stopIntent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
+        // ── ALARM DISABLED ──────────────────────────────────────────
+        // val stopIntent = Intent(context, AlarmStopReceiver::class.java).apply {
+        //     action = "STOP_ALARM"
+        // }
+        // val stopPendingIntent = PendingIntent.getBroadcast(
+        //     context, 0, stopIntent,
+        //     PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        // )
+        // ────────────────────────────────────────────────────────────
 
         val isGeofenceAlert =
             title?.contains("Geofence", true) == true ||
@@ -88,16 +86,12 @@ object NotificationUtil {
             .setContentText(body ?: "New notification")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
-            .setContentIntent(clickPendingIntent)   // 👈 IMPORTANT
+            .setContentIntent(clickPendingIntent)
 
-        // ✅ Stop button only for geofence
-        if (isGeofenceAlert) {
-            builder.addAction(
-                R.drawable.app_logos,
-                "🛑 Stop Alarm",
-                stopPendingIntent
-            )
-        }
+        // ── ALARM DISABLED — Stop Alarm button removed ──────────────
+        // if (isGeofenceAlert) {
+        //     builder.addAction(R.drawable.app_logos, "🛑 Stop Alarm", stopPendingIntent)
+        // }
 
         val notificationId =
             if (isGeofenceAlert) GEOFENCE_NOTIFICATION_ID
