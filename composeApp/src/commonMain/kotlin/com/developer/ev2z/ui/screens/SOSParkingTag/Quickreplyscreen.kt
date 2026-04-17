@@ -132,6 +132,7 @@ fun QuickReplyScreen(
     // treat the screen like there's no active alert — visitor header + input hide,
     // and the "No Alert Found" empty state is shown.
     var isChatClosed by remember { mutableStateOf(false) }
+    var showCallScreen by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -235,6 +236,16 @@ fun QuickReplyScreen(
         viewModel.submitReply(activeAlertId)
     }
 
+    // ── Full-screen call overlay ─────────────────────────────────────
+    if (showCallScreen) {
+        CallScreen(
+            visitorName = latestVisitorName,
+            visitorPhone = latestVisitorPhone ?: "",
+            onEnd = { showCallScreen = false }
+        )
+        return
+    }
+
     Scaffold(
         containerColor = ChatBg,
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -248,11 +259,7 @@ fun QuickReplyScreen(
                     visitorPhone = latestVisitorPhone,
                     showClose = hasReplied,
                     onBackPressed = onBackPressed,
-                    onCallPressed = {
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("Coming soon")
-                        }
-                    },
+                    onCallPressed = { showCallScreen = true },
                     onClosePressed = {
                         // Hit POST /api/owner/chat/{chatId}/close, then route to confirmation.
                         viewModel.closeChat(activeAlertId, onDone = onConfirmed)
@@ -479,14 +486,14 @@ private fun ChatTopBar(
                 )
             }
 
-            // Call button — hidden for now
-//            IconButton(onClick = onCallPressed) {
-//                Icon(
-//                    Icons.Default.Call, "Call",
-//                    tint = Color.White,
-//                    modifier = Modifier.size(22.dp)
-//                )
-//            }
+            // Call button
+            IconButton(onClick = onCallPressed) {
+                Icon(
+                    Icons.Default.Call, "Call",
+                    tint = Color.White,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
 
             // "Mark resolved" / Close chat — appears after the owner sends their first reply.
             // Lives in the top bar so the bottom message area never gets pushed up or cropped.

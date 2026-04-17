@@ -150,7 +150,7 @@ class DocumentsViewModel(
                 authToken = authToken,
                 encryptedFile = imageBytes,
                 fileName = fileName,
-                fileType = fileName,
+                fileType = "image/jpeg",
                 salt = salt,
                 iv = iv,
                 authTag = authTag,
@@ -179,7 +179,7 @@ class DocumentsViewModel(
                 authToken = authToken,
                 encryptedFile = imageBytes,   // 👈 nullable
                 fileName = fileName,
-                fileType = fileName,
+                fileType = "image/jpeg",
                 salt = salt,
                 iv = iv,
                 authTag = authTag,

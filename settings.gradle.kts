@@ -29,11 +29,14 @@ dependencyResolutionManagement {
         }
         mavenCentral()
 
-        // ⭐ REQUIRED for JetBrains Compose components (MAPS)
+        // JetBrains Compose components (Maps, etc.)
         maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
-//        maven {
-//            url = uri("https://phonepe.bintray.com/PhonePeIntentSDK")
-//        }
+
+        // PhonePe Intent SDK
+        maven("https://phonepe.mycloudrepo.io/public/repositories/phonepe-intentsdk-android")
+
+        // JitPack — for libraries not on Maven Central
+        maven("https://jitpack.io")
     }
 }
 

@@ -17,6 +17,26 @@
     <!-- Telephony feature (optional) -->
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
+
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+
+    <!-- ── Voice Call permissions ──────────────────────────────────── -->
+    <!-- Microphone — required for in-app voice calls -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- Bluetooth audio routing (headsets, earbuds) -->
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Wakelock — keep CPU alive during a call -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Show incoming-call screen even when the device is locked -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- Vibrate on incoming call -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Proximity sensor — turn off screen when phone is held to ear -->
+    <uses-feature android:name="android.hardware.sensor.proximity" android:required="false" />
+    <!-- Microphone hardware declaration -->
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
+
     <!-- ✅ Only essential UPI apps -->
     <queries>
         <!-- PhonePe -->
@@ -66,7 +86,9 @@
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden">
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true">
 
             <!-- ✅ Launcher — sirf ek baar -->
             <intent-filter>

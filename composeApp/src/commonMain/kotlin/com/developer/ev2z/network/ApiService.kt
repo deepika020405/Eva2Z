@@ -1544,6 +1544,68 @@ class ApiService {
     }
 
 
+    // ---------------- ACCEPT INCOMING CALL ----------------
+    // POST https://app.eva2z.in/api/call/accept  { "room_id": "..." }
+    suspend fun acceptCall(roomId: String): SosReplyResponse {
+        val token = AppTokenProvider.getToken()
+        val url   = "https://app.eva2z.in/api/call/accept"
+        val body  = buildJsonObject { put("room_id", roomId) }
+        println("🌐 acceptCall → POST $url  room_id=$roomId")
+        return try {
+            val response = client.post(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                header(HttpHeaders.Accept, "application/json")
+                contentType(ContentType.Application.Json)
+                setBody(Json.encodeToString(JsonObject.serializer(), body))
+            }
+            val raw = response.bodyAsText()
+            println("✔️ acceptCall ${response.status}: $raw")
+            val lenient = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
+            when {
+                response.status.value in 200..201 ->
+                    lenient.decodeFromString(SosReplyResponse.serializer(), raw)
+                response.status == HttpStatusCode.Unauthorized ->
+                    SosReplyResponse(status = false, message = "Session expired.")
+                else ->
+                    SosReplyResponse(status = false, message = "Error: ${response.status.value}")
+            }
+        } catch (e: Exception) {
+            println("❌ acceptCall: ${e.message}")
+            SosReplyResponse(status = false, message = "Network error: ${e.message ?: "Unknown"}")
+        }
+    }
+
+    // ---------------- DECLINE INCOMING CALL ----------------
+    // POST https://app.eva2z.in/api/call/decline  { "room_id": "..." }
+    suspend fun declineCall(roomId: String): SosReplyResponse {
+        val token = AppTokenProvider.getToken()
+        val url   = "https://app.eva2z.in/api/call/decline"
+        val body  = buildJsonObject { put("room_id", roomId) }
+        println("🌐 declineCall → POST $url  room_id=$roomId")
+        return try {
+            val response = client.post(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                header(HttpHeaders.Accept, "application/json")
+                contentType(ContentType.Application.Json)
+                setBody(Json.encodeToString(JsonObject.serializer(), body))
+            }
+            val raw = response.bodyAsText()
+            println("✔️ declineCall ${response.status}: $raw")
+            val lenient = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
+            when {
+                response.status.value in 200..201 ->
+                    lenient.decodeFromString(SosReplyResponse.serializer(), raw)
+                response.status == HttpStatusCode.Unauthorized ->
+                    SosReplyResponse(status = false, message = "Session expired.")
+                else ->
+                    SosReplyResponse(status = false, message = "Error: ${response.status.value}")
+            }
+        } catch (e: Exception) {
+            println("❌ declineCall: ${e.message}")
+            SosReplyResponse(status = false, message = "Network error: ${e.message ?: "Unknown"}")
+        }
+    }
+
     // ---------------- ADD TO CART ----------------
     suspend fun addToCart(
         token: String,
@@ -2299,14 +2361,14 @@ class ApiService {
         authTag: String,
         checksum: String
     ) {
-        client.submitFormWithBinaryData(
-            url = "https://gps.eva2z.in/api/vault/upload",
+        val response = client.submitFormWithBinaryData(
+            url = "${baseUrl}vault/upload",
             formData = formData {
                 append("encrypted_file", encryptedFile, Headers.build {
-                    append(HttpHeaders.ContentType, "image/png")
+                    append(HttpHeaders.ContentType, "image/jpeg")
                     append(
                         HttpHeaders.ContentDisposition,
-                        "filename=\"$fileName.png\""
+                        "filename=\"$fileName.jpg\""
                     )
                 })
                 append("file_name", fileName)
@@ -2321,6 +2383,13 @@ class ApiService {
                 append("X-Vault-Token", vaultToken)
                 append("Authorization", "Bearer $authToken")
             }
+        }
+
+        val raw = response.bodyAsText()
+        println("📤 uploadVaultDocument ${response.status}: $raw")
+
+        if (!response.status.isSuccess()) {
+            throw Exception("Upload failed (${response.status.value}): $raw")
         }
     }
 

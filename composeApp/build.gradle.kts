@@ -13,12 +13,8 @@ plugins {
     alias(libs.plugins.firebaseCrashlytics)
 }
 
-repositories {
-    google()
-    mavenCentral()
-    maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
-    maven("https://phonepe.mycloudrepo.io/public/repositories/phonepe-intentsdk-android")
-}
+// Repositories are declared in settings.gradle.kts → dependencyResolutionManagement
+// (module-level repositories {} is ignored when dependencyResolutionManagement is used)
 
 kotlin {
     androidTarget {
@@ -76,6 +72,14 @@ kotlin {
             implementation(libs.firebase.crashlytics)
             implementation("com.google.firebase:firebase-messaging:24.0.0")
             implementation("com.facebook.android:facebook-android-sdk:17.0.2")
+
+            // WebRTC SDK — Stream's pre-built WebRTC for Android (Maven Central)
+            implementation("io.getstream:stream-webrtc-android:1.3.3")
+
+            // Socket.IO client — WebRTC signaling channel
+            implementation("io.socket:socket.io-client:2.1.0") {
+                exclude(group = "com.squareup.okhttp3", module = "okhttp")
+            }
 
 
 
@@ -185,15 +189,52 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "/META-INF/DEPENDENCIES"
+            excludes += "/META-INF/LICENSE*"
+            excludes += "/META-INF/NOTICE*"
+            excludes += "/META-INF/*.kotlin_module"
+            excludes += "kotlin/**"
+            excludes += "**/*.proto"
+            excludes += "**/*.txt"
+            excludes += "**/*.xml"
+            excludes += "okhttp3/**"
+            excludes += "META-INF/versions/**"
+            excludes += "META-INF/services/**"
+        }
+        jniLibs {
+            useLegacyPackaging = false
+        }
+    }
+
+    // ── ABI splits — debug APK only ships arm64-v8a (modern phones) ──
+    // Cuts debug APK from ~60 MB → ~20 MB. Release uses AAB so splits
+    // are handled by Google Play automatically.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a")          // covers 95%+ of current Android devices
+            isUniversalApk = false
         }
     }
 
     buildTypes {
         getByName("release") {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
             signingConfig = signingConfigs.getByName("release")
         }
         getByName("debug") {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
             signingConfig = signingConfigs.getByName("debug")
         }
     }

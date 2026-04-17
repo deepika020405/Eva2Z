@@ -34,6 +34,7 @@ class MainActivity : ComponentActivity() {
             }.checkAndRequest()
 
             NotificationUtil.createChannel(this)
+            NotificationUtil.createCallChannel(this)
 
             // ✅ Step 1: Storage init karo
             initStorageManager(this)
@@ -69,23 +70,43 @@ class MainActivity : ComponentActivity() {
                 handleDeepLink(uri.toString())
             }
 
-            // ✅ SOS — setContent KE BAAD handle karo
+            // ✅ SOS / Incoming-call — setContent KE BAAD handle karo
             // SharedFlow replay=1 hai — HomeNavGraph ready hone par collect karega
             intent?.let {
-                val alertId = it.getIntExtra("sos_alert_id", -1)
-                if (alertId != -1) {
+                val isCall = it.getBooleanExtra("is_incoming_call", false)
+                if (isCall) {
                     val visitorName  = it.getStringExtra("sos_visitor_name")
                     val visitorPhone = it.getStringExtra("sos_visitor_phone")
-                    Log.d("SOS", "🚨 Cold Start alertId=$alertId visitor=$visitorName")
-                    SosNotificationHandler.onSosAlertReceived(
-                        alertId = alertId,
-                        visitorName = visitorName,
-                        visitorPhone = visitorPhone
+                    val roomId       = it.getStringExtra("call_room_id") ?: ""
+                    val chatId       = it.getIntExtra("sos_alert_id", -1).takeIf { id -> id != -1 }
+                    Log.d("IncomingCall", "📞 Cold Start call visitor=$visitorName roomId=$roomId")
+                    SosNotificationHandler.onIncomingCallReceived(
+                        visitorName  = visitorName,
+                        visitorPhone = visitorPhone,
+                        roomId       = roomId,
+                        chatId       = chatId
                     )
-                    // ✅ prevent duplicate trigger
-                    it.removeExtra("sos_alert_id")
+                    it.removeExtra("is_incoming_call")
                     it.removeExtra("sos_visitor_name")
                     it.removeExtra("sos_visitor_phone")
+                    it.removeExtra("call_room_id")
+                    it.removeExtra("sos_alert_id")
+                } else {
+                    val alertId = it.getIntExtra("sos_alert_id", -1)
+                    if (alertId != -1) {
+                        val visitorName  = it.getStringExtra("sos_visitor_name")
+                        val visitorPhone = it.getStringExtra("sos_visitor_phone")
+                        Log.d("SOS", "🚨 Cold Start alertId=$alertId visitor=$visitorName")
+                        SosNotificationHandler.onSosAlertReceived(
+                            alertId = alertId,
+                            visitorName = visitorName,
+                            visitorPhone = visitorPhone
+                        )
+                        // ✅ prevent duplicate trigger
+                        it.removeExtra("sos_alert_id")
+                        it.removeExtra("sos_visitor_name")
+                        it.removeExtra("sos_visitor_phone")
+                    }
                 }
             }
 
@@ -109,17 +130,33 @@ class MainActivity : ComponentActivity() {
             handleDeepLink(uri.toString())
         }
 
-        // ✅ SOS — app already open
-        val alertId = intent.getIntExtra("sos_alert_id", -1)
-        if (alertId != -1) {
+        // ✅ Incoming call — app already open
+        val isCall = intent.getBooleanExtra("is_incoming_call", false)
+        if (isCall) {
             val visitorName  = intent.getStringExtra("sos_visitor_name")
             val visitorPhone = intent.getStringExtra("sos_visitor_phone")
-            Log.d("SOS", "🚨 App Open alertId=$alertId visitor=$visitorName")
-            SosNotificationHandler.onSosAlertReceived(
-                alertId = alertId,
-                visitorName = visitorName,
-                visitorPhone = visitorPhone
+            val roomId       = intent.getStringExtra("call_room_id") ?: ""
+            val chatId       = intent.getIntExtra("sos_alert_id", -1).takeIf { it != -1 }
+            Log.d("IncomingCall", "📞 App Open call visitor=$visitorName roomId=$roomId")
+            SosNotificationHandler.onIncomingCallReceived(
+                visitorName  = visitorName,
+                visitorPhone = visitorPhone,
+                roomId       = roomId,
+                chatId       = chatId
             )
+        } else {
+            // ✅ SOS — app already open
+            val alertId = intent.getIntExtra("sos_alert_id", -1)
+            if (alertId != -1) {
+                val visitorName  = intent.getStringExtra("sos_visitor_name")
+                val visitorPhone = intent.getStringExtra("sos_visitor_phone")
+                Log.d("SOS", "🚨 App Open alertId=$alertId visitor=$visitorName")
+                SosNotificationHandler.onSosAlertReceived(
+                    alertId = alertId,
+                    visitorName = visitorName,
+                    visitorPhone = visitorPhone
+                )
+            }
         }
     }
 

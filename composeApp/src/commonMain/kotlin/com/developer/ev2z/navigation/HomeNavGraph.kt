@@ -88,9 +88,13 @@ import kotlinx.coroutines.launch
 
 // ✅ SOS Tag imports
 
+import com.developer.ev2z.ui.screens.SOSParkingTag.CallScreen
 import com.developer.ev2z.ui.screens.SOSParkingTag.ConfirmationScreen
+import com.developer.ev2z.ui.screens.SOSParkingTag.IncomingCallScreen
 import com.developer.ev2z.ui.screens.SOSParkingTag.QuickReplyScreen
 import com.developer.ev2z.ui.screens.SOSParkingTag.SosTagViewModel
+import com.developer.ev2z.calling.VoiceCallManager
+import com.developer.ev2z.util.IncomingCallData
 import com.developer.ev2z.ui.screens.InstallationSupport.InstallationSupportScreen
 import com.developer.ev2z.ui.screens.market_screen.ShopProduct
 import com.developer.ev2z.util.SosNotificationHandler
@@ -453,6 +457,14 @@ fun HomeNavGraph(
     var showDriverScore by remember { mutableStateOf(false) }
     var showParking by remember { mutableStateOf(false) }  // ✅ CHANGED — add
 
+    // ── Incoming call flow (ringing screen → active call screen) ─────
+    var showIncomingCallScreen by remember { mutableStateOf(false) }
+    var showActiveCallScreen   by remember { mutableStateOf(false) }
+    var incomingCallData       by remember { mutableStateOf<IncomingCallData?>(null) }
+    // Holds the active WebRTC + Socket.IO manager for the current call.
+    // Recreated on each new call; disposed on end or remote hang-up.
+    var activeVoiceCallManager by remember { mutableStateOf<VoiceCallManager?>(null) }
+
 
     // ✅ SOS Tag — chat (QuickReply) + confirmation only. Alert screen removed.
     var showSosQuickReply by remember { mutableStateOf(false) }
@@ -482,6 +494,8 @@ fun HomeNavGraph(
                 showCommunity = false
                 showParking = false
                 showDriverScore = false
+                showIncomingCallScreen = false
+                showActiveCallScreen   = false
 
                 sosTagViewModel.resetAll()
                 currentSosAlertId = alertId
@@ -489,6 +503,35 @@ fun HomeNavGraph(
                 SosNotificationHandler.clear()
             }
             // If chat IS open — do NOT clear, let QuickReplyScreen's poll pick it up
+        }
+    }
+
+    // ── Incoming call notification → show ringing screen ────────────
+    LaunchedEffect(Unit) {
+        SosNotificationHandler.callFlow.collect { callData ->
+            // Ignore if the user has already accepted and is on the active call screen.
+            if (showActiveCallScreen) {
+                println("⚠️ callFlow ignored — CallScreen already active (roomId=${callData.roomId})")
+                SosNotificationHandler.clearCallFlow()
+                return@collect
+            }
+            println("📞 Auto redirect Incoming Call name=${callData.visitorName}")
+            incomingCallData       = callData
+            showActiveCallScreen   = false
+            showIncomingCallScreen = true
+            SosNotificationHandler.clearCallFlow()
+        }
+    }
+
+    // ── Caller cancelled / call_ended → dismiss ringing or active call ─
+    LaunchedEffect(Unit) {
+        SosNotificationHandler.callEndedFlow.collect {
+            println("📵 Caller cancelled — dismissing call screens")
+            activeVoiceCallManager?.dispose()
+            activeVoiceCallManager  = null
+            showIncomingCallScreen  = false
+            showActiveCallScreen    = false
+            incomingCallData        = null
         }
     }
 
@@ -524,7 +567,56 @@ fun HomeNavGraph(
 
     Box(modifier = Modifier.fillMaxSize()) {
 
-        if (showParking) {
+        if (showActiveCallScreen) {
+
+            // ── Active call (after owner accepts) ─────────────────────
+            CallScreen(
+                visitorName       = incomingCallData?.visitorName  ?: SosNotificationHandler.lastVisitorName  ?: "Visitor",
+                visitorPhone      = incomingCallData?.visitorPhone ?: SosNotificationHandler.lastVisitorPhone ?: "",
+                voiceCallManager  = activeVoiceCallManager,
+                onEnd             = {
+                    activeVoiceCallManager?.endCall()
+                    activeVoiceCallManager?.dispose()
+                    activeVoiceCallManager  = null
+                    showActiveCallScreen    = false
+                    incomingCallData        = null
+                }
+            )
+
+        } else if (showIncomingCallScreen) {
+
+            // ── Ringing / accept-decline screen ───────────────────────
+            val callData = incomingCallData
+            if (callData != null) {
+                IncomingCallScreen(
+                    visitorName  = callData.visitorName,
+                    visitorPhone = callData.visitorPhone,
+                    roomId       = callData.roomId,
+                    apiService   = apiService,
+                    onAccepted   = {
+                        // Owner accepted → start WebRTC as callee, open active call screen
+                        val mgr = VoiceCallManager()
+                        mgr.startAsCallee(callData.roomId)
+                        activeVoiceCallManager = mgr
+                        showIncomingCallScreen = false
+                        showActiveCallScreen   = true
+                    },
+                    onDeclined   = {
+                        // Owner declined → dismiss ringing, open QuickReply if chatId exists
+                        showIncomingCallScreen = false
+                        showActiveCallScreen   = false
+                        val chatId = callData.chatId
+                        if (chatId != null && chatId > 0) {
+                            sosTagViewModel.resetAll()
+                            currentSosAlertId = chatId
+                            showSosQuickReply = true
+                        }
+                        incomingCallData = null
+                    }
+                )
+            }
+
+        } else if (showParking) {
 
             ParkingScreen(
                 viewModel = parkingViewModel,
@@ -671,6 +763,7 @@ fun HomeNavGraph(
                     editDeviceId = deviceId
                     editDeviceName = deviceName
                     editSimNumber = simNumber
+                    showManageDevice = false
                     showEditDeviceName = true
                 }
             )
@@ -683,9 +776,13 @@ fun HomeNavGraph(
                 deviceId = editDeviceId,
                 deviceName = editDeviceName,
                 simNumber = editSimNumber,
-                onBackPressed = { showEditDeviceName = false },
+                onBackPressed = {
+                    showEditDeviceName = false
+                    showManageDevice = true
+                },
                 onUpdateSuccess = {
                     showEditDeviceName = false
+                    showManageDevice = true
                     manageDeviceRefresh++
                 }
             )
@@ -928,6 +1025,7 @@ fun HomeNavGraph(
     // isAnyOverlayOpen — memoized to avoid recomputation on every recomposition
     val isAnyOverlayOpen by remember {
         derivedStateOf {
+            showIncomingCallScreen || showActiveCallScreen ||
             showSosConfirmation || showSosQuickReply ||
             showCreatePost || showCreateStory || showStoryViewer || showCommunity ||
             showDocumentViewer || showUploadDocument || showDocuments ||
@@ -1043,6 +1141,8 @@ fun HomeNavGraph(
     PlatformBackHandler(enabled = showDocumentViewer)    { showDocumentViewer = false; showDocuments = true }
     PlatformBackHandler(enabled = showAddDevice)         { showAddDevice = false }
     PlatformBackHandler(enabled = showVaultPasswordDialog) { showVaultPasswordDialog = false }
+    PlatformBackHandler(enabled = showIncomingCallScreen) { showIncomingCallScreen = false; incomingCallData = null }
+    PlatformBackHandler(enabled = showActiveCallScreen)   { showActiveCallScreen = false; incomingCallData = null }
     PlatformBackHandler(enabled = showSosQuickReply)     { showSosQuickReply = false; currentSosAlertId = null; sosTagViewModel.resetAll() }
     PlatformBackHandler(enabled = showSosConfirmation)   { showSosConfirmation = false; currentSosAlertId = null; sosTagViewModel.resetAll() }
     PlatformBackHandler(enabled = showStoryViewer)       { showStoryViewer = false }

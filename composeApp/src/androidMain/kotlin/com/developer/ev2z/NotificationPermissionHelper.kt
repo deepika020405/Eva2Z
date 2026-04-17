@@ -70,7 +70,16 @@ class NotificationPermissionHelper(
         activity.registerForActivityResult(
             ActivityResultContracts.RequestPermission()
         ) { _ ->
-            onGranted() // ✅ SMS granted or denied — proceed either way
+            requestMicPermission() // ✅ SMS done → ask mic
+        }
+
+    // 🎤 Mic permission launcher — needed for WebRTC AudioRecord
+    private val micLauncher =
+        activity.registerForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { granted: Boolean ->
+            android.util.Log.d("Permissions", "🎤 RECORD_AUDIO granted=$granted")
+            onGranted() // ✅ proceed regardless
         }
 
     fun checkAndRequest() {
@@ -98,9 +107,22 @@ class NotificationPermissionHelper(
         ) == PackageManager.PERMISSION_GRANTED
 
         if (smsGranted) {
-            onGranted()
+            requestMicPermission()
         } else {
             smsLauncher.launch(Manifest.permission.SEND_SMS)
+        }
+    }
+
+    private fun requestMicPermission() {
+        val micGranted = ContextCompat.checkSelfPermission(
+            activity,
+            Manifest.permission.RECORD_AUDIO
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (micGranted) {
+            onGranted()
+        } else {
+            micLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
     }
 }

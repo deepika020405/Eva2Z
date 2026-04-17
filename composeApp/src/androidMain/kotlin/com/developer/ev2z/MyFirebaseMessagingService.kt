@@ -2,6 +2,7 @@ package com.developer.ev2z
 
 import android.Manifest
 import androidx.annotation.RequiresPermission
+import com.developer.ev2z.calling.VoiceCallManager
 import com.developer.ev2z.util.NotificationUtil
 import com.developer.ev2z.util.AlertPrefs
 import com.developer.ev2z.util.SmsUtil
@@ -49,7 +50,56 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         val visitorName  = data["visitor_name"]
         val visitorPhone = data["visitor_phone"]
 
-        // ✅ Show notification WITH alertId (+ visitor info so cold-start tap can restore it)
+        when (type) {
+
+            // ── Incoming call from a parking visitor ─────────────────
+            "incoming_call" -> {
+                val roomId = data["room_id"] ?: ""
+                // Drop this FCM if a call is already active — duplicate events from
+                // the server can arrive after the user has already accepted.
+                if (VoiceCallManager.isCallActive) {
+                    println("⚠️ INCOMING CALL FCM ignored — call already active (roomId=$roomId)")
+                    return
+                }
+                println("📞 INCOMING CALL FCM — visitor=$visitorName phone=$visitorPhone roomId=$roomId")
+                SosNotificationHandler.onIncomingCallReceived(
+                    visitorName  = visitorName,
+                    visitorPhone = visitorPhone,
+                    roomId       = roomId,
+                    chatId       = alertId
+                )
+                NotificationUtil.showCallNotification(
+                    context      = applicationContext,
+                    visitorName  = visitorName,
+                    visitorPhone = visitorPhone,
+                    roomId       = roomId,
+                    chatId       = alertId
+                )
+                return   // skip generic notification below
+            }
+
+            // ── Caller cancelled before owner picked up ──────────────
+            "call_ended" -> {
+                val roomId = data["room_id"] ?: ""
+                println("📵 CALL ENDED FCM — room_id=$roomId visitor=$visitorName")
+                // 1. Kill the ringing notification immediately (stops sound)
+                NotificationUtil.cancelCallNotification(applicationContext)
+                // 2. Signal the UI to dismiss IncomingCallScreen / active call
+                SosNotificationHandler.onCallEnded()
+                // 3. Show a silent missed-call notification
+                NotificationUtil.showMissedCallNotification(
+                    context      = applicationContext,
+                    visitorName  = visitorName,
+                    visitorPhone = visitorPhone,
+                    chatId       = alertId
+                )
+                return   // skip generic notification
+            }
+
+            else -> { /* handled after generic notification */ }
+        }
+
+        // ✅ Show standard notification for all non-call types
         NotificationUtil.show(
             context = applicationContext,
             title = title,
