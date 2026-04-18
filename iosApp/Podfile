@@ -10,6 +10,12 @@ target 'iosApp' do
 
   # ✅ PhonePe Payment SDK
   pod 'PhonePePayment'
+
+  # ✅ WebRTC — voice calling
+  pod 'GoogleWebRTC'
+
+  # ✅ Socket.IO — WebRTC signaling transport
+  pod 'Socket.IO-Client-Swift', '~> 16.1'
 end
 
 post_install do |installer|

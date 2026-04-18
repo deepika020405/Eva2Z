@@ -14,5 +14,9 @@ fun initAppContext(app: Application) {
 
 actual fun getAppContext(): Any? = appCtx
 
+actual fun cancelCallNotification() {
+    com.developer.ev2z.util.NotificationUtil.cancelCallNotification(appCtx)
+}
+
 @Composable
 actual fun getPlatformContext(): Any? = LocalContext.current

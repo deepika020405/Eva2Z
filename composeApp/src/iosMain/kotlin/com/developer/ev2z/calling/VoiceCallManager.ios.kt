@@ -1,11 +1,39 @@
 package com.developer.ev2z.calling
 
-// iOS stub — native WebRTC calling would be implemented in the Swift layer (PaymentBridge pattern).
 actual class VoiceCallManager actual constructor() {
-    actual fun startAsCallee(roomId: String) {}
-    actual fun startAsCaller(roomId: String) {}
-    actual fun endCall() {}
-    actual fun setMuted(muted: Boolean) {}
-    actual fun setSpeaker(speaker: Boolean) {}
-    actual fun dispose() {}
+
+    companion object {
+        var isCallActive: Boolean = false
+    }
+
+    actual fun startAsCallee(roomId: String) {
+        isCallActive = true
+        println("📞 [iOS VoiceCall] startAsCallee roomId=$roomId — delegating to WebRtcBridge")
+        WebRtcBridgeHolder.delegate?.startAsCallee(roomId)
+    }
+
+    actual fun startAsCaller(roomId: String) {
+        isCallActive = true
+        println("📞 [iOS VoiceCall] startAsCaller roomId=$roomId — delegating to WebRtcBridge")
+        WebRtcBridgeHolder.delegate?.startAsCaller(roomId)
+    }
+
+    actual fun endCall() {
+        println("📵 [iOS VoiceCall] endCall")
+        WebRtcBridgeHolder.delegate?.endCall()
+    }
+
+    actual fun setMuted(muted: Boolean) {
+        WebRtcBridgeHolder.delegate?.setMuted(muted)
+    }
+
+    actual fun setSpeaker(speaker: Boolean) {
+        WebRtcBridgeHolder.delegate?.setSpeaker(speaker)
+    }
+
+    actual fun dispose() {
+        isCallActive = false
+        println("🗑️ [iOS VoiceCall] dispose — isCallActive=false")
+        WebRtcBridgeHolder.delegate?.dispose()
+    }
 }

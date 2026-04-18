@@ -101,6 +101,7 @@ PODS:
   - GoogleUtilities/UserDefaults (8.1.0):
     - GoogleUtilities/Logger
     - GoogleUtilities/Privacy
+  - GoogleWebRTC (1.1.32000)
   - nanopb (3.30910.0):
     - nanopb/decode (= 3.30910.0)
     - nanopb/encode (= 3.30910.0)
@@ -108,11 +109,16 @@ PODS:
   - nanopb/encode (3.30910.0)
   - PhonePePayment (5.3.2)
   - PromisesObjC (2.4.0)
+  - Socket.IO-Client-Swift (16.1.1):
+    - Starscream (~> 4.0.8)
+  - Starscream (4.0.8)
 
 DEPENDENCIES:
   - Firebase/Core
   - Firebase/Messaging
+  - GoogleWebRTC
   - PhonePePayment
+  - Socket.IO-Client-Swift (~> 16.1)
 
 SPEC REPOS:
   trunk:
@@ -126,9 +132,12 @@ SPEC REPOS:
     - GoogleAppMeasurement
     - GoogleDataTransport
     - GoogleUtilities
+    - GoogleWebRTC
     - nanopb
     - PhonePePayment
     - PromisesObjC
+    - Socket.IO-Client-Swift
+    - Starscream
 
 SPEC CHECKSUMS:
   Firebase: d99ac19b909cd2c548339c2241ecd0d1599ab02e
@@ -141,10 +150,13 @@ SPEC CHECKSUMS:
   GoogleAppMeasurement: 700dce7541804bec33db590a5c496b663fbe2539
   GoogleDataTransport: aae35b7ea0c09004c3797d53c8c41f66f219d6a7
   GoogleUtilities: 00c88b9a86066ef77f0da2fab05f65d7768ed8e1
+  GoogleWebRTC: 4d261187b30512efdb711d21fa961a6adf138717
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
   PhonePePayment: 9516849183e00c77a2d64bb85e2c9942a5e618b7
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
+  Socket.IO-Client-Swift: 3614bea82ba005df1c2ff01154f4004993e05ad7
+  Starscream: 19b5533ddb925208db698f0ac508a100b884a1b9
 
-PODFILE CHECKSUM: efa952807d2ac2ff6c69d4e8f46bc5b1e6f4e088
+PODFILE CHECKSUM: 48fd45c8acaf6bb56ac44edf4359b53750865c65
 
 COCOAPODS: 1.16.2

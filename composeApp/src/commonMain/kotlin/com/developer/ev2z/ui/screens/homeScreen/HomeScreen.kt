@@ -288,8 +288,8 @@ fun HomeQuickActionsSection(
         QuickActionItem("Document Vault", Icons.Default.Folder, onOpenDocuments),
         QuickActionItem("Device Report", Icons.Default.Assessment, onOpenDeviceReport),
         QuickActionItem("Add Device", Icons.Default.Add, onOpenAddDevice) ,
-        QuickActionItem("Vechicle TAG Registration",Icons.Default.LocalParking,   onParking),  // ✅ CHANGED
-        QuickActionItem(" Vechicle TAG Alert",Icons.Default.Warning,onSosTag),  // ✅ WIRED
+        QuickActionItem("Vehicle TAG Registration",Icons.Default.LocalParking,   onParking),  // ✅ CHANGED
+        QuickActionItem(" Vehicle TAG Alert",Icons.Default.Warning,onSosTag),  // ✅ WIRED
         QuickActionItem(
             "Criminal Verification",
             Icons.Default.VerifiedUser,

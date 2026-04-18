@@ -40,10 +40,13 @@
 		<string>bhim</string>
 		<string>supermoney</string>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Microphone access is required for voice calls with parking visitors.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>
 		<string>fetch</string>
+		<string>voip</string>
 	</array>
 	<key>UILaunchScreen</key>
 	<dict/>

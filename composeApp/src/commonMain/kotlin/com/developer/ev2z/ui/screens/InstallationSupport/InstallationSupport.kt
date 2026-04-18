@@ -24,6 +24,7 @@ private val BrandGreen = Color(0xFF34A853)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun InstallationSupportScreen(
+
     onBack: () -> Unit
 ) {
     // System back → close the overlay and return to home immediately.
@@ -70,8 +71,8 @@ fun InstallationSupportScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             VehicleOptionCard(
-                title = "2 Wheeler Vehicle",
-                subtitle = "Bike, Scooter, Electric 2W",
+                title = "EV 2 Wheeler",
+                subtitle = " Electric 2W Vehicle",
                 icon = Icons.Default.TwoWheeler,
                 onClick = {
                     openUrl("https://youtu.be/sYjUGsugOtY?si=aP8lZJ4Lg5RPeo3f")

@@ -1,0 +1,429 @@
+import Foundation
+import AVFoundation
+import WebRTC
+import SocketIO
+import ComposeApp
+
+// Mirrors Android's WebRtcManager + SocketIOSignalingClient exactly.
+//
+// Server URL: https://app.eva2z.in:3001
+// Events emitted : join-room, offer, answer, ice-candidate, end-call
+// Events received: user-joined, offer, answer, ice-candidate, end-call
+
+private let kSignalingServerURL = "https://app.eva2z.in:3001"
+private let kStunServer         = "stun:stun.l.google.com:19302"
+private let kStunServer2        = "stun:stun1.l.google.com:19302"
+
+@objc class WebRtcBridge: NSObject, IOSWebRtcDelegate {
+
+    @objc static let shared = WebRtcBridge()
+
+    // MARK: - State
+
+    private var roomId:   String = ""
+    private var isCaller: Bool   = false
+
+    // True while a call session is alive. AppDelegate uses this to guard against
+    // duplicate incoming-call FCMs while a call is already active.
+    private(set) var isCallActive: Bool = false
+
+    // WebRTC
+    private var factory:         RTCPeerConnectionFactory?
+    private var peerConnection:  RTCPeerConnection?
+    private var localAudioTrack: RTCAudioTrack?
+
+    // Socket.IO
+    private var socketManager: SocketManager?
+    private var socket:        SocketIOClient?
+
+    // ICE candidate buffer — remote candidates that arrived before our local
+    // description was set are held here and flushed once ready.
+    private var pendingRemoteCandidates: [RTCIceCandidate] = []
+    private var isLocalDescriptionSet:   Bool = false
+
+    // MARK: - IOSWebRtcDelegate
+
+    func startAsCallee(roomId: String) {
+        teardownInternal()            // clean up any previous session first
+        isCallActive          = true
+        isLocalDescriptionSet = false
+        pendingRemoteCandidates.removeAll()
+        self.roomId   = roomId
+        self.isCaller = false
+        print("📞 [WebRtcBridge] startAsCallee roomId=\(roomId)")
+        configureAudioSession()
+        setupWebRtc()
+        connectSignaling()
+    }
+
+    func startAsCaller(roomId: String) {
+        teardownInternal()
+        isCallActive          = true
+        isLocalDescriptionSet = false
+        pendingRemoteCandidates.removeAll()
+        self.roomId   = roomId
+        self.isCaller = true
+        print("📞 [WebRtcBridge] startAsCaller roomId=\(roomId)")
+        configureAudioSession()
+        setupWebRtc()
+        connectSignaling()
+    }
+
+    func endCall() {
+        guard isCallActive else { return }
+        print("📵 [WebRtcBridge] endCall — emitting end-call to room \(roomId)")
+        // Emit BEFORE teardown so socket is still connected; flush then close.
+        socket?.emit("end-call", ["roomId": roomId])
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.teardownInternal()
+        }
+    }
+
+    func setMuted(muted: Bool) {
+        localAudioTrack?.isEnabled = !muted
+        print("🎤 [WebRtcBridge] muted=\(muted)")
+    }
+
+    func setSpeaker(speaker: Bool) {
+        do {
+            try AVAudioSession.sharedInstance().overrideOutputAudioPort(speaker ? .speaker : .none)
+            print("🔊 [WebRtcBridge] speaker=\(speaker)")
+        } catch {
+            print("❌ [WebRtcBridge] setSpeaker error: \(error)")
+        }
+    }
+
+    func dispose() {
+        print("🗑️ [WebRtcBridge] dispose")
+        teardownInternal()
+    }
+
+    // MARK: - Audio session
+
+    private func configureAudioSession() {
+        do {
+            let s = AVAudioSession.sharedInstance()
+            try s.setCategory(.playAndRecord,
+                              mode: .voiceChat,
+                              options: [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker])
+            try s.setActive(true)
+            print("✅ [WebRtcBridge] Audio session configured (voiceChat)")
+        } catch {
+            print("❌ [WebRtcBridge] Audio session error: \(error)")
+        }
+    }
+
+    // MARK: - WebRTC setup
+
+    private func setupWebRtc() {
+        RTCInitializeSSL()
+
+        factory = RTCPeerConnectionFactory(
+            encoderFactory: RTCDefaultVideoEncoderFactory(),
+            decoderFactory: RTCDefaultVideoDecoderFactory()
+        )
+
+        let config = RTCConfiguration()
+        config.iceServers = [
+            RTCIceServer(urlStrings: [kStunServer]),
+            RTCIceServer(urlStrings: [kStunServer2])
+        ]
+        config.sdpSemantics             = .unifiedPlan
+        config.continualGatheringPolicy = .gatherContinually
+        config.iceTransportPolicy       = .all
+
+        let constraints = RTCMediaConstraints(
+            mandatoryConstraints: nil,
+            optionalConstraints:  ["DtlsSrtpKeyAgreement": "true"]
+        )
+
+        peerConnection = factory?.peerConnection(with: config,
+                                                  constraints: constraints,
+                                                  delegate: self)
+
+        // Audio track with the same noise/echo constraints as Android
+        let audioConstraints = RTCMediaConstraints(
+            mandatoryConstraints: [
+                "googEchoCancellation": "true",
+                "googNoiseSuppression": "true",
+                "googAutoGainControl":  "true",
+                "googHighpassFilter":   "true"
+            ],
+            optionalConstraints: nil
+        )
+        let audioSource     = factory?.audioSource(with: audioConstraints)
+        localAudioTrack     = factory?.audioTrack(with: audioSource!, trackId: "ARDAMSa0")
+        if let track = localAudioTrack {
+            peerConnection?.add(track, streamIds: ["ARDAMS"])
+        }
+        print("✅ [WebRtcBridge] WebRTC peer connection ready")
+    }
+
+    // MARK: - Socket.IO signaling
+
+    private func connectSignaling() {
+        guard let url = URL(string: kSignalingServerURL) else {
+            print("❌ [WebRtcBridge] Bad signaling URL"); return
+        }
+
+        socketManager = SocketManager(socketURL: url, config: [
+            .log(false),
+            .compress,
+            .forceWebsockets(true),
+            .reconnects(true),
+            .reconnectAttempts(5),
+            .reconnectWait(1)
+        ])
+        socket = socketManager?.defaultSocket
+
+        socket?.on(clientEvent: .connect) { [weak self] _, _ in
+            guard let self = self else { return }
+            print("✅ [WebRtcBridge] Socket.IO connected — joining room \(self.roomId)")
+            self.socket?.emit("join-room", ["roomId": self.roomId])
+        }
+
+        socket?.on(clientEvent: .error) { data, _ in
+            print("❌ [WebRtcBridge] Socket.IO error: \(data)")
+        }
+
+        socket?.on(clientEvent: .disconnect) { data, _ in
+            print("🔌 [WebRtcBridge] Socket.IO disconnected: \(data)")
+        }
+
+        socket?.on("user-joined") { [weak self] _, _ in
+            guard let self = self else { return }
+            print("👤 [WebRtcBridge] user-joined — isCaller=\(self.isCaller)")
+            if self.isCaller { self.createOffer() }
+            else             { print("📋 [WebRtcBridge] Callee — waiting for offer") }
+        }
+
+        socket?.on("offer") { [weak self] data, _ in
+            guard let self = self,
+                  let dict    = data.first as? [String: Any] else { return }
+            let offerDict = (dict["offer"] as? [String: Any]) ?? dict
+            guard let sdpStr = offerDict["sdp"] as? String else {
+                print("❌ [WebRtcBridge] offer missing sdp"); return
+            }
+            print("📥 [WebRtcBridge] Received offer (sdp length=\(sdpStr.count))")
+            let sdp = RTCSessionDescription(type: .offer, sdp: sdpStr)
+            self.peerConnection?.setRemoteDescription(sdp) { error in
+                if let error = error {
+                    print("❌ [WebRtcBridge] setRemoteDescription(offer) error: \(error)"); return
+                }
+                self.createAnswer()
+            }
+        }
+
+        socket?.on("answer") { [weak self] data, _ in
+            guard let self = self,
+                  let dict     = data.first as? [String: Any] else { return }
+            let answerDict = (dict["answer"] as? [String: Any]) ?? dict
+            guard let sdpStr = answerDict["sdp"] as? String else {
+                print("❌ [WebRtcBridge] answer missing sdp"); return
+            }
+            print("📥 [WebRtcBridge] Received answer (sdp length=\(sdpStr.count))")
+            let sdp = RTCSessionDescription(type: .answer, sdp: sdpStr)
+            self.peerConnection?.setRemoteDescription(sdp) { [weak self] error in
+                if let error = error {
+                    print("❌ [WebRtcBridge] setRemoteDescription(answer) error: \(error)"); return
+                }
+                // Caller: flush any buffered remote ICE candidates now that both descs are set
+                self?.flushPendingCandidates()
+            }
+        }
+
+        socket?.on("ice-candidate") { [weak self] data, _ in
+            guard let self = self,
+                  let dict     = data.first as? [String: Any],
+                  let candDict = dict["candidate"] as? [String: Any],
+                  let sdp      = candDict["candidate"]      as? String,
+                  let sdpMid   = candDict["sdpMid"]         as? String else { return }
+            let sdpMLineIndex = (candDict["sdpMLineIndex"] as? Int).map { Int32($0) } ?? 0
+            print("🧊 [WebRtcBridge] Received ICE candidate sdpMid=\(sdpMid)")
+            let candidate = RTCIceCandidate(sdp: sdp, sdpMLineIndex: sdpMLineIndex, sdpMid: sdpMid)
+
+            // Buffer until local description is set — applying candidates before that
+            // causes them to be dropped silently, slowing ICE negotiation.
+            if self.isLocalDescriptionSet {
+                self.peerConnection?.add(candidate)
+            } else {
+                print("🧊 [WebRtcBridge] Buffering ICE candidate (local desc not set yet)")
+                self.pendingRemoteCandidates.append(candidate)
+            }
+        }
+
+        socket?.on("end-call") { [weak self] _, _ in
+            guard let self = self, self.isCallActive else { return }
+            print("📵 [WebRtcBridge] Remote peer ended call")
+            DispatchQueue.main.async {
+                SosNotificationHandler.shared.onCallEnded()
+            }
+        }
+
+        print("📡 [WebRtcBridge] Connecting to \(kSignalingServerURL)")
+        socket?.connect()
+    }
+
+    // MARK: - SDP helpers
+
+    private func createOffer() {
+        let constraints = RTCMediaConstraints(
+            mandatoryConstraints: ["OfferToReceiveAudio": "true"],
+            optionalConstraints:  nil
+        )
+        peerConnection?.offer(for: constraints) { [weak self] sdp, error in
+            guard let self = self, let sdp = sdp else {
+                print("❌ [WebRtcBridge] createOffer error: \(String(describing: error))"); return
+            }
+            self.peerConnection?.setLocalDescription(sdp) { error in
+                if let error = error {
+                    print("❌ [WebRtcBridge] setLocalDescription(offer) error: \(error)"); return
+                }
+                self.isLocalDescriptionSet = true
+                self.flushPendingCandidates()
+                print("📤 [WebRtcBridge] Emitting offer to room \(self.roomId)")
+                self.socket?.emit("offer", [
+                    "sdp": sdp.sdp, "type": "offer", "roomId": self.roomId
+                ])
+            }
+        }
+    }
+
+    private func createAnswer() {
+        let constraints = RTCMediaConstraints(
+            mandatoryConstraints: ["OfferToReceiveAudio": "true"],
+            optionalConstraints:  nil
+        )
+        peerConnection?.answer(for: constraints) { [weak self] sdp, error in
+            guard let self = self, let sdp = sdp else {
+                print("❌ [WebRtcBridge] createAnswer error: \(String(describing: error))"); return
+            }
+            self.peerConnection?.setLocalDescription(sdp) { error in
+                if let error = error {
+                    print("❌ [WebRtcBridge] setLocalDescription(answer) error: \(error)"); return
+                }
+                // Mark ready and flush buffered remote candidates immediately
+                self.isLocalDescriptionSet = true
+                self.flushPendingCandidates()
+                print("📤 [WebRtcBridge] Emitting answer to room \(self.roomId)")
+                self.socket?.emit("answer", [
+                    "sdp": sdp.sdp, "type": "answer", "roomId": self.roomId
+                ])
+            }
+        }
+    }
+
+    private func flushPendingCandidates() {
+        guard !pendingRemoteCandidates.isEmpty else { return }
+        print("🧊 [WebRtcBridge] Flushing \(pendingRemoteCandidates.count) buffered ICE candidates")
+        pendingRemoteCandidates.forEach { peerConnection?.add($0) }
+        pendingRemoteCandidates.removeAll()
+    }
+
+    // MARK: - Teardown (idempotent)
+
+    private func teardownInternal() {
+        guard isCallActive else { return }
+        isCallActive          = false
+        isLocalDescriptionSet = false
+        pendingRemoteCandidates.removeAll()
+
+        socket?.off(clientEvent: .connect)
+        socket?.off(clientEvent: .error)
+        socket?.off(clientEvent: .disconnect)
+        ["user-joined", "offer", "answer", "ice-candidate", "end-call"].forEach { socket?.off($0) }
+        socket?.disconnect()
+        socket        = nil
+        socketManager = nil
+
+        peerConnection?.close()
+        peerConnection  = nil
+        localAudioTrack = nil
+        factory         = nil
+
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        print("✅ [WebRtcBridge] Teardown complete")
+    }
+}
+
+// MARK: - RTCPeerConnectionDelegate
+
+extension WebRtcBridge: RTCPeerConnectionDelegate {
+
+    func peerConnection(_ peerConnection: RTCPeerConnection,
+                        didGenerate candidate: RTCIceCandidate) {
+        print("🧊 [WebRtcBridge] Generated ICE candidate sdpMid=\(candidate.sdpMid ?? "") idx=\(candidate.sdpMLineIndex)")
+        socket?.emit("ice-candidate", [
+            "roomId": roomId,
+            "candidate": [
+                "candidate":     candidate.sdp,
+                "sdpMid":        candidate.sdpMid ?? "",
+                "sdpMLineIndex": candidate.sdpMLineIndex
+            ]
+        ])
+    }
+
+    func peerConnectionShouldNegotiate(_ peerConnection: RTCPeerConnection) {}
+
+    func peerConnection(_ peerConnection: RTCPeerConnection,
+                        didChange stateChanged: RTCSignalingState) {
+        print("🔀 [WebRtcBridge] Signaling state: \(stateChanged.rawValue)")
+    }
+
+    func peerConnection(_ peerConnection: RTCPeerConnection,
+                        didAdd stream: RTCMediaStream) {
+        print("📡 [WebRtcBridge] Remote stream added")
+    }
+
+    func peerConnection(_ peerConnection: RTCPeerConnection,
+                        didRemove stream: RTCMediaStream) {}
+
+    func peerConnection(_ peerConnection: RTCPeerConnection,
+                        didChange newState: RTCIceConnectionState) {
+        print("🧊 [WebRtcBridge] ICE connection state: \(newState.rawValue)")
+        switch newState {
+        case .connected, .completed:
+            print("🟢 [WebRtcBridge] ══ CALL CONNECTED — audio is live ══")
+        case .failed:
+            guard isCallActive else { return }
+            print("🔴 [WebRtcBridge] ICE failed — ending call")
+            DispatchQueue.main.async { SosNotificationHandler.shared.onCallEnded() }
+        case .disconnected:
+            // Short disconnection can recover; give it 3s before giving up
+            guard isCallActive else { return }
+            print("⚠️ [WebRtcBridge] ICE disconnected — waiting for recovery")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+                guard let self = self, self.isCallActive,
+                      peerConnection.iceConnectionState == .disconnected else { return }
+                print("🔴 [WebRtcBridge] ICE still disconnected after 3s — ending call")
+                SosNotificationHandler.shared.onCallEnded()
+            }
+        case .closed:
+            guard isCallActive else { return }
+            print("🔴 [WebRtcBridge] ICE closed — ending call")
+            DispatchQueue.main.async { SosNotificationHandler.shared.onCallEnded() }
+        default:
+            break
+        }
+    }
+
+    func peerConnection(_ peerConnection: RTCPeerConnection,
+                        didChange newState: RTCIceGatheringState) {
+        let stateStr = ["new", "gathering", "complete"][safe: Int(newState.rawValue)] ?? "\(newState.rawValue)"
+        print("🧊 [WebRtcBridge] ICE gathering: \(stateStr)")
+    }
+
+    func peerConnection(_ peerConnection: RTCPeerConnection,
+                        didRemove candidates: [RTCIceCandidate]) {}
+
+    func peerConnection(_ peerConnection: RTCPeerConnection,
+                        didOpen dataChannel: RTCDataChannel) {}
+}
+
+// MARK: - Array safe subscript
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
+    }
+}

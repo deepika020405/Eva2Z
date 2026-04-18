@@ -78,6 +78,17 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 return   // skip generic notification below
             }
 
+            // ── Another device (same account) accepted this call ─────
+            "call_accepted" -> {
+                val roomId = data["room_id"] ?: ""
+                println("📱 CALL ACCEPTED ELSEWHERE FCM — room_id=$roomId")
+                // Stop ringing on this device
+                NotificationUtil.cancelCallNotification(applicationContext)
+                // Dismiss the IncomingCallScreen in the UI
+                SosNotificationHandler.onCallAcceptedElsewhere()
+                return
+            }
+
             // ── Caller cancelled before owner picked up ──────────────
             "call_ended" -> {
                 val roomId = data["room_id"] ?: ""

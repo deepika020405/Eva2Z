@@ -71,6 +71,16 @@ object SosNotificationHandler {
         _callEndedFlow.tryEmit(Unit)
     }
 
+    // Emitted when another device (same account) has already accepted this call.
+    private val _callAcceptedElsewhereFlow = MutableSharedFlow<Unit>(replay = 0, extraBufferCapacity = 1)
+    val callAcceptedElsewhereFlow: SharedFlow<Unit> = _callAcceptedElsewhereFlow.asSharedFlow()
+
+    fun onCallAcceptedElsewhere() {
+        println("📱 CALL ACCEPTED on another device — dismissing ringing screen")
+        clearCallFlow()
+        _callAcceptedElsewhereFlow.tryEmit(Unit)
+    }
+
     fun clear() {
         _alertFlow.resetReplayCache()
     }

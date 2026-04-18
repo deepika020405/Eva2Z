@@ -32,6 +32,7 @@ import cafe.adriel.voyager.navigator.tab.*
 import com.developer.ev2z.LocalPlatformActivity
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.data.local.UserPrefs
+import com.developer.ev2z.cancelCallNotification
 import com.developer.ev2z.getAppContext
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.repository.ProductRepository
@@ -527,11 +528,32 @@ fun HomeNavGraph(
     LaunchedEffect(Unit) {
         SosNotificationHandler.callEndedFlow.collect {
             println("📵 Caller cancelled — dismissing call screens")
+            val chatId = incomingCallData?.chatId   // capture before clearing
+            val wasOnActiveCall = showActiveCallScreen
+
             activeVoiceCallManager?.dispose()
             activeVoiceCallManager  = null
             showIncomingCallScreen  = false
             showActiveCallScreen    = false
             incomingCallData        = null
+
+            // If call was active (visitor hung up mid-call) redirect to chat screen
+            if (wasOnActiveCall && chatId != null && chatId > 0) {
+                sosTagViewModel.resetAll()
+                currentSosAlertId = chatId
+                showSosQuickReply = true
+            }
+        }
+    }
+
+    // ── Another device accepted the same call → dismiss ringing screen ─
+    var callAcceptedElsewhereMsg by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        SosNotificationHandler.callAcceptedElsewhereFlow.collect {
+            println("📱 Another device accepted — dismissing IncomingCallScreen")
+            showIncomingCallScreen = false
+            incomingCallData       = null
+            callAcceptedElsewhereMsg = true
         }
     }
 
@@ -594,7 +616,8 @@ fun HomeNavGraph(
                     roomId       = callData.roomId,
                     apiService   = apiService,
                     onAccepted   = {
-                        // Owner accepted → start WebRTC as callee, open active call screen
+                        // Cancel ringing notification before switching to active call screen
+                        cancelCallNotification()
                         val mgr = VoiceCallManager()
                         mgr.startAsCallee(callData.roomId)
                         activeVoiceCallManager = mgr
@@ -602,7 +625,8 @@ fun HomeNavGraph(
                         showActiveCallScreen   = true
                     },
                     onDeclined   = {
-                        // Owner declined → dismiss ringing, open QuickReply if chatId exists
+                        // Cancel ringing notification so it stops ringing after decline
+                        cancelCallNotification()
                         showIncomingCallScreen = false
                         showActiveCallScreen   = false
                         val chatId = callData.chatId
@@ -1020,6 +1044,29 @@ fun HomeNavGraph(
                 onLogout = onLogout
             )
         }
+
+        // ── "Call accepted on another device" toast ───────────────────
+        if (callAcceptedElsewhereMsg) {
+            LaunchedEffect(Unit) {
+                kotlinx.coroutines.delay(3000)
+                callAcceptedElsewhereMsg = false
+            }
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 80.dp, start = 16.dp, end = 16.dp)
+            ) {
+                Snackbar(
+                    containerColor = Color(0xFF323232),
+                    contentColor   = Color.White,
+                ) {
+                    Text(
+                        text = "Call accepted on another device",
+                        fontSize = 14.sp
+                    )
+                }
+            }
+        }
     }
 
     // isAnyOverlayOpen — memoized to avoid recomputation on every recomposition
@@ -1141,7 +1188,7 @@ fun HomeNavGraph(
     PlatformBackHandler(enabled = showDocumentViewer)    { showDocumentViewer = false; showDocuments = true }
     PlatformBackHandler(enabled = showAddDevice)         { showAddDevice = false }
     PlatformBackHandler(enabled = showVaultPasswordDialog) { showVaultPasswordDialog = false }
-    PlatformBackHandler(enabled = showIncomingCallScreen) { showIncomingCallScreen = false; incomingCallData = null }
+    PlatformBackHandler(enabled = showIncomingCallScreen) { cancelCallNotification(); showIncomingCallScreen = false; incomingCallData = null }
     PlatformBackHandler(enabled = showActiveCallScreen)   { showActiveCallScreen = false; incomingCallData = null }
     PlatformBackHandler(enabled = showSosQuickReply)     { showSosQuickReply = false; currentSosAlertId = null; sosTagViewModel.resetAll() }
     PlatformBackHandler(enabled = showSosConfirmation)   { showSosConfirmation = false; currentSosAlertId = null; sosTagViewModel.resetAll() }
@@ -1211,7 +1258,7 @@ fun LockedDocumentsPlaceholder(
                         onClick = onUnlockClick,
                         shape = RoundedCornerShape(50),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF7B61FF)
+                            containerColor = Color(0xFF6A9F50)
                         ),
                         modifier = Modifier
                             .height(44.dp)
@@ -1236,7 +1283,7 @@ fun LockedDocumentsPlaceholder(
             ) {
                 Surface(
                     shape = CircleShape,
-                    color = Color(0xFF7B61FF),
+                    color = Color(0xFF6A9F50),
                     shadowElevation = 6.dp
                 ) {
                     Icon(
