@@ -3,6 +3,7 @@ package com.developer.ev2z.ui.screens.trackTrace
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
+import com.developer.ev2z.network.UnauthorizedException
 import com.developer.ev2z.repository.TrackTraceRepository
 import com.developer.ev2z.response.Device
 import kotlinx.coroutines.Job
@@ -40,6 +41,9 @@ class TrackTraceViewModel(
 
     private val _error = MutableStateFlow<String?>(null)
     val error = _error.asStateFlow()
+
+    private val _unauthorized = MutableStateFlow(false)
+    val unauthorized = _unauthorized.asStateFlow()
 
     private val _trailPoints = MutableStateFlow<List<TrailPoint>>(emptyList())
     val trailPoints = _trailPoints.asStateFlow()
@@ -79,8 +83,15 @@ class TrackTraceViewModel(
 
     private suspend fun refreshDevices() {
         try {
-            val res = repository.getMyDevices(tokenProvider())
+            val token = tokenProvider()
+            println("🔑 [TrackTrace] Token used: ${if (token.isBlank()) "EMPTY ❌" else token.take(20) + "..."}")
+            val res = repository.getMyDevices(token)
+            println("📦 [TrackTrace] API success=${res.success}, devices=${res.devices.size}, username=${res.username}")
+            res.devices.forEachIndexed { i, d ->
+                println("  [$i] device_id=${d.device_id} name=${d.device_name} status=${d.engine_status}")
+            }
             if (!res.success) {
+                println("❌ [TrackTrace] API returned success=false")
                 if (_devices.value.isEmpty()) {
                     _error.value = "Failed to load devices"
                 }
@@ -106,7 +117,12 @@ class TrackTraceViewModel(
                     _selectedDevice.value = updated
                 }
             }
+        } catch (e: UnauthorizedException) {
+            println("🔒 [TrackTrace] 401 Unauthorized — stopping polling")
+            stop()
+            _unauthorized.value = true
         } catch (e: Exception) {
+            println("💥 [TrackTrace] Exception in refreshDevices: ${e::class.simpleName} — ${e.message}")
             if (_devices.value.isEmpty()) {
                 _error.value = e.message ?: "Failed to load devices"
             }
@@ -127,8 +143,13 @@ class TrackTraceViewModel(
 
     private suspend fun fetchLiveLocation(deviceId: String) {
         try {
+            println("📍 [TrackTrace] Fetching live location for deviceId=$deviceId")
             val res = repository.getLiveLocation(tokenProvider(), deviceId)
-            if (!res.success) return
+            println("📍 [TrackTrace] LiveLocation success=${res.success} data=${res.data}")
+            if (!res.success) {
+                println("❌ [TrackTrace] LiveLocation returned success=false")
+                return
+            }
 
             _liveLocation.value = res
 
@@ -142,7 +163,13 @@ class TrackTraceViewModel(
                     _trailPoints.value = (current + newPoint).takeLast(100)
                 }
             }
-        } catch (_: Exception) { }
+        } catch (e: UnauthorizedException) {
+            println("🔒 [TrackTrace] 401 Unauthorized (live location) — stopping polling")
+            stop()
+            _unauthorized.value = true
+        } catch (e: Exception) {
+            println("💥 [TrackTrace] Exception in fetchLiveLocation: ${e::class.simpleName} — ${e.message}")
+        }
     }
 
     /**

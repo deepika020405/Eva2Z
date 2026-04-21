@@ -60,7 +60,8 @@ fun LiveLocationScreen(
     onNavigateToDeviceReport: () -> Unit,
     onOpenDeviceStatus: () -> Unit,
     onOpenTrackTrace: () -> Unit,
-    onOpenCommunity: () -> Unit
+    onOpenCommunity: () -> Unit,
+    onSessionExpired: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val selectedDevice by viewModel.selectedDevice.collectAsState()
@@ -96,6 +97,10 @@ fun LiveLocationScreen(
     }
 
     when (val state = uiState) {
+        is HomeUiState.Unauthorized -> {
+            LaunchedEffect(Unit) { onSessionExpired() }
+        }
+
         is HomeUiState.Loading -> {
             Box(
                 modifier = Modifier.fillMaxSize(),

@@ -86,15 +86,24 @@ class HistoryPlaybackViewModel(
             _uiState.value = HistoryPlaybackUiState.Loading
             try {
                 val token = storageManager.getString("token", "") ?: ""
+                println("🔑 [History] loadDevices token=${if (token.isBlank()) "EMPTY ❌" else "OK ✅"}")
                 val response = apiService.getMyDevices(token)
+                println("📱 [History] devices loaded: success=${response.success}, count=${response.devices.size}")
 
                 if (response.success) {
                     _devices.value = response.devices
-                    _uiState.value = HistoryPlaybackUiState.Idle
+                    // Auto-select first device and fetch its history
+                    val first = response.devices.firstOrNull()
+                    if (first != null && _selectedDevice.value == null) {
+                        selectDevice(first)
+                    } else {
+                        _uiState.value = HistoryPlaybackUiState.Idle
+                    }
                 } else {
                     _uiState.value = HistoryPlaybackUiState.Error("Failed to load devices")
                 }
             } catch (e: Exception) {
+                println("💥 [History] loadDevices exception: ${e.message}")
                 _uiState.value = HistoryPlaybackUiState.Error(e.message ?: "Unknown error")
             }
         }
@@ -105,6 +114,7 @@ class HistoryPlaybackViewModel(
         _showDeviceDropdown.value = false
         _routePoints.value = emptyList()
         _currentPlaybackIndex.value = 0
+        println("📱 [History] Device selected: ${device.device_id} (${device.device_name}) date=${_startDate.value}")
     }
 
     fun toggleDeviceDropdown() {
@@ -172,23 +182,27 @@ class HistoryPlaybackViewModel(
 
                 result.fold(
                     onSuccess = { response ->
+                        println("📊 [History] totalPoints=${response.data.size}, count=${response.count}, avgSpeed=${response.averageSpeed}")
                         val validPoints = response.data.filter { it.isValid() }
-
+                        println("📊 [History] validPoints=${validPoints.size} (filtered from ${response.data.size})")
+                        response.data.take(3).forEachIndexed { i, p ->
+                            println("  point[$i] lat=${p.latitude} lng=${p.longitude} speed=${p.speed} movement=${p.movement} valid=${p.isValid()}")
+                        }
                         if (validPoints.isEmpty()) {
+                            println("⚠️ [History] No valid points — showing NoDataDialog")
                             _showNoDataDialog.value = true
                             resetStats()
                             _uiState.value = HistoryPlaybackUiState.Idle
                         } else {
                             _routePoints.value = validPoints
                             calculateTotalDistance(validPoints)
-
-                            // ✅ CORRECT PROPERTY
                             _averageSpeed.value = response.averageSpeed ?: 0.0
-
+                            println("✅ [History] Route loaded: ${validPoints.size} points, dist=${_totalDistance.value}, avgSpeed=${_averageSpeed.value}")
                             _uiState.value = HistoryPlaybackUiState.Success
                         }
                     },
-                    onFailure = {
+                    onFailure = { err ->
+                        println("❌ [History] fetchHistory failed: ${err.message}")
                         resetStats()
                         _uiState.value = HistoryPlaybackUiState.Error("Failed to fetch history")
                     }

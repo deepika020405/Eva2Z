@@ -6,3 +6,4 @@ import androidx.compose.runtime.Composable
 expect fun getPlatformContext(): Any?
 expect fun getAppContext(): Any?
 expect fun cancelCallNotification()
+expect fun stopCallSound()

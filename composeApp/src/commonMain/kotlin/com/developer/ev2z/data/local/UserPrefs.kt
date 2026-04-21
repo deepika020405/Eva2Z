@@ -2,6 +2,8 @@ package com.developer.ev2z.data.local
 
 import kotlinx.serialization.encodeToString
 import org.jetbrains.compose.resources.getString
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 class UserPrefs(private val storage: StorageManager) {  // ✅ Storage → StorageManager
 
@@ -29,6 +31,15 @@ class UserPrefs(private val storage: StorageManager) {  // ✅ Storage → Stora
 
     fun saveLastFcmToken(token: String) {
         storage.saveString("last_fcm_token", token)
+    }
+
+    @OptIn(ExperimentalUuidApi::class)
+    fun getOrCreateDeviceUuid(): String {
+        val existing = storage.getString("device_uuid", "")
+        if (existing.isNotBlank()) return existing
+        val uuid = Uuid.random().toString()
+        storage.saveString("device_uuid", uuid)
+        return uuid
     }
 
 

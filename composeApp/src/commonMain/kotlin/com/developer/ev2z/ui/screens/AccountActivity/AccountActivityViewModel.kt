@@ -83,25 +83,28 @@ class AccountActivityViewModel(
         }
     }
 
-    // ✅ ADD THIS FUNCTION - Exactly like ProfileViewModel
     fun logout() {
         viewModelScope.launch {
             try {
                 println("🚪 AccountActivityViewModel: Logging out...")
-
-                // Clear storage
+                val token = storageManager.getString("token", "")
+                val fcmToken = storageManager.getString("last_fcm_token", "")
+                if (token.isNotBlank() && fcmToken.isNotBlank()) {
+                    try {
+                        apiService.logout("Bearer $token", fcmToken)
+                        println("✅ Logout API called successfully")
+                    } catch (e: Exception) {
+                        println("⚠️ Logout API failed (continuing local logout): ${e.message}")
+                    }
+                }
                 storageManager.clear()
                 println("✅ Storage cleared")
-
-                // Set success state
                 _state.value = _state.value.copy(
                     isDeleting = false,
                     deleteSuccess = true,
                     errorMessage = null
                 )
-
-                println("✅ Logout complete, deleteSuccess = true")
-
+                println("✅ Logout complete")
             } catch (e: Exception) {
                 println("❌ Logout failed: ${e.message}")
                 _state.value = _state.value.copy(

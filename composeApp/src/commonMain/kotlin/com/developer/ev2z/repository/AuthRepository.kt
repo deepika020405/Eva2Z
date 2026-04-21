@@ -3,9 +3,9 @@ package com.developer.ev2z.repository
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.request.LoginRequest
 import com.developer.ev2z.response.*
+import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.int
 
 class AuthRepository(private val api: ApiService) {
 
@@ -22,7 +22,19 @@ class AuthRepository(private val api: ApiService) {
         if (token != null && userObj != null) {
             val user = parseUserFromJson(userObj)
                 ?: throw Exception("Invalid user data")
-            return LoginResponse(user = user, token = token)
+            val deviceObj = jsonResponse["device"]?.jsonObject
+            val deviceInfo = if (deviceObj != null) {
+                LoginDeviceInfo(
+                    id = deviceObj["id"]?.jsonPrimitive?.int ?: 0,
+                    fcmToken = deviceObj["fcm_token"]?.jsonPrimitive?.content,
+                    isActive = deviceObj["is_active"]?.jsonPrimitive?.int ?: 0,
+                    deviceUuid = deviceObj["device_uuid"]?.jsonPrimitive?.content,
+                    platform = deviceObj["platform"]?.jsonPrimitive?.content,
+                    lastSeen = deviceObj["last_seen"]?.jsonPrimitive?.content
+                )
+            } else null
+            println("🔑 Login device info: fcmToken=${deviceInfo?.fcmToken?.take(20)}, uuid=${deviceInfo?.deviceUuid}, active=${deviceInfo?.isActive}")
+            return LoginResponse(user = user, token = token, device = deviceInfo)
         }
 
         // ✅ Error response - throw API message as-is
@@ -164,6 +176,13 @@ class AuthRepository(private val api: ApiService) {
         }
 
         return ResetPasswordResponse(success = success, message = message)
+    }
+
+    // ============================================
+    // LOGOUT
+    // ============================================
+    suspend fun logout(token: String, fcmToken: String) {
+        api.logout("Bearer $token", fcmToken)
     }
 
     // ============================================

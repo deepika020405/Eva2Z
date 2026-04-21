@@ -10,10 +10,11 @@ import com.developer.ev2z.webrtc.SocketIOSignalingClient
 import com.developer.ev2z.webrtc.WebRtcManager
 import org.webrtc.IceCandidate
 import org.webrtc.SessionDescription
+import java.util.concurrent.atomic.AtomicBoolean
 
 // ⚠️ IMPORTANT — SET YOUR SOCKET.IO SIGNALING SERVER URL HERE.
 //
-// The current URL https://app.eva2z.in does NOT have a Socket.IO server running on it.
+// The current URL https://gps.eva2z.in does NOT have a Socket.IO server running on it.
 // You are getting "xhr poll error" because this endpoint doesn't serve Socket.IO.
 //
 // You need to either:
@@ -31,7 +32,7 @@ import org.webrtc.SessionDescription
 //   });
 //
 // Replace the URL below once your signaling server is live:
-private const val SIGNALING_SERVER_URL = "https://app.eva2z.in:3001"
+private const val SIGNALING_SERVER_URL = "https://gps.eva2z.in:3001"
 
 actual class VoiceCallManager actual constructor() {
 
@@ -44,6 +45,7 @@ actual class VoiceCallManager actual constructor() {
 
     private val webRtc = WebRtcManager(AppContextHolder.context)
     private val signalingClient = SocketIOSignalingClient(SIGNALING_SERVER_URL)
+    private val disposed = AtomicBoolean(false)
     private var isCaller = false
 
     actual fun startAsCallee(roomId: String) {
@@ -91,6 +93,7 @@ actual class VoiceCallManager actual constructor() {
             }
             override fun onConnectionEstablished() {
                 println("🟢 [VoiceCall] ══ CALL CONNECTED — audio is live ══")
+                SosNotificationHandler.onCallConnected()
             }
             override fun onConnectionFailed() {
                 println("🔴 [VoiceCall] ══ CALL FAILED / DISCONNECTED — notifying UI ══")
@@ -128,6 +131,11 @@ actual class VoiceCallManager actual constructor() {
             SosNotificationHandler.onCallEnded()
             dispose()
         }
+        override fun onSignalingFailed() {
+            println("❌ [VoiceCall] Signaling server unreachable — ending call")
+            SosNotificationHandler.onCallEnded()
+            dispose()
+        }
     }
 
     actual fun endCall() {
@@ -144,6 +152,7 @@ actual class VoiceCallManager actual constructor() {
     }
 
     actual fun dispose() {
+        if (!disposed.compareAndSet(false, true)) return
         isCallActive = false
         println("🗑️ [VoiceCall] dispose() — cleaning up Socket.IO + WebRTC  isCallActive=false")
         signalingClient.disconnect()

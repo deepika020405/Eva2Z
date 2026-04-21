@@ -10,23 +10,59 @@ import android.content.Intent
 import android.media.AudioAttributes
 import android.media.RingtoneManager
 import android.os.Build
+import android.util.Log
 import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import com.developer.ev2z.IncomingCallActivity
 import com.developer.ev2z.MainActivity
 import com.developer.ev2z.R
 
 object NotificationUtil {
 
-    const val CHANNEL_ID      = "default_channel"
-    const val CALL_CHANNEL_ID = "incoming_call_channel"
+    // v4: force-recreate channels — v3 may exist on devices without sound settings locked in.
+    const val CHANNEL_ID      = "eva2z_general_v4"
+    const val CALL_CHANNEL_ID = "eva2z_call_v4"
 
     const val GEOFENCE_NOTIFICATION_ID = 9001
     const val CALL_NOTIFICATION_ID     = 9002
 
-    // ── General notification channel (chat, geofence, etc.) ──────────
+    // ── Android 14+: request USE_FULL_SCREEN_INTENT if not granted ───
+    fun requestFullScreenIntentPermissionIfNeeded(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (!nm.canUseFullScreenIntent()) {
+                Log.w("NotificationUtil", "⚠️ USE_FULL_SCREEN_INTENT not granted")
+                val intent = android.content.Intent(
+                    android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
+                    android.net.Uri.parse("package:${context.packageName}")
+                ).apply { flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK }
+                if (intent.resolveActivity(context.packageManager) != null) {
+                    context.startActivity(intent)
+                }
+            }
+        }
+    }
+
+    // ── Delete stale channels from old app versions ───────────────────
+    private fun deleteOldChannels(nm: NotificationManager) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            listOf(
+                "default_channel", "incoming_call_channel",
+                "eva2z_general_v2", "eva2z_call_v2",
+                "eva2z_general_v3", "eva2z_call_v3"
+            ).forEach { old ->
+                nm.deleteNotificationChannel(old)
+            }
+        }
+    }
+
+    // ── General notification channel (chat / geofence / SOS) ─────────
     fun createChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            deleteOldChannels(nm)
+
             val notifSound = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
             val audioAttr = AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION)
@@ -35,42 +71,45 @@ object NotificationUtil {
 
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "General Notifications",
+                "Eva2z Notifications",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "EV2Z Notifications"
+                description = "Chat, geofence and SOS alerts"
                 setSound(notifSound, audioAttr)
                 enableVibration(true)
-                vibrationPattern = longArrayOf(0, 250, 250, 250)
+                vibrationPattern = longArrayOf(0, 300, 200, 300)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                setShowBadge(true)
             }
-
-            (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
-                .createNotificationChannel(channel)
+            nm.createNotificationChannel(channel)
         }
     }
 
-    // ── Incoming-call channel (ringtone sound, repeating) ─────────────
+    // ── Incoming-call channel (ringtone, repeating) ───────────────────
     fun createCallChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            deleteOldChannels(nm)
+
             val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
             val audioAttr = AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                .setUsage(AudioAttributes.USAGE_ALARM)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .build()
 
             val channel = NotificationChannel(
                 CALL_CHANNEL_ID,
-                "Incoming Calls",
+                "Eva2z Incoming Calls",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Incoming calls from parking visitors"
+                description = "Incoming voice calls from parking visitors"
                 setSound(ringtoneUri, audioAttr)
                 enableVibration(true)
                 vibrationPattern = longArrayOf(0, 1000, 500, 1000, 500, 1000)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                setShowBadge(true)
             }
-
-            (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
-                .createNotificationChannel(channel)
+            nm.createNotificationChannel(channel)
         }
     }
 
@@ -133,8 +172,10 @@ object NotificationUtil {
         val callerDisplay = visitorName?.takeIf { it.isNotBlank() } ?: "Visitor"
         val callerPhone   = visitorPhone?.takeIf { it.isNotBlank() } ?: ""
 
-        val intent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        val requestCode = chatId ?: System.currentTimeMillis().toInt()
+
+        // Call extras shared by both intents
+        fun Intent.addCallExtras() {
             putExtra("is_incoming_call", true)
             chatId?.let { putExtra("sos_alert_id", it) }
             if (callerDisplay.isNotBlank()) putExtra("sos_visitor_name", callerDisplay)
@@ -142,15 +183,41 @@ object NotificationUtil {
             if (!roomId.isNullOrBlank())    putExtra("call_room_id", roomId)
         }
 
-        val requestCode      = chatId ?: System.currentTimeMillis().toInt()
+        // Tap-on-notification → open MainActivity with is_incoming_call=true so
+        // handleSosIntent() emits to callFlow and HomeNavGraph shows IncomingCallScreen.
+        // This avoids opening IncomingCallActivity on top of an already-running app.
+        val contentIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra("is_incoming_call", true)
+            addCallExtras()
+        }
         val contentPendingIntent = PendingIntent.getActivity(
-            context, requestCode, intent,
+            context, requestCode, contentIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+
+        // Full-screen intent — fires immediately when screen is off / device locked.
+        // Uses IncomingCallActivity so it appears in ~200ms without full App() boot.
+        // On Android 14+, USE_FULL_SCREEN_INTENT may need to be granted by the user
+        // in Settings → Special app access. If not granted, the notification falls
+        // back to a heads-up banner that the user can tap (contentIntent above).
+        val fullScreenIntent = Intent(context, IncomingCallActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            addCallExtras()
+        }
         val fullScreenPendingIntent = PendingIntent.getActivity(
-            context, requestCode + 50_000, intent,
+            context, requestCode + 50_000, fullScreenIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+
+        // On Android 14+ check if we're allowed to use full-screen intents.
+        // If not, the notification still rings/vibrates as heads-up.
+        val canUseFullScreen = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+                .canUseFullScreenIntent()
+        } else {
+            true
+        }
 
         val ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
 
@@ -167,7 +234,9 @@ object NotificationUtil {
             .setVibrate(longArrayOf(0, 1000, 500, 1000, 500, 1000))
             .setAutoCancel(true)
             .setTimeoutAfter(30_000L)
-            .setFullScreenIntent(fullScreenPendingIntent, true)
+            .apply {
+                if (canUseFullScreen) setFullScreenIntent(fullScreenPendingIntent, true)
+            }
             .setContentIntent(contentPendingIntent)
 
         // FLAG_INSISTENT makes the ringtone repeat until user interacts

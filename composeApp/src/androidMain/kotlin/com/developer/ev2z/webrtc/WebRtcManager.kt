@@ -6,6 +6,7 @@ import android.media.AudioManager
 import android.os.Build
 import org.webrtc.*
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 class WebRtcManager(private val context: Context) {
 
@@ -17,6 +18,7 @@ class WebRtcManager(private val context: Context) {
     }
 
     private val executor = Executors.newSingleThreadExecutor()
+    private val disposed = AtomicBoolean(false)
     private var factory: PeerConnectionFactory? = null
     private var peerConnection: PeerConnection? = null
     private var localAudioTrack: AudioTrack? = null
@@ -238,7 +240,10 @@ class WebRtcManager(private val context: Context) {
     }
 
     fun dispose() {
+        if (!disposed.compareAndSet(false, true)) return
         println("🗑️ [WebRTC] dispose() — closing peer connection and releasing resources")
+        // Null listener first so ICE-CLOSED callback can't re-enter dispose()
+        listener = null
         executor.execute {
             peerConnection?.close()
             peerConnection = null

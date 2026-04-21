@@ -37,14 +37,23 @@ fun CallScreen(
     visitorName: String,
     visitorPhone: String,
     onEnd: () -> Unit,
-    voiceCallManager: VoiceCallManager? = null
+    voiceCallManager: VoiceCallManager? = null,
+    isConnected: Boolean = false
 ) {
-    // ── Timer ──────────────────────────────────────────────────────
+    // ── Timer — starts only after connected ────────────────────────
     var elapsedSeconds by remember { mutableStateOf(0) }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(isConnected) {
+        if (!isConnected) return@LaunchedEffect
         while (true) { delay(1000); elapsedSeconds++ }
     }
     val timerText = "${(elapsedSeconds / 60).toString().padStart(2, '0')}:${(elapsedSeconds % 60).toString().padStart(2, '0')}"
+
+    // ── Connecting dots animation ──────────────────────────────────
+    var dotCount by remember { mutableStateOf(1) }
+    LaunchedEffect(isConnected) {
+        if (isConnected) return@LaunchedEffect
+        while (true) { delay(500); dotCount = (dotCount % 3) + 1 }
+    }
 
     // ── Toggles ────────────────────────────────────────────────────
     var isMuted   by remember { mutableStateOf(false) }
@@ -77,7 +86,8 @@ fun CallScreen(
 
             // ── Subtitle ──────────────────────────────────────────
             Text(
-                "Parking Alert · In Call",
+                if (isConnected) "Parking Alert · In Call"
+                else "Parking Alert · Connecting" + ".".repeat(dotCount),
                 fontSize = 12.sp,
                 color = CallGreenLight.copy(alpha = 0.6f),
                 fontWeight = FontWeight.Medium,
@@ -134,7 +144,7 @@ fun CallScreen(
 
             Spacer(Modifier.height(16.dp))
 
-            // ── Timer pill ────────────────────────────────────────
+            // ── Timer / connecting pill ───────────────────────────
             Surface(
                 shape = RoundedCornerShape(24.dp),
                 color = Color.White.copy(alpha = 0.08f)
@@ -144,7 +154,6 @@ fun CallScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(7.dp)
                 ) {
-                    // Blinking green dot
                     val dotAlpha by pulse.animateFloat(
                         initialValue = 1f, targetValue = 0.2f,
                         animationSpec = infiniteRepeatable(
@@ -155,10 +164,13 @@ fun CallScreen(
                         modifier = Modifier
                             .size(7.dp)
                             .clip(CircleShape)
-                            .background(CallGreenLight.copy(alpha = dotAlpha))
+                            .background(
+                                (if (isConnected) CallGreenLight else Color(0xFFFFB74D))
+                                    .copy(alpha = dotAlpha)
+                            )
                     )
                     Text(
-                        timerText,
+                        if (isConnected) timerText else "Connecting...",
                         fontSize = 15.sp,
                         color = Color.White,
                         fontWeight = FontWeight.SemiBold

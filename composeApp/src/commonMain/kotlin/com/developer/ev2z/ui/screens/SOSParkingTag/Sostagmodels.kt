@@ -11,18 +11,16 @@ import kotlinx.serialization.Serializable
 // Fields: chat_id, vehicle_number, visitor_name, visitor_phone, last_message, time
 @Serializable
 data class SosAlert(
-    @SerialName("chat_id")        val chat_id: Int?         = null,
+    @SerialName("id")             val chat_id: Int?         = null,
     @SerialName("vehicle_number") val vehicle_number: String? = null,
     @SerialName("visitor_name")   val visitor_name: String?  = null,
     @SerialName("visitor_phone")  val visitor_phone: String? = null,
-    @SerialName("last_message")   val last_message: String?  = null,
+    @SerialName("reason")         val last_message: String?  = null,
     val time: String?                                       = null
 ) {
-    // Backwards-compat aliases so existing call sites in Quickreplyscreen keep working.
     val id: Int? get() = chat_id
     val reason: String? get() = last_message
     val created_at: String? get() = time
-    // Fields no longer present in the new payload — kept as null getters for compile compatibility.
     val alert_message: String? get() = null
     val vehicle_color: String? get() = null
     val vehicle_type: String? get() = null
@@ -150,8 +148,72 @@ enum class QuickReplyOption(
 }
 
 // ─────────────────────────────────────────────────────────────────
+// /my-chats-with-messages  — full thread list with embedded messages
+// ─────────────────────────────────────────────────────────────────
+
+@Serializable
+data class MyChatsResponse(
+    val status: Boolean                  = false,
+    val user: ChatUserInfo?              = null,
+    @SerialName("total_chats") val total_chats: Int = 0,
+    val data: List<ChatThread>           = emptyList()
+)
+
+@Serializable
+data class ChatUserInfo(
+    val id: Int    = 0,
+    val name: String = ""
+)
+
+@Serializable
+data class ChatThread(
+    @SerialName("chat_id")         val chat_id: Int          = 0,
+    @SerialName("vehicle_id")      val vehicle_id: Int?      = null,
+    val visitor: VisitorInfo?                                 = null,
+    val status: String?                                       = null,
+    @SerialName("last_message_at") val last_message_at: String? = null,
+    @SerialName("total_messages")  val total_messages: Int   = 0,
+    @SerialName("last_message")    val last_message: ChatMessageItem? = null,
+    val messages: List<ChatMessageItem>                       = emptyList()
+) {
+    val isOpen: Boolean get() = status.equals("open", ignoreCase = true)
+}
+
+@Serializable
+data class VisitorInfo(
+    val name: String?  = null,
+    val phone: String? = null
+)
+
+@Serializable
+data class ChatMessageItem(
+    val id: Int?           = null,
+    val text: String?      = null,
+    @SerialName("sender_id") val sender_id: Int? = null,
+    val type: String?      = null,
+    val time: String?      = null,
+    val timestamp: String? = null
+) {
+    fun toDto() = ChatMessageDto(
+        id        = id,
+        message   = text,
+        sender_id = sender_id,
+        type      = type,
+        time      = time,
+        timestamp = timestamp
+    )
+}
+
+// ─────────────────────────────────────────────────────────────────
 // UI States
 // ─────────────────────────────────────────────────────────────────
+
+sealed class ChatThreadListUiState {
+    object Idle                                           : ChatThreadListUiState()
+    object Loading                                        : ChatThreadListUiState()
+    data class Success(val threads: List<ChatThread>)     : ChatThreadListUiState()
+    data class Error(val message: String)                 : ChatThreadListUiState()
+}
 
 sealed class SosAlertUiState {
     object Idle                                 : SosAlertUiState()

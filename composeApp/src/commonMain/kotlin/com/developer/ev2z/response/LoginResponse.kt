@@ -1,11 +1,23 @@
 package com.developer.ev2z.response
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
 data class LoginResponse(
     val user: User,
-    val token: String
+    val token: String,
+    val device: LoginDeviceInfo? = null
+)
+
+@Serializable
+data class LoginDeviceInfo(
+    val id: Int = 0,
+    @SerialName("fcm_token") val fcmToken: String? = null,
+    @SerialName("is_active") val isActive: Int = 0,
+    @SerialName("device_uuid") val deviceUuid: String? = null,
+    val platform: String? = null,
+    @SerialName("last_seen") val lastSeen: String? = null
 )
 
 @Serializable

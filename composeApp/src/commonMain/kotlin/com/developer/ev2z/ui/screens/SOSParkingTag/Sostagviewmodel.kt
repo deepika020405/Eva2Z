@@ -23,8 +23,23 @@ class SosTagViewModel(
     private val _alertListState = MutableStateFlow<SosAlertListUiState>(SosAlertListUiState.Idle)
     val alertListState: StateFlow<SosAlertListUiState> = _alertListState.asStateFlow()
 
+    private val _threadListState = MutableStateFlow<ChatThreadListUiState>(ChatThreadListUiState.Idle)
+    val threadListState: StateFlow<ChatThreadListUiState> = _threadListState.asStateFlow()
+
     private val _replyState = MutableStateFlow<SosReplyUiState>(SosReplyUiState.Idle)
     val replyState: StateFlow<SosReplyUiState> = _replyState.asStateFlow()
+
+    // Thread selected from ChatInboxScreen — used to pre-seed QuickReplyScreen instantly
+    private val _selectedThread = MutableStateFlow<ChatThread?>(null)
+    val selectedThread: StateFlow<ChatThread?> = _selectedThread.asStateFlow()
+
+    fun selectThread(thread: ChatThread) {
+        _selectedThread.value = thread
+    }
+
+    fun clearSelectedThread() {
+        _selectedThread.value = null
+    }
 
     private val _selectedReply = MutableStateFlow<QuickReplyOption?>(null)
     val selectedReply: StateFlow<QuickReplyOption?> = _selectedReply.asStateFlow()
@@ -37,6 +52,25 @@ class SosTagViewModel(
 
     private var loadDetailJob: Job? = null
     private var loadListJob: Job? = null
+
+    // chatId → lastSeenMessageId (0 = never opened)
+    private val readStateMap = mutableMapOf<Int, Int>()
+
+    fun markChatRead(chatId: Int, lastMessageId: Int?) {
+        readStateMap[chatId] = lastMessageId ?: 0
+    }
+
+    fun getUnreadCount(thread: ChatThread): Int {
+        if (!thread.isOpen) return 0
+        val lastMsgId = thread.last_message?.id ?: return 0
+        val lastSeenId = readStateMap[thread.chat_id]
+        return when {
+            lastSeenId == null ->
+                if (thread.last_message?.type.equals("received", ignoreCase = true)) thread.total_messages else 0
+            lastMsgId > lastSeenId -> thread.total_messages
+            else -> 0
+        }
+    }
 
     fun loadAlertDetail(alertId: Int) {
         if (alertId <= 0) {
@@ -113,6 +147,25 @@ class SosTagViewModel(
         } catch (e: Exception) {
             println("❌ fetchChatMessages: ${e.message}")
             null
+        }
+    }
+
+    fun loadChatsWithMessages() {
+        loadListJob?.cancel()
+        loadListJob = viewModelScope.launch {
+            _threadListState.value = ChatThreadListUiState.Loading
+            try {
+                val response = apiService.getMyChatsWithMessages()
+                if (response.status) {
+                    _threadListState.value = ChatThreadListUiState.Success(response.data)
+                } else {
+                    _threadListState.value = ChatThreadListUiState.Success(emptyList())
+                }
+            } catch (e: Exception) {
+                _threadListState.value = ChatThreadListUiState.Error(
+                    e.message ?: "Network error"
+                )
+            }
         }
     }
 
@@ -234,8 +287,10 @@ class SosTagViewModel(
         loadDetailJob?.cancel()
         loadListJob?.cancel()
         resetReplyState()
-        _alertDetailState.value = SosAlertUiState.Idle
-        _alertListState.value   = SosAlertListUiState.Idle
-        _currentAlert.value     = null
+        _alertDetailState.value  = SosAlertUiState.Idle
+        _alertListState.value    = SosAlertListUiState.Idle
+        _threadListState.value   = ChatThreadListUiState.Idle
+        _currentAlert.value      = null
+        _selectedThread.value    = null
     }
 }

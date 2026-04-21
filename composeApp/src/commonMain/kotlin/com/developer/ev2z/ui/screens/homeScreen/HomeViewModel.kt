@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.developer.ev2z.data.local.model.Device
 import com.developer.ev2z.data.local.model.DeviceResponse
+import com.developer.ev2z.network.UnauthorizedException
 import com.developer.ev2z.repository.HomeRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,6 +16,7 @@ sealed class HomeUiState {
     object Loading : HomeUiState()
     data class Success(val deviceResponse: DeviceResponse) : HomeUiState()
     data class Error(val message: String) : HomeUiState()
+    object Unauthorized : HomeUiState()
 }
 
 class HomeViewModel(
@@ -47,8 +49,13 @@ class HomeViewModel(
                     println("✅ Response Body: ${response.toString()}")
                 },
                 onFailure = { error ->
-                    _uiState.value = HomeUiState.Error(error.message ?: "Unknown error")
-                    println("❌ Error loading devices: ${error.message}")
+                    if (error is UnauthorizedException) {
+                        println("🔒 [Home] 401 Unauthorized — redirecting to login")
+                        _uiState.value = HomeUiState.Unauthorized
+                    } else {
+                        _uiState.value = HomeUiState.Error(error.message ?: "Unknown error")
+                        println("❌ Error loading devices: ${error.message}")
+                    }
                 }
             )
         }

@@ -6,11 +6,11 @@ import ComposeApp
 
 // Mirrors Android's WebRtcManager + SocketIOSignalingClient exactly.
 //
-// Server URL: https://app.eva2z.in:3001
+// Server URL: https://gps.eva2z.in:3001
 // Events emitted : join-room, offer, answer, ice-candidate, end-call
 // Events received: user-joined, offer, answer, ice-candidate, end-call
 
-private let kSignalingServerURL = "https://app.eva2z.in:3001"
+private let kSignalingServerURL = "https://gps.eva2z.in:3001"
 private let kStunServer         = "stun:stun.l.google.com:19302"
 private let kStunServer2        = "stun:stun1.l.google.com:19302"
 

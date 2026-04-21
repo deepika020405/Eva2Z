@@ -15,7 +15,13 @@ fun initAppContext(app: Application) {
 actual fun getAppContext(): Any? = appCtx
 
 actual fun cancelCallNotification() {
-    com.developer.ev2z.util.NotificationUtil.cancelCallNotification(appCtx)
+    // Stopping the service also dismisses the foreground notification automatically.
+    CallRingtoneService.stop(appCtx)
+}
+
+actual fun stopCallSound() {
+    // CallRingtoneService owns both the ringtone and the notification.
+    CallRingtoneService.stop(appCtx)
 }
 
 @Composable

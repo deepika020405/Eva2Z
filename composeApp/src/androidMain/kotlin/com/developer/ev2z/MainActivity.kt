@@ -29,12 +29,14 @@ class MainActivity : ComponentActivity() {
         try {
             initOpenUrl(applicationContext)
 
+            FcmBridge.tokenFetcher = { FcmManager.fetchAndRegisterToken() }
             NotificationPermissionHelper(this) {
                 FcmManager.fetchAndRegisterToken()
             }.checkAndRequest()
 
             NotificationUtil.createChannel(this)
             NotificationUtil.createCallChannel(this)
+            NotificationUtil.requestFullScreenIntentPermissionIfNeeded(this)
 
             // ✅ Step 1: Storage init karo
             initStorageManager(this)
@@ -72,47 +74,21 @@ class MainActivity : ComponentActivity() {
 
             // ✅ SOS / Incoming-call — setContent KE BAAD handle karo
             // SharedFlow replay=1 hai — HomeNavGraph ready hone par collect karega
-            intent?.let {
-                val isCall = it.getBooleanExtra("is_incoming_call", false)
-                if (isCall) {
-                    val visitorName  = it.getStringExtra("sos_visitor_name")
-                    val visitorPhone = it.getStringExtra("sos_visitor_phone")
-                    val roomId       = it.getStringExtra("call_room_id") ?: ""
-                    val chatId       = it.getIntExtra("sos_alert_id", -1).takeIf { id -> id != -1 }
-                    Log.d("IncomingCall", "📞 Cold Start call visitor=$visitorName roomId=$roomId")
-                    SosNotificationHandler.onIncomingCallReceived(
-                        visitorName  = visitorName,
-                        visitorPhone = visitorPhone,
-                        roomId       = roomId,
-                        chatId       = chatId
-                    )
-                    it.removeExtra("is_incoming_call")
-                    it.removeExtra("sos_visitor_name")
-                    it.removeExtra("sos_visitor_phone")
-                    it.removeExtra("call_room_id")
-                    it.removeExtra("sos_alert_id")
-                } else {
-                    val alertId = it.getIntExtra("sos_alert_id", -1)
-                    if (alertId != -1) {
-                        val visitorName  = it.getStringExtra("sos_visitor_name")
-                        val visitorPhone = it.getStringExtra("sos_visitor_phone")
-                        Log.d("SOS", "🚨 Cold Start alertId=$alertId visitor=$visitorName")
-                        SosNotificationHandler.onSosAlertReceived(
-                            alertId = alertId,
-                            visitorName = visitorName,
-                            visitorPhone = visitorPhone
-                        )
-                        // ✅ prevent duplicate trigger
-                        it.removeExtra("sos_alert_id")
-                        it.removeExtra("sos_visitor_name")
-                        it.removeExtra("sos_visitor_phone")
-                    }
-                }
-            }
+            intent?.let { handleSosIntent(it) }
 
         } catch (e: Exception) {
             Log.e("MainActivity", "❌ Initialization error", e)
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        AppState.isInForeground = true
+    }
+
+    override fun onStop() {
+        super.onStop()
+        AppState.isInForeground = false
     }
 
     override fun onDestroy() {
@@ -124,38 +100,65 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        intent.data?.let { uri -> handleDeepLink(uri.toString()) }
+        handleSosIntent(intent)
+    }
 
-        // Deep link (same as before)
-        intent.data?.let { uri ->
-            handleDeepLink(uri.toString())
-        }
-
-        // ✅ Incoming call — app already open
+    // Handles both our custom PendingIntent extras (sos_alert_id / sos_visitor_name) AND
+    // Firebase auto-notification extras (chat_id / visitor_name) so tap-to-open works
+    // regardless of whether the server sends a notification+data FCM or a data-only FCM.
+    private fun handleSosIntent(intent: Intent) {
+        // Firebase auto-notification tap passes FCM data extras as-is.
+        // "type=incoming_call" comes from the FCM data payload when Firebase handles the
+        // notification automatically (background/killed) and user taps the banner.
+        val fcmType = intent.getStringExtra("type")
         val isCall = intent.getBooleanExtra("is_incoming_call", false)
+                  || fcmType == "incoming_call"
         if (isCall) {
             val visitorName  = intent.getStringExtra("sos_visitor_name")
+                ?: intent.getStringExtra("visitor_name")
             val visitorPhone = intent.getStringExtra("sos_visitor_phone")
-            val roomId       = intent.getStringExtra("call_room_id") ?: ""
-            val chatId       = intent.getIntExtra("sos_alert_id", -1).takeIf { it != -1 }
-            Log.d("IncomingCall", "📞 App Open call visitor=$visitorName roomId=$roomId")
+                ?: intent.getStringExtra("visitor_phone")
+            val roomId = intent.getStringExtra("call_room_id")
+                ?: intent.getStringExtra("room_id") ?: ""
+            val chatId = intent.getIntExtra("sos_alert_id", -1).takeIf { it != -1 }
+                ?: intent.getStringExtra("chat_id")?.toIntOrNull()
+            Log.d("SOS", "📞 Incoming call intent visitor=$visitorName roomId=$roomId")
+            // Start ringtone service — needed when user taps a Firebase auto-notification
+            // (notification+data FCM handled by Firebase bypasses onMessageReceived entirely).
+            CallRingtoneService.start(this, visitorName, visitorPhone, roomId, chatId)
             SosNotificationHandler.onIncomingCallReceived(
                 visitorName  = visitorName,
                 visitorPhone = visitorPhone,
                 roomId       = roomId,
                 chatId       = chatId
             )
+            intent.removeExtra("is_incoming_call"); intent.removeExtra("type")
+            intent.removeExtra("sos_visitor_name"); intent.removeExtra("visitor_name")
+            intent.removeExtra("sos_visitor_phone"); intent.removeExtra("visitor_phone")
+            intent.removeExtra("call_room_id"); intent.removeExtra("room_id")
+            intent.removeExtra("sos_alert_id"); intent.removeExtra("chat_id")
         } else {
-            // ✅ SOS — app already open
-            val alertId = intent.getIntExtra("sos_alert_id", -1)
-            if (alertId != -1) {
+            // Our custom PendingIntent uses "sos_alert_id".
+            // Firebase auto-notification (background/killed) passes the FCM data as-is → "chat_id".
+            val alertId = intent.getIntExtra("sos_alert_id", -1).takeIf { it != -1 }
+                ?: intent.getStringExtra("chat_id")?.toIntOrNull()
+                ?: intent.getStringExtra("notification_id")?.toIntOrNull()
+            if (alertId != null && alertId > 0) {
                 val visitorName  = intent.getStringExtra("sos_visitor_name")
+                    ?: intent.getStringExtra("visitor_name")
                 val visitorPhone = intent.getStringExtra("sos_visitor_phone")
-                Log.d("SOS", "🚨 App Open alertId=$alertId visitor=$visitorName")
+                    ?: intent.getStringExtra("visitor_phone")
+                Log.d("SOS", "🚨 SOS intent alertId=$alertId visitor=$visitorName")
                 SosNotificationHandler.onSosAlertReceived(
                     alertId = alertId,
                     visitorName = visitorName,
                     visitorPhone = visitorPhone
                 )
+                intent.removeExtra("sos_alert_id"); intent.removeExtra("chat_id")
+                intent.removeExtra("notification_id")
+                intent.removeExtra("sos_visitor_name"); intent.removeExtra("visitor_name")
+                intent.removeExtra("sos_visitor_phone"); intent.removeExtra("visitor_phone")
             }
         }
     }

@@ -1,10 +1,11 @@
 package com.developer.ev2z
 
 import android.Manifest
+import android.content.Intent
 import androidx.annotation.RequiresPermission
 import com.developer.ev2z.calling.VoiceCallManager
-import com.developer.ev2z.util.NotificationUtil
 import com.developer.ev2z.util.AlertPrefs
+import com.developer.ev2z.util.NotificationUtil
 import com.developer.ev2z.util.SmsUtil
 //import com.developer.ev2z.util.AlarmPlayer  // ── ALARM DISABLED
 import com.developer.ev2z.util.SosNotificationHandler
@@ -12,6 +13,28 @@ import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 
 class MyFirebaseMessagingService : FirebaseMessagingService() {
+
+    // Called for EVERY FCM message — even notification+data in background/killed state,
+    // where Firebase skips onMessageReceived entirely.
+    // We use this to start CallRingtoneService before Firebase decides what to do,
+    // guaranteeing the ringtone plays regardless of FCM payload type or app state.
+    override fun handleIntent(intent: Intent) {
+        val extras = intent.extras
+        if (extras != null && extras.getString("type") == "incoming_call") {
+            val prefs = applicationContext.getSharedPreferences("eva2z_prefs", MODE_PRIVATE)
+            val authToken = prefs.getString("token", "") ?: ""
+            if (authToken.isNotBlank() && !VoiceCallManager.isCallActive) {
+                val visitorName  = extras.getString("visitor_name")
+                val visitorPhone = extras.getString("visitor_phone")
+                val roomId       = extras.getString("room_id") ?: ""
+                val chatId       = extras.getString("chat_id")?.toIntOrNull()
+                println("🔔 handleIntent: incoming_call intercepted — starting ringtone roomId=$roomId")
+                CallRingtoneService.start(applicationContext, visitorName, visitorPhone, roomId, chatId)
+            }
+        }
+        // Always let Firebase proceed (shows notification banner, may call onMessageReceived)
+        super.handleIntent(intent)
+    }
 
     override fun onNewToken(token: String) {
         super.onNewToken(token)
@@ -46,6 +69,13 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         println("Title: $title")
         println("Body: $body")
         println("Data: $data")
+        // If message.notification != null the server is sending notification+data FCM.
+        // Firebase will auto-handle it in background/killed WITHOUT calling onMessageReceived.
+        // Server MUST send data-only FCM (no notification field) for incoming_call to work reliably.
+        if (message.notification != null) {
+            println("⚠️ WARNING: FCM has 'notification' field — background/killed delivery bypasses onMessageReceived!")
+            println("⚠️ FIX REQUIRED: Server must send data-only FCM for type=incoming_call (remove notification field)")
+        }
 
         val visitorName  = data["visitor_name"]
         val visitorPhone = data["visitor_phone"]
@@ -61,14 +91,20 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                     println("⚠️ INCOMING CALL FCM ignored — call already active (roomId=$roomId)")
                     return
                 }
-                println("📞 INCOMING CALL FCM — visitor=$visitorName phone=$visitorPhone roomId=$roomId")
+                println("📞 INCOMING CALL FCM — visitor=$visitorName phone=$visitorPhone roomId=$roomId foreground=${AppState.isInForeground}")
+
+                // Always emit to callFlow — HomeNavGraph shows IncomingCallScreen when foreground.
                 SosNotificationHandler.onIncomingCallReceived(
                     visitorName  = visitorName,
                     visitorPhone = visitorPhone,
                     roomId       = roomId,
                     chatId       = alertId
                 )
-                NotificationUtil.showCallNotification(
+
+                // Start foreground ringtone service — plays looping ringtone and shows
+                // call notification with full-screen intent in ALL states:
+                // foreground, background, killed, locked screen.
+                CallRingtoneService.start(
                     context      = applicationContext,
                     visitorName  = visitorName,
                     visitorPhone = visitorPhone,
@@ -82,9 +118,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             "call_accepted" -> {
                 val roomId = data["room_id"] ?: ""
                 println("📱 CALL ACCEPTED ELSEWHERE FCM — room_id=$roomId")
-                // Stop ringing on this device
-                NotificationUtil.cancelCallNotification(applicationContext)
-                // Dismiss the IncomingCallScreen in the UI
+                CallRingtoneService.stop(applicationContext)
                 SosNotificationHandler.onCallAcceptedElsewhere()
                 return
             }
@@ -93,9 +127,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             "call_ended" -> {
                 val roomId = data["room_id"] ?: ""
                 println("📵 CALL ENDED FCM — room_id=$roomId visitor=$visitorName")
-                // 1. Kill the ringing notification immediately (stops sound)
-                NotificationUtil.cancelCallNotification(applicationContext)
-                // 2. Signal the UI to dismiss IncomingCallScreen / active call
+                CallRingtoneService.stop(applicationContext)
                 SosNotificationHandler.onCallEnded()
                 // 3. Show a silent missed-call notification
                 NotificationUtil.showMissedCallNotification(
@@ -110,7 +142,8 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             else -> { /* handled after generic notification */ }
         }
 
-        // ✅ Show standard notification for all non-call types
+        // Always show system notification — foreground or background.
+        // alertFlow handles in-app redirect; notification gives user a fallback tap target.
         NotificationUtil.show(
             context = applicationContext,
             title = title,
@@ -124,8 +157,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
             "chat", "vehicle_notification" -> {
                 if (alertId != null) {
-                    println("🚨 SOS ALERT — App Open: $alertId (type=$type)")
-                    // App open ho tab bhi emit karo — HomeNavGraph sun raha hai
+                    println("🚨 SOS ALERT — type=$type alertId=$alertId foreground=${AppState.isInForeground}")
                     SosNotificationHandler.onSosAlertReceived(
                         alertId = alertId,
                         visitorName = visitorName,

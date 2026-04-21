@@ -101,15 +101,23 @@ class ProfileViewModel(
     fun logout() {
         viewModelScope.launch {
             try {
+                val token = storageManager.getString("token", "")
+                val fcmToken = storageManager.getString("last_fcm_token", "")
+                if (token.isNotBlank() && fcmToken.isNotBlank()) {
+                    try {
+                        apiService.logout("Bearer $token", fcmToken)
+                        println("✅ Logout API called successfully")
+                    } catch (e: Exception) {
+                        println("⚠️ Logout API failed (continuing local logout): ${e.message}")
+                    }
+                }
                 storageManager.clear()
-
                 _state.value = _state.value.copy(
                     logoutSuccess = true,
                     userName = "",
                     userPhone = "",
                     userImage = null
                 )
-
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     error = e.message ?: "Logout failed"

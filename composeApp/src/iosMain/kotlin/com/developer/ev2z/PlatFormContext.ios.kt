@@ -17,3 +17,7 @@ actual fun cancelCallNotification() {
     center.removePendingNotificationRequestsWithIdentifiers(listOf("incoming-call"))
     center.removeDeliveredNotificationsWithIdentifiers(listOf("incoming-call"))
 }
+
+actual fun stopCallSound() {
+    // No-op on iOS — ringtone is handled natively via CallKit
+}

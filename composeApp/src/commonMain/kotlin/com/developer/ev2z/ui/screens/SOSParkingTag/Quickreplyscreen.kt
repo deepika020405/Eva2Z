@@ -97,6 +97,8 @@ private enum class MessageStatus { SENDING, SENT, DELIVERED, ERROR }
 @Composable
 fun QuickReplyScreen(
     alertId: Int,
+    visitorName: String = "Visitor",
+    visitorPhone: String? = null,
     viewModel: SosTagViewModel,
     onConfirmed: () -> Unit,
     onBackPressed: () -> Unit
@@ -108,6 +110,9 @@ fun QuickReplyScreen(
 
     val replyState by viewModel.replyState.collectAsState()
     val focusManager = LocalFocusManager.current
+
+    // ── Seed from the thread already fetched by my-chats-with-messages ──
+    val preloadedThread by viewModel.selectedThread.collectAsState()
 
     var messages by remember { mutableStateOf(listOf<ChatMessage>()) }
     var inputText by remember { mutableStateOf("") }
@@ -122,16 +127,25 @@ fun QuickReplyScreen(
     // Track latest visitor info for top bar — seeded from the FCM payload stashed in
     // SosNotificationHandler, since /chat-messages/{chatId} doesn't return visitor info.
     var latestVisitorName by remember {
-        mutableStateOf(SosNotificationHandler.lastVisitorName ?: "Visitor")
+        mutableStateOf(
+            visitorName.takeIf { it.isNotBlank() && it != "Visitor" }
+                ?: SosNotificationHandler.lastVisitorName
+                ?: "Visitor"
+        )
     }
     var latestVisitorPhone by remember {
-        mutableStateOf(SosNotificationHandler.lastVisitorPhone)
+        mutableStateOf(visitorPhone ?: SosNotificationHandler.lastVisitorPhone)
     }
-    var isLoading by remember { mutableStateOf(true) }
-    // Server marks a chat as closed via `ChatMessagesResponse.closed`. Once that flips,
-    // treat the screen like there's no active alert — visitor header + input hide,
-    // and the "No Alert Found" empty state is shown.
-    var isChatClosed by remember { mutableStateOf(false) }
+    // Seed isChatClosed from thread.isOpen immediately (no API wait)
+    var isChatClosed by remember {
+        mutableStateOf(preloadedThread?.let { !it.isOpen } ?: false)
+    }
+    // isLoading=false immediately if we have pre-loaded messages; true only for cold-open from FCM
+    var isLoading by remember {
+        mutableStateOf(
+            preloadedThread == null || preloadedThread!!.messages.isEmpty()
+        )
+    }
     var showCallScreen by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -169,16 +183,23 @@ fun QuickReplyScreen(
     // ── Load full chat history + live polling for the focused chat ──
     LaunchedEffect(Unit) {
         if (activeAlertId <= 0) {
-            // No notification, no cached chat → empty state.
             isLoading = false
             return@LaunchedEffect
         }
 
+        // Pre-seed from my-chats-with-messages data immediately (no network wait)
+        preloadedThread?.let { thread ->
+            isChatClosed = !thread.isOpen
+            thread.messages.forEach { item -> applyServerMessage(item.toDto()) }
+            isLoading = false
+        }
+
+        // Then fetch full history from /chat-messages/{chatId} to get any messages
+        // not included in the inbox snapshot (my-chats-with-messages may be truncated)
         viewModel.fetchChatMessages(activeAlertId)?.let { applyChatThread(it) }
         isLoading = false
 
-        // Polling — refetch the same chat every 2s and append any new messages by id.
-        // Stop once the server tells us the chat is closed (empty state takes over).
+        // Polling — only for open chats; stop once server says closed
         while (!isChatClosed) {
             kotlinx.coroutines.delay(2000)
             try {
@@ -188,7 +209,6 @@ fun QuickReplyScreen(
                     println("📡 Live: chat #$activeAlertId +${freshIds.size} new message(s)")
                 }
                 applyChatThread(thread)
-                // Pick up any newer visitor info that arrived via a fresh FCM push.
                 SosNotificationHandler.lastVisitorName?.let { latestVisitorName = it }
                 SosNotificationHandler.lastVisitorPhone?.let { latestVisitorPhone = it }
             } catch (_: Exception) { /* retry next cycle */ }
@@ -222,7 +242,7 @@ fun QuickReplyScreen(
     }
 
     fun sendMessage(text: String) {
-        if (text.isBlank() || activeAlertId <= 0) return
+        if (text.isBlank() || activeAlertId <= 0 || isChatClosed) return
         val trimmed = text.trim()
 
         inputText = ""
@@ -250,18 +270,16 @@ fun QuickReplyScreen(
         containerColor = ChatBg,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            // When there's no active alert (or the chat has been closed on the
-            // server), skip the visitor header entirely — only a minimal bar with
-            // the back button sits above the empty state.
-            if (activeAlertId > 0 && !isChatClosed) {
+            if (activeAlertId > 0) {
                 ChatTopBar(
                     visitorName = latestVisitorName,
                     visitorPhone = latestVisitorPhone,
-                    showClose = hasReplied,
+                    // hide "Close Chat" button if chat already closed
+                    showClose = hasReplied && !isChatClosed,
+                    isClosed = isChatClosed,
                     onBackPressed = onBackPressed,
                     onCallPressed = { showCallScreen = true },
                     onClosePressed = {
-                        // Hit POST /api/owner/chat/{chatId}/close, then route to confirmation.
                         viewModel.closeChat(activeAlertId, onDone = onConfirmed)
                     }
                 )
@@ -341,9 +359,8 @@ fun QuickReplyScreen(
                     )
                 }
             }
-            // Empty state — no notification, no cached chat id, or the chat has
-            // been closed on the server.
-            else if (activeAlertId <= 0 || isChatClosed) {
+            // Empty state — only when there's no chat to show at all
+            else if (activeAlertId <= 0) {
                 Column(
                     modifier = Modifier
                         .align(Alignment.Center)
@@ -366,13 +383,13 @@ fun QuickReplyScreen(
                         )
                     }
                     Text(
-                        "No Alert Found",
+                        "No Chat Found",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = TextPrimary
                     )
                     Text(
-                        "You'll see parking alerts here when a visitor reports your vehicle.",
+                        "This conversation is unavailable.",
                         fontSize = 13.sp,
                         color = TextSecondary,
                         textAlign = TextAlign.Center,
@@ -380,7 +397,7 @@ fun QuickReplyScreen(
                     )
                 }
             }
-            // Chat messages
+            // Chat messages — shown for both open AND closed chats
             else {
                 LazyColumn(
                     state = listState,
@@ -407,8 +424,15 @@ fun QuickReplyScreen(
                         }
                     }
 
-                    // Typing indicator
-                    if (replyState is SosReplyUiState.Loading) {
+                    // "Chat closed" end-of-conversation pill
+                    if (isChatClosed) {
+                        item {
+                            ChatClosedBanner()
+                        }
+                    }
+
+                    // Typing indicator (only for open chats)
+                    if (!isChatClosed && replyState is SosReplyUiState.Loading) {
                         item {
                             TypingIndicator()
                         }
@@ -428,12 +452,13 @@ private fun ChatTopBar(
     visitorName: String,
     visitorPhone: String?,
     showClose: Boolean,
+    isClosed: Boolean = false,
     onBackPressed: () -> Unit,
     onCallPressed: () -> Unit,
     onClosePressed: () -> Unit
 ) {
     Surface(
-        color = ChatTopBarColor,
+        color = if (isClosed) Color(0xFF6B7280) else ChatTopBarColor,
         shadowElevation = 4.dp
     ) {
         Row(
@@ -456,7 +481,7 @@ private fun ChatTopBar(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .background(ChatTopBarLight),
+                    .background(if (isClosed) Color(0xFF9CA3AF) else ChatTopBarLight),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -469,7 +494,7 @@ private fun ChatTopBar(
 
             Spacer(Modifier.width(12.dp))
 
-            // Name & alert type
+            // Name & status
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = visitorName,
@@ -480,23 +505,24 @@ private fun ChatTopBar(
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    text = visitorPhone ?: "Online",
+                    text = if (isClosed) "Chat closed" else (visitorPhone ?: "Online"),
                     color = Color.White.copy(alpha = 0.8f),
                     fontSize = 12.sp
                 )
             }
 
-            // Call button
-            IconButton(onClick = onCallPressed) {
-                Icon(
-                    Icons.Default.Call, "Call",
-                    tint = Color.White,
-                    modifier = Modifier.size(22.dp)
-                )
+            // Call button — only for open chats
+            if (!isClosed) {
+                IconButton(onClick = onCallPressed) {
+//                    Icon(
+//                        Icons.Default.Call, "Call",
+//                        tint = Color.White,
+//                        modifier = Modifier.size(22.dp)
+//                    )
+                }
             }
 
-            // "Mark resolved" / Close chat — appears after the owner sends their first reply.
-            // Lives in the top bar so the bottom message area never gets pushed up or cropped.
+            // Close chat button
             AnimatedVisibility(
                 visible = showClose,
                 enter = fadeIn() + scaleIn(),
@@ -623,6 +649,42 @@ private fun AlertInfoBanner(alertId: Int) {
                     )
                 }
             }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Chat Closed Banner — shown at the bottom of message list
+// ─────────────────────────────────────────────────────────────────
+
+@Composable
+private fun ChatClosedBanner() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            modifier = Modifier
+                .clip(RoundedCornerShape(20.dp))
+                .background(Color(0xFFF3F4F6))
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                Icons.Default.Lock,
+                contentDescription = null,
+                tint = Color(0xFF6B7280),
+                modifier = Modifier.size(14.dp)
+            )
+            Text(
+                "This chat has been closed",
+                fontSize = 12.sp,
+                color = Color(0xFF6B7280),
+                fontWeight = FontWeight.Medium
+            )
         }
     }
 }

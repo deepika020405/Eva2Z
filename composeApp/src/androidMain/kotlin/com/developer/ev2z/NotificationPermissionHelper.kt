@@ -59,18 +59,8 @@ class NotificationPermissionHelper(
     private val notificationLauncher =
         activity.registerForActivityResult(
             ActivityResultContracts.RequestPermission()
-        ) { granted: Boolean ->
-            if (granted) {
-                requestSmsPermission() // ✅ notification granted → now ask SMS
-            }
-        }
-
-    // 📩 SMS permission launcher
-    private val smsLauncher =
-        activity.registerForActivityResult(
-            ActivityResultContracts.RequestPermission()
         ) { _ ->
-            requestMicPermission() // ✅ SMS done → ask mic
+            requestMicPermission() // proceed regardless — token must be registered even if denied
         }
 
     // 🎤 Mic permission launcher — needed for WebRTC AudioRecord
@@ -84,7 +74,7 @@ class NotificationPermissionHelper(
 
     fun checkAndRequest() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-            requestSmsPermission() // skip notification check on old Android
+            requestMicPermission() // skip notification check on old Android
             return
         }
 
@@ -94,22 +84,9 @@ class NotificationPermissionHelper(
         ) == PackageManager.PERMISSION_GRANTED
 
         if (notificationGranted) {
-            requestSmsPermission()
-        } else {
-            notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
-    }
-
-    private fun requestSmsPermission() {
-        val smsGranted = ContextCompat.checkSelfPermission(
-            activity,
-            Manifest.permission.SEND_SMS
-        ) == PackageManager.PERMISSION_GRANTED
-
-        if (smsGranted) {
             requestMicPermission()
         } else {
-            smsLauncher.launch(Manifest.permission.SEND_SMS)
+            notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 

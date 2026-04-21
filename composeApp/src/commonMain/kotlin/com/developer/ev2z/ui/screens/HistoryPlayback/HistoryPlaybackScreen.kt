@@ -69,7 +69,7 @@ fun HistoryPlaybackScreen(
     }
 
     LaunchedEffect(devices) {
-        if (devices.size == 1 && selectedDevice == null) {
+        if (devices.isNotEmpty() && selectedDevice == null) {
             viewModel.selectDevice(devices.first())
         }
     }
@@ -197,25 +197,20 @@ fun HistoryPlaybackScreen(
                             ) {
                                 items(devices) { device ->
                                     // ✅ FIXED: Using engine_status correctly with proper color mapping
-                                    val statusColor = when (device.engine_status.lowercase()) {
+                                    val displayStatus = (device.status ?: device.engine_status).lowercase()
+                                    val statusColor = when (displayStatus) {
                                         "moving", "running" -> Color(0xFF86b071)  // Green
-                                        "idle", "ideal" -> Color(0xFFfcd158)      // Yellow
-                                        "parked" -> Color(0xFFfa7575)             // Red
-                                        "offline" -> Color(0xFFe8e8e8)            // Gray
-                                        else -> Color(0xFFe8e8e8)                 // Default Gray
+                                        "idle", "ideal"     -> Color(0xFFfcd158)  // Yellow
+                                        "parked"            -> Color(0xFFfa7575)  // Red
+                                        else                -> Color(0xFFe8e8e8)  // Gray (offline/unknown/no_data)
                                     }
-
-                                    // ✅ FIXED: Display text mapping
-                                    val statusText = when (device.engine_status.lowercase()) {
-                                        "moving" -> "Running"
-                                        "running" -> "Running"
-                                        "idle" -> "Idle"
-                                        "ideal" -> "Idle"
-                                        "parked" -> "Parked"
-                                        "offline" -> "Offline"
-                                        else -> device.engine_status.replaceFirstChar {
-                                            if (it.isLowerCase()) it.titlecase() else it.toString()
-                                        }
+                                    val statusText = when (displayStatus) {
+                                        "moving", "running" -> "Running"
+                                        "idle", "ideal"     -> "Idle"
+                                        "parked"            -> "Parked"
+                                        "offline"           -> "Offline"
+                                        "no_data"           -> "No Data"
+                                        else                -> "Offline"
                                     }
 
                                     Row(

@@ -289,7 +289,7 @@ fun HomeQuickActionsSection(
         QuickActionItem("Device Report", Icons.Default.Assessment, onOpenDeviceReport),
         QuickActionItem("Add Device", Icons.Default.Add, onOpenAddDevice) ,
         QuickActionItem("Vehicle TAG Registration",Icons.Default.LocalParking,   onParking),  // ✅ CHANGED
-        QuickActionItem(" Vehicle TAG Alert",Icons.Default.Warning,onSosTag),  // ✅ WIRED
+        QuickActionItem("Visitor Chats",Icons.Default.Warning,onSosTag),  // ✅ WIRED
         QuickActionItem(
             "Criminal Verification",
             Icons.Default.VerifiedUser,

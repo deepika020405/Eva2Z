@@ -18,6 +18,7 @@ import com.developer.ev2z.ui.screens.ChangePlan.UserDevicesResponse
 import com.developer.ev2z.ui.screens.CriminalVerification.CandidateResult
 import com.developer.ev2z.ui.screens.CriminalVerification.CriminalForm
 import com.developer.ev2z.ui.screens.SOSParkingTag.ChatMessagesResponse
+import com.developer.ev2z.ui.screens.SOSParkingTag.MyChatsResponse
 import com.developer.ev2z.ui.screens.SOSParkingTag.OwnerReplyRequest
 import com.developer.ev2z.ui.screens.SOSParkingTag.SosAlertDetailResponse
 import com.developer.ev2z.ui.screens.SOSParkingTag.SosAlertListResponse
@@ -48,6 +49,8 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
+
+class UnauthorizedException : Exception("Session expired. Please login again.")
 
 class ApiService {
 
@@ -372,8 +375,15 @@ class ApiService {
             }
 
             println("✔️ Latest Locations Status: ${response.status}")
+
+            if (response.status == HttpStatusCode.Unauthorized) {
+                throw UnauthorizedException()
+            }
+
             response.body()
 
+        } catch (e: UnauthorizedException) {
+            throw e
         } catch (e: Exception) {
             println("❌ Latest Location Error: ${e.message}")
             throw e
@@ -457,9 +467,15 @@ class ApiService {
             println("✔️ Live Location Status: ${response.status} deviceId=$deviceId")
             println("📝 LIVE LOCATION RAW = $raw")
 
+            if (response.status == HttpStatusCode.Unauthorized) {
+                throw UnauthorizedException()
+            }
+
             Json { ignoreUnknownKeys = true }
                 .decodeFromString(LiveLocationResponse.serializer(), raw)
 
+        } catch (e: UnauthorizedException) {
+            throw e
         } catch (e: Exception) {
             println("❌ Live Location Error: ${e.message}")
             throw e
@@ -885,6 +901,7 @@ class ApiService {
         println("🌐 API: Fetching route history")
 
         return try {
+            println("📤 Route History Request: terminal_id=$terminalId, start=$startDate, end=$endDate")
             val response = client.post("${baseUrl}route-history") {
                 header(HttpHeaders.Authorization, "Bearer $token")
                 contentType(ContentType.Application.Json)
@@ -896,10 +913,12 @@ class ApiService {
             }
 
             println("✔️ Route History Status: ${response.status}")
-            response.body()
+            val raw = response.bodyAsText()
+            println("📝 Route History RAW = $raw")
+            Json { ignoreUnknownKeys = true }.decodeFromString(RouteHistoryResponse.serializer(), raw)
 
         } catch (e: Exception) {
-            println("❌ Route History Error: ${e.message}")
+            println("❌ Route History Error: ${e::class.simpleName} — ${e.message}")
             throw e
         }
     }
@@ -1295,6 +1314,28 @@ class ApiService {
 // Add these 3 functions inside your existing ApiService class
 // ─────────────────────────────────────────────────────────────────
 
+    // ---------------- ALL CHATS WITH MESSAGES ----------------
+    suspend fun getMyChatsWithMessages(): MyChatsResponse {
+        val token = AppTokenProvider.getToken()
+        val url   = "${baseUrl}my-chats-with-messages"
+        println("🌐 getMyChatsWithMessages → GET $url")
+        return try {
+            val response = client.get(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+            }
+            val raw = response.bodyAsText()
+            println("📥 getMyChatsWithMessages ${response.status}: ${raw.take(300)}")
+            if (!response.status.isSuccess()) {
+                return MyChatsResponse(status = false)
+            }
+            Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
+                .decodeFromString(MyChatsResponse.serializer(), raw)
+        } catch (e: Exception) {
+            println("❌ getMyChatsWithMessages: ${e.message}")
+            MyChatsResponse(status = false)
+        }
+    }
+
     // ---------------- GET MESSAGES FOR ONE CHAT ----------------
     // New endpoint replaces /visitor-notifications which 404s now.
     suspend fun getChatMessages(chatId: Int): ChatMessagesResponse {
@@ -1328,8 +1369,7 @@ class ApiService {
                     message = "Error: ${response.status.value}"
                 )
             }
-        } catch (e: Exception) {
-            println("❌ getChatMessages: ${e.message}")
+        } catch (e: Exception) {            println("❌ getChatMessages: ${e.message}")
             ChatMessagesResponse(
                 status = false,
                 message = "Network error: ${e.message ?: "Unknown"}"
@@ -1548,7 +1588,7 @@ class ApiService {
     // POST https://app.eva2z.in/api/call/accept  { "room_id": "..." }
     suspend fun acceptCall(roomId: String): SosReplyResponse {
         val token = AppTokenProvider.getToken()
-        val url   = "https://app.eva2z.in/api/call/accept"
+        val url   = "https://gps.eva2z.in/api/call/accept"
         val body  = buildJsonObject { put("room_id", roomId) }
         println("🌐 acceptCall → POST $url  room_id=$roomId")
         return try {
@@ -1579,7 +1619,7 @@ class ApiService {
     // POST https://app.eva2z.in/api/call/decline  { "room_id": "..." }
     suspend fun declineCall(roomId: String): SosReplyResponse {
         val token = AppTokenProvider.getToken()
-        val url   = "https://app.eva2z.in/api/call/decline"
+        val url   = "https://gps.eva2z.in/api/call/decline"
         val body  = buildJsonObject { put("room_id", roomId) }
         println("🌐 declineCall → POST $url  room_id=$roomId")
         return try {
@@ -2219,7 +2259,8 @@ class ApiService {
 
     suspend fun registerFcmToken(
         authHeader: String,
-        fcmToken: String
+        fcmToken: String,
+        deviceUuid: String
     ) {
         val response = client.post("${baseUrl}fcm/register") {
             headers {
@@ -2228,7 +2269,8 @@ class ApiService {
             }
             setBody(
                 mapOf(
-                    "fcm_token" to fcmToken
+                    "fcm_token" to fcmToken,
+                    "device_uuid" to deviceUuid
                 )
             )
         }
@@ -2237,8 +2279,17 @@ class ApiService {
         println("📡 FCM API BODY: ${response.bodyAsText()}")
     }
 
-    // TODO: Add removeFcmToken API here when server endpoint is ready
-
+    // ---------------- LOGOUT ----------------
+    suspend fun logout(authHeader: String, fcmToken: String) {
+        println("🚪 API: Calling logout... fcmToken=${fcmToken.take(20)}")
+        val response = client.post("${baseUrl}logout") {
+            header(HttpHeaders.Authorization, authHeader)
+            contentType(ContentType.Application.Json)
+            setBody(mapOf("fcm_token" to fcmToken))
+        }
+        println("🚪 Logout status: ${response.status}")
+        println("🚪 Logout body: ${response.bodyAsText()}")
+    }
 
     // ---------------- VAULT UNLOCK ----------------
     suspend fun unlockVault(

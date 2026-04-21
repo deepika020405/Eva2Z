@@ -24,14 +24,17 @@ class SocketIOSignalingClient(private val serverUrl: String) {
         fun onRemoteIceCandidateReceived(candidate: IceCandidate)
         fun onUserJoined()
         fun onCallEnded()
+        fun onSignalingFailed() {}   // called after all reconnect attempts exhausted
     }
 
     private val socket: Socket = IO.socket(serverUrl, IO.Options().apply {
-        transports = arrayOf("websocket")   // skip XHR polling — force WebSocket directly
+        // Try WebSocket first, fall back to polling if WebSocket is blocked/unavailable
+        transports = arrayOf("websocket", "polling")
         reconnection = true
-        reconnectionAttempts = 5
-        reconnectionDelay = 1000
-
+        reconnectionAttempts = 3
+        reconnectionDelay = 2000
+        reconnectionDelayMax = 5000
+        timeout = 10000   // 10s connection timeout
         forceNew = true
     })
 
@@ -47,8 +50,14 @@ class SocketIOSignalingClient(private val serverUrl: String) {
             socket.emit("join-room", JSONObject().put("roomId", roomId))
             println("📤 [Socket.IO] join-room emitted for roomId=$roomId")
         }
+        var failCount = 0
         socket.on(Socket.EVENT_CONNECT_ERROR) { args ->
-            println("❌ [Socket.IO] Connection error: ${args.getOrNull(0)}")
+            failCount++
+            println("❌ [Socket.IO] Connection error ($failCount): ${args.getOrNull(0)}")
+            if (failCount >= 3) {
+                println("❌ [Socket.IO] Signaling server unreachable after $failCount attempts — aborting call")
+                listener.onSignalingFailed()
+            }
         }
         socket.on(Socket.EVENT_DISCONNECT) { args ->
             println("🔌 [Socket.IO] Disconnected — reason=${args.getOrNull(0)}")

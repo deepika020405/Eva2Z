@@ -155,7 +155,8 @@ fun App() {
 
                 FcmRegistrar.registerFcmToServer(
                     authTokenNullable = "Bearer $authToken",
-                    fcmToken = fcmToken
+                    fcmToken = fcmToken,
+                    deviceUuid = userPrefs.getOrCreateDeviceUuid()
                 )
                 userPrefs.saveLastFcmToken(fcmToken)
             }

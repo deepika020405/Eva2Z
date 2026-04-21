@@ -13,14 +13,16 @@ object FcmRegistrar {
 
     fun registerFcmToServer(
         authTokenNullable: String,
-        fcmToken: String
+        fcmToken: String,
+        deviceUuid: String
     ) {
         println("📡 Registering FCM token to server...")
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 apiService.registerFcmToken(
                     authHeader = authTokenNullable,
-                    fcmToken = fcmToken
+                    fcmToken = fcmToken,
+                    deviceUuid = deviceUuid
                 )
                 println("✅ FCM token registered to server successfully")
             } catch (e: Exception) {

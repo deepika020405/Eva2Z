@@ -4,9 +4,16 @@ object FcmBridge {
 
     private var callback: ((String) -> Unit)? = null
     private var lastToken: String? = null
+    var tokenFetcher: (() -> Unit)? = null
+
     fun register(cb: (String) -> Unit) {
         callback = cb
-        lastToken?.let { cb(it) } // 👈 replay last token
+        val token = lastToken
+        if (token != null) {
+            cb(token)
+        } else {
+            tokenFetcher?.invoke() // fetch fresh token; onToken() will invoke cb when ready
+        }
     }
 
     fun onToken(token: String) {
@@ -14,7 +21,6 @@ object FcmBridge {
         lastToken = token
         callback?.invoke(token)
     }
-
 
     fun clear() {
         callback = null

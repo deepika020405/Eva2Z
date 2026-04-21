@@ -5,6 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CallEnd
@@ -52,6 +55,7 @@ fun IncomingCallScreen(
     val scope = rememberCoroutineScope()
     var isLoading by remember { mutableStateOf(false) }
     var loadingAction by remember { mutableStateOf<String?>(null) }   // "accept" | "decline"
+    var errorMsg by remember { mutableStateOf<String?>(null) }
 
     // ── Ripple pulse animation (3 staggered rings) ───────────────────
     val infiniteTransition = rememberInfiniteTransition(label = "rings")
@@ -124,10 +128,15 @@ fun IncomingCallScreen(
         if (isLoading) return
         isLoading = true
         loadingAction = "accept"
+        errorMsg = null
         scope.launch {
-            runCatching { apiService.acceptCall(roomId) }
+            val result = runCatching { apiService.acceptCall(roomId) }
             isLoading = false
             loadingAction = null
+            if (result.isFailure) {
+                errorMsg = "Could not accept call. Check your connection."
+                return@launch
+            }
             onAccepted()
         }
     }
@@ -149,6 +158,28 @@ fun IncomingCallScreen(
             .fillMaxSize()
             .background(Brush.verticalGradient(listOf(RingBg, RingBgMid, Color(0xFF050F05))))
     ) {
+        // Error snackbar
+        AnimatedVisibility(
+            visible = errorMsg != null,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(16.dp)
+                .navigationBarsPadding()
+        ) {
+            errorMsg?.let { msg ->
+                LaunchedEffect(msg) {
+                    kotlinx.coroutines.delay(3000)
+                    errorMsg = null
+                }
+                Snackbar(
+                    containerColor = Color(0xFFB71C1C),
+                    contentColor = Color.White,
+                ) { Text(msg, fontSize = 13.sp) }
+            }
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxSize()

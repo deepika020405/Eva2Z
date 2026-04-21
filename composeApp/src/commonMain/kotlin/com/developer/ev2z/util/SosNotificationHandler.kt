@@ -32,6 +32,11 @@ object SosNotificationHandler {
     var lastVisitorPhone: String? = null
         private set
 
+    // Dedup guard — ignore repeated onIncomingCallReceived for the same roomId until
+    // the call ends / is accepted / is declined.  Clears automatically in onCallEnded,
+    // onCallAcceptedByOwner, onCallAcceptedElsewhere, and clearCallFlow.
+    private var activeRoomId: String = ""
+
     fun onSosAlertReceived(
         alertId: Int,
         visitorName: String? = null,
@@ -51,6 +56,11 @@ object SosNotificationHandler {
         roomId:       String  = "",
         chatId:       Int?    = null
     ) {
+        if (roomId.isNotBlank() && roomId == activeRoomId) {
+            println("⚠️ Duplicate incoming_call for roomId=$roomId — ignoring")
+            return
+        }
+        if (roomId.isNotBlank()) activeRoomId = roomId
         val name  = visitorName?.takeIf { it.isNotBlank() } ?: "Visitor"
         val phone = visitorPhone ?: ""
         if (!visitorName.isNullOrBlank())  lastVisitorName  = visitorName
@@ -65,8 +75,18 @@ object SosNotificationHandler {
     private val _callEndedFlow = MutableSharedFlow<Unit>(replay = 0, extraBufferCapacity = 1)
     val callEndedFlow: SharedFlow<Unit> = _callEndedFlow.asSharedFlow()
 
+    // Emitted when WebRTC ICE connection is fully established (audio is live)
+    private val _callConnectedFlow = MutableSharedFlow<Unit>(replay = 0, extraBufferCapacity = 1)
+    val callConnectedFlow: SharedFlow<Unit> = _callConnectedFlow.asSharedFlow()
+
+    fun onCallConnected() {
+        println("🟢 CALL CONNECTED — audio live")
+        _callConnectedFlow.tryEmit(Unit)
+    }
+
     fun onCallEnded() {
         println("📵 CALL ENDED by caller")
+        activeRoomId = ""
         clearCallFlow()   // discard any buffered ringing event
         _callEndedFlow.tryEmit(Unit)
     }
@@ -77,8 +97,25 @@ object SosNotificationHandler {
 
     fun onCallAcceptedElsewhere() {
         println("📱 CALL ACCEPTED on another device — dismissing ringing screen")
+        activeRoomId = ""
         clearCallFlow()
         _callAcceptedElsewhereFlow.tryEmit(Unit)
+    }
+
+    // Emitted by IncomingCallActivity when owner accepts call from lock screen / killed state.
+    // replay=1 so HomeNavGraph can consume it even after a short boot delay.
+    private val _callAcceptedByOwnerFlow = MutableSharedFlow<IncomingCallData>(replay = 1, extraBufferCapacity = 1)
+    val callAcceptedByOwnerFlow: SharedFlow<IncomingCallData> = _callAcceptedByOwnerFlow.asSharedFlow()
+
+    fun onCallAcceptedByOwner(data: IncomingCallData) {
+        println("✅ CALL ACCEPTED BY OWNER from lock screen — roomId=${data.roomId}")
+        activeRoomId = ""
+        clearCallFlow()   // prevent HomeNavGraph from also showing IncomingCallScreen
+        _callAcceptedByOwnerFlow.tryEmit(data)
+    }
+
+    fun clearAcceptedByOwnerFlow() {
+        _callAcceptedByOwnerFlow.resetReplayCache()
     }
 
     fun clear() {
@@ -86,6 +123,7 @@ object SosNotificationHandler {
     }
 
     fun clearCallFlow() {
+        activeRoomId = ""
         _callFlow.resetReplayCache()
     }
 }
