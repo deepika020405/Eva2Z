@@ -221,6 +221,13 @@ class CallRingtoneService : Service() {
         // Track the roomId currently being rung so duplicate start() calls are ignored.
         @Volatile private var activeRoomId: String = ""
 
+        // After stop() is called, refuse to restart the same roomId for 60 s.
+        // Stale notification taps (FCM persists after call ends) call start() again once
+        // activeRoomId is cleared — the cooldown blocks those spurious restarts.
+        @Volatile private var lastStoppedRoomId: String = ""
+        @Volatile private var lastStoppedTimeMs: Long   = 0L
+        private const val RESTART_COOLDOWN_MS = 60_000L
+
         fun start(
             context: Context,
             visitorName:  String?,
@@ -231,6 +238,11 @@ class CallRingtoneService : Service() {
             val room = roomId ?: ""
             if (room.isNotBlank() && room == activeRoomId) {
                 Log.d(TAG, "Already ringing for roomId=$room — skipping duplicate start")
+                return
+            }
+            if (room.isNotBlank() && room == lastStoppedRoomId &&
+                System.currentTimeMillis() - lastStoppedTimeMs < RESTART_COOLDOWN_MS) {
+                Log.d(TAG, "Refusing restart of recently-stopped call — roomId=$room (cooldown)")
                 return
             }
             activeRoomId = room
@@ -250,7 +262,12 @@ class CallRingtoneService : Service() {
         }
 
         fun stop(context: Context) {
+            val stoppedRoom = activeRoomId
             activeRoomId = ""
+            if (stoppedRoom.isNotBlank()) {
+                lastStoppedRoomId = stoppedRoom
+                lastStoppedTimeMs = System.currentTimeMillis()
+            }
             context.stopService(Intent(context, CallRingtoneService::class.java))
             Log.d(TAG, "stopService sent")
         }

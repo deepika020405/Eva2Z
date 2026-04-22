@@ -2,7 +2,12 @@ package com.developer.ev2z
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.NotificationManager
+import android.content.Context
 import android.content.Intent
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import androidx.annotation.RequiresPermission
 import com.developer.ev2z.calling.VoiceCallManager
 import com.developer.ev2z.util.AlertPrefs
@@ -48,6 +53,20 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 // IncomingCallActivity.onCreate() calls CallRingtoneService.start() from an
                 // Activity context, which is always permitted.
                 NotificationUtil.showCallNotification(applicationContext, visitorName, visitorPhone, roomId, chatId)
+
+                // Firebase auto-displays its OWN notification when the FCM payload has a
+                // "notification" field (notification+data message). That creates a duplicate
+                // alongside our showCallNotification(). Firebase always tags its auto-notification
+                // "FCM-Notification:N" — cancel it 400 ms after super.handleIntent() posts it.
+                Handler(Looper.getMainLooper()).postDelayed({
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        val nm = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE)
+                                as NotificationManager
+                        nm.activeNotifications
+                            .filter { it.tag?.startsWith("FCM-Notification:") == true }
+                            .forEach { nm.cancel(it.tag, it.id) }
+                    }
+                }, 400L)
             }
         }
         // Always let Firebase proceed (shows notification banner, may call onMessageReceived)
