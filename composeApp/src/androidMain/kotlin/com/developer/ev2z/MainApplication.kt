@@ -7,6 +7,7 @@ import com.developer.ev2z.util.AlertPrefs
 import com.developer.ev2z.util.Analytics
 import com.developer.ev2z.util.AppContextProvider
 import com.developer.ev2z.util.MetaAnalytics
+import com.developer.ev2z.util.NotificationUtil
 import com.developer.ev2z.util.initContexts
 //import com.developer.ev2z.util.loadAlertPrefs  // ── ALARM DISABLED
 import com.facebook.FacebookSdk
@@ -16,9 +17,16 @@ class MainApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         AppContextHolder.context = this
-        // loadAlertPrefs()  // ── ALARM DISABLED
 
-
+        // Create notification channels here, not in MainActivity.
+        // When the app is killed and Firebase restarts the process to deliver a
+        // call FCM, only Application.onCreate() runs — MainActivity never opens.
+        // CallRingtoneService.startForeground() uses CALL_SERVICE_CHANNEL_ID, so
+        // the channel MUST exist at this point or startForeground() throws
+        // RemoteServiceException: Bad notification for startForeground → process killed.
+        NotificationUtil.createChannel(this)
+        NotificationUtil.createCallChannel(this)
+        NotificationUtil.createCallServiceChannel(this)
 
         try {
             // Meta SDK

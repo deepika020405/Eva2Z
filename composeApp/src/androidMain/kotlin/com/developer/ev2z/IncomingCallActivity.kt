@@ -5,12 +5,14 @@ import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.lifecycle.lifecycleScope
 import com.developer.ev2z.data.local.initStorageManager
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.ui.screens.SOSParkingTag.IncomingCallScreen
 import com.developer.ev2z.util.IncomingCallData
 import com.developer.ev2z.util.NotificationUtil
 import com.developer.ev2z.util.SosNotificationHandler
+import kotlinx.coroutines.launch
 
 /**
  * Lightweight Activity shown over the lock screen when a call FCM arrives while
@@ -65,6 +67,16 @@ class IncomingCallActivity : ComponentActivity() {
 
         val callData   = IncomingCallData(visitorName, visitorPhone, roomId, chatId)
         val apiService = ApiService()
+
+        // When the user taps the notification while this activity is alive (locked screen
+        // or heads-up popup), MainActivity starts and takes over call handling via
+        // HomeNavGraph. Finish this activity immediately so its 30-second auto-decline
+        // timer cannot fire and terminate an already-accepted call.
+        lifecycleScope.launch {
+            SosNotificationHandler.mainActivityTookOverFlow.collect {
+                finish()
+            }
+        }
 
         setContent {
             IncomingCallScreen(

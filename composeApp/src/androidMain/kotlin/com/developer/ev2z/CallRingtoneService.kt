@@ -11,7 +11,10 @@ import android.media.AudioManager
 import android.media.Ringtone
 import android.media.RingtoneManager
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
+import android.os.PowerManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.developer.ev2z.util.NotificationUtil
@@ -32,6 +35,17 @@ import com.developer.ev2z.util.NotificationUtil
 class CallRingtoneService : Service() {
 
     private var ringtone: Ringtone? = null
+    private var wakeLock: PowerManager.WakeLock? = null
+
+    // Auto-stop after 60 s if the call is never answered / declined.
+    // Prevents the foreground notification from staying forever when the
+    // caller gives up and the call_ended FCM never arrives (e.g. new device
+    // whose FCM token hasn't been registered with the server yet).
+    private val timeoutHandler  = Handler(Looper.getMainLooper())
+    private val autoStopRunnable = Runnable {
+        Log.d(TAG, "Auto-stop after 60 s — call was not answered")
+        stopSelf()
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
@@ -53,35 +67,34 @@ class CallRingtoneService : Service() {
         roomId: String,
         chatId: Int?
     ) {
+        wakeScreen()
         val notification = buildCallNotification(visitorName, visitorPhone, roomId, chatId)
+        // startForeground posts the notification whose fullScreenIntent fires IncomingCallActivity
+        // automatically on a locked/off screen. Do NOT also call startActivity() directly —
+        // that would launch a second IncomingCallActivity instance on top of the one the
+        // fullScreenIntent already started, producing duplicate call UI and a race condition.
         startForeground(NotificationUtil.CALL_NOTIFICATION_ID, notification)
         playRingtone()
-        // Directly launch IncomingCallActivity as a backup for devices where the
-        // full-screen intent is suppressed (Android 14+ without USE_FULL_SCREEN_INTENT
-        // grant, or OPPO/Xiaomi/Realme battery-manager restrictions).
-        launchIncomingCallActivity(visitorName, visitorPhone, roomId, chatId)
+        timeoutHandler.removeCallbacks(autoStopRunnable)
+        timeoutHandler.postDelayed(autoStopRunnable, 60_000L)
     }
 
-    private fun launchIncomingCallActivity(
-        visitorName: String,
-        visitorPhone: String,
-        roomId: String,
-        chatId: Int?
-    ) {
+    private fun wakeScreen() {
         try {
-            val intent = Intent(this, IncomingCallActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                putExtra("sos_visitor_name",  visitorName)
-                putExtra("sos_visitor_phone", visitorPhone)
-                putExtra("call_room_id",      roomId)
-                chatId?.let { putExtra("sos_alert_id", it) }
-            }
-            startActivity(intent)
-            Log.d(TAG, "IncomingCallActivity launched directly from service")
+            val pm = getSystemService(POWER_SERVICE) as PowerManager
+            @Suppress("DEPRECATION")
+            val wl = pm.newWakeLock(
+                PowerManager.FULL_WAKE_LOCK or
+                PowerManager.ACQUIRE_CAUSES_WAKEUP or
+                PowerManager.ON_AFTER_RELEASE,
+                "ev2z:incoming_call"
+            )
+            // Hold for up to 60 s — released earlier in onDestroy when call is answered/declined.
+            wl.acquire(60_000L)
+            wakeLock = wl
+            Log.d(TAG, "Screen wake lock acquired")
         } catch (e: Exception) {
-            // Android 10+ background activity launch restrictions may block this —
-            // the full-screen intent on the notification is the fallback in that case.
-            Log.w(TAG, "Direct activity launch blocked: ${e.message}")
+            Log.e(TAG, "wakeScreen error: ${e.message}")
         }
     }
 
@@ -161,7 +174,7 @@ class CallRingtoneService : Service() {
         val callerDisplay = if (visitorPhone.isNotBlank()) "$visitorName • $visitorPhone"
                             else visitorName
 
-        return NotificationCompat.Builder(this, NotificationUtil.CALL_CHANNEL_ID)
+        return NotificationCompat.Builder(this, NotificationUtil.CALL_SERVICE_CHANNEL_ID)
             .setSmallIcon(R.drawable.app_logos)
             .setContentTitle("Incoming Call")
             .setContentText(callerDisplay)
@@ -176,13 +189,20 @@ class CallRingtoneService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        timeoutHandler.removeCallbacks(autoStopRunnable)
         try {
             ringtone?.stop()
             ringtone = null
         } catch (e: Exception) {
-            Log.e(TAG, "onDestroy error: ${e.message}")
+            Log.e(TAG, "onDestroy ringtone error: ${e.message}")
         }
-        Log.d(TAG, "Service destroyed — ringtone stopped")
+        try {
+            if (wakeLock?.isHeld == true) wakeLock?.release()
+            wakeLock = null
+        } catch (e: Exception) {
+            Log.e(TAG, "onDestroy wakelock error: ${e.message}")
+        }
+        Log.d(TAG, "Service destroyed — ringtone stopped, wake lock released")
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

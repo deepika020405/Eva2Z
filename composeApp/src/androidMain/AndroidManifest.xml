@@ -87,7 +87,7 @@
             android:showWhenLocked="true"
             android:turnScreenOn="true"
             android:excludeFromRecents="true"
-            android:launchMode="singleTop"
+            android:launchMode="singleInstance"
             android:theme="@style/Theme.AppCompat.NoActionBar" />
 
         <!-- Payment Handler -->

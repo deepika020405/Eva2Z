@@ -36,6 +36,7 @@ class MainActivity : ComponentActivity() {
 
             NotificationUtil.createChannel(this)
             NotificationUtil.createCallChannel(this)
+            NotificationUtil.createCallServiceChannel(this)
             NotificationUtil.requestFullScreenIntentPermissionIfNeeded(this)
 
             // ✅ Step 1: Storage init karo
@@ -124,6 +125,10 @@ class MainActivity : ComponentActivity() {
             val chatId = intent.getIntExtra("sos_alert_id", -1).takeIf { it != -1 }
                 ?: intent.getStringExtra("chat_id")?.toIntOrNull()
             Log.d("SOS", "📞 Incoming call intent visitor=$visitorName roomId=$roomId")
+            // Dismiss IncomingCallActivity if it is alive (shown over lock screen or as a
+            // heads-up popup). Without this, its 30-second auto-decline timer would fire and
+            // call declineCall() on a call that MainActivity's HomeNavGraph has already accepted.
+            SosNotificationHandler.onMainActivityTookOver()
             // Start ringtone service — needed when user taps a Firebase auto-notification
             // (notification+data FCM handled by Firebase bypasses onMessageReceived entirely).
             CallRingtoneService.start(this, visitorName, visitorPhone, roomId, chatId)

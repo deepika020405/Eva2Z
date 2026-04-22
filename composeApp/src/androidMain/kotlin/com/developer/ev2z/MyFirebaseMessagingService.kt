@@ -1,6 +1,7 @@
 package com.developer.ev2z
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Intent
 import androidx.annotation.RequiresPermission
 import com.developer.ev2z.calling.VoiceCallManager
@@ -16,8 +17,13 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
 
     // Called for EVERY FCM message — even notification+data in background/killed state,
     // where Firebase skips onMessageReceived entirely.
-    // We use this to start CallRingtoneService before Firebase decides what to do,
-    // guaranteeing the ringtone plays regardless of FCM payload type or app state.
+    // We post the call notification here so the ringtone / full-screen UI fires
+    // regardless of FCM payload type or app state.
+    // NOTE: startForegroundService() is NOT called here — Android 12+ forbids it
+    // from handleIntent when the app is killed/background (mAllowStartForeground false).
+    // Instead we post a notification whose fullScreenIntent fires IncomingCallActivity,
+    // which then starts CallRingtoneService from an Activity context (always allowed).
+    @SuppressLint("MissingPermission")
     override fun handleIntent(intent: Intent) {
         val extras = intent.extras
         if (extras != null && extras.getString("type") == "incoming_call") {
@@ -28,8 +34,20 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 val visitorPhone = extras.getString("visitor_phone")
                 val roomId       = extras.getString("room_id") ?: ""
                 val chatId       = extras.getString("chat_id")?.toIntOrNull()
-                println("🔔 handleIntent: incoming_call intercepted — starting ringtone roomId=$roomId")
-                CallRingtoneService.start(applicationContext, visitorName, visitorPhone, roomId, chatId)
+                println("🔔 handleIntent: incoming_call intercepted — roomId=$roomId")
+                // Populate the shared flow so HomeNavGraph shows IncomingCallScreen
+                // if/when the app comes to foreground before onMessageReceived fires.
+                SosNotificationHandler.onIncomingCallReceived(
+                    visitorName  = visitorName,
+                    visitorPhone = visitorPhone,
+                    roomId       = roomId,
+                    chatId       = chatId
+                )
+                // Post call notification — no background restrictions on NotificationManager.notify().
+                // Its fullScreenIntent fires IncomingCallActivity on lock screen / killed state.
+                // IncomingCallActivity.onCreate() calls CallRingtoneService.start() from an
+                // Activity context, which is always permitted.
+                NotificationUtil.showCallNotification(applicationContext, visitorName, visitorPhone, roomId, chatId)
             }
         }
         // Always let Firebase proceed (shows notification banner, may call onMessageReceived)
@@ -104,13 +122,22 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 // Start foreground ringtone service — plays looping ringtone and shows
                 // call notification with full-screen intent in ALL states:
                 // foreground, background, killed, locked screen.
-                CallRingtoneService.start(
-                    context      = applicationContext,
-                    visitorName  = visitorName,
-                    visitorPhone = visitorPhone,
-                    roomId       = roomId,
-                    chatId       = alertId
-                )
+                // Wrapped in try-catch: on Android 12+ the high-priority FCM exemption
+                // can expire between handleIntent and onMessageReceived if the process
+                // was slow to start. Fall back to showCallNotification() in that case —
+                // IncomingCallActivity will start CallRingtoneService from its context.
+                try {
+                    CallRingtoneService.start(
+                        context      = applicationContext,
+                        visitorName  = visitorName,
+                        visitorPhone = visitorPhone,
+                        roomId       = roomId,
+                        chatId       = alertId
+                    )
+                } catch (e: Exception) {
+                    println("⚠️ CallRingtoneService.start() blocked — falling back to showCallNotification: ${e.message}")
+                    NotificationUtil.showCallNotification(applicationContext, visitorName, visitorPhone, roomId, alertId)
+                }
                 return   // skip generic notification below
             }
 

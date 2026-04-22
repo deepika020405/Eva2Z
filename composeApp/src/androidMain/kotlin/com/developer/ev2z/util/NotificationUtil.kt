@@ -21,8 +21,12 @@ import com.developer.ev2z.R
 object NotificationUtil {
 
     // v4: force-recreate channels — v3 may exist on devices without sound settings locked in.
-    const val CHANNEL_ID      = "eva2z_general_v4"
-    const val CALL_CHANNEL_ID = "eva2z_call_v4"
+    const val CHANNEL_ID              = "eva2z_general_v4"
+    const val CALL_CHANNEL_ID         = "eva2z_call_v4"
+    // Silent channel used by CallRingtoneService's foreground notification.
+    // The service plays the ringtone itself via playRingtone(); the notification
+    // must not also trigger channel sound or the user hears double ringing.
+    const val CALL_SERVICE_CHANNEL_ID = "eva2z_call_service_v4"
 
     const val GEOFENCE_NOTIFICATION_ID = 9001
     const val CALL_NOTIFICATION_ID     = 9002
@@ -108,6 +112,25 @@ object NotificationUtil {
                 vibrationPattern = longArrayOf(0, 1000, 500, 1000, 500, 1000)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
                 setShowBadge(true)
+            }
+            nm.createNotificationChannel(channel)
+        }
+    }
+
+    // ── Silent channel for CallRingtoneService foreground notification ─
+    // No sound/vibration — the service's playRingtone() handles audio.
+    fun createCallServiceChannel(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val channel = NotificationChannel(
+                CALL_SERVICE_CHANNEL_ID,
+                "Eva2z Call Service",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "Silent channel for ongoing call ringtone service"
+                setSound(null, null)
+                enableVibration(false)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             }
             nm.createNotificationChannel(channel)
         }

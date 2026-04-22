@@ -3,6 +3,7 @@ package com.developer.ev2z.util
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlin.time.TimeSource
 
 // Data carried by every incoming-call event (FCM → HomeNavGraph)
 data class IncomingCallData(
@@ -33,9 +34,15 @@ object SosNotificationHandler {
         private set
 
     // Dedup guard — ignore repeated onIncomingCallReceived for the same roomId until
-    // the call ends / is accepted / is declined.  Clears automatically in onCallEnded,
-    // onCallAcceptedByOwner, onCallAcceptedElsewhere, and clearCallFlow.
+    // the call ends / is accepted / is declined.
     private var activeRoomId: String = ""
+
+    // After a call is accepted or ended, remember the roomId for 60 s so that any
+    // stale FCM notification tap (or Firebase auto-notification) cannot re-open the
+    // incoming-call screen for the same call.
+    private var lastHandledRoomId: String               = ""
+    private var lastHandledMark:  TimeSource.Monotonic.ValueTimeMark? = null
+    private const val HANDLED_COOLDOWN_MS               = 60_000L
 
     fun onSosAlertReceived(
         alertId: Int,
@@ -57,7 +64,14 @@ object SosNotificationHandler {
         chatId:       Int?    = null
     ) {
         if (roomId.isNotBlank() && roomId == activeRoomId) {
-            println("⚠️ Duplicate incoming_call for roomId=$roomId — ignoring")
+            println("⚠️ Duplicate incoming_call for roomId=$roomId — ignoring (already ringing)")
+            return
+        }
+        // Reject any re-trigger for a roomId that was already accepted/ended recently.
+        // This prevents stale notification taps (Firebase auto-notification persists after
+        // the call ends) from reopening IncomingCallScreen for the same call.
+        if (roomId.isNotBlank() && roomId == lastHandledRoomId && isInCooldown()) {
+            println("⚠️ Skipping already-handled roomId=$roomId (within 60 s cooldown)")
             return
         }
         if (roomId.isNotBlank()) activeRoomId = roomId
@@ -86,8 +100,9 @@ object SosNotificationHandler {
 
     fun onCallEnded() {
         println("📵 CALL ENDED by caller")
+        markHandled(activeRoomId)
         activeRoomId = ""
-        clearCallFlow()   // discard any buffered ringing event
+        clearCallFlow()
         _callEndedFlow.tryEmit(Unit)
     }
 
@@ -97,6 +112,7 @@ object SosNotificationHandler {
 
     fun onCallAcceptedElsewhere() {
         println("📱 CALL ACCEPTED on another device — dismissing ringing screen")
+        markHandled(activeRoomId)
         activeRoomId = ""
         clearCallFlow()
         _callAcceptedElsewhereFlow.tryEmit(Unit)
@@ -109,8 +125,9 @@ object SosNotificationHandler {
 
     fun onCallAcceptedByOwner(data: IncomingCallData) {
         println("✅ CALL ACCEPTED BY OWNER from lock screen — roomId=${data.roomId}")
+        markHandled(data.roomId)
         activeRoomId = ""
-        clearCallFlow()   // prevent HomeNavGraph from also showing IncomingCallScreen
+        clearCallFlow()
         _callAcceptedByOwnerFlow.tryEmit(data)
     }
 
@@ -123,7 +140,34 @@ object SosNotificationHandler {
     }
 
     fun clearCallFlow() {
-        activeRoomId = ""
+        // Reset replay cache only — do NOT clear activeRoomId here.
+        // HomeNavGraph calls clearCallFlow() right after showing IncomingCallScreen;
+        // clearing activeRoomId here would let the same roomId be re-processed if
+        // a stale notification is tapped before the call finishes.
+        // activeRoomId is cleared by onCallEnded / onCallAcceptedByOwner / onCallAcceptedElsewhere.
         _callFlow.resetReplayCache()
+    }
+
+    // Emitted by MainActivity.handleSosIntent when it takes over call handling.
+    // IncomingCallActivity collects this and finishes itself (without calling declineCall),
+    // preventing its 30-second auto-decline timer from killing an already-accepted call.
+    private val _mainActivityTookOverFlow = MutableSharedFlow<Unit>(replay = 0, extraBufferCapacity = 1)
+    val mainActivityTookOverFlow: SharedFlow<Unit> = _mainActivityTookOverFlow.asSharedFlow()
+
+    fun onMainActivityTookOver() {
+        _mainActivityTookOverFlow.tryEmit(Unit)
+    }
+
+    // ── Internal helpers ─────────────────────────────────────────────────
+    private fun markHandled(roomId: String) {
+        if (roomId.isNotBlank()) {
+            lastHandledRoomId = roomId
+            lastHandledMark   = TimeSource.Monotonic.markNow()
+        }
+    }
+
+    private fun isInCooldown(): Boolean {
+        val mark = lastHandledMark ?: return false
+        return mark.elapsedNow().inWholeMilliseconds < HANDLED_COOLDOWN_MS
     }
 }

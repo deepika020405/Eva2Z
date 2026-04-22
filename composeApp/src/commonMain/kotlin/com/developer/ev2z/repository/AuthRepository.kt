@@ -4,6 +4,7 @@ import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.request.LoginRequest
 import com.developer.ev2z.response.*
 import kotlinx.serialization.json.int
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -25,9 +26,9 @@ class AuthRepository(private val api: ApiService) {
             val deviceObj = jsonResponse["device"]?.jsonObject
             val deviceInfo = if (deviceObj != null) {
                 LoginDeviceInfo(
-                    id = deviceObj["id"]?.jsonPrimitive?.int ?: 0,
+                    id = deviceObj["id"]?.jsonPrimitive?.intOrNull ?: 0,
                     fcmToken = deviceObj["fcm_token"]?.jsonPrimitive?.content,
-                    isActive = deviceObj["is_active"]?.jsonPrimitive?.int ?: 0,
+                    isActive = deviceObj["is_active"]?.jsonPrimitive?.intOrNull ?: 0,
                     deviceUuid = deviceObj["device_uuid"]?.jsonPrimitive?.content,
                     platform = deviceObj["platform"]?.jsonPrimitive?.content,
                     lastSeen = deviceObj["last_seen"]?.jsonPrimitive?.content
@@ -191,7 +192,7 @@ class AuthRepository(private val api: ApiService) {
     private fun parseUserFromJson(userObj: kotlinx.serialization.json.JsonObject?): User? {
         return if (userObj != null) {
             User(
-                id = userObj["id"]?.jsonPrimitive?.int ?: 0,
+                id = userObj["id"]?.jsonPrimitive?.intOrNull ?: 0,
                 name = userObj["name"]?.jsonPrimitive?.content ?: "",
                 userName = userObj["userName"]?.jsonPrimitive?.content,
                 phone = userObj["phone"]?.jsonPrimitive?.content ?: "",
