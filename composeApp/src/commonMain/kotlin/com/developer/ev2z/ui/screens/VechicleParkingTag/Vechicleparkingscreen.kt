@@ -395,7 +395,7 @@ private fun ParkingFormCard(
             Eva2zInputField(
                 value           = phone,
                 onValueChange   = onPhoneChange,
-                label           = "ALTERNATE NUMBER 1 *",
+                label           = "EMERGENCY CONTACT 1 *",
                 placeholder     = "e.g. 9876543210",
                 icon            = Icons.Outlined.Phone,
                 errorText       = phoneError,
@@ -410,7 +410,7 @@ private fun ParkingFormCard(
             Eva2zInputField(
                 value           = alternatePhone,
                 onValueChange   = onAlternatePhoneChange,
-                label           = "ALTERNATE NUMBER 2 (OPTIONAL)",
+                label           = "EMERGENCY CONTACT 2 (OPTIONAL)",
                 placeholder     = "e.g. 9876543210",
                 icon            = Icons.Outlined.PhoneAndroid,
                 errorText       = alternatePhoneError,
@@ -612,8 +612,8 @@ private fun ParkingSuccessBanner(
                 ) {
                     data.vehicle_type?.let { BannerRow("Vehicle Name",   it) }
                     data.vehicle_number?.let { BannerRow("Vehicle Number", it) }
-                    (data.alternate_phone_1 ?: data.phone)?.let           { BannerRow("Alternate Number 1", it) }
-                    (data.alternate_phone_2 ?: data.alternate_phone)?.let { BannerRow("Alternate Number 2", it) }
+                    (data.alternate_phone_1 ?: data.phone)?.let           { BannerRow("EMERGENCY Contact 1", it) }
+                    (data.alternate_phone_2 ?: data.alternate_phone)?.let { BannerRow("EMERGENCY Contact 2", it) }
                     data.status?.let { BannerRow("Status",   it) }
                     data.id?.let     { BannerRow("Ticket #", "#$it") }
                 }

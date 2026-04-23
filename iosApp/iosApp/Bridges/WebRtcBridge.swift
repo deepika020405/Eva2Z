@@ -98,6 +98,14 @@ private let kStunServer2        = "stun:stun1.l.google.com:19302"
         teardownInternal()
     }
 
+    // Called by CallKitManager when the system activates the audio session after answer.
+    // Reconfigure so WebRTC audio tracks use the CallKit-managed session.
+    func onCallKitAudioActivated() {
+        guard isCallActive else { return }
+        print("🔊 [WebRtcBridge] onCallKitAudioActivated — reconfiguring audio session")
+        configureAudioSession()
+    }
+
     // MARK: - Audio session
 
     private func configureAudioSession() {
@@ -384,6 +392,9 @@ extension WebRtcBridge: RTCPeerConnectionDelegate {
         switch newState {
         case .connected, .completed:
             print("🟢 [WebRtcBridge] ══ CALL CONNECTED — audio is live ══")
+            DispatchQueue.main.async {
+                SosNotificationHandler.shared.onCallConnected()
+            }
         case .failed:
             guard isCallActive else { return }
             print("🔴 [WebRtcBridge] ICE failed — ending call")

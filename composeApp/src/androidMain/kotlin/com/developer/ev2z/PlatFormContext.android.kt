@@ -24,5 +24,7 @@ actual fun stopCallSound() {
     CallRingtoneService.stop(appCtx)
 }
 
+actual fun platformName() = "android"
+
 @Composable
 actual fun getPlatformContext(): Any? = LocalContext.current

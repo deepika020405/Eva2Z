@@ -131,6 +131,16 @@ object SosNotificationHandler {
         _callAcceptedByOwnerFlow.tryEmit(data)
     }
 
+    // Convenience overload for iOS CallKit delegate (Swift can't easily construct IncomingCallData)
+    fun onCallAcceptedByOwner(
+        visitorName:  String,
+        visitorPhone: String,
+        roomId:       String,
+        chatId:       Int?   = null
+    ) {
+        onCallAcceptedByOwner(IncomingCallData(visitorName, visitorPhone, roomId, chatId))
+    }
+
     fun clearAcceptedByOwnerFlow() {
         _callAcceptedByOwnerFlow.resetReplayCache()
     }

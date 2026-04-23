@@ -2259,8 +2259,9 @@ class ApiService {
 
     suspend fun registerFcmToken(
         authHeader: String,
-        fcmToken: String,
-        deviceUuid: String
+        fcmToken:   String,
+        deviceUuid: String,
+        platform:   String = "android"
     ) {
         val response = client.post("${baseUrl}fcm/register") {
             headers {
@@ -2269,8 +2270,9 @@ class ApiService {
             }
             setBody(
                 mapOf(
-                    "fcm_token" to fcmToken,
-                    "device_uuid" to deviceUuid
+                    "fcm_token"   to fcmToken,
+                    "device_uuid" to deviceUuid,
+                    "platform"    to platform
                 )
             )
         }

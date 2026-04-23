@@ -146,19 +146,19 @@ fun App() {
 
     /* ---------------------------------------
       2️⃣ POST-LOGIN SIDE EFFECT → FCM REGISTER
+      Always send the token on every login so the server is guaranteed to have it.
+      Token is saved only after successful API response to prevent silent cache bugs.
    ---------------------------------------- */
     LaunchedEffect(isLoggedIn, authToken) {
         if (isLoggedIn && authToken.isNotEmpty()) {
             FcmBridge.register { fcmToken ->
-                val lastSent = userPrefs.getLastFcmToken()
-                if (lastSent == fcmToken) return@register
-
                 FcmRegistrar.registerFcmToServer(
                     authTokenNullable = "Bearer $authToken",
-                    fcmToken = fcmToken,
-                    deviceUuid = userPrefs.getOrCreateDeviceUuid()
+                    fcmToken          = fcmToken,
+                    deviceUuid        = userPrefs.getOrCreateDeviceUuid(),
+                    platform          = platformName(),
+                    onSuccess         = { userPrefs.saveLastFcmToken(fcmToken) }
                 )
-                userPrefs.saveLastFcmToken(fcmToken)
             }
         }
     }

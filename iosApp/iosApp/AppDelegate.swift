@@ -1,5 +1,6 @@
 import UIKit
 import AVFoundation
+import CallKit
 import ComposeApp
 import PhonePePayment
 import FirebaseCore
@@ -10,10 +11,6 @@ class AppDelegate: NSObject,
                    UIApplicationDelegate,
                    UNUserNotificationCenterDelegate,
                    MessagingDelegate {
-
-    // isCallActive is now read from WebRtcBridge.shared so it stays in sync
-    // when the owner ends the call from the app side (no FCM comes in that case).
-    private let callNotifId = "incoming-call"
 
     func application(
         _ application: UIApplication,
@@ -49,9 +46,29 @@ class AppDelegate: NSObject,
         // FCM
         Messaging.messaging().delegate = self
 
-        // Register WebRTC bridge so VoiceCallManager.ios.kt can delegate to it
+        // tokenFetcher lets FcmBridge.register() pull a fresh token after logout + re-login.
+        // Without this, lastToken is nil after FcmBridge.clear() and no token ever arrives.
+        FcmBridge.shared.tokenFetcher = {
+            Messaging.messaging().token { token, error in
+                if let error = error {
+                    print("❌ FCM token refresh error: \(error.localizedDescription)")
+                } else if let token = token {
+                    FcmBridge.shared.onToken(token: token)
+                }
+            }
+        }
+
+        // Register WebRTC bridge
         WebRtcBridgeHolder.shared.delegate = WebRtcBridge.shared
         print("✅ WebRtcBridge registered")
+
+        // Register CallKit bridge — lets Kotlin cancelCallNotification() dismiss native UI
+        CallKitBridgeHolder.shared.delegate = CallKitManager.shared
+        print("✅ CallKitBridge registered")
+
+        // Register ringtone bridge — lets Kotlin stopCallSound() stop the foreground ringtone
+        RingtoneBridgeHolder.shared.delegate = RingtoneManager.shared
+        print("✅ RingtoneBridge registered")
 
         // Cold-start: app killed and user tapped a notification banner
         if let payload = launchOptions?[UIApplication.LaunchOptionsKey.remoteNotification] as? [AnyHashable: Any] {
@@ -90,9 +107,9 @@ class AppDelegate: NSObject,
         FcmBridge.shared.onToken(token: fcmToken ?? "")
     }
 
-    // MARK: - Data-only FCM (background + foreground)
+    // MARK: - FCM message received (foreground + background)
     // Required when FirebaseAppDelegateProxyEnabled = NO.
-    // Backend sends call/SOS events as DATA payloads, not notification payloads.
+    // Called for both data-only FCM and notification+data FCM (in background).
 
     func application(
         _ application: UIApplication,
@@ -102,30 +119,66 @@ class AppDelegate: NSObject,
         Messaging.messaging().appDidReceiveMessage(userInfo)
         print("📨 didReceiveRemoteNotification:", userInfo)
 
-        let type = userInfo["type"] as? String ?? ""
+        let type   = userInfo["type"]    as? String ?? ""
+        let roomId = userInfo["room_id"] as? String ?? ""
 
         // Call-related FCM types — handle exclusively (no generic banner)
         if ["incoming_call", "call_ended", "call_accepted"].contains(type) {
             handleCallIfNeeded(data: userInfo)
+
+            // Belt-and-suspenders: post a local notification with sound so the user
+            // always hears something, even if CallKit takes a moment to appear.
+            // Dismissed automatically when the call ends / is accepted.
+            if type == "incoming_call" {
+                let content = UNMutableNotificationContent()
+                let callerName = userInfo["visitor_name"] as? String ?? "Visitor"
+                content.title = callerName
+                content.body  = "Incoming parking call — tap to answer"
+                content.sound = UNNotificationSound.default
+                if let dict = userInfo as? [String: Any] {
+                    content.userInfo = dict
+                }
+                let req = UNNotificationRequest(
+                    identifier: "incoming-call-\(roomId.isEmpty ? "bg" : roomId)",
+                    content:    content,
+                    trigger:    nil
+                )
+                UNUserNotificationCenter.current().add(req) { _ in }
+            }
+
             completionHandler(.newData)
             return
         }
 
-        // Generic SOS/chat — show local banner when backgrounded
-        if application.applicationState != .active {
-            let title = (userInfo["title"] as? String) ?? "New Alert"
-            let body  = (userInfo["body"]  as? String) ?? ""
+        // Generic SOS/chat — extract title/body, then decide whether to post a local banner.
+        // For notification+data FCM: iOS auto-shows the banner in background; willPresent
+        // shows it in foreground. We must NOT post a duplicate local notification.
+        // For data-only FCM: no system notification — we must post the local banner ourselves.
+        let aps   = userInfo["aps"] as? [AnyHashable: Any]
+        let alert = aps?["alert"] as? [AnyHashable: Any]
+        let title = (userInfo["title"] as? String)
+                 ?? (alert?["title"] as? String)
+                 ?? "New Alert"
+        let body  = (userInfo["body"] as? String)
+                 ?? (alert?["body"] as? String)
+                 ?? ""
 
+        let hasSystemNotification = alert != nil
+        if !hasSystemNotification {
+            // Data-only FCM — post a local banner (system won't show anything otherwise)
             let content = UNMutableNotificationContent()
-            content.title   = title
-            content.body    = body
-            content.sound   = .default
-            content.userInfo = userInfo as! [String: Any]
+            content.title = title
+            content.body  = body
+            content.sound = .default
+            if let dict = userInfo as? [String: Any] {
+                content.userInfo = dict
+            }
 
+            let chatKey = (userInfo["chat_id"] as? String) ?? UUID().uuidString
             let request = UNNotificationRequest(
-                identifier: "chat-\(userInfo["chat_id"] ?? UUID().uuidString)",
-                content: content,
-                trigger: nil
+                identifier: "chat-\(chatKey)",
+                content:    content,
+                trigger:    nil
             )
             UNUserNotificationCenter.current().add(request) { err in
                 if let err = err { print("❌ Local notif error:", err) }
@@ -143,12 +196,22 @@ class AppDelegate: NSObject,
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
+        let identifier = notification.request.identifier
         let data = notification.request.content.userInfo
         let type = data["type"] as? String ?? ""
-        print("📩 Foreground notification (type=\(type)):", data)
+        print("📩 Foreground notification id=\(identifier) type=\(type)")
+
+        // Suppress our background-fallback local notification when app is foreground
+        // (IncomingCallScreen + RingtoneManager already handle the foreground call UI)
+        if identifier.hasPrefix("incoming-call-") {
+            center.removeDeliveredNotifications(withIdentifiers: [identifier])
+            completionHandler([])
+            return
+        }
 
         if ["incoming_call", "call_ended", "call_accepted"].contains(type) {
-            // Call events are handled by the Compose UI — suppress system banner
+            // Call events from FCM in foreground — Compose UI handles them.
+            // Suppress the system banner; RingtoneManager plays a foreground ringtone.
             handleCallIfNeeded(data: data)
             completionHandler([])
             return
@@ -197,7 +260,6 @@ class AppDelegate: NSObject,
             }
             print("📞 iOS INCOMING CALL — visitor=\(visitorName) phone=\(visitorPhone) room=\(roomId)")
 
-            // Notify Kotlin UI layer
             let chatId: KotlinInt? = chatIdInt > 0 ? KotlinInt(value: chatIdInt) : nil
             SosNotificationHandler.shared.onIncomingCallReceived(
                 visitorName:  visitorName,
@@ -205,17 +267,33 @@ class AppDelegate: NSObject,
                 roomId:       roomId,
                 chatId:       chatId
             )
-            // Show ringtone notification for when app is backgrounded/killed
-            showCallNotification(visitorName: visitorName, visitorPhone: visitorPhone)
+
+            let appState = UIApplication.shared.applicationState
+            if appState == .background || appState == .inactive {
+                // Background / locked screen — show CallKit native call UI (manages its own ringtone)
+                CallKitManager.shared.reportIncomingCall(
+                    visitorName:  visitorName,
+                    visitorPhone: visitorPhone,
+                    roomId:       roomId,
+                    chatId:       chatIdInt
+                )
+            } else {
+                // Foreground — Compose IncomingCallScreen is shown; play our own ringtone
+                RingtoneManager.shared.startRinging()
+            }
 
         case "call_ended":
             print("📵 iOS CALL ENDED")
-            dismissCallNotification()
+            RingtoneManager.shared.stopRinging()
+            dismissIncomingCallNotification()
+            CallKitManager.shared.endCurrentCall(reason: .remoteEnded)
             SosNotificationHandler.shared.onCallEnded()
 
         case "call_accepted":
             print("📱 iOS CALL ACCEPTED ELSEWHERE")
-            dismissCallNotification()
+            RingtoneManager.shared.stopRinging()
+            dismissIncomingCallNotification()
+            CallKitManager.shared.endCurrentCall(reason: .answeredElsewhere)
             SosNotificationHandler.shared.onCallAcceptedElsewhere()
 
         default:
@@ -223,28 +301,22 @@ class AppDelegate: NSObject,
         }
     }
 
-    private func showCallNotification(visitorName: String, visitorPhone: String) {
-        let content         = UNMutableNotificationContent()
-        content.title       = visitorName.isEmpty ? "Incoming Call" : visitorName
-        content.body        = visitorPhone.isEmpty ? "Visitor is calling..." : visitorPhone
-        content.sound       = .default
-        content.userInfo    = ["type": "incoming_call"]
+    // MARK: - Notification helpers
 
-        let request = UNNotificationRequest(
-            identifier: callNotifId,
-            content: content,
-            trigger: nil
-        )
-        UNUserNotificationCenter.current().add(request) { err in
-            if let err = err { print("❌ Call notification error:", err) }
+    private func dismissIncomingCallNotification() {
+        let center = UNUserNotificationCenter.current()
+        center.getDeliveredNotifications { notifications in
+            let ids = notifications
+                .map { $0.request.identifier }
+                .filter { $0.hasPrefix("incoming-call-") }
+            center.removeDeliveredNotifications(withIdentifiers: ids)
         }
-    }
-
-    func dismissCallNotification() {
-        UNUserNotificationCenter.current()
-            .removePendingNotificationRequests(withIdentifiers: [callNotifId])
-        UNUserNotificationCenter.current()
-            .removeDeliveredNotifications(withIdentifiers: [callNotifId])
+        center.getPendingNotificationRequests { requests in
+            let ids = requests
+                .map { $0.identifier }
+                .filter { $0.hasPrefix("incoming-call-") }
+            center.removePendingNotificationRequests(withIdentifiers: ids)
+        }
     }
 
     // MARK: - SOS helper

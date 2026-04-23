@@ -1,5 +1,6 @@
 package com.developer.ev2z.ui.screens.AccountActivity
 
+import com.developer.ev2z.FcmBridge
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.network.ApiService
 import kotlinx.coroutines.CoroutineScope
@@ -87,9 +88,10 @@ class AccountActivityViewModel(
         viewModelScope.launch {
             try {
                 println("🚪 AccountActivityViewModel: Logging out...")
-                val token = storageManager.getString("token", "")
-                val fcmToken = storageManager.getString("last_fcm_token", "")
-                if (token.isNotBlank() && fcmToken.isNotBlank()) {
+                val token    = storageManager.getString("token", "")
+                // Use in-memory FCM token (reliable even if storage write hasn't completed)
+                val fcmToken = FcmBridge.currentToken() ?: storageManager.getString("last_fcm_token", "")
+                if (token.isNotBlank() && !fcmToken.isNullOrBlank()) {
                     try {
                         apiService.logout("Bearer $token", fcmToken)
                         println("✅ Logout API called successfully")

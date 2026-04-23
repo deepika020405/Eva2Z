@@ -6,6 +6,10 @@ object FcmBridge {
     private var lastToken: String? = null
     var tokenFetcher: (() -> Unit)? = null
 
+    // Returns the current in-memory FCM token (preferred over reading from storage).
+    // Use this for logout API calls so the server always gets the correct token.
+    fun currentToken(): String? = lastToken
+
     fun register(cb: (String) -> Unit) {
         callback = cb
         val token = lastToken
@@ -22,8 +26,9 @@ object FcmBridge {
         callback?.invoke(token)
     }
 
+    // Called on logout — clears in-memory state so next login triggers fresh registration.
     fun clear() {
-        callback = null
+        callback  = null
         lastToken = null
     }
 
