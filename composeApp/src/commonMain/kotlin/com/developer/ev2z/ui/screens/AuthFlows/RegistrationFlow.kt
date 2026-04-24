@@ -141,16 +141,14 @@ fun RegistrationFlow(
                     RegistrationStep.VERIFY_OTP -> {
                         OTPScreen(
                             title = "Verify OTP",
-                            subtitle = "Enter the OTP sent to +91$phone",
+                            subtitle = "Enter the OTP sent to $phone",
                             isLoading = isLoading,
                             error = error,
                             onOTPComplete = { otp ->
-                                val fullPhone = "+91$phone"
-                                authViewModel.verifyOtp(fullPhone, otp)
+                                authViewModel.verifyOtp(phone, otp)
                             },
                             onResendOTP = {
-                                val fullPhone = "+91$phone"
-                                authViewModel.signUp(name, fullPhone, "", email)
+                                authViewModel.signUp(name, phone, "", email)
                             },
                             onBack = onBack
                         )
@@ -173,9 +171,8 @@ fun RegistrationFlow(
                             isLoading = isLoading,
                             error = error,
                             onPasswordSubmit = { password, confirmPassword ->
-                                val fullPhone = "+91$phone"
                                 println("🔐 Calling savePasswordAndLogin...")
-                                authViewModel.savePasswordAndLogin(name, fullPhone, password, email)
+                                authViewModel.savePasswordAndLogin(name, phone, password, email)
                             },
                             onBack = { currentStep = RegistrationStep.VERIFY_OTP }
                         )

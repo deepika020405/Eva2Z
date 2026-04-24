@@ -281,32 +281,19 @@ fun HomeQuickActionsSection(
 ) {
 
     val features = listOf(
+        QuickActionItem("Vehicle TAG Registration", Icons.Default.LocalParking, onParking),
+        QuickActionItem("Visitor Chats", Icons.Default.Warning, onSosTag),
         QuickActionItem("Live Location", Icons.Default.LocationOn, onMyDevices),
         QuickActionItem("Create Geofencing", Icons.Default.Security, onGeoFence),
         QuickActionItem("History Playback", Icons.Default.History, onHistory),
         QuickActionItem("Engine On/Off", Icons.Default.PowerSettingsNew, onManageDevice),
         QuickActionItem("Document Vault", Icons.Default.Folder, onOpenDocuments),
         QuickActionItem("Device Report", Icons.Default.Assessment, onOpenDeviceReport),
-        QuickActionItem("Add Device", Icons.Default.Add, onOpenAddDevice) ,
-        QuickActionItem("Vehicle TAG Registration",Icons.Default.LocalParking,   onParking),  // ✅ CHANGED
-        QuickActionItem("Visitor Chats",Icons.Default.Warning,onSosTag),  // ✅ WIRED
-        QuickActionItem(
-            "Criminal Verification",
-            Icons.Default.VerifiedUser,
-            onCriminalVerification   // ✅ connect
-        ),
-
-        QuickActionItem(
-            "Community",
-            Icons.Default.Groups,
-            onOpenCommunity   // ✅ connect
-        ),
-        QuickActionItem(
-            "Installation Support",
-            Icons.Default.Build,
-            onInstallationSupport
-        )
-       )
+        QuickActionItem("Add Device", Icons.Default.Add, onOpenAddDevice),
+        QuickActionItem("Criminal Verification", Icons.Default.VerifiedUser, onCriminalVerification),
+        QuickActionItem("Community", Icons.Default.Groups, onOpenCommunity),
+        QuickActionItem("Installation Support", Icons.Default.Build, onInstallationSupport)
+    )
 
     val columns = 3
     val itemHeight = 110.dp

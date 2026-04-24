@@ -44,11 +44,8 @@ fun ForgetPasswordFlow(
     var showExitDialog by remember { mutableStateOf(false) }
 
     val initialPhone = remember(preFilledPhone) {
-        when {
-            preFilledPhone.startsWith("+91") -> preFilledPhone.removePrefix("+91")
-            preFilledPhone.length == 10 -> preFilledPhone
-            else -> ""
-        }
+        // Pass digits only; ForgetPasswordPhoneScreen owns the country code selection
+        preFilledPhone.filter { it.isDigit() }
     }
 
     var phoneNumber by remember { mutableStateOf("") }
@@ -158,8 +155,9 @@ fun ForgetPasswordFlow(
                             preFilledPhone = initialPhone,
                             onBack = onBack,
                             onOtpSent = { phone ->
+                                // phone already includes country code (e.g. "+916789546789")
                                 println("✅ OTP sent! Phone: $phone")
-                                phoneNumber = "+91$phone"
+                                phoneNumber = phone
 
                                 GlobalScope.launch(Dispatchers.Main) {
                                     delay(300)

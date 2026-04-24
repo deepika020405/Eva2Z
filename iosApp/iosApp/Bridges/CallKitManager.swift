@@ -40,7 +40,7 @@ class CallKitManager: NSObject, CXProviderDelegate, IOSCallKitDelegate {
     private var pendingChatId:       Int32  = -1
 
     private override init() {
-        let config = CXProviderConfiguration()
+        let config = CXProviderConfiguration(localizedName: "Eva2z Connect")
         config.supportsVideo            = false
         config.maximumCallsPerCallGroup = 1
         config.maximumCallGroups        = 1

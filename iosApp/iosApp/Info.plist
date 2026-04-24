@@ -44,6 +44,7 @@
 	<string>Microphone access is required for voice calls with parking visitors.</string>
 	<key>UIBackgroundModes</key>
 	<array>
+		<string>audio</string>
 		<string>remote-notification</string>
 		<string>fetch</string>
 		<string>voip</string>

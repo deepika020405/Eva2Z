@@ -27,6 +27,10 @@ private let kStunServer2        = "stun:stun1.l.google.com:19302"
     // duplicate incoming-call FCMs while a call is already active.
     private(set) var isCallActive: Bool = false
 
+    // Guards against a race where the 500 ms deferred configureAudioSession fires
+    // after onCallKitAudioActivated already ran (CallKit-answer path).
+    private var audioSessionReady: Bool = false
+
     // WebRTC
     private var factory:         RTCPeerConnectionFactory?
     private var peerConnection:  RTCPeerConnection?
@@ -44,29 +48,45 @@ private let kStunServer2        = "stun:stun1.l.google.com:19302"
     // MARK: - IOSWebRtcDelegate
 
     func startAsCallee(roomId: String) {
-        teardownInternal()            // clean up any previous session first
+        teardownInternal()
         isCallActive          = true
+        audioSessionReady     = false
         isLocalDescriptionSet = false
         pendingRemoteCandidates.removeAll()
         self.roomId   = roomId
         self.isCaller = false
         print("📞 [WebRtcBridge] startAsCallee roomId=\(roomId)")
-        configureAudioSession()
         setupWebRtc()
         connectSignaling()
+        // Defer audio session setup by 500 ms. If CallKit was ringing (background/locked),
+        // it holds the audio hardware; releasing and re-claiming it in the same run-loop
+        // causes AUIOClient_StartIO to fail and drops ICE. The 500 ms window lets the
+        // prior session fully deactivate before WebRTC opens the hardware.
+        // If CallKit answers the call first, onCallKitAudioActivated sets audioSessionReady
+        // immediately and this deferred call is skipped.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self = self, self.isCallActive, !self.audioSessionReady else { return }
+            self.audioSessionReady = true
+            self.configureAudioSession()
+        }
     }
 
     func startAsCaller(roomId: String) {
         teardownInternal()
         isCallActive          = true
+        audioSessionReady     = false
         isLocalDescriptionSet = false
         pendingRemoteCandidates.removeAll()
         self.roomId   = roomId
         self.isCaller = true
         print("📞 [WebRtcBridge] startAsCaller roomId=\(roomId)")
-        configureAudioSession()
         setupWebRtc()
         connectSignaling()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self = self, self.isCallActive, !self.audioSessionReady else { return }
+            self.audioSessionReady = true
+            self.configureAudioSession()
+        }
     }
 
     func endCall() {
@@ -100,9 +120,12 @@ private let kStunServer2        = "stun:stun1.l.google.com:19302"
 
     // Called by CallKitManager when the system activates the audio session after answer.
     // Reconfigure so WebRTC audio tracks use the CallKit-managed session.
+    // Setting audioSessionReady=true here prevents the deferred 500 ms call from
+    // firing a second time (the CallKit-activation path takes priority).
     func onCallKitAudioActivated() {
         guard isCallActive else { return }
         print("🔊 [WebRtcBridge] onCallKitAudioActivated — reconfiguring audio session")
+        audioSessionReady = true
         configureAudioSession()
     }
 
@@ -333,6 +356,7 @@ private let kStunServer2        = "stun:stun1.l.google.com:19302"
     private func teardownInternal() {
         guard isCallActive else { return }
         isCallActive          = false
+        audioSessionReady     = false
         isLocalDescriptionSet = false
         pendingRemoteCandidates.removeAll()
 

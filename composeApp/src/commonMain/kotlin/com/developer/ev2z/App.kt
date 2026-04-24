@@ -402,8 +402,8 @@ fun App() {
                         registrationName = name
                         registrationPhone = phone
                         registrationEmail = email
-                        val fullPhone = "+91$phone"
-                        authViewModel.signUp(name, fullPhone, "", email)
+                        // phone already contains the full international number (e.g. +929319837225)
+                        authViewModel.signUp(name, phone, "", email)
                         // showRegistration is set by LaunchedEffect(signupSuccess)
                         // only after the OTP is confirmed sent successfully
                     }

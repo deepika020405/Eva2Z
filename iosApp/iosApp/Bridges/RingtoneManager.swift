@@ -3,7 +3,7 @@ import AudioToolbox
 import ComposeApp
 
 // Plays a looping ringtone for in-app (foreground) incoming calls.
-// Uses AVAudioPlayer with .playback audio session so it rings even when
+// Uses AVAudioPlayer / AVAudioEngine with .playback audio session so it rings even when
 // the ringer/silent switch is OFF — matching Android's IncomingCallActivity behaviour.
 // CallKit handles background/locked ringing automatically via its native UI.
 
@@ -12,6 +12,8 @@ import ComposeApp
     @objc static let shared = RingtoneManager()
 
     private var player: AVAudioPlayer?
+    private var audioEngine: AVAudioEngine?
+    private var playerNode: AVAudioPlayerNode?
     private(set) var isRinging = false
 
     // MARK: - Public API
@@ -21,11 +23,10 @@ import ComposeApp
         isRinging = true
 
         // .playback category plays audio even when ringer switch is off.
-        // This is critical — AudioServicesPlaySystemSound respects silent mode but AVAudioPlayer with
-        // .playback does not.
+        // .duckOthers lowers other audio so the ring is clearly heard.
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+            try session.setCategory(.playback, mode: .default, options: [.duckOthers])
             try session.setActive(true)
         } catch {
             print("⚠️ [Ringtone] Audio session setup failed: \(error)")
@@ -39,12 +40,13 @@ import ComposeApp
             return
         }
 
-        // 2. Known system sound files (short but looped → audible repeating alert)
+        // 2. Known system sound files present on modern iOS
         let systemPaths = [
-            "/System/Library/Audio/UISounds/ReceivedMessage.caf",   // iMessage notification tone
-            "/System/Library/Audio/UISounds/SIMToolkitCallDropped.caf",
-            "/System/Library/Audio/UISounds/tweet_sent.caf",
-            "/System/Library/Audio/UISounds/nano/ReceiveMessage.caf"
+            "/System/Library/Audio/UISounds/ReceivedMessage.caf",
+            "/System/Library/Audio/UISounds/sms-received1.caf",
+            "/System/Library/Audio/UISounds/sms-received5.caf",
+            "/System/Library/Audio/UISounds/new-mail.caf",
+            "/System/Library/Audio/UISounds/Tock.caf",
         ]
         for path in systemPaths {
             let url = URL(fileURLWithPath: path)
@@ -54,13 +56,10 @@ import ComposeApp
             }
         }
 
-        // 3. Last-resort fallback: vibration loop (no sound file found)
-        print("🔔 [Ringtone] No sound file found — vibration-only fallback")
-        AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
-        Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] t in
-            guard let self = self, self.isRinging else { t.invalidate(); return }
-            AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
-        }
+        // 3. Generate a dual-tone PSTN ring (440 Hz + 480 Hz) using AVAudioEngine.
+        //    No external file needed; .playback session keeps it audible on silent mode.
+        print("🔔 [Ringtone] No sound file found — generating ring tone")
+        playGeneratedRingtone()
     }
 
     func stopRinging() {
@@ -68,6 +67,10 @@ import ComposeApp
         isRinging = false
         player?.stop()
         player = nil
+        playerNode?.stop()
+        playerNode = nil
+        audioEngine?.stop()
+        audioEngine = nil
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         print("🔇 [Ringtone] Stopped")
     }
@@ -89,5 +92,70 @@ import ComposeApp
         let started = p.play()
         if started { player = p }
         return started
+    }
+
+    // Generates a 1-second dual-tone ring followed by 0.5 seconds of silence, looped.
+    // 440 Hz + 480 Hz produces the classic North American PSTN ring sound.
+    private func playGeneratedRingtone() {
+        let sampleRate: Double = 44100
+        let ringDuration: Double  = 1.0
+        let totalDuration: Double = 1.5   // 1s ring + 0.5s silence
+
+        let totalFrames = AVAudioFrameCount(sampleRate * totalDuration)
+        let ringFrames  = AVAudioFrameCount(sampleRate * ringDuration)
+
+        let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: totalFrames),
+              let data   = buffer.floatChannelData?[0] else {
+            fallbackVibration()
+            return
+        }
+        buffer.frameLength = totalFrames
+
+        let freq1: Double = 440.0
+        let freq2: Double = 480.0
+        let fadeFrames    = Int(sampleRate * 0.05)   // 50 ms fade in/out
+
+        for i in 0..<Int(totalFrames) {
+            if i < Int(ringFrames) {
+                let envelope: Double
+                if i < fadeFrames {
+                    envelope = Double(i) / Double(fadeFrames)
+                } else if i > Int(ringFrames) - fadeFrames {
+                    envelope = Double(Int(ringFrames) - i) / Double(fadeFrames)
+                } else {
+                    envelope = 1.0
+                }
+                let t = Double(i) / sampleRate
+                data[i] = Float((sin(2 * .pi * freq1 * t) + sin(2 * .pi * freq2 * t)) * 0.4 * envelope)
+            } else {
+                data[i] = 0
+            }
+        }
+
+        let engine = AVAudioEngine()
+        let node   = AVAudioPlayerNode()
+        engine.attach(node)
+        engine.connect(node, to: engine.mainMixerNode, format: format)
+
+        do {
+            try engine.start()
+            node.scheduleBuffer(buffer, at: nil, options: .loops, completionHandler: nil)
+            node.play()
+            audioEngine = engine
+            playerNode  = node
+            print("🔔 [Ringtone] Generated ring tone playing")
+        } catch {
+            print("⚠️ [Ringtone] AVAudioEngine failed: \(error)")
+            fallbackVibration()
+        }
+    }
+
+    private func fallbackVibration() {
+        AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
+        Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] t in
+            guard let self = self, self.isRinging else { t.invalidate(); return }
+            AudioServicesPlaySystemSound(kSystemSoundID_Vibrate)
+        }
     }
 }
