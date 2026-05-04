@@ -64,6 +64,7 @@ kotlin {
             implementation(libs.intentsdk)
             implementation(libs.play.services.auth)
             implementation(libs.play.services.auth.api.phone)
+            implementation(libs.app.update.ktx)
 
             implementation("com.android.installreferrer:installreferrer:2.2")
             // ✅ FIREBASE ONLY - NO PLAY INTEGRITY
@@ -84,6 +85,7 @@ kotlin {
 
 
             // ❌ REMOVED: Play Integrity API (causes Play Protect warnings)
+
             // implementation(libs.integrity)
         }
         iosMain.dependencies {
@@ -141,8 +143,8 @@ android {
         applicationId = "com.developer.ev2z"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 88  // ✅ INCREMENTED
-        versionName = "5.4.0"  // ✅ NEW MAJOR VERSION (Play Protect fixed)
+        versionCode = 90
+        versionName = "5.5.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

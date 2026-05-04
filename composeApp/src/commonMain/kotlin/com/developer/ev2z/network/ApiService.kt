@@ -18,6 +18,7 @@ import com.developer.ev2z.ui.screens.ChangePlan.UserDevicesResponse
 import com.developer.ev2z.ui.screens.CriminalVerification.CandidateResult
 import com.developer.ev2z.ui.screens.CriminalVerification.CriminalForm
 import com.developer.ev2z.ui.screens.SOSParkingTag.ChatMessagesResponse
+import com.developer.ev2z.ui.screens.SOSParkingTag.InitiateCallResponse
 import com.developer.ev2z.ui.screens.SOSParkingTag.MyChatsResponse
 import com.developer.ev2z.ui.screens.SOSParkingTag.OwnerReplyRequest
 import com.developer.ev2z.ui.screens.SOSParkingTag.SosAlertDetailResponse
@@ -1584,6 +1585,41 @@ class ApiService {
     }
 
 
+    // ---------------- MARK MESSAGE DELIVERED ----------------
+    // Called when a chat message arrives on device but user hasn't opened the chat yet.
+    suspend fun markDelivered(chatId: Int) {
+        val token = AppTokenProvider.getToken()
+        val url   = "${baseUrl}chat/$chatId/delivered"
+        try {
+            val response = client.post(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                header(HttpHeaders.Accept, "application/json")
+            }
+            val raw = response.bodyAsText()
+            println("✔️ markDelivered #$chatId: ${response.status} | $raw")
+        } catch (e: Exception) {
+            println("❌ markDelivered #$chatId: ${e.message}")
+        }
+    }
+
+    // ---------------- MARK CHAT SEEN ----------------
+    // Called when the owner opens the chat screen and reads the messages.
+    suspend fun markSeen(chatId: Int) {
+        val token = AppTokenProvider.getToken()
+        val url   = "${baseUrl}chat/$chatId/seen"
+        println("🔵 markSeen → POST $url")
+        try {
+            val response = client.post(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                header(HttpHeaders.Accept, "application/json")
+            }
+            val raw = response.bodyAsText()
+            println("✔️ markSeen #$chatId: ${response.status} | response=$raw")
+        } catch (e: Exception) {
+            println("❌ markSeen #$chatId: ${e.message}")
+        }
+    }
+
     // ---------------- ACCEPT INCOMING CALL ----------------
     // POST https://app.eva2z.in/api/call/accept  { "room_id": "..." }
     suspend fun acceptCall(roomId: String): SosReplyResponse {
@@ -1643,6 +1679,38 @@ class ApiService {
         } catch (e: Exception) {
             println("❌ declineCall: ${e.message}")
             SosReplyResponse(status = false, message = "Network error: ${e.message ?: "Unknown"}")
+        }
+    }
+
+    // ---------------- INITIATE CALL (OWNER → VISITOR) ----------------
+    // POST https://gps.eva2z.in/api/owner/call/initiate  { "chat_id": chatId }
+    // Backend sends FCM to visitor and returns the room_id for WebRTC signaling.
+    suspend fun initiateCall(chatId: Int): InitiateCallResponse {
+        val token = AppTokenProvider.getToken()
+        val url   = "https://gps.eva2z.in/api/owner/call/initiate"
+        val body  = buildJsonObject { put("chat_id", chatId) }
+        println("🌐 initiateCall → POST $url  chat_id=$chatId")
+        return try {
+            val response = client.post(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                header(HttpHeaders.Accept, "application/json")
+                contentType(ContentType.Application.Json)
+                setBody(Json.encodeToString(JsonObject.serializer(), body))
+            }
+            val raw = response.bodyAsText()
+            println("✔️ initiateCall ${response.status}: $raw")
+            val lenient = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
+            when {
+                response.status.value in 200..201 ->
+                    lenient.decodeFromString(InitiateCallResponse.serializer(), raw)
+                response.status == HttpStatusCode.Unauthorized ->
+                    InitiateCallResponse(success = false, message = "Session expired.")
+                else ->
+                    InitiateCallResponse(success = false, message = "Error: ${response.status.value}")
+            }
+        } catch (e: Exception) {
+            println("❌ initiateCall: ${e.message}")
+            InitiateCallResponse(success = false, message = "Network error: ${e.message ?: "Unknown"}")
         }
     }
 

@@ -40,6 +40,17 @@
 		<string>bhim</string>
 		<string>supermoney</string>
 	</array>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>app.eva2z.in</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+		</dict>
+	</dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Microphone access is required for voice calls with parking visitors.</string>
 	<key>UIBackgroundModes</key>

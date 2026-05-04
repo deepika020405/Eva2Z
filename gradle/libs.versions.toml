@@ -32,6 +32,7 @@ mapsCompose = "7.0.0"
 material3 = "1.4.0"
 materialIconsExtended = "1.7.8"
 navigationCompose = "2.9.6"
+appUpdate = "2.1.0"
 playServicesAuth = "21.4.0"
 playServicesAuthApiPhone = "18.3.0"
 playServicesMaps = "19.2.0"
@@ -54,6 +55,7 @@ coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coilCo
 coil-network-ktor3 = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coilCompose" }
 firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
 firebase-crashlytics = { module = "com.google.firebase:firebase-crashlytics" }
+app-update-ktx = { module = "com.google.android.play:app-update-ktx", version.ref = "appUpdate" }
 integrity = { module = "com.google.android.play:integrity", version.ref = "integrity" }
 intentsdk = { module = "phonepe.intentsdk.android.release:IntentSDK", version.ref = "intentsdk" }
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }

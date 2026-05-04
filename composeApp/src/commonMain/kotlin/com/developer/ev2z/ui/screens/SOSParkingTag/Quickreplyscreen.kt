@@ -87,7 +87,7 @@ private data class ChatMessage(
     val localId: Long = 0L                   // tie-breaker for owner replies sent in same ms
 )
 
-private enum class MessageStatus { SENDING, SENT, DELIVERED, ERROR }
+private enum class MessageStatus { SENDING, SENT, DELIVERED, READ, ERROR }
 
 // ─────────────────────────────────────────────────────────────────
 // QuickReplyScreen — Direct Chat UI (opens from notification)
@@ -101,14 +101,14 @@ fun QuickReplyScreen(
     visitorPhone: String? = null,
     viewModel: SosTagViewModel,
     onConfirmed: () -> Unit,
-    onBackPressed: () -> Unit
+    onBackPressed: () -> Unit,
+    onInitiateCall: (chatId: Int, onStarted: () -> Unit, onFailed: (String) -> Unit) -> Unit = { _, _, _ -> }
 ) {
-    // System back → close the chat overlay and return to home immediately.
-    // Composed AFTER the home pager's Voyager handlers so it wins LIFO priority
-    // and a single back press is enough.
+
     PlatformBackHandler(enabled = true) { onBackPressed() }
 
     val replyState by viewModel.replyState.collectAsState()
+    val isVisitorOnline by viewModel.isVisitorOnline.collectAsState()
     val focusManager = LocalFocusManager.current
 
     // ── Seed from the thread already fetched by my-chats-with-messages ──
@@ -117,6 +117,8 @@ fun QuickReplyScreen(
     var messages by remember { mutableStateOf(listOf<ChatMessage>()) }
     var inputText by remember { mutableStateOf("") }
     var hasReplied by remember { mutableStateOf(false) }
+    // Tracks the localId of the optimistic bubble we added before server confirms.
+    var pendingLocalId by remember { mutableStateOf<Long?>(null) }
     // Resolve which chat to load: explicit notification id, then last cached, then 0 (= empty state).
     val initialChatId = remember(alertId) {
         if (alertId > 0) alertId else (SosNotificationHandler.lastChatId ?: 0)
@@ -146,19 +148,45 @@ fun QuickReplyScreen(
             preloadedThread == null || preloadedThread!!.messages.isEmpty()
         )
     }
-    var showCallScreen by remember { mutableStateOf(false) }
+    var isInitiatingCall by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Helper — apply a server message into the chat (idempotent on message id).
-    // `type=="sent"` → owner bubble, anything else → visitor bubble.
+    fun statusFromDto(msg: ChatMessageDto, isOwner: Boolean): MessageStatus {
+        if (!isOwner) return MessageStatus.SENT
+        return when {
+            (msg.is_seen ?: 0) == 1      -> MessageStatus.READ
+            (msg.is_delivered ?: 0) == 1 -> MessageStatus.DELIVERED
+            else                         -> MessageStatus.SENT
+        }
+    }
+
+    // Apply a server message. For new ids → add bubble. For known ids → update status only.
     fun applyServerMessage(msg: ChatMessageDto) {
         val mid = msg.id ?: return
-        if (mid in seenServerMessageIds) return
+        val isOwner = msg.type.equals("sent", ignoreCase = true)
+        val newStatus = statusFromDto(msg, isOwner)
+
+        if (mid in seenServerMessageIds) {
+
+            if (isOwner) {
+                messages = messages.map { m ->
+                    if (m.localId == mid.toLong()) {
+                        when {
+                            newStatus == MessageStatus.READ -> m.copy(status = MessageStatus.READ)
+                            newStatus == MessageStatus.DELIVERED && m.status !in listOf(MessageStatus.READ, MessageStatus.DELIVERED) ->
+                                m.copy(status = MessageStatus.DELIVERED)
+                            else -> m  // keep current optimistic status — don't downgrade
+                        }
+                    } else m
+                }
+            }
+            return
+        }
+
         val text = msg.message?.takeIf { it.isNotBlank() } ?: return
         seenServerMessageIds.add(mid)
-        val isOwner = msg.type.equals("sent", ignoreCase = true)
         val sortMs = parseTimestampMs(msg.timestamp) ?: Clock.System.now().toEpochMilliseconds()
         val display = msg.time ?: formatMsTime(sortMs)
         messages = (messages + ChatMessage(
@@ -166,21 +194,117 @@ fun QuickReplyScreen(
             isOwner = isOwner,
             timestamp = display,
             sortKey = sortMs,
-            // Use the server id as the tie-breaker so message order is stable across polls.
             localId = mid.toLong(),
-            status = if (isOwner) MessageStatus.DELIVERED else MessageStatus.SENT
+            status = newStatus
         )).sortedWith(compareBy({ it.sortKey }, { it.localId }))
     }
 
-    // Helper — render an entire chat response (initial seed and ongoing reconciliation).
-    // Visitor name/phone are not in this endpoint's payload (see Sostagmodels.kt), so we
-    // only reconcile messages here. The `closed` flag flips the screen into empty state.
+
     fun applyChatThread(thread: ChatMessagesResponse) {
         if (thread.closed) isChatClosed = true
         thread.data.forEach { applyServerMessage(it) }
     }
 
-    // ── Load full chat history + live polling for the focused chat ──
+    // ── Connect Socket.IO for real-time messages ──
+    LaunchedEffect(activeAlertId) {
+        if (activeAlertId > 0 && !isChatClosed) {
+            viewModel.connectChatSocket(activeAlertId)
+            // Mark all messages as seen — owner is now viewing the chat
+            viewModel.markSeen(activeAlertId)
+
+            kotlinx.coroutines.delay(3000)
+            if (!isChatClosed) {
+                viewModel.fetchChatMessages(activeAlertId)?.let { response ->
+                    applyChatThread(response)
+                    if (response.data.any { msg ->
+                            msg.type.equals("sent", ignoreCase = true) && (msg.is_delivered ?: 0) == 1
+                        }) {
+                        viewModel.setVisitorOnlineHint(true)
+                    }
+                }
+            }
+        }
+    }
+
+    // Emit user_offline and disconnect when the screen leaves composition (point 2)
+    DisposableEffect(Unit) {
+        onDispose {
+            viewModel.emitUserOffline()
+            viewModel.disconnectChatSocket()
+        }
+    }
+
+    // Collect real-time messages pushed by the server via socket
+    LaunchedEffect(Unit) {
+        viewModel.socketMessageFlow.collect { dto ->
+            applyServerMessage(dto)
+            // Fetch REST for any message that is NOT explicitly an owner echo ("sent").
+            // Server may omit id/type in newMessage events, so null type counts as incoming.
+            val isIncoming = dto.type?.equals("sent", ignoreCase = true) != true
+            if (isIncoming && activeAlertId > 0) {
+                viewModel.markSeen(activeAlertId)
+
+                val chatId = activeAlertId
+                coroutineScope.launch {
+                    viewModel.fetchChatMessages(chatId)?.let { response ->
+                        applyChatThread(response)
+                        if (response.data.any { msg ->
+                                msg.type.equals("sent", ignoreCase = true) && (msg.is_delivered ?: 0) == 1
+                            }) {
+                            viewModel.setVisitorOnlineHint(true)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Collect real-time tick status updates (delivered / seen) from socket
+    LaunchedEffect(Unit) {
+        viewModel.socketStatusFlow.collect { (messageId, isDelivered, isSeen) ->
+            val newStatus = when {
+                isSeen      -> MessageStatus.READ
+                isDelivered -> MessageStatus.DELIVERED
+                else        -> MessageStatus.SENT
+            }
+            messages = messages.map { m ->
+                if (m.localId == messageId.toLong() && m.isOwner) m.copy(status = newStatus) else m
+            }
+        }
+    }
+
+    // When the socket reconnects after a brief drop, fetch REST history to catch any
+    // messages the socket missed while it was disconnected.
+    val isSocketConnected by viewModel.isSocketConnected.collectAsState()
+    LaunchedEffect(isSocketConnected) {
+        if (isSocketConnected && activeAlertId > 0 && !isChatClosed) {
+            viewModel.fetchChatMessages(activeAlertId)?.let { applyChatThread(it) }
+        }
+    }
+
+    // FCM fallback: when a new chat notification arrives for the currently open chat,
+    // fetch REST messages immediately — handles the case where socket is disconnected.
+    LaunchedEffect(Unit) {
+        SosNotificationHandler.alertFlow.collect { incomingChatId ->
+            if (incomingChatId == activeAlertId && activeAlertId > 0 && !isChatClosed) {
+                viewModel.fetchChatMessages(activeAlertId)?.let { response ->
+                    applyChatThread(response)
+                }
+                viewModel.markSeen(activeAlertId)
+            }
+        }
+    }
+
+    // Visitor came online → upgrade all SENT owner messages to DELIVERED (like WhatsApp double-tick)
+    LaunchedEffect(isVisitorOnline) {
+        if (isVisitorOnline) {
+            messages = messages.map { m ->
+                if (m.isOwner && m.status == MessageStatus.SENT) m.copy(status = MessageStatus.DELIVERED) else m
+            }
+        }
+    }
+
+    // ── Load full chat history on open (one-time) ──
     LaunchedEffect(Unit) {
         if (activeAlertId <= 0) {
             isLoading = false
@@ -194,37 +318,44 @@ fun QuickReplyScreen(
             isLoading = false
         }
 
-        // Then fetch full history from /chat-messages/{chatId} to get any messages
-        // not included in the inbox snapshot (my-chats-with-messages may be truncated)
+        // Fetch full history once — new messages arrive in real-time via Socket.IO
         viewModel.fetchChatMessages(activeAlertId)?.let { applyChatThread(it) }
         isLoading = false
-
-        // Polling — only for open chats; stop once server says closed
-        while (!isChatClosed) {
-            kotlinx.coroutines.delay(2000)
-            try {
-                val thread = viewModel.fetchChatMessages(activeAlertId) ?: continue
-                val freshIds = thread.data.mapNotNull { it.id }.filter { it !in seenServerMessageIds }
-                if (freshIds.isNotEmpty()) {
-                    println("📡 Live: chat #$activeAlertId +${freshIds.size} new message(s)")
-                }
-                applyChatThread(thread)
-                SosNotificationHandler.lastVisitorName?.let { latestVisitorName = it }
-                SosNotificationHandler.lastVisitorPhone?.let { latestVisitorPhone = it }
-            } catch (_: Exception) { /* retry next cycle */ }
-        }
+        SosNotificationHandler.lastVisitorName?.let { latestVisitorName = it }
+        SosNotificationHandler.lastVisitorPhone?.let { latestVisitorPhone = it }
     }
 
-    // Handle reply success/error — refresh chat from server (single source of truth).
+
     LaunchedEffect(replyState) {
         when (replyState) {
             is SosReplyUiState.Success -> {
                 hasReplied = true
-                // Pull the freshly-stored owner message immediately instead of waiting 2s.
-                viewModel.fetchChatMessages(activeAlertId)?.let { applyChatThread(it) }
+                // Drop the optimistic bubble — server response is the source of truth.
+                pendingLocalId?.let { tempId ->
+                    messages = messages.filter { it.localId != tempId }
+                }
+                pendingLocalId = null
+                val capturedChatId = activeAlertId
+                val capturedOnline = isVisitorOnline
+                coroutineScope.launch {
+                    viewModel.fetchChatMessages(capturedChatId)?.let { applyChatThread(it) }
+
+                    if (capturedOnline) {
+                        messages = messages.map { m ->
+                            if (m.isOwner && m.status == MessageStatus.SENT) m.copy(status = MessageStatus.DELIVERED) else m
+                        }
+                    }
+                }
                 viewModel.resetReplyState()
             }
             is SosReplyUiState.Error -> {
+                // Mark optimistic bubble as ERROR so the user can see it failed.
+                pendingLocalId?.let { tempId ->
+                    messages = messages.map { m ->
+                        if (m.localId == tempId) m.copy(status = MessageStatus.ERROR) else m
+                    }
+                }
+                pendingLocalId = null
                 coroutineScope.launch {
                     snackbarHostState.showSnackbar("Failed to send. Try again.")
                 }
@@ -243,27 +374,28 @@ fun QuickReplyScreen(
 
     fun sendMessage(text: String) {
         if (text.isBlank() || activeAlertId <= 0 || isChatClosed) return
+        if (replyState is SosReplyUiState.Loading) return  // prevent double-send
         val trimmed = text.trim()
 
         inputText = ""
         focusManager.clearFocus()
 
-        // No optimistic local bubble — the server is the source of truth.
-        // The Success branch of the replyState effect re-fetches the chat immediately so the
-        // owner sees their own message within ~150ms.
+        // Optimistic bubble — show instantly like WhatsApp, SENDING status until server confirms.
+        val nowMs = Clock.System.now().toEpochMilliseconds()
+        val tempId = -nowMs  // negative so it never collides with server IDs
+        pendingLocalId = tempId
+        messages = (messages + ChatMessage(
+            text = trimmed,
+            isOwner = true,
+            timestamp = formatMsTime(nowMs),
+            sortKey = nowMs,
+            localId = tempId,
+            status = MessageStatus.SENDING
+        )).sortedWith(compareBy({ it.sortKey }, { it.localId }))
+
         viewModel.selectReply(QuickReplyOption.CUSTOM)
         viewModel.onCustomMessageChange(trimmed)
         viewModel.submitReply(activeAlertId)
-    }
-
-    // ── Full-screen call overlay ─────────────────────────────────────
-    if (showCallScreen) {
-        CallScreen(
-            visitorName = latestVisitorName,
-            visitorPhone = latestVisitorPhone ?: "",
-            onEnd = { showCallScreen = false }
-        )
-        return
     }
 
     Scaffold(
@@ -277,8 +409,24 @@ fun QuickReplyScreen(
                     // hide "Close Chat" button if chat already closed
                     showClose = hasReplied && !isChatClosed,
                     isClosed = isChatClosed,
+                    isVisitorOnline = isVisitorOnline,
                     onBackPressed = onBackPressed,
-                    onCallPressed = { showCallScreen = true },
+                    onCallPressed = {
+                        if (!isInitiatingCall && activeAlertId > 0) {
+                            isInitiatingCall = true
+                            onInitiateCall(
+                                activeAlertId,
+                                { isInitiatingCall = false },
+                                { errMsg ->
+                                    isInitiatingCall = false
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar(errMsg)
+                                    }
+                                }
+                            )
+                        }
+                    },
+                    isCallLoading = isInitiatingCall,
                     onClosePressed = {
                         viewModel.closeChat(activeAlertId, onDone = onConfirmed)
                     }
@@ -304,12 +452,10 @@ fun QuickReplyScreen(
             }
         },
         bottomBar = {
-            // Hide the reply chips + input bar when there is no active alert or
-            // the chat has been closed — nothing to reply to.
-            if (!isLoading && activeAlertId > 0 && !isChatClosed) {
+
+            if (activeAlertId > 0 && !isChatClosed) {
                 Column {
-                    // Quick reply chips — always visible so the owner can use them
-                    // even after they've already typed/sent a custom message.
+
                     QuickReplyChips(
                         onChipSelected = { option ->
                             val text = when (option) {
@@ -453,6 +599,8 @@ private fun ChatTopBar(
     visitorPhone: String?,
     showClose: Boolean,
     isClosed: Boolean = false,
+    isVisitorOnline: Boolean = false,
+    isCallLoading: Boolean = false,
     onBackPressed: () -> Unit,
     onCallPressed: () -> Unit,
     onClosePressed: () -> Unit
@@ -485,7 +633,7 @@ private fun ChatTopBar(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = visitorName.firstOrNull()?.uppercase() ?: "V",
+                    text = "V",
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 18.sp
@@ -497,28 +645,61 @@ private fun ChatTopBar(
             // Name & status
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = visitorName,
+                    text = "Visitor",
                     color = Color.White,
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 16.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    text = if (isClosed) "Chat closed" else (visitorPhone ?: "Online"),
-                    color = Color.White.copy(alpha = 0.8f),
-                    fontSize = 12.sp
-                )
+                if (isClosed) {
+                    Text(
+                        text = "Chat closed",
+                        color = Color.White.copy(alpha = 0.8f),
+                        fontSize = 12.sp
+                    )
+                } else {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    if (isVisitorOnline) Color(0xFF4CAF50)
+                                    else Color.White.copy(alpha = 0.4f)
+                                )
+                        )
+                        Text(
+                            text = if (isVisitorOnline) "Online" else "Offline",
+                            color = Color.White.copy(alpha = 0.85f),
+                            fontSize = 12.sp
+                        )
+                    }
+                }
             }
 
             // Call button — only for open chats
             if (!isClosed) {
-                IconButton(onClick = onCallPressed) {
-//                    Icon(
-//                        Icons.Default.Call, "Call",
-//                        tint = Color.White,
-//                        modifier = Modifier.size(22.dp)
-//                    )
+                IconButton(
+                    onClick = onCallPressed,
+                    enabled = !isCallLoading
+                ) {
+                    if (isCallLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            Icons.Default.Call, "Call",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
                 }
             }
 
@@ -759,16 +940,18 @@ private fun ChatBubble(message: ChatMessage) {
                         Icon(
                             imageVector = when (message.status) {
                                 MessageStatus.SENDING   -> Icons.Default.Schedule
-                                MessageStatus.SENT      -> Icons.Default.Done
-                                MessageStatus.DELIVERED  -> Icons.Default.DoneAll
-                                MessageStatus.ERROR      -> Icons.Default.ErrorOutline
+                                MessageStatus.SENT      -> Icons.Default.Done       // 1 grey tick
+                                MessageStatus.DELIVERED -> Icons.Default.DoneAll    // 2 grey ticks
+                                MessageStatus.READ      -> Icons.Default.DoneAll    // 2 blue ticks
+                                MessageStatus.ERROR     -> Icons.Default.ErrorOutline
                             },
                             contentDescription = null,
                             modifier = Modifier.size(14.dp),
                             tint = when (message.status) {
-                                MessageStatus.DELIVERED -> Color(0xFF85B070)
+                                MessageStatus.READ      -> Color(0xFF2196F3)  // blue
+                                MessageStatus.DELIVERED -> TimestampColor     // grey
                                 MessageStatus.ERROR     -> ErrorRed
-                                else -> TimestampColor
+                                else                    -> TimestampColor
                             }
                         )
                     }

@@ -6,11 +6,11 @@ import ComposeApp
 
 // Mirrors Android's WebRtcManager + SocketIOSignalingClient exactly.
 //
-// Server URL: https://gps.eva2z.in:3001
+// Server URL: https://gps.eva2z.in
 // Events emitted : join-room, offer, answer, ice-candidate, end-call
 // Events received: user-joined, offer, answer, ice-candidate, end-call
 
-private let kSignalingServerURL = "https://gps.eva2z.in:3001"
+private let kSignalingServerURL = "https://gps.eva2z.in"
 private let kStunServer         = "stun:stun.l.google.com:19302"
 private let kStunServer2        = "stun:stun1.l.google.com:19302"
 
@@ -30,6 +30,13 @@ private let kStunServer2        = "stun:stun1.l.google.com:19302"
     // Guards against a race where the 500 ms deferred configureAudioSession fires
     // after onCallKitAudioActivated already ran (CallKit-answer path).
     private var audioSessionReady: Bool = false
+
+    // Ring timeout — auto-ends the outgoing call if callee never joins within 30s.
+    private var ringTimeoutItem: DispatchWorkItem?
+    private let ringTimeoutSeconds: Double = 30.0
+
+    // Separate socket+manager used only for connectAndDecline (visitor decline path).
+    private var declineSocketManager: SocketManager?
 
     // WebRTC
     private var factory:         RTCPeerConnectionFactory?
@@ -82,6 +89,7 @@ private let kStunServer2        = "stun:stun1.l.google.com:19302"
         print("📞 [WebRtcBridge] startAsCaller roomId=\(roomId)")
         setupWebRtc()
         connectSignaling()
+        startRingTimeout()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             guard let self = self, self.isCallActive, !self.audioSessionReady else { return }
             self.audioSessionReady = true
@@ -113,6 +121,37 @@ private let kStunServer2        = "stun:stun1.l.google.com:19302"
         }
     }
 
+    func connectAndDecline(roomId: String) {
+        print("📵 [WebRtcBridge] connectAndDecline → room=\(roomId)")
+        guard let url = URL(string: kSignalingServerURL) else { return }
+
+        let mgr = SocketManager(socketURL: url, config: [
+            .log(false), .compress, .forceWebsockets(true), .reconnects(false)
+        ])
+        let s = mgr.defaultSocket
+        declineSocketManager = mgr  // retain so ARC doesn't free it
+
+        s.once(clientEvent: .connect) { _, _ in
+            print("✅ [WebRtcBridge] Decline connected — joining room=\(roomId)")
+            s.emit("join-room", ["roomId": roomId])
+            // Wait 500ms for server to add us to the room before emitting end-call
+            DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
+                print("📵 [WebRtcBridge] Decline: emitting end-call → room=\(roomId)")
+                s.emit("end-call", ["roomId": roomId])
+                DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) {
+                    s.disconnect()
+                    self.declineSocketManager = nil
+                }
+            }
+        }
+        s.on(clientEvent: .error) { _, _ in
+            print("❌ [WebRtcBridge] connectAndDecline: server unreachable for room=\(roomId)")
+            s.disconnect()
+            self.declineSocketManager = nil
+        }
+        s.connect()
+    }
+
     func dispose() {
         print("🗑️ [WebRtcBridge] dispose")
         teardownInternal()
@@ -127,6 +166,25 @@ private let kStunServer2        = "stun:stun1.l.google.com:19302"
         print("🔊 [WebRtcBridge] onCallKitAudioActivated — reconfiguring audio session")
         audioSessionReady = true
         configureAudioSession()
+    }
+
+    // MARK: - Ring timeout
+
+    private func startRingTimeout() {
+        let item = DispatchWorkItem { [weak self] in
+            guard let self = self, self.isCallActive else { return }
+            print("⏰ [WebRtcBridge] Ring timeout — no answer after \(Int(self.ringTimeoutSeconds))s, ending call")
+            DispatchQueue.main.async { SosNotificationHandler.shared.onCallEnded() }
+            self.endCall()
+        }
+        ringTimeoutItem = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + ringTimeoutSeconds, execute: item)
+        print("⏱️ [WebRtcBridge] Ring timeout scheduled — \(Int(ringTimeoutSeconds))s")
+    }
+
+    private func cancelRingTimeout() {
+        ringTimeoutItem?.cancel()
+        ringTimeoutItem = nil
     }
 
     // MARK: - Audio session
@@ -224,8 +282,13 @@ private let kStunServer2        = "stun:stun1.l.google.com:19302"
         socket?.on("user-joined") { [weak self] _, _ in
             guard let self = self else { return }
             print("👤 [WebRtcBridge] user-joined — isCaller=\(self.isCaller)")
-            if self.isCaller { self.createOffer() }
-            else             { print("📋 [WebRtcBridge] Callee — waiting for offer") }
+            if self.isCaller {
+                self.cancelRingTimeout()
+                DispatchQueue.main.async { SosNotificationHandler.shared.onCalleeJoined() }
+                self.createOffer()
+            } else {
+                print("📋 [WebRtcBridge] Callee — waiting for offer")
+            }
         }
 
         socket?.on("offer") { [weak self] data, _ in
@@ -285,9 +348,16 @@ private let kStunServer2        = "stun:stun1.l.google.com:19302"
 
         socket?.on("end-call") { [weak self] _, _ in
             guard let self = self, self.isCallActive else { return }
-            print("📵 [WebRtcBridge] Remote peer ended call")
-            DispatchQueue.main.async {
-                SosNotificationHandler.shared.onCallEnded()
+            print("📵 [WebRtcBridge] end-call received — remote peer ended call")
+            DispatchQueue.main.async { SosNotificationHandler.shared.onCallEnded() }
+        }
+
+        // Alternative event names the backend may emit on REST decline/reject
+        for eventName in ["call_declined", "call_rejected", "call_ended"] {
+            socket?.on(eventName) { [weak self] _, _ in
+                guard let self = self, self.isCallActive else { return }
+                print("📵 [WebRtcBridge] \(eventName) received — ending call")
+                DispatchQueue.main.async { SosNotificationHandler.shared.onCallEnded() }
             }
         }
 
@@ -360,10 +430,13 @@ private let kStunServer2        = "stun:stun1.l.google.com:19302"
         isLocalDescriptionSet = false
         pendingRemoteCandidates.removeAll()
 
+        cancelRingTimeout()
+
         socket?.off(clientEvent: .connect)
         socket?.off(clientEvent: .error)
         socket?.off(clientEvent: .disconnect)
-        ["user-joined", "offer", "answer", "ice-candidate", "end-call"].forEach { socket?.off($0) }
+        ["user-joined", "offer", "answer", "ice-candidate",
+         "end-call", "call_declined", "call_rejected", "call_ended"].forEach { socket?.off($0) }
         socket?.disconnect()
         socket        = nil
         socketManager = nil

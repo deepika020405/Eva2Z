@@ -78,6 +78,10 @@ class AppDelegate: NSObject,
         RingtoneBridgeHolder.shared.delegate = RingtoneManager.shared
         print("✅ RingtoneBridge registered")
 
+        // Register Chat Socket bridge — real-time messaging via Socket.IO (mirrors Android)
+        ChatSocketBridgeHolder.shared.delegate = ChatSocketBridge.shared
+        print("✅ ChatSocketBridge registered")
+
         // VoIP PushKit — wakes app immediately on any state (background / killed / locked)
         // so CallKit can ring before the user ever taps a notification.
         let voipReg = PKPushRegistry(queue: .main)
@@ -186,16 +190,22 @@ class AppDelegate: NSObject,
         // For data-only FCM: no system notification — we must post the local banner ourselves.
         let aps   = userInfo["aps"] as? [AnyHashable: Any]
         let alert = aps?["alert"] as? [AnyHashable: Any]
+
+        let visitorName = (userInfo["visitor_name"] as? String) ?? ""
         let title = (userInfo["title"] as? String)
                  ?? (alert?["title"] as? String)
-                 ?? "New Alert"
+                 ?? (visitorName.isEmpty ? "New Message" : visitorName)
         let body  = (userInfo["body"] as? String)
                  ?? (alert?["body"] as? String)
-                 ?? ""
+                 ?? "You have a new visitor message"
+
+        // Resolve chat_id from either String or Int (server may send either type)
+        let chatIdInt = chatIdFromPayload(userInfo)
 
         let hasSystemNotification = alert != nil
         if !hasSystemNotification {
-            // Data-only FCM — post a local banner (system won't show anything otherwise)
+            // Data-only FCM — post a local banner (system won't show anything otherwise).
+            // This fires when the app is foreground or background (content-available:1).
             let content = UNMutableNotificationContent()
             content.title = title
             content.body  = body
@@ -204,7 +214,7 @@ class AppDelegate: NSObject,
                 content.userInfo = dict
             }
 
-            let chatKey = (userInfo["chat_id"] as? String) ?? UUID().uuidString
+            let chatKey = chatIdInt > 0 ? String(chatIdInt) : UUID().uuidString
             let request = UNNotificationRequest(
                 identifier: "chat-\(chatKey)",
                 content:    content,
@@ -212,7 +222,13 @@ class AppDelegate: NSObject,
             )
             UNUserNotificationCenter.current().add(request) { err in
                 if let err = err { print("❌ Local notif error:", err) }
+                else             { print("🔔 Local chat notification posted — chatId=\(chatKey)") }
             }
+        }
+
+        // Mark message delivered on device (matches Android's callDeliveredApi behaviour).
+        if (type == "chat" || type == "vehicle_notification") && chatIdInt > 0 {
+            markChatDelivered(chatId: chatIdInt)
         }
 
         triggerSosIfNeeded(data: userInfo)
@@ -247,6 +263,11 @@ class AppDelegate: NSObject,
             return
         }
 
+        // Chat / SOS notifications — always show the banner in foreground.
+        let chatId = chatIdFromPayload(data)
+        if (type == "chat" || type == "vehicle_notification") && chatId > 0 {
+            markChatDelivered(chatId: chatId)
+        }
         triggerSosIfNeeded(data: data)
         completionHandler([.banner, .badge, .sound])
     }
@@ -279,6 +300,10 @@ class AppDelegate: NSObject,
         } else if ["call_ended", "call_accepted"].contains(type) {
             handleCallIfNeeded(data: data)
         } else {
+            let chatId = chatIdFromPayload(data)
+            if (type == "chat" || type == "vehicle_notification") && chatId > 0 {
+                markChatDelivered(chatId: chatId)
+            }
             triggerSosIfNeeded(data: data)
         }
 
@@ -411,18 +436,44 @@ class AppDelegate: NSObject,
     // MARK: - SOS helper
 
     private func triggerSosIfNeeded(data: [AnyHashable: Any]) {
-        let chatIdStr = (data["chat_id"] as? String) ?? ""
-        guard let chatId = Int32(chatIdStr) else { return }
+        let chatId = chatIdFromPayload(data)
+        guard chatId > 0 else { return }
 
         let visitorName  = (data["visitor_name"]  as? String) ?? ""
         let visitorPhone = (data["visitor_phone"] as? String) ?? ""
 
         print("🚨 iOS SOS alert → chatId=\(chatId) name=\(visitorName) phone=\(visitorPhone)")
         SosNotificationHandler.shared.onSosAlertReceived(
-            alertId:      chatId,
+            alertId:      Int32(chatId),
             visitorName:  visitorName,
             visitorPhone: visitorPhone
         )
+    }
+
+    // Resolves chat_id from the FCM payload regardless of whether the server sent it
+    // as a JSON String ("44") or a JSON Number (44) — both arrive as Swift Any.
+    private func chatIdFromPayload(_ data: [AnyHashable: Any]) -> Int {
+        if let s = data["chat_id"] as? String, let i = Int(s) { return i }
+        if let i = data["chat_id"] as? Int                     { return i }
+        if let s = data["notification_id"] as? String, let i = Int(s) { return i }
+        if let i = data["notification_id"] as? Int             { return i }
+        return 0
+    }
+
+    // Mirrors Android's callDeliveredApi — tells the server the notification reached the device.
+    private func markChatDelivered(chatId: Int) {
+        let authToken = UserDefaults.standard.string(forKey: "token") ?? ""
+        guard !authToken.isEmpty,
+              let url = URL(string: "https://app.eva2z.in/api/chat/\(chatId)/delivered") else { return }
+
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json",    forHTTPHeaderField: "Accept")
+        URLSession.shared.dataTask(with: req) { _, resp, _ in
+            let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+            print("✔️ markDelivered #\(chatId) (FCM) → HTTP \(code)")
+        }.resume()
     }
 
     // MARK: - VoIP PushKit
@@ -553,10 +604,16 @@ class AppDelegate: NSObject,
         req.httpMethod = "POST"
         req.setValue("Bearer \(authToken)", forHTTPHeaderField: "Authorization")
         req.setValue("application/json",    forHTTPHeaderField: "Content-Type")
+        #if DEBUG
+        let isProduction = false
+        #else
+        let isProduction = true
+        #endif
         req.httpBody = try? JSONSerialization.data(withJSONObject: [
-            "fcm_token":   voipToken,
-            "device_uuid": deviceUUID,
-            "platform":    "ios_voip"
+            "fcm_token":     voipToken,
+            "device_uuid":   deviceUUID,
+            "platform":      "ios_voip",
+            "is_production": isProduction
         ])
 
         URLSession.shared.dataTask(with: req) { _, resp, err in

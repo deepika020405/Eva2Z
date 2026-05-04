@@ -38,7 +38,8 @@ fun CallScreen(
     visitorPhone: String,
     onEnd: () -> Unit,
     voiceCallManager: VoiceCallManager? = null,
-    isConnected: Boolean = false
+    isConnected: Boolean = false,
+    isRinging: Boolean = false
 ) {
     // ── Timer — starts only after connected ────────────────────────
     var elapsedSeconds by remember { mutableStateOf(0) }
@@ -48,7 +49,7 @@ fun CallScreen(
     }
     val timerText = "${(elapsedSeconds / 60).toString().padStart(2, '0')}:${(elapsedSeconds % 60).toString().padStart(2, '0')}"
 
-    // ── Connecting dots animation ──────────────────────────────────
+    // ── Dots animation (ringing / connecting) ─────────────────────
     var dotCount by remember { mutableStateOf(1) }
     LaunchedEffect(isConnected) {
         if (isConnected) return@LaunchedEffect
@@ -86,8 +87,11 @@ fun CallScreen(
 
             // ── Subtitle ──────────────────────────────────────────
             Text(
-                if (isConnected) "Parking Alert · In Call"
-                else "Parking Alert · Connecting" + ".".repeat(dotCount),
+                when {
+                    isConnected -> "Parking Alert · In Call"
+                    isRinging   -> "Parking Alert · Ringing" + ".".repeat(dotCount)
+                    else        -> "Parking Alert · Connecting" + ".".repeat(dotCount)
+                },
                 fontSize = 12.sp,
                 color = CallGreenLight.copy(alpha = 0.6f),
                 fontWeight = FontWeight.Medium,
@@ -115,7 +119,7 @@ fun CallScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        visitorName.firstOrNull()?.uppercase() ?: "V",
+                        "V",
                         fontSize = 38.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
@@ -127,7 +131,7 @@ fun CallScreen(
 
             // ── Name ──────────────────────────────────────────────
             Text(
-                visitorName,
+                "Visitor",
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White
@@ -135,12 +139,19 @@ fun CallScreen(
 
             Spacer(Modifier.height(6.dp))
 
-            // ── Phone ─────────────────────────────────────────────
-            Text(
-                visitorPhone,
-                fontSize = 14.sp,
-                color = Color.White.copy(alpha = 0.55f)
-            )
+            // ── Phone (masked) ────────────────────────────────────
+            if (visitorPhone.isNotBlank()) {
+                val digits = visitorPhone.filter { it.isDigit() }
+                val maskedPhone = if (digits.length >= 4)
+                    "•••• •••• ${digits.takeLast(4)}"
+                else
+                    "••••••••••"
+                Text(
+                    maskedPhone,
+                    fontSize = 14.sp,
+                    color = Color.White.copy(alpha = 0.55f)
+                )
+            }
 
             Spacer(Modifier.height(16.dp))
 
@@ -170,7 +181,11 @@ fun CallScreen(
                             )
                     )
                     Text(
-                        if (isConnected) timerText else "Connecting...",
+                        when {
+                            isConnected -> timerText
+                            isRinging   -> "Ringing..."
+                            else        -> "Connecting..."
+                        },
                         fontSize = 15.sp,
                         color = Color.White,
                         fontWeight = FontWeight.SemiBold

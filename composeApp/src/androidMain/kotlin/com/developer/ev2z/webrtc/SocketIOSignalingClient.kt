@@ -2,6 +2,10 @@ package com.developer.ev2z.webrtc
 
 import io.socket.client.IO
 import io.socket.client.Socket
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 import org.webrtc.IceCandidate
 import org.webrtc.SessionDescription
@@ -28,8 +32,7 @@ class SocketIOSignalingClient(private val serverUrl: String) {
     }
 
     private val socket: Socket = IO.socket(serverUrl, IO.Options().apply {
-        // Try WebSocket first, fall back to polling if WebSocket is blocked/unavailable
-        transports = arrayOf("websocket", "polling")
+        transports = arrayOf("websocket")
         reconnection = true
         reconnectionAttempts = 3
         reconnectionDelay = 2000
@@ -106,6 +109,19 @@ class SocketIOSignalingClient(private val serverUrl: String) {
             println("📵 [Socket.IO] end-call event received — remote peer ended the call")
             listener.onCallEnded()
         }
+        // Alternative event names the backend might emit on REST decline/reject
+        socket.on("call_declined") {
+            println("📵 [Socket.IO] call_declined event received")
+            listener.onCallEnded()
+        }
+        socket.on("call_rejected") {
+            println("📵 [Socket.IO] call_rejected event received")
+            listener.onCallEnded()
+        }
+        socket.on("call_ended") {
+            println("📵 [Socket.IO] call_ended event received")
+            listener.onCallEnded()
+        }
 
         println("📡 [Socket.IO] socket.connect() called")
         socket.connect()
@@ -155,6 +171,31 @@ class SocketIOSignalingClient(private val serverUrl: String) {
     fun sendEnd() {
         println("📤 [Socket.IO] EMIT end-call → room=$activeRoomId")
         socket.emit("end-call", JSONObject().put("roomId", activeRoomId))
+    }
+
+    // Join a room and immediately emit end-call, then disconnect.
+    // Used by the callee to notify the caller when declining without accepting.
+    fun connectAndDecline(roomId: String) {
+        println("📵 [Socket.IO] connectAndDecline → room=$roomId")
+        socket.once(Socket.EVENT_CONNECT) { _ ->
+            println("✅ [Socket.IO] Decline connected — joining room=$roomId")
+            socket.emit("join-room", JSONObject().put("roomId", roomId))
+            // Wait for server to add us to the room before emitting end-call
+            CoroutineScope(Dispatchers.IO).launch {
+                delay(500)
+                println("📵 [Socket.IO] Decline: emitting end-call → room=$roomId")
+                socket.emit("end-call", JSONObject().put("roomId", roomId))
+                delay(1000)
+                socket.off()
+                socket.disconnect()
+            }
+        }
+        socket.on(Socket.EVENT_CONNECT_ERROR) { _ ->
+            println("❌ [Socket.IO] connectAndDecline: server unreachable for room=$roomId")
+            socket.off()
+            socket.disconnect()
+        }
+        socket.connect()
     }
 
     fun disconnect() {

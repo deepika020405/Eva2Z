@@ -2,37 +2,24 @@ package com.developer.ev2z.calling
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.media.ToneGenerator
+import android.media.AudioManager
 import androidx.core.content.ContextCompat
 import com.developer.ev2z.AppContextHolder
+import com.developer.ev2z.network.KtorClient
 import com.developer.ev2z.util.NotificationUtil
 import com.developer.ev2z.util.SosNotificationHandler
 import com.developer.ev2z.webrtc.SocketIOSignalingClient
 import com.developer.ev2z.webrtc.WebRtcManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import org.webrtc.IceCandidate
 import org.webrtc.SessionDescription
 import java.util.concurrent.atomic.AtomicBoolean
-
-// ⚠️ IMPORTANT — SET YOUR SOCKET.IO SIGNALING SERVER URL HERE.
-//
-// The current URL https://gps.eva2z.in does NOT have a Socket.IO server running on it.
-// You are getting "xhr poll error" because this endpoint doesn't serve Socket.IO.
-//
-// You need to either:
-//   1. Deploy a Socket.IO signaling server (see node.js example below) and put its URL here.
-//   2. Ask your backend team for the correct WebSocket / Socket.IO server URL.
-//
-// Minimal Node.js server to run alongside your API:
-//   const io = require('socket.io')(httpServer, { cors: { origin: '*' } });
-//   io.on('connection', socket => {
-//     socket.on('join',      d => socket.join(d.room_id));
-//     socket.on('offer',     d => socket.to(d.room_id).emit('offer',     d));
-//     socket.on('answer',    d => socket.to(d.room_id).emit('answer',    d));
-//     socket.on('candidate', d => socket.to(d.room_id).emit('candidate', d));
-//     socket.on('end',       d => socket.to(d.room_id).emit('end',       d));
-//   });
-//
-// Replace the URL below once your signaling server is live:
-private const val SIGNALING_SERVER_URL = "https://gps.eva2z.in:3001"
 
 actual class VoiceCallManager actual constructor() {
 
@@ -44,9 +31,39 @@ actual class VoiceCallManager actual constructor() {
     }
 
     private val webRtc = WebRtcManager(AppContextHolder.context)
-    private val signalingClient = SocketIOSignalingClient(SIGNALING_SERVER_URL)
+    private val signalingClient = SocketIOSignalingClient(KtorClient.SOCKET_SERVER_URL)
     private val disposed = AtomicBoolean(false)
     private var isCaller = false
+
+    private var ringbackJob: Job? = null
+    private var toneGenerator: ToneGenerator? = null
+    // Cancels the outgoing call if the callee never joins within this window
+    private var ringTimeoutJob: Job? = null
+    private val RING_TIMEOUT_MS = 30_000L
+
+    private fun startRingback() {
+        try {
+            toneGenerator = ToneGenerator(AudioManager.STREAM_VOICE_CALL, 80)
+            ringbackJob = CoroutineScope(Dispatchers.IO).launch {
+                while (isActive) {
+                    toneGenerator?.startTone(ToneGenerator.TONE_SUP_RINGTONE, 1500)
+                    delay(3000)
+                }
+            }
+            println("🔔 [VoiceCall] Ringback tone started")
+        } catch (e: Exception) {
+            println("⚠️ [VoiceCall] Could not start ringback: ${e.message}")
+        }
+    }
+
+    private fun stopRingback() {
+        ringbackJob?.cancel()
+        ringbackJob = null
+        toneGenerator?.stopTone()
+        toneGenerator?.release()
+        toneGenerator = null
+        println("🔕 [VoiceCall] Ringback tone stopped")
+    }
 
     actual fun startAsCallee(roomId: String) {
         isCaller = false
@@ -64,8 +81,19 @@ actual class VoiceCallManager actual constructor() {
         isCallActive = true
         println("📞 [VoiceCall] ── START AS CALLER ── roomId=$roomId  isCallActive=true")
         if (!checkMicPermission()) return
+        startRingback()
         initWebRtc()
         signalingClient.connect(roomId, signalingListener)
+        // Auto-cancel: if visitor never joins within 60 s, treat as declined
+        ringTimeoutJob = CoroutineScope(Dispatchers.Main).launch {
+            delay(RING_TIMEOUT_MS)
+            if (!disposed.get()) {
+                println("⏰ [VoiceCall] Ring timeout — no answer after ${RING_TIMEOUT_MS / 1000}s, ending call")
+                SosNotificationHandler.onCallEnded()
+                endCall()
+                dispose()
+            }
+        }
     }
 
     private fun checkMicPermission(): Boolean {
@@ -119,7 +147,11 @@ actual class VoiceCallManager actual constructor() {
         }
         override fun onUserJoined() {
             println("👤 [VoiceCall] Remote user joined room — isCaller=$isCaller")
+            ringTimeoutJob?.cancel()  // callee answered — no longer need the timeout
+            ringTimeoutJob = null
             if (isCaller) {
+                stopRingback()
+                SosNotificationHandler.onCalleeJoined()
                 println("📋 [VoiceCall] We are caller → creating offer")
                 webRtc.createOffer()
             } else {
@@ -143,6 +175,12 @@ actual class VoiceCallManager actual constructor() {
         signalingClient.sendEnd()
     }
 
+    actual fun sendDeclineSignal(roomId: String) {
+        if (roomId.isBlank()) return
+        println("📵 [VoiceCall] sendDeclineSignal — notifying caller via socket room=$roomId")
+        SocketIOSignalingClient(KtorClient.SOCKET_SERVER_URL).connectAndDecline(roomId)
+    }
+
     actual fun setMuted(muted: Boolean) {
         webRtc.setMuted(muted)
     }
@@ -155,6 +193,9 @@ actual class VoiceCallManager actual constructor() {
         if (!disposed.compareAndSet(false, true)) return
         isCallActive = false
         println("🗑️ [VoiceCall] dispose() — cleaning up Socket.IO + WebRTC  isCallActive=false")
+        ringTimeoutJob?.cancel()
+        ringTimeoutJob = null
+        stopRingback()
         signalingClient.disconnect()
         webRtc.dispose()
         println("✅ [VoiceCall] Call session fully disposed")

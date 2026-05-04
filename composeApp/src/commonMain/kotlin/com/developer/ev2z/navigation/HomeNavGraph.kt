@@ -466,6 +466,7 @@ fun HomeNavGraph(
     var showIncomingCallScreen by remember { mutableStateOf(false) }
     var showActiveCallScreen   by remember { mutableStateOf(false) }
     var callIsConnected        by remember { mutableStateOf(false) }
+    var callIsRinging          by remember { mutableStateOf(false) }
     var incomingCallData       by remember { mutableStateOf<IncomingCallData?>(null) }
     // Holds the active WebRTC + Socket.IO manager for the current call.
     // Recreated on each new call; disposed on end or remote hang-up.
@@ -551,6 +552,14 @@ fun HomeNavGraph(
         }
     }
 
+    // ── Callee joined signaling room → stop ringing, show connecting ──
+    LaunchedEffect(Unit) {
+        SosNotificationHandler.calleeJoinedFlow.collect {
+            println("📲 Callee joined — transitioning ringing → connecting")
+            callIsRinging = false
+        }
+    }
+
     // ── Caller cancelled / call_ended → dismiss ringing or active call ─
     var callFailedMsg by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(Unit) {
@@ -566,15 +575,17 @@ fun HomeNavGraph(
             showIncomingCallScreen  = false
             showActiveCallScreen    = false
             callIsConnected         = false
+            callIsRinging           = false
             incomingCallData        = null
 
             if (wasOnActiveCall && !wasConnected) {
-                // Call screen was shown but never actually connected → signaling server down
-                callFailedMsg = "Could not connect call. Signaling server unavailable."
+                // Call ended before ICE connected → visitor unavailable / declined
+                callFailedMsg = "Call disconnect by visitor. Please try again."
             }
 
-            // If call was active (visitor hung up mid-call) redirect to chat screen
-            if (wasOnActiveCall && chatId != null && chatId > 0) {
+            // Only redirect to chat if the call was actually connected (visitor hung up mid-call).
+            // Do NOT redirect when the call failed before connecting (visitor unavailable).
+            if (wasOnActiveCall && wasConnected && chatId != null && chatId > 0) {
                 sosTagViewModel.resetAll()
                 currentSosAlertId = chatId
                 showSosQuickReply = true
@@ -651,12 +662,14 @@ fun HomeNavGraph(
                 visitorPhone      = incomingCallData?.visitorPhone ?: SosNotificationHandler.lastVisitorPhone ?: "",
                 voiceCallManager  = activeVoiceCallManager,
                 isConnected       = callIsConnected,
+                isRinging         = callIsRinging,
                 onEnd             = {
                     activeVoiceCallManager?.endCall()
                     activeVoiceCallManager?.dispose()
                     activeVoiceCallManager  = null
                     showActiveCallScreen    = false
                     callIsConnected         = false
+                    callIsRinging           = false
                     incomingCallData        = null
                 }
             )
@@ -684,6 +697,11 @@ fun HomeNavGraph(
                     onDeclined   = {
                         stopCallSound()
                         cancelCallNotification()
+                        // Immediately notify the caller via socket so their screen closes
+                        // without waiting for an FCM round-trip or the 60s ring timeout.
+                        if (callData.roomId.isNotBlank()) {
+                            VoiceCallManager().sendDeclineSignal(callData.roomId)
+                        }
                         showIncomingCallScreen = false
                         showActiveCallScreen   = false
                         val chatId = callData.chatId
@@ -740,6 +758,32 @@ fun HomeNavGraph(
                     if (sosOpenedFromInbox) {
                         sosOpenedFromInbox = false
                         showSosChatInbox = true
+                    }
+                },
+                onInitiateCall = { chatId, onStarted, onFailed ->
+                    coroutineScope.launch {
+                        println("📞 Owner initiating call — chatId=$chatId")
+                        val resp = apiService.initiateCall(chatId)
+                        val roomId = resp.room_id
+                        if (resp.success && !roomId.isNullOrBlank()) {
+                            println("📞 Call initiated — roomId=$roomId, starting as caller")
+                            val mgr = VoiceCallManager()
+                            mgr.startAsCaller(roomId)
+                            incomingCallData = IncomingCallData(
+                                visitorName  = currentVisitorName,
+                                visitorPhone = currentVisitorPhone ?: "",
+                                roomId       = roomId,
+                                chatId       = chatId
+                            )
+                            activeVoiceCallManager = mgr
+                            callIsConnected        = false
+                            callIsRinging          = true
+                            showActiveCallScreen   = true
+                            onStarted()
+                        } else {
+                            println("❌ initiateCall failed: ${resp.message}")
+                            onFailed(resp.message ?: "Could not start call. Please try again.")
+                        }
                     }
                 }
             )
@@ -1161,7 +1205,7 @@ fun HomeNavGraph(
                     .padding(bottom = 80.dp, start = 16.dp, end = 16.dp)
             ) {
                 Snackbar(
-                    containerColor = Color(0xFFB71C1C),
+                    containerColor = Color(0xFF424242),
                     contentColor   = Color.White,
                 ) {
                     Text(
@@ -1292,7 +1336,13 @@ fun HomeNavGraph(
     PlatformBackHandler(enabled = showDocumentViewer)    { showDocumentViewer = false; showDocuments = true }
     PlatformBackHandler(enabled = showAddDevice)         { showAddDevice = false }
     PlatformBackHandler(enabled = showVaultPasswordDialog) { showVaultPasswordDialog = false }
-    PlatformBackHandler(enabled = showIncomingCallScreen) { stopCallSound(); cancelCallNotification(); showIncomingCallScreen = false; incomingCallData = null }
+    PlatformBackHandler(enabled = showIncomingCallScreen) {
+        stopCallSound()
+        cancelCallNotification()
+        incomingCallData?.roomId?.takeIf { it.isNotBlank() }?.let { VoiceCallManager().sendDeclineSignal(it) }
+        showIncomingCallScreen = false
+        incomingCallData = null
+    }
     PlatformBackHandler(enabled = showActiveCallScreen)   { showActiveCallScreen = false; incomingCallData = null }
     PlatformBackHandler(enabled = showSosQuickReply)     { showSosQuickReply = false; currentSosAlertId = null; sosTagViewModel.resetAll() }
     PlatformBackHandler(enabled = showSosConfirmation)   { showSosConfirmation = false; currentSosAlertId = null; sosTagViewModel.resetAll() }

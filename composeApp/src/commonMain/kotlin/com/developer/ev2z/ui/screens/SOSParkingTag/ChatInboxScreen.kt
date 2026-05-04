@@ -63,8 +63,17 @@ fun ChatInboxScreen(
     PlatformBackHandler(enabled = true) { onBackPressed() }
 
     val threadListState by viewModel.threadListState.collectAsState()
+    val onlineChats    by viewModel.onlineChats.collectAsState()
 
-    LaunchedEffect(Unit) { viewModel.loadChatsWithMessages() }
+    LaunchedEffect(Unit) {
+        viewModel.loadChatsWithMessages()
+        // Periodic silent refresh — keeps inbox live when socket is not connected on this screen.
+        // refreshChatsWithMessages() doesn't show a loading spinner so there's no UI flicker.
+        while (true) {
+            kotlinx.coroutines.delay(10_000)
+            viewModel.refreshChatsWithMessages()
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(ColorBg)) {
 
@@ -107,6 +116,7 @@ fun ChatInboxScreen(
                         } else {
                             ThreadList(
                                 threads = state.threads,
+                                onlineChats = onlineChats,
                                 viewModel = viewModel,
                                 onChatSelected = onChatSelected
                             )
@@ -201,6 +211,7 @@ private fun PremiumTopBar(
 @Composable
 private fun ThreadList(
     threads: List<ChatThread>,
+    onlineChats: Set<Int>,
     viewModel: SosTagViewModel,
     onChatSelected: (chatId: Int, visitorName: String, visitorPhone: String?) -> Unit
 ) {
@@ -244,9 +255,10 @@ private fun ThreadList(
             ThreadCard(
                 thread = thread,
                 unreadCount = unreadCount,
+                isVisitorOnline = thread.chat_id in onlineChats,
                 onClick = {
                     viewModel.markChatRead(thread.chat_id, thread.last_message?.id)
-                    viewModel.selectThread(thread)   // pre-seed messages + isOpen state
+                    viewModel.selectThread(thread)
                     val name = thread.visitor?.name?.takeIf { it.isNotBlank() } ?: "Visitor"
                     onChatSelected(thread.chat_id, name, thread.visitor?.phone)
                 }
@@ -261,9 +273,11 @@ private fun ThreadList(
 private fun ThreadCard(
     thread: ChatThread,
     unreadCount: Int,
+    isVisitorOnline: Boolean,
     onClick: () -> Unit
 ) {
     val visitorName   = thread.visitor?.name?.takeIf { it.isNotBlank() } ?: "Visitor"
+    val displayName   = "Visitor #${thread.chat_id}"
     val lastMsg       = thread.last_message
     val lastMsgText   = lastMsg?.text?.takeIf { it.isNotBlank() } ?: "Parking alert"
     val lastMsgTime   = lastMsg?.time?.takeIf { it.isNotBlank() }
@@ -271,8 +285,8 @@ private fun ThreadCard(
     val isOpen        = thread.isOpen
     val hasUnread     = unreadCount > 0
 
-    val avatarColor = AvatarColors[visitorName.length % AvatarColors.size]
-    val avatarLetter = visitorName.first().uppercaseChar().toString()
+    val avatarColor = AvatarColors[thread.chat_id % AvatarColors.size]
+    val avatarLetter = "V"
 
     Column(
         modifier = Modifier
@@ -316,8 +330,8 @@ private fun ThreadCard(
                             fontSize = 22.sp
                         )
                     }
-                    // Online dot (only for open chats)
-                    if (isOpen) {
+                    // Green dot only when visitor is actually connected via socket right now
+                    if (isVisitorOnline) {
                         Box(
                             modifier = Modifier
                                 .size(13.dp)
@@ -342,7 +356,7 @@ private fun ThreadCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = visitorName,
+                            text = displayName,
                             fontWeight = if (hasUnread) FontWeight.Bold else FontWeight.SemiBold,
                             fontSize = 15.sp,
                             color = if (isOpen) ColorTextTitle else ColorTextBody,
@@ -368,11 +382,18 @@ private fun ThreadCard(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Double tick
+                        // Tick icon driven by real is_delivered / is_seen from API.
+                        // is_seen=1  → double blue tick  (visitor read it)
+                        // is_delivered=1 only → double grey tick (visitor received it)
+                        // neither       → single grey tick (sent, not yet delivered)
                         if (ownerSentLast) {
+                            val isSeen      = lastMsg?.is_seen == 1
+                            val isDelivered = lastMsg?.is_delivered == 1
                             Icon(
-                                Icons.Default.DoneAll, null,
-                                tint = ColorTickBlue,
+                                imageVector = if (isSeen || isDelivered) Icons.Default.DoneAll
+                                              else Icons.Default.Done,
+                                contentDescription = null,
+                                tint = if (isSeen) ColorTickBlue else ColorTextMuted,
                                 modifier = Modifier
                                     .size(14.dp)
                                     .padding(end = 2.dp)

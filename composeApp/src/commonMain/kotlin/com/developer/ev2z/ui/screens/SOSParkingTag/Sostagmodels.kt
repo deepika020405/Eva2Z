@@ -87,10 +87,12 @@ data class ChatMessagesResponse(
 data class ChatMessageDto(
     val id: Int?           = null,
     val message: String?   = null,
-    @SerialName("sender_id") val sender_id: Int? = null,
+    @SerialName("sender_id")    val sender_id: Int?    = null,
     val type: String?      = null,   // "sent" (owner) | "received" (visitor)
-    val time: String?      = null,   // pre-formatted display, e.g. "05:13 AM"
-    val timestamp: String? = null    // ISO-8601 for ordering
+    val time: String?      = null,
+    val timestamp: String? = null,
+    @SerialName("is_delivered") val is_delivered: Int? = null,  // 1 = visitor received
+    @SerialName("is_seen")      val is_seen: Int?      = null   // 1 = visitor read
 )
 
 // ─────────────────────────────────────────────────────────────────
@@ -112,6 +114,17 @@ data class SosReplyResponse(
     val status: Boolean  = false,
     val message: String? = null,
     val data: SosAlert?  = null
+)
+
+// ─────────────────────────────────────────────────────────────────
+// Initiate Call Response — POST /call/initiate
+// ─────────────────────────────────────────────────────────────────
+
+@Serializable
+data class InitiateCallResponse(
+    val success: Boolean  = false,
+    val room_id: String?  = null,
+    val message: String?  = null
 )
 
 // ─────────────────────────────────────────────────────────────────
@@ -189,18 +202,22 @@ data class VisitorInfo(
 data class ChatMessageItem(
     val id: Int?           = null,
     val text: String?      = null,
-    @SerialName("sender_id") val sender_id: Int? = null,
+    @SerialName("sender_id")     val sender_id: Int?     = null,
     val type: String?      = null,
     val time: String?      = null,
-    val timestamp: String? = null
+    val timestamp: String? = null,
+    @SerialName("is_delivered")  val is_delivered: Int?  = null,
+    @SerialName("is_seen")       val is_seen: Int?       = null
 ) {
     fun toDto() = ChatMessageDto(
-        id        = id,
-        message   = text,
-        sender_id = sender_id,
-        type      = type,
-        time      = time,
-        timestamp = timestamp
+        id           = id,
+        message      = text,
+        sender_id    = sender_id,
+        type         = type,
+        time         = time,
+        timestamp    = timestamp,
+        is_delivered = is_delivered,
+        is_seen      = is_seen
     )
 }
 

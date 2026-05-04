@@ -9,6 +9,9 @@ expect class VoiceCallManager() {
     // Call startAsCaller when the owner initiates an outgoing call.
     fun startAsCaller(roomId: String)
     fun endCall()
+    // Joins the signaling room and immediately emits end-call so the caller's
+    // screen dismisses without waiting for an FCM or a 60s timeout.
+    fun sendDeclineSignal(roomId: String)
     fun setMuted(muted: Boolean)
     fun setSpeaker(speaker: Boolean)
     fun dispose()

@@ -258,7 +258,7 @@ fun IncomingCallScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = visitorName.firstOrNull()?.uppercase() ?: "V",
+                        text = "V",
                         fontSize = 46.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
@@ -270,7 +270,7 @@ fun IncomingCallScreen(
 
             // ── Caller name ───────────────────────────────────────────
             Text(
-                visitorName,
+                "Visitor",
                 fontSize = 30.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
@@ -279,10 +279,15 @@ fun IncomingCallScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            // ── Phone number ──────────────────────────────────────────
+            // ── Phone number (masked) ─────────────────────────────────
             if (visitorPhone.isNotBlank()) {
+                val digits = visitorPhone.filter { it.isDigit() }
+                val maskedPhone = if (digits.length >= 4)
+                    "•••• •••• ${digits.takeLast(4)}"
+                else
+                    "••••••••••"
                 Text(
-                    visitorPhone,
+                    maskedPhone,
                     fontSize = 15.sp,
                     color = Color.White.copy(alpha = 0.55f)
                 )

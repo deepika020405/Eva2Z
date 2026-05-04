@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Allow cleartext HTTP to the Socket.IO server (port 3000) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">app.eva2z.in</domain>
+    </domain-config>
+    <!-- All other traffic requires TLS (default secure behaviour) -->
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

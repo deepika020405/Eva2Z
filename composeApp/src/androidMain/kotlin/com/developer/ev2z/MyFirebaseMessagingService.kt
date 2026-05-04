@@ -17,8 +17,34 @@ import com.developer.ev2z.util.SmsUtil
 import com.developer.ev2z.util.SosNotificationHandler
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 
 class MyFirebaseMessagingService : FirebaseMessagingService() {
+
+    // Fire-and-forget POST to mark message as delivered (arrived on device, not yet read).
+    private fun callDeliveredApi(chatId: Int, token: String) {
+        CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
+            try {
+                val client = OkHttpClient()
+                val request = Request.Builder()
+                    .url("https://app.eva2z.in/api/chat/$chatId/delivered")
+                    .post("".toRequestBody())
+                    .addHeader("Authorization", "Bearer $token")
+                    .addHeader("Accept", "application/json")
+                    .build()
+                client.newCall(request).execute().close()
+                println("✔️ markDelivered #$chatId (FCM)")
+            } catch (e: Exception) {
+                println("❌ markDelivered #$chatId (FCM): ${e.message}")
+            }
+        }
+    }
 
     // Called for EVERY FCM message — even notification+data in background/killed state,
     // where Firebase skips onMessageReceived entirely.
@@ -31,33 +57,92 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
     @SuppressLint("MissingPermission")
     override fun handleIntent(intent: Intent) {
         val extras = intent.extras
-        if (extras != null && extras.getString("type") == "incoming_call") {
-            val prefs = applicationContext.getSharedPreferences("eva2z_prefs", MODE_PRIVATE)
-            val authToken = prefs.getString("token", "") ?: ""
-            if (authToken.isNotBlank() && !VoiceCallManager.isCallActive) {
+        val prefs = applicationContext.getSharedPreferences("eva2z_prefs", MODE_PRIVATE)
+        val authToken = prefs.getString("token", "") ?: ""
+        val type = extras?.getString("type")
+
+        when {
+            // ── Visitor declined / caller cancelled — dismiss owner's CallScreen ──
+            type == "call_ended" && authToken.isNotBlank() -> {
+                val roomId      = extras?.getString("room_id") ?: ""
+                val visitorName = extras?.getString("visitor_name")
+                val visitorPhone= extras?.getString("visitor_phone")
+                val chatId      = extras?.getString("chat_id")?.toIntOrNull()
+                println("📵 handleIntent: call_ended intercepted — roomId=$roomId")
+                CallRingtoneService.stop(applicationContext)
+                SosNotificationHandler.onCallEnded()
+                Handler(Looper.getMainLooper()).post {
+                    NotificationUtil.showMissedCallNotification(
+                        context      = applicationContext,
+                        visitorName  = visitorName,
+                        visitorPhone = visitorPhone,
+                        chatId       = chatId
+                    )
+                }
+            }
+
+            // ── Incoming call ──────────────────────────────────────────────
+            type == "incoming_call" && authToken.isNotBlank() && !VoiceCallManager.isCallActive -> {
                 val visitorName  = extras.getString("visitor_name")
                 val visitorPhone = extras.getString("visitor_phone")
                 val roomId       = extras.getString("room_id") ?: ""
                 val chatId       = extras.getString("chat_id")?.toIntOrNull()
                 println("🔔 handleIntent: incoming_call intercepted — roomId=$roomId")
-                // Populate the shared flow so HomeNavGraph shows IncomingCallScreen
-                // if/when the app comes to foreground before onMessageReceived fires.
                 SosNotificationHandler.onIncomingCallReceived(
                     visitorName  = visitorName,
                     visitorPhone = visitorPhone,
                     roomId       = roomId,
                     chatId       = chatId
                 )
-                // Post call notification — no background restrictions on NotificationManager.notify().
-                // Its fullScreenIntent fires IncomingCallActivity on lock screen / killed state.
-                // IncomingCallActivity.onCreate() calls CallRingtoneService.start() from an
-                // Activity context, which is always permitted.
                 NotificationUtil.showCallNotification(applicationContext, visitorName, visitorPhone, roomId, chatId)
 
-                // Firebase auto-displays its OWN notification when the FCM payload has a
-                // "notification" field (notification+data message). That creates a duplicate
-                // alongside our showCallNotification(). Firebase always tags its auto-notification
-                // "FCM-Notification:N" — cancel it 400 ms after super.handleIntent() posts it.
+                // Cancel Firebase's own duplicate notification (notification+data payload)
+                Handler(Looper.getMainLooper()).postDelayed({
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        val nm = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE)
+                                as NotificationManager
+                        nm.activeNotifications
+                            .filter { it.tag?.startsWith("FCM-Notification:") == true }
+                            .forEach { nm.cancel(it.tag, it.id) }
+                    }
+                }, 400L)
+            }
+
+            // ── New visitor chat message ───────────────────────────────────
+            // handleIntent runs even in background/killed state where a notification+data
+            // FCM bypasses onMessageReceived entirely. Posting our own notification here
+            // ensures the owner is always alerted regardless of app state.
+            (type == "chat" || type == "vehicle_notification") && authToken.isNotBlank() -> {
+                val chatId       = extras.getString("chat_id")?.toIntOrNull()
+                    ?: extras.getString("notification_id")?.toIntOrNull()
+                val visitorName  = extras.getString("visitor_name")
+                val visitorPhone = extras.getString("visitor_phone")
+                val title        = extras.getString("gcm.notification.title")
+                    ?: extras.getString("title") ?: "New Message"
+                val body         = extras.getString("gcm.notification.body")
+                    ?: extras.getString("body") ?: "You have a new visitor message"
+                println("🔔 handleIntent: chat message intercepted — chatId=$chatId visitor=$visitorName")
+
+                NotificationUtil.show(
+                    context      = applicationContext,
+                    title        = title,
+                    body         = body,
+                    alertId      = chatId,
+                    visitorName  = visitorName,
+                    visitorPhone = visitorPhone
+                )
+
+                if (chatId != null) {
+                    SosNotificationHandler.onSosAlertReceived(
+                        alertId      = chatId,
+                        visitorName  = visitorName,
+                        visitorPhone = visitorPhone
+                    )
+                    // Point 4: mark delivered — message reached the device
+                    callDeliveredApi(chatId, authToken)
+                }
+
+                // Cancel Firebase's duplicate auto-notification so only ours shows
                 Handler(Looper.getMainLooper()).postDelayed({
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                         val nm = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE)
@@ -69,7 +154,8 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 }, 400L)
             }
         }
-        // Always let Firebase proceed (shows notification banner, may call onMessageReceived)
+
+        // Always let Firebase proceed (needed for kill/background state token refresh etc.)
         super.handleIntent(intent)
     }
 
@@ -209,6 +295,8 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                         visitorName = visitorName,
                         visitorPhone = visitorPhone
                     )
+                    // Point 4: mark delivered — message reached the device
+                    callDeliveredApi(alertId, authToken)
                 }
             }
 

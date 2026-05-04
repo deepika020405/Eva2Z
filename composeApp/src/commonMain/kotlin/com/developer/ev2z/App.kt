@@ -25,6 +25,10 @@ import com.developer.ev2z.ui.screens.device_Report.PlatformAddressProvider
 import com.developer.ev2z.util.AppTokenProvider
 import com.developer.ev2z.ui.screens.AuthFlows.ForgetPasswordFlow
 import com.developer.ev2z.ui.screens.AuthFlows.RegistrationFlow
+import com.developer.ev2z.util.UpdateAvailableDialog
+import com.developer.ev2z.util.isUpdateAvailable
+import com.developer.ev2z.ui.screens.Profile.getPlatformStoreUrl
+import com.developer.ev2z.ui.screens.Profile.platformOpenUrl
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -84,6 +88,7 @@ fun App() {
 
     // ✅ NEW: Change Password state
     var showChangePassword by remember { mutableStateOf(false) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
 
 
     // 🔥 My Account navigation states
@@ -115,7 +120,11 @@ fun App() {
     val addDeviceResult by addDeviceViewModel.addDeviceResult.collectAsState()
     var forgetPasswordPhone by remember { mutableStateOf("") }
 
-    LaunchedEffect(Unit) { }
+    LaunchedEffect(Unit) {
+        try {
+            if (isUpdateAvailable()) showUpdateDialog = true
+        } catch (_: Exception) {}
+    }
 
     // Login success handler
 //    LaunchedEffect(loginSuccess) {
@@ -409,6 +418,16 @@ fun App() {
                     }
                 )
             }
+        }
+
+        if (showUpdateDialog) {
+            UpdateAvailableDialog(
+                onUpdate = {
+                    platformOpenUrl(getPlatformStoreUrl())
+                    showUpdateDialog = false
+                },
+                onDismiss = { showUpdateDialog = false }
+            )
         }
     }
 }

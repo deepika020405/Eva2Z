@@ -23,6 +23,11 @@ actual class VoiceCallManager actual constructor() {
         WebRtcBridgeHolder.delegate?.endCall()
     }
 
+    actual fun sendDeclineSignal(roomId: String) {
+        println("📵 [iOS VoiceCall] sendDeclineSignal room=$roomId — delegating to bridge")
+        WebRtcBridgeHolder.delegate?.connectAndDecline(roomId)
+    }
+
     actual fun setMuted(muted: Boolean) {
         WebRtcBridgeHolder.delegate?.setMuted(muted)
     }

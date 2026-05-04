@@ -45,6 +45,12 @@ class UserPrefs(private val storage: StorageManager) {  // ✅ Storage → Stora
 
     fun isLoggedIn() = getToken()?.isNotEmpty()
 
+    // Sanctum tokens are "{userId}|{secret}"; parse the numeric prefix as ownerId.
+    fun getUserId(): Int {
+        val token = getToken() ?: return 0
+        return token.substringBefore("|").toIntOrNull() ?: 0
+    }
+
     fun clear() = storage.clear()
 
 

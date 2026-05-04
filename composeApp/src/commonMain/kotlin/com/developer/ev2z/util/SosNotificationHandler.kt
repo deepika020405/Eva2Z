@@ -98,6 +98,15 @@ object SosNotificationHandler {
         _callConnectedFlow.tryEmit(Unit)
     }
 
+    // Emitted when the visitor (callee) joins the signaling room — ringing → connecting transition
+    private val _calleeJoinedFlow = MutableSharedFlow<Unit>(replay = 0, extraBufferCapacity = 1)
+    val calleeJoinedFlow: SharedFlow<Unit> = _calleeJoinedFlow.asSharedFlow()
+
+    fun onCalleeJoined() {
+        println("📲 CALLEE JOINED ROOM — transitioning ringing → connecting")
+        _calleeJoinedFlow.tryEmit(Unit)
+    }
+
     fun onCallEnded() {
         println("📵 CALL ENDED by caller")
         markHandled(activeRoomId)
