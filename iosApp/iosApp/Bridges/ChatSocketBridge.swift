@@ -118,24 +118,34 @@ import ComposeApp
             )
         }
 
-        socket?.on("user_online") { data, _ in
-            guard let dict = data.first as? [String: Any] else { return }
+        socket?.on("user_online") { [weak self] data, _ in
+            guard let self = self, let dict = data.first as? [String: Any] else { return }
             let eventUserId: Int32
             if let n = dict["user_id"] as? NSNumber { eventUserId = n.int32Value }
             else if let i = dict["user_id"] as? Int { eventUserId = Int32(i) }
-            else { eventUserId = -1 }
-            print("🟢 [ChatSocketBridge] user_online eventUserId=\(eventUserId)")
-            ChatSocketBridgeHolder.shared.callback?.onVisitorOnline(eventUserId: eventUserId)
+            else { eventUserId = 0 }
+            let role = (dict["role"] as? String) ?? ""
+            let isDifferentUser = eventUserId > 0 && eventUserId != Int32(self.activeUserId)
+            let isVisitorRole   = role.lowercased() == "visitor"
+            print("🟢 [ChatSocketBridge] user_online eventUserId=\(eventUserId) role=\(role)")
+            if isDifferentUser || isVisitorRole {
+                ChatSocketBridgeHolder.shared.callback?.onVisitorOnline(eventUserId: eventUserId)
+            }
         }
 
-        socket?.on("user_offline") { data, _ in
-            guard let dict = data.first as? [String: Any] else { return }
+        socket?.on("user_offline") { [weak self] data, _ in
+            guard let self = self, let dict = data.first as? [String: Any] else { return }
             let eventUserId: Int32
             if let n = dict["user_id"] as? NSNumber { eventUserId = n.int32Value }
             else if let i = dict["user_id"] as? Int { eventUserId = Int32(i) }
-            else { eventUserId = -1 }
-            print("🔴 [ChatSocketBridge] user_offline eventUserId=\(eventUserId)")
-            ChatSocketBridgeHolder.shared.callback?.onVisitorOffline(eventUserId: eventUserId)
+            else { eventUserId = 0 }
+            let role = (dict["role"] as? String) ?? ""
+            let isDifferentUser = eventUserId > 0 && eventUserId != Int32(self.activeUserId)
+            let isVisitorRole   = role.lowercased() == "visitor"
+            print("🔴 [ChatSocketBridge] user_offline eventUserId=\(eventUserId) role=\(role)")
+            if isDifferentUser || isVisitorRole {
+                ChatSocketBridgeHolder.shared.callback?.onVisitorOffline(eventUserId: eventUserId)
+            }
         }
 
         socket?.on("chat_closed") { _, _ in

@@ -39,10 +39,6 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
-// ─────────────────────────────────────────────────────────────────
-// Design Tokens — Light green + white (matching app theme)
-// (Previously lived in Sostagalertscreen.kt — now centralized here.)
-// ─────────────────────────────────────────────────────────────────
 
 internal val BrandGreen      = Color(0xFF4A7D39)
 internal val BrandGreenLight = Color(0xFFF1F4ED)
@@ -216,11 +212,6 @@ fun QuickReplyScreen(
             if (!isChatClosed) {
                 viewModel.fetchChatMessages(activeAlertId)?.let { response ->
                     applyChatThread(response)
-                    if (response.data.any { msg ->
-                            msg.type.equals("sent", ignoreCase = true) && (msg.is_delivered ?: 0) == 1
-                        }) {
-                        viewModel.setVisitorOnlineHint(true)
-                    }
                 }
             }
         }
@@ -242,17 +233,14 @@ fun QuickReplyScreen(
             // Server may omit id/type in newMessage events, so null type counts as incoming.
             val isIncoming = dto.type?.equals("sent", ignoreCase = true) != true
             if (isIncoming && activeAlertId > 0) {
+                // Visitor just sent a message — they are online right now.
+                viewModel.setVisitorOnlineHint(true)
                 viewModel.markSeen(activeAlertId)
 
                 val chatId = activeAlertId
                 coroutineScope.launch {
                     viewModel.fetchChatMessages(chatId)?.let { response ->
                         applyChatThread(response)
-                        if (response.data.any { msg ->
-                                msg.type.equals("sent", ignoreCase = true) && (msg.is_delivered ?: 0) == 1
-                            }) {
-                            viewModel.setVisitorOnlineHint(true)
-                        }
                     }
                 }
             }
@@ -262,6 +250,8 @@ fun QuickReplyScreen(
     // Collect real-time tick status updates (delivered / seen) from socket
     LaunchedEffect(Unit) {
         viewModel.socketStatusFlow.collect { (messageId, isDelivered, isSeen) ->
+            // Socket delivery/seen = visitor received the message right now → they are online
+            if (isDelivered || isSeen) viewModel.setVisitorOnlineHint(true)
             val newStatus = when {
                 isSeen      -> MessageStatus.READ
                 isDelivered -> MessageStatus.DELIVERED

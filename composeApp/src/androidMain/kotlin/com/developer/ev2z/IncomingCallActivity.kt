@@ -12,6 +12,7 @@ import com.developer.ev2z.ui.screens.SOSParkingTag.IncomingCallScreen
 import com.developer.ev2z.util.IncomingCallData
 import com.developer.ev2z.util.NotificationUtil
 import com.developer.ev2z.util.SosNotificationHandler
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -26,8 +27,15 @@ import kotlinx.coroutines.launch
  *
  * Flow on Decline / auto-timeout:
  *   IncomingCallScreen calls apiService.declineCall() → onDeclined() fires → finish
+ *
+ * Multi-device: a socket watcher joins the signaling room immediately and listens
+ * for "call-resolved" / "call-ended" broadcasts so this Activity can finish itself
+ * the moment another owner device accepts or declines the call.
  */
 class IncomingCallActivity : ComponentActivity() {
+
+    private var acceptedOnThisDevice = false
+    private var callWatcher: IncomingCallSocketWatcher? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // ── Turn screen on / show over lock screen ────────────────────
@@ -65,6 +73,30 @@ class IncomingCallActivity : ComponentActivity() {
         // our service, so CallRingtoneService.start() in FCM service was never reached).
         CallRingtoneService.start(applicationContext, visitorName, visitorPhone, roomId, chatId)
 
+        // Connect to the signaling room immediately so we hear "call-resolved" /
+        // "call-ended" broadcasts from the server and can finish this Activity when
+        // another owner device accepts or declines the call.
+        if (roomId.isNotBlank()) {
+            val watcher = IncomingCallSocketWatcher(
+                serverUrl = "https://gps.eva2z.in",
+                roomId    = roomId,
+                onAcceptedElsewhere = {
+                    if (!acceptedOnThisDevice) {
+                        println("📱 [IncomingCallActivity] Accepted on another device — finishing")
+                        CallRingtoneService.stop(applicationContext)
+                        runOnUiThread { finish() }
+                    }
+                },
+                onEnded = {
+                    println("📵 [IncomingCallActivity] Call ended remotely — finishing")
+                    CallRingtoneService.stop(applicationContext)
+                    runOnUiThread { finish() }
+                }
+            )
+            watcher.connect()
+            callWatcher = watcher
+        }
+
         val callData   = IncomingCallData(visitorName, visitorPhone, roomId, chatId)
         val apiService = ApiService()
 
@@ -85,6 +117,7 @@ class IncomingCallActivity : ComponentActivity() {
                 roomId       = roomId,
                 apiService   = apiService,
                 onAccepted   = {
+                    acceptedOnThisDevice = true
                     CallRingtoneService.stop(applicationContext)
                     SosNotificationHandler.onCallAcceptedByOwner(callData)
                     // Boot the main app — HomeNavGraph will read callAcceptedByOwnerFlow
@@ -95,10 +128,23 @@ class IncomingCallActivity : ComponentActivity() {
                     finish()
                 },
                 onDeclined   = {
+                    // Emit end-call through the watcher socket (already joined the room)
+                    // so the visitor side is notified immediately, then wait for the
+                    // message to flush before onDestroy disconnects the socket.
+                    callWatcher?.sendEndCall()
                     CallRingtoneService.stop(applicationContext)
-                    finish()
+                    lifecycleScope.launch {
+                        delay(700)
+                        finish()
+                    }
                 }
             )
         }
+    }
+
+    override fun onDestroy() {
+        callWatcher?.disconnect()
+        callWatcher = null
+        super.onDestroy()
     }
 }

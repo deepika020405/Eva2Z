@@ -52,6 +52,31 @@ actual fun compressStoryImage(
     outputData?.toByteArraySafe() ?: imageBytes
 }
 
+@OptIn(ExperimentalForeignApi::class)
+actual fun saveQrImageToGallery(
+    bytes: ByteArray,
+    fileName: String,
+    onSuccess: () -> Unit,
+    onError: (String) -> Unit
+) = autoreleasepool {
+    val image = bytes.toUIImage()
+    if (image == null) { onError("Failed to decode image"); return@autoreleasepool }
+    // UIImageWriteToSavedPhotosAlbum requests NSPhotoLibraryAddUsageDescription permission on first use
+    UIImageWriteToSavedPhotosAlbum(image, null, null, null)
+    onSuccess()
+}
+
+@OptIn(ExperimentalForeignApi::class)
+actual fun shareQrImage(bytes: ByteArray, fileName: String) = autoreleasepool {
+    val image = bytes.toUIImage() ?: return@autoreleasepool
+    val activityVC = UIActivityViewController(
+        activityItems = listOf(image),
+        applicationActivities = null
+    )
+    val rootVC = UIApplication.sharedApplication.keyWindow?.rootViewController
+    rootVC?.presentViewController(activityVC, animated = true, completion = null)
+}
+
 // ================= SAFE HELPERS =================
 @OptIn(ExperimentalForeignApi::class)
 private fun ByteArray.toUIImage(): UIImage? =

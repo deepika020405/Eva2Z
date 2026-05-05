@@ -88,16 +88,13 @@ actual class ChatSocketManager actual constructor(private val serverUrl: String)
 
     override fun onVisitorOnline(eventUserId: Int) {
         println("🟢 [ChatSocket-iOS] user_online eventUserId=$eventUserId ownerUserId=$activeUserId")
-        if (eventUserId > 0 && eventUserId != activeUserId) {
-            listener?.onVisitorOnline()
-        }
+        // Swift bridge already filters by role/userId before calling here; just forward.
+        listener?.onVisitorOnline()
     }
 
     override fun onVisitorOffline(eventUserId: Int) {
         println("🔴 [ChatSocket-iOS] user_offline eventUserId=$eventUserId ownerUserId=$activeUserId")
-        if (eventUserId > 0 && eventUserId != activeUserId) {
-            listener?.onVisitorOffline()
-        }
+        listener?.onVisitorOffline()
     }
 
     override fun onChatClosed() {

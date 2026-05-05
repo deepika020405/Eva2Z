@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class SosTagViewModel(
@@ -85,6 +86,10 @@ class SosTagViewModel(
     private var activeChatId: Int = 0
     private var activeUserId: Int = 0
 
+    // True once socket emits user_offline; cleared on user_online or reconnect.
+    // Prevents stale REST is_delivered=1 data from overriding a socket-confirmed offline.
+    private var socketConfirmedOffline = false
+
     fun connectChatSocket(chatId: Int) {
         if (chatId <= 0) return
         val token = userPrefs.getToken() ?: return
@@ -96,6 +101,7 @@ class SosTagViewModel(
 
         activeChatId = chatId
         activeUserId = userId
+        socketConfirmedOffline = false
 
         chatSocketManager = ChatSocketManager(KtorClient.SOCKET_SERVER_URL)
         chatSocketManager?.connect(
@@ -111,7 +117,7 @@ class SosTagViewModel(
                         // on the main thread and is not racing with other state updates.
                         updateThreadInbox(chatId, msg)
                     }
-                    if (msg.type.equals("received", ignoreCase = true)) {
+                    if (msg.type.equals("received", ignoreCase = true) && !socketConfirmedOffline) {
                         _isVisitorOnline.value = true
                     }
                 }
@@ -122,16 +128,27 @@ class SosTagViewModel(
                     println("🔒 [SosTagVM] Server signalled chat_closed for chatId=$chatId")
                 }
                 override fun onVisitorOnline() {
+                    socketConfirmedOffline = false
                     _isVisitorOnline.value = true
                     _onlineChats.value = _onlineChats.value + chatId
                 }
                 override fun onVisitorOffline() {
+                    socketConfirmedOffline = true
                     _isVisitorOnline.value = false
                     _onlineChats.value = _onlineChats.value - chatId
                 }
                 override fun onConnected() {
                     _isSocketConnected.value = true
                     println("✅ [SosTagVM] Chat socket connected — chatId=$chatId userId=$userId")
+                    // Re-emit after a short delay: visitor's app listens for user_online events
+                    // and responds with its own presence — this is how we learn they're online
+                    // without the server explicitly broadcasting presence on join.
+                    viewModelScope.launch {
+                        delay(1500)
+                        if (activeChatId == chatId) {
+                            chatSocketManager?.emitUserOnline(activeChatId, activeUserId)
+                        }
+                    }
                 }
                 override fun onDisconnected() {
                     _isSocketConnected.value = false
@@ -142,8 +159,9 @@ class SosTagViewModel(
 
     // Called by the screen when a REST fetch reveals is_delivered=1 on a message that
     // was previously SENT — the visitor's socket received it, so they're reachable.
+    // Ignored when the socket has already confirmed the visitor is offline.
     fun setVisitorOnlineHint(online: Boolean) {
-        if (online) {
+        if (online && !socketConfirmedOffline) {
             _isVisitorOnline.value = true
             if (activeChatId > 0) _onlineChats.value = _onlineChats.value + activeChatId
         }
@@ -162,6 +180,7 @@ class SosTagViewModel(
         chatSocketManager = null
         _isSocketConnected.value = false
         _isVisitorOnline.value = false
+        socketConfirmedOffline = false
     }
 
     suspend fun markSeen(chatId: Int) {

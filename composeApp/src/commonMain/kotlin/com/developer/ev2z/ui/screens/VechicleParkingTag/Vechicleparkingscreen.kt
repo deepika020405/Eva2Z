@@ -26,8 +26,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.developer.ev2z.navigation.PlatformBackHandler
+import com.developer.ev2z.util.saveQrImageToGallery
+import com.developer.ev2z.util.shareQrImage
+import eva2z_connect_multiplatform.composeapp.generated.resources.Res
+import eva2z_connect_multiplatform.composeapp.generated.resources.qr_image
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.ExperimentalResourceApi
+import org.jetbrains.compose.resources.painterResource
 
 // ─────────────────────────────────────────────────────────────────
 // Design tokens
@@ -686,6 +693,8 @@ private fun RecentParkingsCard(
     history: List<ParkingData>,
     onDelete: (id: Int, name: String) -> Unit
 ) {
+    var qrItem by remember { mutableStateOf<ParkingData?>(null) }
+
     Card(
         modifier  = Modifier.fillMaxWidth(),
         shape     = RoundedCornerShape(20.dp),
@@ -713,11 +722,16 @@ private fun RecentParkingsCard(
                         item     = item,
                         onDelete = {
                             item.id?.let { id -> onDelete(id, item.vehicle_type ?: "Vehicle") }
-                        }
+                        },
+                        onShowQr = { qrItem = item }
                     )
                 }
             }
         }
+    }
+
+    qrItem?.let { item ->
+        QRCodeDialog(item = item, onDismiss = { qrItem = null })
     }
 }
 
@@ -728,10 +742,14 @@ private fun RecentParkingsCard(
 @Composable
 private fun ParkingHistoryRow(
     item: ParkingData,
-    onDelete: () -> Unit = {}
+    onDelete: () -> Unit = {},
+    onShowQr: () -> Unit = {}
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onShowQr() }
+            .padding(vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         Row(
@@ -754,24 +772,14 @@ private fun ParkingHistoryRow(
                 Text(item.vehicle_number ?: "–", fontSize = 11.sp, color = TextSecondary, maxLines = 1)
             }
 
-            val isActive     = item.status?.lowercase() == "active"
-            val isNullStatus = item.status.isNullOrBlank()
-
-            val statusLabel = when {
-                isNullStatus -> "Registered"
-                isActive     -> "Active"
-                else         -> item.status!!
-            }
-            val statusBg    = if (isNullStatus || isActive) GreenLight else WarningBg
-            val statusColor = if (isNullStatus || isActive) BrandGreen else WarningText
-
-            Box(
+            IconButton(
+                onClick  = { onShowQr() },
                 modifier = Modifier
+                    .size(30.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .background(statusBg)
-                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                    .background(GreenLight)
             ) {
-                Text(statusLabel, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = statusColor)
+                Icon(Icons.Default.QrCode, null, tint = BrandGreen, modifier = Modifier.size(16.dp))
             }
 
             IconButton(
@@ -802,6 +810,156 @@ private fun ParkingHistoryRow(
                 (item.parked_at ?: item.created_at ?: "–").take(10),
                 fontSize = 10.sp, color = TextTertiary, maxLines = 1
             )
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// QR Code Dialog
+// ─────────────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalResourceApi::class)
+@Composable
+private fun QRCodeDialog(item: ParkingData, onDismiss: () -> Unit) {
+    val scope             = rememberCoroutineScope()
+    var qrBytes           by remember { mutableStateOf<ByteArray?>(null) }
+    var saveStatus        by remember { mutableStateOf("") }
+    var isSaving          by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        runCatching { qrBytes = Res.readBytes("files/qr_image.png") }
+    }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape     = RoundedCornerShape(24.dp),
+            colors    = CardDefaults.cardColors(containerColor = CardColor),
+            elevation = CardDefaults.cardElevation(8.dp)
+        ) {
+            Column(
+                modifier            = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment     = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "Vehicle TAG QR",
+                        fontSize   = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color      = TextPrimary
+                    )
+                    IconButton(
+                        onClick  = onDismiss,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(BackgroundColor)
+                    ) {
+                        Icon(Icons.Default.Close, null, tint = TextSecondary, modifier = Modifier.size(16.dp))
+                    }
+                }
+
+                Divider(color = BorderColor)
+
+                Image(
+                    painter            = painterResource(Res.drawable.qr_image),
+                    contentDescription = "Vehicle TAG QR Code",
+                    modifier           = Modifier
+                        .size(240.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .border(1.dp, BorderColor, RoundedCornerShape(16.dp))
+                )
+
+                Divider(color = BorderColor)
+
+                Column(
+                    modifier            = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(GreenLight)
+                        .padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    item.vehicle_type?.let   { BannerRow("Vehicle", it) }
+                    item.vehicle_number?.let { BannerRow("Number",  it) }
+                    (item.alternate_phone_1 ?: item.phone)?.let { BannerRow("Contact", it) }
+                }
+
+                // ── Download & Share buttons ──────────────────────
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Download / Save to gallery
+                    Button(
+                        onClick = {
+                            val bytes = qrBytes ?: return@Button
+                            isSaving = true
+                            saveStatus = ""
+                            saveQrImageToGallery(
+                                bytes    = bytes,
+                                fileName = "eva2z_qr.png",
+                                onSuccess = {
+                                    isSaving   = false
+                                    saveStatus = "Saved to gallery!"
+                                },
+                                onError = { err ->
+                                    isSaving   = false
+                                    saveStatus = err
+                                }
+                            )
+                        },
+                        enabled  = qrBytes != null && !isSaving,
+                        modifier = Modifier.weight(1f).height(46.dp),
+                        shape    = RoundedCornerShape(12.dp),
+                        colors   = ButtonDefaults.buttonColors(containerColor = BrandGreen)
+                    ) {
+                        if (isSaving) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Download, null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Download", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+
+                    // Share
+                    OutlinedButton(
+                        onClick = {
+                            val bytes = qrBytes ?: return@OutlinedButton
+                            scope.launch { shareQrImage(bytes, "eva2z_qr.png") }
+                        },
+                        enabled  = qrBytes != null,
+                        modifier = Modifier.weight(1f).height(46.dp),
+                        shape    = RoundedCornerShape(12.dp),
+                        border   = BorderStroke(1.5.dp, BrandGreen)
+                    ) {
+                        Icon(Icons.Default.Share, null, tint = BrandGreen, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Share", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = BrandGreen)
+                    }
+                }
+
+                if (saveStatus.isNotBlank()) {
+                    Text(
+                        saveStatus,
+                        fontSize  = 12.sp,
+                        color     = if (saveStatus.startsWith("Saved")) SuccessText else ErrorColor,
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment     = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.QrCode2, null, tint = TextTertiary, modifier = Modifier.size(14.dp))
+                }
+            }
         }
     }
 }

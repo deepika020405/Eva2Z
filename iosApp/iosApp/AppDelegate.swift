@@ -82,6 +82,11 @@ class AppDelegate: NSObject,
         ChatSocketBridgeHolder.shared.delegate = ChatSocketBridge.shared
         print("✅ ChatSocketBridge registered")
 
+        // Register incoming call watcher bridge — socket-based multi-device dismiss
+        // (dismisses IncomingCallScreen on all other owner devices when one accepts/declines)
+        IncomingCallWatcherBridgeHolder.shared.delegate = IncomingCallWatcherBridge.shared
+        print("✅ IncomingCallWatcherBridge registered")
+
         // VoIP PushKit — wakes app immediately on any state (background / killed / locked)
         // so CallKit can ring before the user ever taps a notification.
         let voipReg = PKPushRegistry(queue: .main)

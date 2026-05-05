@@ -116,10 +116,13 @@ actual class ChatSocketManager actual constructor(private val serverUrl: String)
 
                 on("user_online") { args ->
                     val data = args.getOrNull(0) as? JSONObject ?: return@on
-                    val eventUserId = data.optInt("user_id", -1)
-                    println("🟢 [ChatSocket] user_online received — eventUserId=$eventUserId ownerUserId=$userId raw=$data")
-                    // Treat as visitor online if it's not the owner's own echo
-                    if (eventUserId > 0 && eventUserId != userId) {
+                    val eventUserId = data.optInt("user_id", 0)
+                    val role        = data.optString("role", "")
+                    println("🟢 [ChatSocket] user_online received — eventUserId=$eventUserId ownerUserId=$userId role=$role raw=$data")
+                    // Accept if explicitly a different user OR if role=visitor (website may omit user_id)
+                    val isDifferentUser = eventUserId > 0 && eventUserId != userId
+                    val isVisitorRole   = role.equals("visitor", ignoreCase = true)
+                    if (isDifferentUser || isVisitorRole) {
                         println("🟢 [ChatSocket] visitor_online confirmed — chatId=$chatId")
                         listener.onVisitorOnline()
                     }
@@ -127,9 +130,12 @@ actual class ChatSocketManager actual constructor(private val serverUrl: String)
 
                 on("user_offline") { args ->
                     val data = args.getOrNull(0) as? JSONObject ?: return@on
-                    val eventUserId = data.optInt("user_id", -1)
-                    println("🔴 [ChatSocket] user_offline received — eventUserId=$eventUserId ownerUserId=$userId raw=$data")
-                    if (eventUserId > 0 && eventUserId != userId) {
+                    val eventUserId = data.optInt("user_id", 0)
+                    val role        = data.optString("role", "")
+                    println("🔴 [ChatSocket] user_offline received — eventUserId=$eventUserId ownerUserId=$userId role=$role raw=$data")
+                    val isDifferentUser = eventUserId > 0 && eventUserId != userId
+                    val isVisitorRole   = role.equals("visitor", ignoreCase = true)
+                    if (isDifferentUser || isVisitorRole) {
                         println("🔴 [ChatSocket] visitor_offline confirmed — chatId=$chatId")
                         listener.onVisitorOffline()
                     }

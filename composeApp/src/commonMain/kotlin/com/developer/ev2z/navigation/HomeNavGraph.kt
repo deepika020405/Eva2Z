@@ -97,6 +97,8 @@ import com.developer.ev2z.ui.screens.SOSParkingTag.IncomingCallScreen
 import com.developer.ev2z.ui.screens.SOSParkingTag.QuickReplyScreen
 import com.developer.ev2z.ui.screens.SOSParkingTag.SosTagViewModel
 import com.developer.ev2z.calling.VoiceCallManager
+import com.developer.ev2z.calling.startIncomingCallWatcher
+import com.developer.ev2z.calling.stopIncomingCallWatcher
 import com.developer.ev2z.util.IncomingCallData
 import com.developer.ev2z.ui.screens.InstallationSupport.InstallationSupportScreen
 import com.developer.ev2z.ui.screens.market_screen.ShopProduct
@@ -540,6 +542,8 @@ fun HomeNavGraph(
             incomingCallData       = callData
             showActiveCallScreen   = false
             showIncomingCallScreen = true
+            // Connect to signaling room so we hear accept/decline from other devices immediately
+            startIncomingCallWatcher(callData.roomId)
             SosNotificationHandler.clearCallFlow()
         }
     }
@@ -566,6 +570,7 @@ fun HomeNavGraph(
         SosNotificationHandler.callEndedFlow.collect {
             println("📵 Caller cancelled — dismissing call screens")
             stopCallSound()
+            stopIncomingCallWatcher()
             val chatId = incomingCallData?.chatId   // capture before clearing
             val wasOnActiveCall = showActiveCallScreen
             val wasConnected = callIsConnected
@@ -594,13 +599,27 @@ fun HomeNavGraph(
     }
 
     // ── Another device accepted the same call → dismiss ringing screen ─
+    // acceptingOnThisDevice is set in onAccepted before the watcher is stopped,
+    // so if call-resolved echoes back to our still-open watcher socket we don't
+    // show the toast on the device that just accepted the call.
+    var acceptingOnThisDevice    by remember { mutableStateOf(false) }
     var callAcceptedElsewhereMsg by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         SosNotificationHandler.callAcceptedElsewhereFlow.collect {
+            if (acceptingOnThisDevice) {
+                // This device was the one that accepted — suppress the toast.
+                acceptingOnThisDevice  = false
+                stopCallSound()
+                stopIncomingCallWatcher()
+                showIncomingCallScreen = false
+                incomingCallData       = null
+                return@collect
+            }
             println("📱 Another device accepted — dismissing IncomingCallScreen")
             stopCallSound()
-            showIncomingCallScreen = false
-            incomingCallData       = null
+            stopIncomingCallWatcher()
+            showIncomingCallScreen   = false
+            incomingCallData         = null
             callAcceptedElsewhereMsg = true
         }
     }
@@ -611,6 +630,8 @@ fun HomeNavGraph(
         SosNotificationHandler.callAcceptedByOwnerFlow.collect { callData ->
             SosNotificationHandler.clearAcceptedByOwnerFlow()
             cancelCallNotification()
+            acceptingOnThisDevice = true   // suppress toast if call-resolved echoes back
+            stopIncomingCallWatcher()
             println("✅ callAcceptedByOwnerFlow — starting CallScreen roomId=${callData.roomId}")
             incomingCallData = callData
             callIsConnected  = false
@@ -685,8 +706,10 @@ fun HomeNavGraph(
                     roomId       = callData.roomId,
                     apiService   = apiService,
                     onAccepted   = {
+                        acceptingOnThisDevice = true   // must be set before watcher is stopped
                         stopCallSound()
                         cancelCallNotification()
+                        stopIncomingCallWatcher()
                         callIsConnected = false   // reset — will be set true when ICE connects
                         val mgr = VoiceCallManager()
                         mgr.startAsCallee(callData.roomId)
@@ -697,6 +720,7 @@ fun HomeNavGraph(
                     onDeclined   = {
                         stopCallSound()
                         cancelCallNotification()
+                        stopIncomingCallWatcher()
                         // Immediately notify the caller via socket so their screen closes
                         // without waiting for an FCM round-trip or the 60s ring timeout.
                         if (callData.roomId.isNotBlank()) {

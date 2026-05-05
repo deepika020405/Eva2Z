@@ -53,6 +53,8 @@
 	</dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Microphone access is required for voice calls with parking visitors.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Save your vehicle TAG QR code to Photos.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>
