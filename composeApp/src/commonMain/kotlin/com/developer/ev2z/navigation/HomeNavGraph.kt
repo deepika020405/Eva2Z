@@ -43,6 +43,9 @@ import com.developer.ev2z.ui.screens.HistoryPlayback.HistoryPlaybackScreen
 import com.developer.ev2z.ui.screens.Profile.ProfileScreen
 import com.developer.ev2z.ui.screens.homeScreen.HomeScreen
 import com.developer.ev2z.ui.screens.homeScreen.HomeViewModel
+import com.developer.ev2z.ui.screens.homeScreen.NotificationBadgeManager
+import com.developer.ev2z.ui.screens.homeScreen.NotificationsScreen
+import com.developer.ev2z.ui.screens.homeScreen.countUnreadNotifications
 import com.developer.ev2z.ui.screens.ManageDevices.ManageDeviceScreen
 import com.developer.ev2z.ui.screens.ManageDevices.EditDeviceNameScreen
 import com.developer.ev2z.ui.screens.market_screen.ShopScreenHost
@@ -125,7 +128,7 @@ class HomeTab(
     private val onNavigateToDriverScore: () -> Unit,
     private val onNavigateToParking: () -> Unit,
     private val onNavigateToSosTag: (Int) -> Unit,
-    private val onSosTagManual: () -> Unit,   // ✅ NEW — manual button ke liye
+    private val onSosTagManual: () -> Unit,
     private val onNavigateToInstallationSupport: () -> Unit,
     private val onLogout: () -> Unit = {},
 ) : Tab {
@@ -134,7 +137,7 @@ class HomeTab(
     override fun Content() {
 
         var showLiveLocation by rememberSaveable { mutableStateOf(false) }
-
+        val unreadNotifCount by NotificationBadgeManager.unreadCount.collectAsState()
 
         val uiState by viewModel.uiState.collectAsState()
 
@@ -203,8 +206,10 @@ class HomeTab(
 
                 onOpenCommunity = onOpenCommunity,
 
-                onCriminalVerification = onNavigateToCriminalVerification, // ✅ NEW
-                onInstallationSupport = onNavigateToInstallationSupport
+                onCriminalVerification = onNavigateToCriminalVerification,
+                onInstallationSupport = onNavigateToInstallationSupport,
+                onOpenNotifications = { onSosTagManual() },
+                unreadNotificationCount = unreadNotifCount
             )
         }
     }
@@ -462,7 +467,8 @@ fun HomeNavGraph(
 
 
     var showDriverScore by remember { mutableStateOf(false) }
-    var showParking by remember { mutableStateOf(false) }  // ✅ CHANGED — add
+    var showParking by remember { mutableStateOf(false) }
+    var showNotificationsScreen by remember { mutableStateOf(false) }
 
     // ── Incoming call flow (ringing screen → active call screen) ─────
     var showIncomingCallScreen by remember { mutableStateOf(false) }
@@ -488,6 +494,20 @@ fun HomeNavGraph(
             apiService = apiService,
             userPrefs = userPrefs
         )
+    }
+
+    // Keep badge count fresh — load chats once on entry, then every 30s silently
+    LaunchedEffect(Unit) {
+        sosTagViewModel.loadChatsWithMessages()
+        while (true) {
+            kotlinx.coroutines.delay(30_000)
+            sosTagViewModel.refreshChatsWithMessages()
+        }
+    }
+    val _threadStateForBadge by sosTagViewModel.threadListState.collectAsState()
+    // Push to singleton so HomeTab.Content() can collect without constructor threading
+    LaunchedEffect(_threadStateForBadge) {
+        NotificationBadgeManager.unreadCount.value = countUnreadNotifications(_threadStateForBadge)
     }
 
     val parkingViewModel = remember {
@@ -744,6 +764,24 @@ fun HomeNavGraph(
             ParkingScreen(
                 viewModel = parkingViewModel,
                 onBackPressed = { showParking = false }
+            )
+
+        } else if (showNotificationsScreen) {
+
+            NotificationsScreen(
+                viewModel = sosTagViewModel,
+                onBackPressed = {
+                    showNotificationsScreen = false
+                    sosTagViewModel.resetAll()
+                },
+                onNotificationClick = { chatId, visitorName, visitorPhone ->
+                    currentSosAlertId = chatId
+                    currentVisitorName = visitorName
+                    currentVisitorPhone = visitorPhone
+                    showNotificationsScreen = false
+                    sosOpenedFromInbox = true
+                    showSosQuickReply = true
+                }
             )
 
         } else if (showSosChatInbox) {
@@ -1188,7 +1226,7 @@ fun HomeNavGraph(
                 onSosTagManual = {
                     sosTagViewModel.resetAll()
                     currentSosAlertId = null
-                    showSosChatInbox = true
+                    showNotificationsScreen = true
                 },
                 onLogout = onLogout
             )
@@ -1519,8 +1557,8 @@ fun HomeNavGraphContent(
     onOpenCommunity: () -> Unit,
     onNavigateToDriverScore: () -> Unit,  // ✅ ADD THIS LINE
     onNavigateToParking: () -> Unit,    // ✅ CHANGED — add after onNavigateToDriverScore
-    onNavigateToSosTag: (Int) -> Unit,   // ✅ alertId pass karna hoga
-    onSosTagManual: () -> Unit,    // ✅ NEW
+    onNavigateToSosTag: (Int) -> Unit,
+    onSosTagManual: () -> Unit,
     onLogout: () -> Unit
 ) {
     val productRepository = remember { ProductRepository(apiService) }

@@ -31,7 +31,7 @@ import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.util.saveQrImageToGallery
 import com.developer.ev2z.util.shareQrImage
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
-import eva2z_connect_multiplatform.composeapp.generated.resources.qr_image
+import eva2z_connect_multiplatform.composeapp.generated.resources.qr_image_tag
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.painterResource
@@ -827,7 +827,7 @@ private fun QRCodeDialog(item: ParkingData, onDismiss: () -> Unit) {
     var isSaving          by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
-        runCatching { qrBytes = Res.readBytes("files/qr_image.png") }
+        runCatching { qrBytes = Res.readBytes("files/qr_image_tag.png") }
     }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -866,7 +866,7 @@ private fun QRCodeDialog(item: ParkingData, onDismiss: () -> Unit) {
                 Divider(color = BorderColor)
 
                 Image(
-                    painter            = painterResource(Res.drawable.qr_image),
+                    painter            = painterResource(Res.drawable.qr_image_tag),
                     contentDescription = "Vehicle TAG QR Code",
                     modifier           = Modifier
                         .size(240.dp)
