@@ -55,7 +55,9 @@ class AuthRepository(private val api: ApiService) {
         val message = jsonResponse["message"]?.jsonPrimitive?.content ?: ""
 
         val success = when {
-            message.contains("OTP sent successfully", ignoreCase = true) -> true
+            // "OTP sent" or "OTPs sent" (dual-OTP response)
+            message.contains("sent successfully", ignoreCase = true) -> true
+            message.contains("OTP sent", ignoreCase = true) -> true
             message.contains("already registered", ignoreCase = true) -> false
             else -> false
         }
@@ -92,6 +94,21 @@ class AuthRepository(private val api: ApiService) {
         val user = parseUserFromJson(userObj)
 
         return OtpResponse(success = success, message = message, token = token, user = user)
+    }
+
+    // ============================================
+    // VERIFY EMAIL OTP
+    // ============================================
+    suspend fun verifyEmailOtp(phone: String, email: String, otp: String): OtpResponse {
+        val jsonResponse = api.verifyEmailOtp(phone, email, otp)
+        val message = jsonResponse["message"]?.jsonPrimitive?.content ?: ""
+        val success = when {
+            jsonResponse["success"]?.jsonPrimitive?.content?.toBoolean() == true -> true
+            message.contains("successfully", ignoreCase = true) -> true
+            message.contains("verified", ignoreCase = true) -> true
+            else -> false
+        }
+        return OtpResponse(success = success, message = message, token = null, user = null)
     }
 
     // ============================================

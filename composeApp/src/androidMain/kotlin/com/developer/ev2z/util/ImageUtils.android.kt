@@ -73,6 +73,17 @@ actual fun compressStoryImage(
     return output
 }
 
+private fun toJpegBytes(bytes: ByteArray, quality: Int = 95): ByteArray {
+    return try {
+        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return bytes
+        val stream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, quality, stream)
+        stream.toByteArray()
+    } catch (_: Exception) {
+        bytes
+    }
+}
+
 actual fun saveQrImageToGallery(
     bytes: ByteArray,
     fileName: String,
@@ -81,23 +92,27 @@ actual fun saveQrImageToGallery(
 ) {
     try {
         val context = appCtx
+        val jpegBytes = toJpegBytes(bytes)
+        val jpegName  = fileName.replaceAfterLast('.', "jpg").let {
+            if (it == fileName) "$fileName.jpg" else it
+        }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val values = ContentValues().apply {
-                put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
-                put(MediaStore.Images.Media.MIME_TYPE, "image/png")
-                put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/EVA2Z")
+                put(MediaStore.Downloads.DISPLAY_NAME, jpegName)
+                put(MediaStore.Downloads.MIME_TYPE, "image/jpeg")
+                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/EVA2Z")
             }
-            val uri = context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+            val uri = context.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
             if (uri != null) {
-                context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+                context.contentResolver.openOutputStream(uri)?.use { it.write(jpegBytes) }
                 onSuccess()
             } else {
-                onError("Failed to create image file")
+                onError("Failed to create file in Downloads")
             }
         } else {
-            val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "EVA2Z")
+            val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "EVA2Z")
             dir.mkdirs()
-            File(dir, fileName).writeBytes(bytes)
+            File(dir, jpegName).writeBytes(jpegBytes)
             onSuccess()
         }
     } catch (e: Exception) {
@@ -107,12 +122,16 @@ actual fun saveQrImageToGallery(
 
 actual fun shareQrImage(bytes: ByteArray, fileName: String) {
     try {
-        val context = appCtx
-        val file = File(context.cacheDir, fileName)
-        file.writeBytes(bytes)
+        val context  = appCtx
+        val jpegBytes = toJpegBytes(bytes)
+        val jpegName  = fileName.replaceAfterLast('.', "jpg").let {
+            if (it == fileName) "$fileName.jpg" else it
+        }
+        val file = File(context.cacheDir, jpegName)
+        file.writeBytes(jpegBytes)
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "image/png"
+            type = "image/jpeg"
             putExtra(Intent.EXTRA_STREAM, uri)
             putExtra(Intent.EXTRA_SUBJECT, "EVA2Z Vehicle TAG QR Code")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)

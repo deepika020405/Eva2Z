@@ -80,7 +80,9 @@ private data class ChatMessage(
     val sortKey: Long,                       // ms-since-epoch — drives WhatsApp-like time order
     val status: MessageStatus = MessageStatus.SENT,
     val isSystemMessage: Boolean = false,
-    val localId: Long = 0L                   // tie-breaker for owner replies sent in same ms
+    val localId: Long = 0L,                  // tie-breaker for owner replies sent in same ms
+    val isCall: Boolean = false,
+    val callStatus: String? = null           // "initiated"|"answered"|"missed"|"ended"
 )
 
 private enum class MessageStatus { SENDING, SENT, DELIVERED, READ, ERROR }
@@ -161,11 +163,11 @@ fun QuickReplyScreen(
     // Apply a server message. For new ids → add bubble. For known ids → update status only.
     fun applyServerMessage(msg: ChatMessageDto) {
         val mid = msg.id ?: return
+        val isCallType = msg.type.equals("call", ignoreCase = true)
         val isOwner = msg.type.equals("sent", ignoreCase = true)
         val newStatus = statusFromDto(msg, isOwner)
 
         if (mid in seenServerMessageIds) {
-
             if (isOwner) {
                 messages = messages.map { m ->
                     if (m.localId == mid.toLong()) {
@@ -173,7 +175,7 @@ fun QuickReplyScreen(
                             newStatus == MessageStatus.READ -> m.copy(status = MessageStatus.READ)
                             newStatus == MessageStatus.DELIVERED && m.status !in listOf(MessageStatus.READ, MessageStatus.DELIVERED) ->
                                 m.copy(status = MessageStatus.DELIVERED)
-                            else -> m  // keep current optimistic status — don't downgrade
+                            else -> m
                         }
                     } else m
                 }
@@ -181,10 +183,24 @@ fun QuickReplyScreen(
             return
         }
 
-        val text = msg.message?.takeIf { it.isNotBlank() } ?: return
         seenServerMessageIds.add(mid)
         val sortMs = parseTimestampMs(msg.timestamp) ?: Clock.System.now().toEpochMilliseconds()
         val display = msg.time ?: formatMsTime(sortMs)
+
+        if (isCallType) {
+            messages = (messages + ChatMessage(
+                text = callStatusLabel(msg.call_status),
+                isOwner = false,
+                timestamp = display,
+                sortKey = sortMs,
+                localId = mid.toLong(),
+                isCall = true,
+                callStatus = msg.call_status
+            )).sortedWith(compareBy({ it.sortKey }, { it.localId }))
+            return
+        }
+
+        val text = msg.message?.takeIf { it.isNotBlank() } ?: return
         messages = (messages + ChatMessage(
             text = text,
             isOwner = isOwner,
@@ -553,10 +569,10 @@ fun QuickReplyScreen(
 
                     // Chat bubbles
                     items(messages) { message ->
-                        if (message.isSystemMessage) {
-                            SystemMessage(text = message.text)
-                        } else {
-                            ChatBubble(message = message)
+                        when {
+                            message.isCall        -> CallHistoryCard(message)
+                            message.isSystemMessage -> SystemMessage(text = message.text)
+                            else                  -> ChatBubble(message = message)
                         }
                     }
 
@@ -1164,6 +1180,67 @@ private fun ChatInputBar(
             }
         }
     }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Call History Card — WhatsApp-style centered call log entry
+// ─────────────────────────────────────────────────────────────────
+
+@Composable
+private fun CallHistoryCard(message: ChatMessage) {
+    val isMissed = message.callStatus.equals("missed", ignoreCase = true)
+    val iconTint = if (isMissed) Color(0xFFE53935) else Color(0xFF4A7D39)
+    val icon = if (isMissed) Icons.Default.PhoneMissed else Icons.Default.Call
+    val bgColor = if (isMissed) Color(0xFFFFF0F0) else Color(0xFFF1F8EC)
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 48.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = bgColor,
+            shadowElevation = 0.dp,
+            border = androidx.compose.foundation.BorderStroke(
+                0.8.dp,
+                if (isMissed) Color(0xFFFFCDD2) else Color(0xFFC8E6C9)
+            )
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = iconTint,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    text = message.text,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = iconTint
+                )
+                Text(
+                    text = "· ${message.timestamp}",
+                    fontSize = 11.sp,
+                    color = Color(0xFF9CA3AF)
+                )
+            }
+        }
+    }
+}
+
+private fun callStatusLabel(status: String?): String = when (status?.lowercase()) {
+    "initiated" -> " Call started"
+    "answered"  -> " Call answered"
+    "missed"    -> " Missed call"
+    "ended"     -> " Call ended"
+    else        -> " Call"
 }
 
 // ─────────────────────────────────────────────────────────────────

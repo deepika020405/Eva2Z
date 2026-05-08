@@ -12,11 +12,14 @@ import com.developer.ev2z.request.DeviceAnalyticsRequest
 import com.developer.ev2z.request.PackageDto
 import com.developer.ev2z.request.PhonePeCallbackRequest
 import com.developer.ev2z.request.RenewPlanRequest
+import com.developer.ev2z.request.SupportRequest
+import com.developer.ev2z.response.SupportResponse
 import com.developer.ev2z.response.*
 import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanScreenHost
 import com.developer.ev2z.ui.screens.ChangePlan.UserDevicesResponse
 import com.developer.ev2z.ui.screens.CriminalVerification.CandidateResult
 import com.developer.ev2z.ui.screens.CriminalVerification.CriminalForm
+import com.developer.ev2z.ui.screens.SOSParkingTag.ChatMessageDto
 import com.developer.ev2z.ui.screens.SOSParkingTag.ChatMessagesResponse
 import com.developer.ev2z.ui.screens.SOSParkingTag.InitiateCallResponse
 import com.developer.ev2z.ui.screens.SOSParkingTag.MyChatsResponse
@@ -41,11 +44,15 @@ import io.ktor.http.*
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
@@ -151,9 +158,9 @@ class ApiService {
         }
     }
 
-    // ---------------- VERIFY OTP (after signup) ----------------
+    // ---------------- VERIFY PHONE OTP (after signup) ----------------
     suspend fun verifyOtp(phone: String, otp: String): JsonObject {
-        println("🌐 API: Verifying OTP for phone=$phone")
+        println("🌐 API: Verifying Phone OTP for phone=$phone")
 
         return try {
             val response = client.post("${baseUrl}verify-otp") {
@@ -164,17 +171,44 @@ class ApiService {
                 ))
             }
 
-            println("✔️ Verify OTP Status: ${response.status}")
+            println("✔️ Verify Phone OTP Status: ${response.status}")
             response.body()
 
         } catch (e: ResponseException) {
             val status = e.response.status
             val text = try { e.response.bodyAsText() } catch (_: Exception) { "unable-to-read-body" }
-            println("❌ Verify OTP Error: HTTP $status")
-            println("   response body: $text")
+            println("❌ Verify Phone OTP Error: HTTP $status — $text")
             throw e
         } catch (e: Exception) {
-            println("❌ Verify OTP Error: ${e.message}")
+            println("❌ Verify Phone OTP Error: ${e.message}")
+            throw e
+        }
+    }
+
+    // ---------------- VERIFY EMAIL OTP (after signup) ----------------
+    suspend fun verifyEmailOtp(phone: String, email: String, otp: String): JsonObject {
+        println("🌐 API: Verifying Email OTP for phone=$phone email=$email otp=$otp")
+
+        return try {
+            val response = client.post("${baseUrl}verify-otp") {
+                contentType(ContentType.Application.Json)
+                setBody(mapOf(
+                    "phone" to phone,
+                    "email_otp" to otp
+                ))
+            }
+
+            val bodyText = response.bodyAsText()
+            println("✔️ Verify Email OTP Status: ${response.status} — Body: $bodyText")
+            Json.parseToJsonElement(bodyText).jsonObject
+
+        } catch (e: ResponseException) {
+            val status = e.response.status
+            val text = try { e.response.bodyAsText() } catch (_: Exception) { "unable-to-read-body" }
+            println("❌ Verify Email OTP Error: HTTP $status — $text")
+            throw e
+        } catch (e: Exception) {
+            println("❌ Verify Email OTP Error: ${e.message}")
             throw e
         }
     }
@@ -1356,25 +1390,50 @@ class ApiService {
             val raw = response.bodyAsText()
             println("📥 getChatMessages ${response.status}: $raw")
 
-            val json = Json {
-                ignoreUnknownKeys = true
-                isLenient = true
-                coerceInputValues = true
+            if (!response.status.isSuccess()) {
+                ChatMessagesResponse(status = false, message = "Error: ${response.status.value}")
+            } else {
+                val root = Json.parseToJsonElement(raw).jsonObject
+                val status = root["status"]?.jsonPrimitive?.booleanOrNull ?: false
+                val closed = root["closed"]?.jsonPrimitive?.booleanOrNull ?: false
+                val message = root["message"]?.jsonPrimitive?.contentOrNull
+                val dataArray = root["data"]?.jsonArray
+
+                if (dataArray == null) {
+                    ChatMessagesResponse(status = status, closed = closed, message = message)
+                } else {
+                    val messages = dataArray.mapNotNull { element ->
+                        runCatching<ChatMessageDto> {
+                            val obj = element.jsonObject
+                            // id can be int (21) or string ("call_12") — extract numeric part
+                            val id: Int? = when (val idEl = obj["id"]) {
+                                is JsonPrimitive -> when {
+                                    idEl.isString -> idEl.content.filter { it.isDigit() }.toIntOrNull()
+                                    else          -> idEl.intOrNull
+                                }
+                                else -> null
+                            }
+                            ChatMessageDto(
+                                id           = id,
+                                message      = obj["message"]?.jsonPrimitive?.contentOrNull,
+                                sender_id    = obj["sender_id"]?.jsonPrimitive?.intOrNull,
+                                type         = obj["type"]?.jsonPrimitive?.contentOrNull,
+                                time         = obj["time"]?.jsonPrimitive?.contentOrNull,
+                                timestamp    = obj["timestamp"]?.jsonPrimitive?.contentOrNull,
+                                is_delivered = obj["is_delivered"]?.jsonPrimitive?.intOrNull,
+                                is_seen      = obj["is_seen"]?.jsonPrimitive?.intOrNull,
+                                call_status  = obj["call_status"]?.jsonPrimitive?.contentOrNull,
+                                room_id      = obj["room_id"]?.jsonPrimitive?.contentOrNull
+                            )
+                        }.getOrNull()
+                    }
+                    ChatMessagesResponse(status = status, closed = closed, message = message, data = messages)
+                }
             }
 
-            if (response.status.isSuccess()) {
-                json.decodeFromString(ChatMessagesResponse.serializer(), raw)
-            } else {
-                ChatMessagesResponse(
-                    status = false,
-                    message = "Error: ${response.status.value}"
-                )
-            }
-        } catch (e: Exception) {            println("❌ getChatMessages: ${e.message}")
-            ChatMessagesResponse(
-                status = false,
-                message = "Network error: ${e.message ?: "Unknown"}"
-            )
+        } catch (e: Exception) {
+            println("❌ getChatMessages: ${e.message}")
+            ChatMessagesResponse(status = false, message = "Network error: ${e.message ?: "Unknown"}")
         }
     }
 
@@ -2550,6 +2609,30 @@ class ApiService {
                 append("X-Vault-Token", vaultToken)
                 append("Authorization", "Bearer $authToken")
             }
+        }
+    }
+
+    // ---------------- SUBMIT SUPPORT REQUEST ----------------
+    suspend fun submitSupportRequest(request: SupportRequest): SupportResponse {
+        val token = AppTokenProvider.getToken()
+        println("🌐 API: Submitting support request for ${request.name}")
+
+        return try {
+            val response = client.post("${baseUrl}support") {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(request)
+            }
+
+            val raw = response.bodyAsText()
+            println("✔️ Support Request Status: ${response.status}")
+            println("📝 Support Response: $raw")
+
+            Json { ignoreUnknownKeys = true }.decodeFromString(SupportResponse.serializer(), raw)
+
+        } catch (e: Exception) {
+            println("❌ Support Request Error: ${e.message}")
+            throw e
         }
     }
 }

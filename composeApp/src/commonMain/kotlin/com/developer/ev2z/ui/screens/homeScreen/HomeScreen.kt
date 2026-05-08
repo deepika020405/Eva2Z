@@ -143,28 +143,47 @@ private fun HomeHeader(
         }
         Box(modifier = Modifier.size(44.dp)) {
             Box(
-                modifier         = Modifier.fillMaxSize().clip(CircleShape).background(BellBg)
+                modifier         = Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape)
+                    .background(if (unreadCount > 0) Color(0xFFE8F5E9) else BellBg)
                     .clickable { onOpenNotifications() },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Notifications, "Notifications", tint = TextPrimary, modifier = Modifier.size(22.dp))
+                Icon(
+                    imageVector      = if (unreadCount > 0) Icons.Default.NotificationsActive else Icons.Default.NotificationsNone,
+                    contentDescription = "Notifications",
+                    tint             = if (unreadCount > 0) Color(0xFF00A859) else TextPrimary,
+                    modifier         = Modifier.size(22.dp)
+                )
             }
-            // Unread badge
+            // Unread badge — dot for 1, count for 2+
             if (unreadCount > 0) {
-                Box(
-                    modifier         = Modifier
-                        .size(18.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFFEF4444))
-                        .align(Alignment.TopEnd),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text       = if (unreadCount > 9) "9+" else unreadCount.toString(),
-                        fontSize   = 9.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color      = Color.White
+                if (unreadCount == 1) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFEF4444))
+                            .align(Alignment.TopEnd)
                     )
+                } else {
+                    Box(
+                        modifier         = Modifier
+                            .sizeIn(minWidth = 18.dp, minHeight = 18.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFEF4444))
+                            .align(Alignment.TopEnd)
+                            .padding(horizontal = 2.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text       = if (unreadCount > 9) "9+" else unreadCount.toString(),
+                            fontSize   = 9.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color      = Color.White
+                        )
+                    }
                 }
             }
         }
@@ -217,7 +236,7 @@ private fun ParkingTagSection(
                 modifier = Modifier.weight(1f)
             )
             ParkingTagCard(
-                title    = "Visitor\nChats",
+                title    = "QR Scan\nMessages",
                 icon     = Icons.Default.ChatBubbleOutline,
                 onClick  = onVisitorChats,
                 modifier = Modifier.weight(1f)

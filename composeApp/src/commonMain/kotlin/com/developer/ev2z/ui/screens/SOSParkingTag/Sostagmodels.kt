@@ -87,12 +87,14 @@ data class ChatMessagesResponse(
 data class ChatMessageDto(
     val id: Int?           = null,
     val message: String?   = null,
-    @SerialName("sender_id")    val sender_id: Int?    = null,
-    val type: String?      = null,   // "sent" (owner) | "received" (visitor)
+    @SerialName("sender_id")    val sender_id: Int?      = null,
+    val type: String?      = null,   // "sent" | "received" | "call"
     val time: String?      = null,
     val timestamp: String? = null,
-    @SerialName("is_delivered") val is_delivered: Int? = null,  // 1 = visitor received
-    @SerialName("is_seen")      val is_seen: Int?      = null   // 1 = visitor read
+    @SerialName("is_delivered") val is_delivered: Int?   = null,
+    @SerialName("is_seen")      val is_seen: Int?        = null,
+    @SerialName("call_status")  val call_status: String? = null, // "initiated"|"answered"|"missed"|"ended"
+    @SerialName("room_id")      val room_id: String?     = null
 )
 
 // ─────────────────────────────────────────────────────────────────
@@ -202,12 +204,14 @@ data class VisitorInfo(
 data class ChatMessageItem(
     val id: Int?           = null,
     val text: String?      = null,
-    @SerialName("sender_id")     val sender_id: Int?     = null,
+    @SerialName("sender_id")     val sender_id: Int?      = null,
     val type: String?      = null,
     val time: String?      = null,
     val timestamp: String? = null,
-    @SerialName("is_delivered")  val is_delivered: Int?  = null,
-    @SerialName("is_seen")       val is_seen: Int?       = null
+    @SerialName("is_delivered")  val is_delivered: Int?   = null,
+    @SerialName("is_seen")       val is_seen: Int?        = null,
+    @SerialName("call_status")   val call_status: String? = null,
+    @SerialName("room_id")       val room_id: String?     = null
 ) {
     fun toDto() = ChatMessageDto(
         id           = id,
@@ -217,7 +221,9 @@ data class ChatMessageItem(
         time         = time,
         timestamp    = timestamp,
         is_delivered = is_delivered,
-        is_seen      = is_seen
+        is_seen      = is_seen,
+        call_status  = call_status,
+        room_id      = room_id
     )
 }
 

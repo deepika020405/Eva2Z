@@ -69,8 +69,8 @@ class ParkingViewModel(
     val isFormValid: Boolean
         get() = _vehicleType.value.isNotBlank()
                 && _vehicleNumber.value.isNotBlank()
-                && _phone.value.length == 10
-                && (_alternatePhone.value.isEmpty() || _alternatePhone.value.length == 10)
+                && _phone.value.length in 7..15
+                && (_alternatePhone.value.isEmpty() || _alternatePhone.value.length in 7..15)
 
     // ── Input handlers ────────────────────────────────────────────
 
@@ -87,23 +87,25 @@ class ParkingViewModel(
     }
 
     fun onPhoneChange(value: String) {
-        val digits = value.filter { it.isDigit() }.take(10)
+        val digits = value.filter { it.isDigit() }.take(15)
         _phone.value = digits
         _phoneError.value = when {
-            digits.isEmpty()    -> null
-            digits.length != 10 -> "Enter a valid 10-digit number"
-            else                -> null
+            digits.isEmpty()       -> null
+            digits.length < 7      -> "Enter at least 7 digits"
+            digits.length > 15     -> "Max 15 digits allowed"
+            else                   -> null
         }
         clearErrorState()
     }
 
     fun onAlternatePhoneChange(value: String) {
-        val digits = value.filter { it.isDigit() }.take(10)
+        val digits = value.filter { it.isDigit() }.take(15)
         _alternatePhone.value = digits
         _alternatePhoneError.value = when {
-            digits.isEmpty()    -> null
-            digits.length != 10 -> "Enter a valid 10-digit number"
-            else                -> null
+            digits.isEmpty()       -> null
+            digits.length < 7      -> "Enter at least 7 digits"
+            digits.length > 15     -> "Max 15 digits allowed"
+            else                   -> null
         }
         clearErrorState()
     }
@@ -128,19 +130,19 @@ class ParkingViewModel(
             _vehicleNumberError.value = "Vehicle number is required"
             valid = false
         }
-        if (_phone.value.length != 10) {
-            _phoneError.value = "Enter a valid 10-digit mobile number"
+        if (_phone.value.length !in 7..15) {
+            _phoneError.value = "Enter a valid number (7–15 digits)"
             valid = false
         }
         // Alternate phone 2 is optional — only validate format if it was entered
-        if (_alternatePhone.value.isNotBlank() && _alternatePhone.value.length != 10) {
-            _alternatePhoneError.value = "Enter a valid 10-digit number"
+        if (_alternatePhone.value.isNotBlank() && _alternatePhone.value.length !in 7..15) {
+            _alternatePhoneError.value = "Enter a valid number (7–15 digits)"
             valid = false
         }
 
         // Same number check (only when alternate phone is provided)
         if (
-            _phone.value.length == 10 &&
+            _phone.value.length in 7..15 &&
             _alternatePhone.value.isNotBlank() &&
             _phone.value == _alternatePhone.value
         ) {

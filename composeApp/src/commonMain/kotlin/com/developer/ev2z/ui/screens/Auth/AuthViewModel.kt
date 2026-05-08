@@ -30,9 +30,13 @@ class AuthViewModel(
     private val _signupSuccess = MutableStateFlow(false)
     val signupSuccess: StateFlow<Boolean> = _signupSuccess
 
-    // OTP verified state
+    // Phone OTP verified state
     private val _otpVerified = MutableStateFlow(false)
     val otpVerified: StateFlow<Boolean> = _otpVerified
+
+    // Email OTP verified state
+    private val _emailOtpVerified = MutableStateFlow(false)
+    val emailOtpVerified: StateFlow<Boolean> = _emailOtpVerified
 
     // Error state
     private val _error = MutableStateFlow<String?>(null)
@@ -300,6 +304,37 @@ class AuthViewModel(
 
 
     // ============================================
+    // VERIFY EMAIL OTP
+    // ============================================
+    fun verifyEmailOtp(phone: String, email: String, otp: String) {
+        println("🔥 Verifying Email OTP for: $email (phone: $phone)")
+
+        viewModelScope.launch {
+            _loading.value = true
+            _error.value = null
+
+            try {
+                val result = repository.verifyEmailOtp(phone, email, otp)
+
+                if (result.success) {
+                    println("🔥 Email OTP verified successfully!")
+                    _emailOtpVerified.value = true
+                } else {
+                    _error.value = result.message
+                        ?.takeIf { it.isNotBlank() }
+                        ?: "Invalid OTP. Please try again."
+                }
+
+            } catch (e: Exception) {
+                println("❌ Email OTP verification error: ${e.message}")
+                _error.value = mapToUserError(e)
+            } finally {
+                _loading.value = false
+            }
+        }
+    }
+
+    // ============================================
     // RESEND OTP
     // ============================================
     fun resendOtp(phone: String) {
@@ -466,6 +501,10 @@ class AuthViewModel(
 
     fun resetOtpVerified() {
         _otpVerified.value = false
+    }
+
+    fun resetEmailOtpVerified() {
+        _emailOtpVerified.value = false
     }
 
     fun setError(message: String) {

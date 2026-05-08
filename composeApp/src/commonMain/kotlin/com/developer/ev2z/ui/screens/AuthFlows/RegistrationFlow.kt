@@ -23,7 +23,8 @@ import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
 import org.jetbrains.compose.resources.painterResource
 
 enum class RegistrationStep {
-    VERIFY_OTP,
+    VERIFY_PHONE_OTP,
+    VERIFY_EMAIL_OTP,
     CREATE_PASSWORD
 }
 
@@ -36,15 +37,16 @@ fun RegistrationFlow(
     onBack: () -> Unit = {},
     onSuccess: () -> Unit = {}
 ) {
-    var currentStep by remember { mutableStateOf(RegistrationStep.VERIFY_OTP) }
+    var currentStep by remember { mutableStateOf(RegistrationStep.VERIFY_PHONE_OTP) }
     var showExitDialog by remember { mutableStateOf(false) }
 
     val isLoading by authViewModel.loading.collectAsState()
     val otpVerified by authViewModel.otpVerified.collectAsState()
+    val emailOtpVerified by authViewModel.emailOtpVerified.collectAsState()
     val error by authViewModel.error.collectAsState()
 
-    // ✅ Cross-platform back button - ONLY on first screen
-    if (currentStep == RegistrationStep.VERIFY_OTP) {
+    // Cross-platform back button — only on first screen
+    if (currentStep == RegistrationStep.VERIFY_PHONE_OTP) {
         BackPressHandler {
             showExitDialog = true
         }
@@ -78,13 +80,21 @@ fun RegistrationFlow(
 //        }
 //    }
 
+    // Phone OTP verified → go to email OTP step
     LaunchedEffect(otpVerified) {
         if (otpVerified) {
-            // 🔥 Give backend time to finalize user
-            kotlinx.coroutines.delay(800)
-
-            currentStep = RegistrationStep.CREATE_PASSWORD
+            kotlinx.coroutines.delay(500)
+            currentStep = RegistrationStep.VERIFY_EMAIL_OTP
             authViewModel.resetOtpVerified()
+        }
+    }
+
+    // Email OTP verified → go to create password
+    LaunchedEffect(emailOtpVerified) {
+        if (emailOtpVerified) {
+            kotlinx.coroutines.delay(500)
+            currentStep = RegistrationStep.CREATE_PASSWORD
+            authViewModel.resetEmailOtpVerified()
         }
     }
 
@@ -138,10 +148,12 @@ fun RegistrationFlow(
                     )
             ) {
                 when (currentStep) {
-                    RegistrationStep.VERIFY_OTP -> {
+
+                    // ── Step 1: Phone OTP ─────────────────────────────────
+                    RegistrationStep.VERIFY_PHONE_OTP -> {
                         OTPScreen(
-                            title = "Verify OTP",
-                            subtitle = "Enter the OTP sent to $phone",
+                            title = "Verify Phone Number",
+                            subtitle = "Enter the 6-digit OTP sent to\n$phone",
                             isLoading = isLoading,
                             error = error,
                             onOTPComplete = { otp ->
@@ -154,6 +166,27 @@ fun RegistrationFlow(
                         )
                     }
 
+                    // ── Step 2: Email OTP ─────────────────────────────────
+                    RegistrationStep.VERIFY_EMAIL_OTP -> {
+                        OTPScreen(
+                            title = "Verify Email Address",
+                            subtitle = "Enter the 6-digit OTP sent to\n$email",
+                            isLoading = isLoading,
+                            error = error,
+                            onOTPComplete = { otp ->
+                                authViewModel.verifyEmailOtp(phone, email, otp)
+                            },
+                            onResendOTP = {
+                                authViewModel.signUp(name, phone, "", email)
+                            },
+                            onBack = {
+                                currentStep = RegistrationStep.VERIFY_PHONE_OTP
+                                authViewModel.clearError()
+                            }
+                        )
+                    }
+
+                    // ── Step 3: Create Password ───────────────────────────
                     RegistrationStep.CREATE_PASSWORD -> {
                         val loginSuccess by authViewModel.loginSuccess.collectAsState()
 
@@ -170,11 +203,11 @@ fun RegistrationFlow(
                             buttonText = "Create Account",
                             isLoading = isLoading,
                             error = error,
-                            onPasswordSubmit = { password, confirmPassword ->
+                            onPasswordSubmit = { password, _ ->
                                 println("🔐 Calling savePasswordAndLogin...")
                                 authViewModel.savePasswordAndLogin(name, phone, password, email)
                             },
-                            onBack = { currentStep = RegistrationStep.VERIFY_OTP }
+                            onBack = { currentStep = RegistrationStep.VERIFY_EMAIL_OTP }
                         )
                     }
                 }

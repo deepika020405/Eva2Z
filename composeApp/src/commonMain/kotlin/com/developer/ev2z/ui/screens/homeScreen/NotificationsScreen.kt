@@ -37,6 +37,35 @@ import kotlinx.datetime.toLocalDateTime
 // Singleton for reactive badge count — updated by HomeNavGraph, collected by HomeTab
 object NotificationBadgeManager {
     val unreadCount = MutableStateFlow(0)
+
+    // Thread IDs the user has already seen via the notifications panel (session-local)
+    private val seenThreadIds = mutableSetOf<Int>()
+
+    /** Called when the notifications panel is opened and threads are visible. */
+    fun markAllSeen(threadIds: List<Int>) {
+        seenThreadIds.addAll(threadIds)
+        unreadCount.value = 0
+    }
+
+    /** Called when the user taps a specific notification to open its chat. */
+    fun markOneSeen(chatId: Int) {
+        seenThreadIds.add(chatId)
+        val current = unreadCount.value
+        if (current > 0) unreadCount.value = current - 1
+    }
+
+    /**
+     * Recalculates the badge from the latest thread state.
+     * Only counts threads that are open AND have not yet been seen by the user.
+     */
+    fun recalculate(state: ChatThreadListUiState): Int {
+        val count = (state as? ChatThreadListUiState.Success)
+            ?.threads
+            ?.count { it.isOpen && it.chat_id !in seenThreadIds }
+            ?: 0
+        unreadCount.value = count
+        return count
+    }
 }
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
@@ -76,6 +105,14 @@ fun NotificationsScreen(
         while (true) {
             delay(15_000)
             viewModel.refreshChatsWithMessages()
+        }
+    }
+
+    // Clear badge as soon as threads are visible to the user
+    LaunchedEffect(threadListState) {
+        if (threadListState is ChatThreadListUiState.Success) {
+            val ids = (threadListState as ChatThreadListUiState.Success).threads.map { it.chat_id }
+            NotificationBadgeManager.markAllSeen(ids)
         }
     }
 
@@ -182,12 +219,14 @@ private fun NotificationsList(
 
 @Composable
 private fun NotificationRow(thread: ChatThread, onClick: () -> Unit) {
-    val isUnread   = thread.isOpen
+    val isUnread    = thread.isOpen
     val visitorName = thread.visitor?.name ?: "Visitor"
     val avatarColor = AvatarPalette[visitorName.hashCode().rem(AvatarPalette.size).let { if (it < 0) it + AvatarPalette.size else it }]
-    val initials   = visitorName.trim().split(" ").take(2).mapNotNull { it.firstOrNull()?.uppercaseChar() }.joinToString("")
-    val lastMsg    = thread.last_message?.text ?: thread.messages.lastOrNull()?.text ?: "New scan alert"
-    val timeStr    = relativeTime(thread.last_message_at)
+    val maskedPhone = thread.visitor?.phone?.filter { it.isDigit() }?.let { digits ->
+        if (digits.length >= 4) "•••• •••• ${digits.takeLast(4)}" else "••••••••••"
+    }
+    val lastMsg = thread.last_message?.text ?: thread.messages.lastOrNull()?.text ?: "New scan alert"
+    val timeStr = relativeTime(thread.last_message_at)
 
     Row(
         modifier          = Modifier
@@ -197,12 +236,12 @@ private fun NotificationRow(thread: ChatThread, onClick: () -> Unit) {
             .padding(horizontal = 16.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Avatar
+        // Avatar — color stays unique per visitor, but initials always "V"
         Box(
             modifier         = Modifier.size(50.dp).clip(CircleShape).background(avatarColor),
             contentAlignment = Alignment.Center
         ) {
-            Text(initials.ifBlank { "V" }, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text("V", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         }
 
         Spacer(Modifier.width(14.dp))
@@ -215,7 +254,7 @@ private fun NotificationRow(thread: ChatThread, onClick: () -> Unit) {
                 verticalAlignment     = Alignment.CenterVertically
             ) {
                 Text(
-                    visitorName,
+                    "Visitor",
                     fontSize   = 15.sp,
                     fontWeight = if (isUnread) FontWeight.ExtraBold else FontWeight.SemiBold,
                     color      = NTextPrimary,
@@ -233,7 +272,7 @@ private fun NotificationRow(thread: ChatThread, onClick: () -> Unit) {
                 Icon(Icons.Default.QrCode2, null, tint = NGreen, modifier = Modifier.size(13.dp))
                 Spacer(Modifier.width(4.dp))
                 Text(
-                    thread.visitor?.phone?.let { "· $it" } ?: "",
+                    maskedPhone?.let { "· $it" } ?: "",
                     fontSize = 12.sp, color = NTextSecond, maxLines = 1
                 )
             }
@@ -431,7 +470,7 @@ private fun relativeTime(timestamp: String?): String {
     }
 }
 
-// ─── Badge count helper (used by HomeScreen) ──────────────────────────────────
+// ─── Badge count helper (used by HomeNavGraph via NotificationBadgeManager) ───
 
 fun countUnreadNotifications(state: ChatThreadListUiState): Int =
-    (state as? ChatThreadListUiState.Success)?.threads?.count { it.isOpen } ?: 0
+    NotificationBadgeManager.recalculate(state)

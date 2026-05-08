@@ -40,7 +40,8 @@ kotlin {
                 "-framework", "UIKit",
                 "-framework", "Foundation",
                 "-framework", "Security",
-                "-framework", "Network"
+                "-framework", "Network",
+                "-framework", "Photos"
             )
         }
     }
@@ -143,8 +144,8 @@ android {
         applicationId = "com.developer.ev2z"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 91
-        versionName = "5.5.2"
+        versionCode = 93
+        versionName = "5.5.4"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

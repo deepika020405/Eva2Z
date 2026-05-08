@@ -182,7 +182,7 @@ private fun PremiumTopBar(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "Visitor Chats",
+                    "QR Scan Chats",
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 17.sp,

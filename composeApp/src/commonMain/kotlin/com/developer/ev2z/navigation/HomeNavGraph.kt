@@ -129,6 +129,7 @@ class HomeTab(
     private val onNavigateToParking: () -> Unit,
     private val onNavigateToSosTag: (Int) -> Unit,
     private val onSosTagManual: () -> Unit,
+    private val onSosChatInbox: () -> Unit,
     private val onNavigateToInstallationSupport: () -> Unit,
     private val onLogout: () -> Unit = {},
 ) : Tab {
@@ -178,8 +179,8 @@ class HomeTab(
                 onDriverScore = onNavigateToDriverScore,
                 onParking = onNavigateToParking,         // ✅ CHANGED
                 onSosTag = {
-                    println("SOS Tag opened manually")
-                    onSosTagManual()   // ✅ HomeNavGraph ka state set hoga
+                    println("Visitor Chats opened manually")
+                    onSosChatInbox()
                 },
                 onOpenLiveLocation = { showLiveLocation = true },
 
@@ -505,9 +506,9 @@ fun HomeNavGraph(
         }
     }
     val _threadStateForBadge by sosTagViewModel.threadListState.collectAsState()
-    // Push to singleton so HomeTab.Content() can collect without constructor threading
+    // Recalculate badge, skipping threads the user has already seen in the panel
     LaunchedEffect(_threadStateForBadge) {
-        NotificationBadgeManager.unreadCount.value = countUnreadNotifications(_threadStateForBadge)
+        countUnreadNotifications(_threadStateForBadge)   // updates NotificationBadgeManager internally
     }
 
     val parkingViewModel = remember {
@@ -775,6 +776,7 @@ fun HomeNavGraph(
                     sosTagViewModel.resetAll()
                 },
                 onNotificationClick = { chatId, visitorName, visitorPhone ->
+                    NotificationBadgeManager.markOneSeen(chatId)
                     currentSosAlertId = chatId
                     currentVisitorName = visitorName
                     currentVisitorPhone = visitorPhone
@@ -1228,6 +1230,11 @@ fun HomeNavGraph(
                     currentSosAlertId = null
                     showNotificationsScreen = true
                 },
+                onSosChatInbox = {
+                    sosTagViewModel.resetAll()
+                    currentSosAlertId = null
+                    showSosChatInbox = true
+                },
                 onLogout = onLogout
             )
         }
@@ -1559,6 +1566,7 @@ fun HomeNavGraphContent(
     onNavigateToParking: () -> Unit,    // ✅ CHANGED — add after onNavigateToDriverScore
     onNavigateToSosTag: (Int) -> Unit,
     onSosTagManual: () -> Unit,
+    onSosChatInbox: () -> Unit,
     onLogout: () -> Unit
 ) {
     val productRepository = remember { ProductRepository(apiService) }
@@ -1608,6 +1616,7 @@ fun HomeNavGraphContent(
     // rememberUpdatedState — stale lambda problem fix
     val latestOnSosTag by rememberUpdatedState(onNavigateToSosTag)
     val latestOnSosTagManual by rememberUpdatedState(onSosTagManual)
+    val latestOnSosChatInbox by rememberUpdatedState(onSosChatInbox)
 
     val homeTab = remember {
         HomeTab(
@@ -1627,8 +1636,9 @@ fun HomeNavGraphContent(
             onNavigateToCriminalVerification = onNavigateToCriminalVerification,
             onNavigateToDriverScore = onNavigateToDriverScore,
             onNavigateToParking = onNavigateToParking,
-            onNavigateToSosTag = { alertId -> latestOnSosTag(alertId) },  // ✅ fresh lambda
-            onSosTagManual = { latestOnSosTagManual() },                   // ✅ fresh lambda
+            onNavigateToSosTag = { alertId -> latestOnSosTag(alertId) },
+            onSosTagManual = { latestOnSosTagManual() },
+            onSosChatInbox = { latestOnSosChatInbox() },
             onNavigateToInstallationSupport = onNavigateToInstallationSupport,
             onLogout = onLogout,
         )
