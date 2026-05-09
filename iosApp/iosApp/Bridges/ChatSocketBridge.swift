@@ -72,6 +72,14 @@ import ComposeApp
                 print("❌ [ChatSocketBridge] newMessage: could not parse payload — \(data)")
                 return
             }
+            // Skip the send_message echo: server echoes our own emit back as
+            // {chat_id:N, message:"<text>"} (plain String). The real broadcast always
+            // has message as a dict with id/type/etc. Forwarding the echo causes a
+            // duplicate bubble because it gets a negative fallback id not in seenServerMessageIds.
+            if dict["message"] is String {
+                print("⏭️ [ChatSocketBridge] newMessage: skipping send_message echo")
+                return
+            }
             let msgObj = (dict["message"] as? [String: Any]) ?? dict
 
             // Parse id robustly: SocketIO-Swift returns NSNumber from JSON,
