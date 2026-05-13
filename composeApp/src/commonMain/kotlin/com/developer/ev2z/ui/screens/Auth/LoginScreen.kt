@@ -28,6 +28,7 @@ import com.developer.ev2z.ui.components.CountryPickerDialog
 import com.developer.ev2z.ui.components.PhoneInputField
 import com.developer.ev2z.ui.components.defaultCountry
 import com.developer.ev2z.util.Analytics
+import com.developer.ev2z.utils.PhoneValidator
 import com.developer.ev2z.viewmodel.AuthViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -105,6 +106,7 @@ fun LoginScreen(
             onDismiss = { showPicker = false },
             onCountrySelected = { country ->
                 selectedCountry = country
+                if (phoneNumber.length > country.phoneLength) phoneNumber = phoneNumber.take(country.phoneLength)
                 showPicker = false
             }
         )
@@ -160,13 +162,13 @@ fun LoginScreen(
                 selectedCountry = selectedCountry,
                 onCountryClick  = { showPicker = true },
                 fieldHeight     = fieldHeight,
-                isError         = phoneNumber.isNotEmpty() && phoneNumber.length < 5,
+                isError         = phoneNumber.isNotEmpty() && !PhoneValidator.isValid(phoneNumber, selectedCountry.dialCode, selectedCountry.phoneLength),
                 labelSize       = labelSize,
                 placeholder     = if (isCompact) "Phone number" else "Enter Your Registered Number"
             )
-            if (phoneNumber.isNotEmpty() && phoneNumber.length < 5) {
+            if (phoneNumber.isNotEmpty() && !PhoneValidator.isValid(phoneNumber, selectedCountry.dialCode, selectedCountry.phoneLength)) {
                 Text(
-                    text  = "Enter a valid phone number",
+                    text  = PhoneValidator.errorMessage(selectedCountry.dialCode, selectedCountry.phoneLength),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(start = 8.dp, top = 4.dp)
@@ -267,7 +269,7 @@ fun LoginScreen(
             Spacer(Modifier.height(if (isCompact) 16.dp else 24.dp))
 
             // Login Button
-            val phoneValid = phoneNumber.length >= 5
+            val phoneValid = PhoneValidator.isValid(phoneNumber, selectedCountry.dialCode, selectedCountry.phoneLength)
             Button(
                 onClick = {
                     focusManager.clearFocus()

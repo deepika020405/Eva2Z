@@ -268,15 +268,8 @@ class DocumentsTab(
     @Composable
     override fun Content() {
         when (documentsGateState) {
-            DocumentsGateState.LOCKED -> {
-                LockedDocumentsPlaceholder(
-                    onUnlockClick = onUnlock
-                )
-            }
-
-            else -> {
-                Box(modifier = Modifier.fillMaxSize())
-            }
+            DocumentsGateState.UNLOCKED -> Box(modifier = Modifier.fillMaxSize())
+            else -> LockedDocumentsPlaceholder(onUnlockClick = onUnlock)
         }
     }
 
@@ -520,8 +513,9 @@ fun HomeNavGraph(
         SosNotificationHandler.alertFlow.collect { alertId ->
             println("📲 Auto redirect SOS Alert $alertId")
 
-            if (showSosQuickReply) {
-                // Chat is already open — QuickReplyScreen's 2s poll will pick up the new message
+            if (showSosQuickReply && alertId == currentSosAlertId) {
+                // Same chat is already open — socket + QuickReplyScreen's alertFlow collector
+                // handle the new message in real-time. No navigation change needed.
                 return@collect
             }
 
@@ -806,6 +800,7 @@ fun HomeNavGraph(
 
         } else if (showSosQuickReply) {
 
+            key(currentSosAlertId) {
             QuickReplyScreen(
                 alertId = currentSosAlertId ?: 0,
                 visitorName = currentVisitorName,
@@ -851,6 +846,7 @@ fun HomeNavGraph(
                     }
                 }
             )
+            } // key(currentSosAlertId)
 
         } else if (showSosConfirmation) {
 
@@ -1719,6 +1715,7 @@ fun HomeNavGraphContent(
     ) { padding ->
         HorizontalPager(
             state = pagerState,
+            beyondViewportPageCount = 1,
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()

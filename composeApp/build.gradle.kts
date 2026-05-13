@@ -65,6 +65,7 @@ kotlin {
             implementation(libs.intentsdk)
             implementation(libs.play.services.auth)
             implementation(libs.play.services.auth.api.phone)
+            implementation(libs.play.services.location)
             implementation(libs.app.update.ktx)
 
             implementation("com.android.installreferrer:installreferrer:2.2")

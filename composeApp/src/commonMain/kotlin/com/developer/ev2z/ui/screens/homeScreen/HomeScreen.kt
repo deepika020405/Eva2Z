@@ -111,9 +111,10 @@ fun HomeScreen(
                 }
                 item {
                     GeneralSection(
-                        onDocumentVault = onOpenDocuments,
-                        onCommunity     = onOpenCommunity,
-                        hPad            = hPad
+                        onDocumentVault        = onOpenDocuments,
+                        onCommunity            = onOpenCommunity,
+                        onCriminalVerification = onCriminalVerification,
+                        hPad                   = hPad
                     )
                 }
             }
@@ -435,23 +436,39 @@ private fun InstallationSupportCard(onClick: () -> Unit) {
 
 // ─────────────────────────── GENERAL SECTION ───────────────────────
 
+private data class GeneralItemData(val title: String, val icon: ImageVector, val onClick: () -> Unit)
+
 @Composable
 private fun GeneralSection(
     onDocumentVault: () -> Unit,
     onCommunity: () -> Unit,
+    onCriminalVerification: () -> Unit,
     hPad: Dp
 ) {
+    val items = listOf(
+        GeneralItemData("Document\nVault",        Icons.Default.FolderOpen,   onDocumentVault),
+        GeneralItemData("Community",              Icons.Default.Groups,        onCommunity),
+        GeneralItemData("Criminal\nVerification", Icons.Default.VerifiedUser,  onCriminalVerification),
+    )
+
     Column(modifier = Modifier.padding(horizontal = hPad)) {
         Text("General", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
 
         Spacer(Modifier.height(16.dp))
 
-        Row(
-            modifier              = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            GeneralItem(title = "Document\nVault", icon = Icons.Default.FolderOpen, onClick = onDocumentVault, modifier = Modifier.weight(1f))
-            GeneralItem(title = "Community",       icon = Icons.Default.Groups,     onClick = onCommunity,     modifier = Modifier.weight(1f))
+        val rows = items.chunked(2)
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            rows.forEach { row ->
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    row.forEach { item ->
+                        GeneralItem(title = item.title, icon = item.icon, onClick = item.onClick, modifier = Modifier.weight(1f))
+                    }
+                    if (row.size < 2) Spacer(Modifier.weight(1f))
+                }
+            }
         }
     }
 }
@@ -504,6 +521,7 @@ private fun GeneralItem(
         }
     }
 }
+
 
 // ══════════════════════════════════════════════════════════════════
 // SHARED MODELS — used by AllFeaturesScreen (do not modify)

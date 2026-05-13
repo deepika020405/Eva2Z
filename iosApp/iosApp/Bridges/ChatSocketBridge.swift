@@ -104,6 +104,15 @@ import ComposeApp
             let timestamp = (msgObj["timestamp"] as? String).flatMap { $0.isEmpty ? nil : $0 }
 
             print("📨 [ChatSocketBridge] newMessage id=\(id) type=\(type ?? "") text=\(message?.prefix(40) ?? "")")
+            // System message = visitor ended the chat from their side
+            if type?.lowercased() == "system" {
+                print("🔒 [ChatSocketBridge] system newMessage → onChatClosed")
+                ChatSocketBridgeHolder.shared.callback?.onNewMessage(
+                    id: id, message: message, type: type, time: time, timestamp: timestamp
+                )
+                ChatSocketBridgeHolder.shared.callback?.onChatClosed()
+                return
+            }
             ChatSocketBridgeHolder.shared.callback?.onNewMessage(
                 id: id, message: message, type: type, time: time, timestamp: timestamp
             )
@@ -156,9 +165,18 @@ import ComposeApp
             }
         }
 
-        socket?.on("chat_closed") { _, _ in
-            print("🔒 [ChatSocketBridge] chat_closed")
-            ChatSocketBridgeHolder.shared.callback?.onChatClosed()
+        socket?.on("chat_closed") { [weak self] data, _ in
+            guard let self = self else { return }
+            let dict        = data.first as? [String: Any]
+            let eventChatId = (dict?["chat_id"] as? NSNumber)?.intValue
+                           ?? (dict?["chat_id"] as? Int)
+                           ?? 0
+            let closedBy    = (dict?["closed_by"] as? String) ?? "unknown"
+            print("🔒 [ChatSocketBridge] chat_closed — eventChatId=\(eventChatId) activeChatId=\(self.activeChatId) closedBy=\(closedBy)")
+            // Only act if this event belongs to the room we joined
+            if eventChatId == 0 || eventChatId == self.activeChatId {
+                ChatSocketBridgeHolder.shared.callback?.onChatClosed()
+            }
         }
 
         // connect(withPayload:) sends the token as a Socket.IO v3 auth object —

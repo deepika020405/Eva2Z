@@ -3,7 +3,9 @@ package com.developer.ev2z.ui.screens.device_Report
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,6 +32,7 @@ import platform.CoreGraphics.CGRectMake
 import platform.CoreGraphics.CGSizeMake
 import platform.CoreLocation.CLLocationCoordinate2D
 import platform.CoreLocation.CLLocationCoordinate2DMake
+import platform.CoreLocation.CLLocationManager
 import platform.MapKit.*
 import platform.UIKit.UIBezierPath
 import platform.UIKit.UIColor
@@ -49,13 +52,19 @@ actual fun PlatformMapView(
     zoom: Double,
     trailPoints: List<TrailPoint>
 ) {
-    val vehicleAnnotation = remember { MKPointAnnotation() }
-    val startAnnotation = remember { MKPointAnnotation() }
-    val polylineRef = remember { arrayOfNulls<MKPolyline>(1) }
-    val lastLocation = remember { doubleArrayOf(latitude, longitude) }
-    val arrowImage = remember { buildNavigationArrowImage() }
-    var startAnnotationAdded by remember { mutableStateOf(false) }
-    var isHybrid by remember { mutableStateOf(false) }
+    val vehicleAnnotation        = remember { MKPointAnnotation() }
+    val startAnnotation          = remember { MKPointAnnotation() }
+    val userAnnotation           = remember { MKPointAnnotation() }
+    val polylineRef              = remember { arrayOfNulls<MKPolyline>(1) }
+    val userToDevicePolylineRef  = remember { arrayOfNulls<MKPolyline>(1) }
+    val mapViewRef               = remember { arrayOfNulls<MKMapView>(1) }
+    val locationManager          = remember { CLLocationManager() }
+    val lastLocation             = remember { doubleArrayOf(latitude, longitude) }
+    val arrowImage               = remember { buildNavigationArrowImage() }
+    var startAnnotationAdded     by remember { mutableStateOf(false) }
+    var userAnnotationAdded      by remember { mutableStateOf(false) }
+    var isHybrid                 by remember { mutableStateOf(false) }
+    var routeActive              by remember { mutableStateOf(false) }
 
     Box(modifier = modifier) {
 
@@ -63,6 +72,10 @@ actual fun PlatformMapView(
             modifier = Modifier.fillMaxSize(),
             factory = {
                 val mapView = MKMapView()
+                mapViewRef[0] = mapView
+
+                locationManager.requestWhenInUseAuthorization()
+                mapView.showsUserLocation = true
 
                 val coordinate = CLLocationCoordinate2DMake(latitude, longitude)
                 vehicleAnnotation.setCoordinate(coordinate)
@@ -86,39 +99,59 @@ actual fun PlatformMapView(
                         if (viewForAnnotation is MKUserLocation) return null
 
                         val title = viewForAnnotation.title ?: ""
-                        return if (title == "Start") {
-                            val id = "start_marker"
-                            val view = mapView.dequeueReusableAnnotationViewWithIdentifier(id)
-                                as? MKMarkerAnnotationView
-                                ?: MKMarkerAnnotationView(
-                                    annotation = viewForAnnotation,
-                                    reuseIdentifier = id
+                        return when (title) {
+                            "Start" -> {
+                                val id = "start_marker"
+                                val view = mapView.dequeueReusableAnnotationViewWithIdentifier(id)
+                                    as? MKMarkerAnnotationView
+                                    ?: MKMarkerAnnotationView(
+                                        annotation = viewForAnnotation,
+                                        reuseIdentifier = id
+                                    )
+                                view.annotation = viewForAnnotation
+                                view.markerTintColor = UIColor(
+                                    red = 0x4C / 255.0, green = 0xAF / 255.0,
+                                    blue = 0x50 / 255.0, alpha = 1.0
                                 )
-                            view.annotation = viewForAnnotation
-                            view.markerTintColor = UIColor(
-                                red = 0x4C / 255.0, green = 0xAF / 255.0,
-                                blue = 0x50 / 255.0, alpha = 1.0
-                            )
-                            view.glyphText = "S"
-                            view.canShowCallout = true
-                            view
-                        } else {
-                            val id = "vehicle_arrow"
-                            val view = mapView.dequeueReusableAnnotationViewWithIdentifier(id)
-                                ?: MKAnnotationView(
-                                    annotation = viewForAnnotation,
-                                    reuseIdentifier = id
+                                view.glyphText = "S"
+                                view.canShowCallout = true
+                                view
+                            }
+                            "You" -> {
+                                val id = "user_marker"
+                                val view = mapView.dequeueReusableAnnotationViewWithIdentifier(id)
+                                    as? MKMarkerAnnotationView
+                                    ?: MKMarkerAnnotationView(
+                                        annotation = viewForAnnotation,
+                                        reuseIdentifier = id
+                                    )
+                                view.annotation = viewForAnnotation
+                                view.markerTintColor = UIColor(
+                                    red = 0x21 / 255.0, green = 0x96 / 255.0,
+                                    blue = 0xF3 / 255.0, alpha = 1.0
                                 )
-                            view.annotation = viewForAnnotation
-                            view.image = arrowImage
-                            view.canShowCallout = false
-                            view.centerOffset = CGPointMake(0.0, 0.0)
-                            val bearing = calculateBearing(
-                                lastLocation[0], lastLocation[1],
-                                latitude, longitude
-                            )
-                            view.transform = CGAffineTransformMakeRotation(bearing * PI / 180.0)
-                            view
+                                view.glyphText = "📍"
+                                view.canShowCallout = true
+                                view
+                            }
+                            else -> {
+                                val id = "vehicle_arrow"
+                                val view = mapView.dequeueReusableAnnotationViewWithIdentifier(id)
+                                    ?: MKAnnotationView(
+                                        annotation = viewForAnnotation,
+                                        reuseIdentifier = id
+                                    )
+                                view.annotation = viewForAnnotation
+                                view.image = arrowImage
+                                view.canShowCallout = false
+                                view.centerOffset = CGPointMake(0.0, 0.0)
+                                val bearing = calculateBearing(
+                                    lastLocation[0], lastLocation[1],
+                                    latitude, longitude
+                                )
+                                view.transform = CGAffineTransformMakeRotation(bearing * PI / 180.0)
+                                view
+                            }
                         }
                     }
 
@@ -219,21 +252,99 @@ actual fun PlatformMapView(
             }
         )
 
-        // ✅ Toggle Button (Middle right)
-        Box(
+        // ── Right-side map control buttons ──────────────────────────
+        Column(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
-                .padding(end = 10.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color.White)
-                .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(8.dp))
-                .clickable { isHybrid = !isHybrid }
-                .padding(8.dp)
+                .padding(end = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                text = if (!isHybrid) "🛰️" else "🗺️",
-                fontSize = 18.sp
-            )
+            // User → Device route button
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (routeActive) Color(0xFFE3F2FD) else Color.White)
+                    .border(
+                        1.dp,
+                        if (routeActive) Color(0xFF2196F3) else Color(0xFFE0E0E0),
+                        RoundedCornerShape(8.dp)
+                    )
+                    .clickable {
+                        val mv = mapViewRef[0] ?: return@clickable
+                        if (routeActive) {
+                            userToDevicePolylineRef[0]?.let { mv.removeOverlay(it) }
+                            userToDevicePolylineRef[0] = null
+                            if (userAnnotationAdded) {
+                                mv.removeAnnotation(userAnnotation)
+                                userAnnotationAdded = false
+                            }
+                            routeActive = false
+                        } else {
+                            val userLocation = mv.userLocation.location ?: return@clickable
+                            val userLat = userLocation.coordinate.useContents { latitude }
+                            val userLng = userLocation.coordinate.useContents { longitude }
+
+                            // User annotation
+                            userAnnotation.setTitle("You")
+                            userAnnotation.setCoordinate(
+                                CLLocationCoordinate2DMake(userLat, userLng)
+                            )
+                            if (!userAnnotationAdded) {
+                                mv.addAnnotation(userAnnotation)
+                                userAnnotationAdded = true
+                            }
+
+                            // Route polyline
+                            userToDevicePolylineRef[0]?.let { mv.removeOverlay(it) }
+                            val polyline = memScoped {
+                                val buf = allocArray<DoubleVar>(4)
+                                buf[0] = userLat; buf[1] = userLng
+                                buf[2] = latitude; buf[3] = longitude
+                                MKPolyline.polylineWithCoordinates(
+                                    buf.reinterpret<CLLocationCoordinate2D>(), 2.toULong()
+                                )
+                            }
+                            userToDevicePolylineRef[0] = polyline
+                            mv.addOverlay(polyline)
+
+                            // Fit camera to show both points
+                            val minLat = min(userLat, latitude)
+                            val maxLat = max(userLat, latitude)
+                            val minLng = min(userLng, longitude)
+                            val maxLng = max(userLng, longitude)
+                            val spanLat = (maxLat - minLat) * 1.5 + 0.01
+                            val spanLng = (maxLng - minLng) * 1.5 + 0.01
+                            val center = CLLocationCoordinate2DMake(
+                                (minLat + maxLat) / 2, (minLng + maxLng) / 2
+                            )
+                            mv.setRegion(
+                                MKCoordinateRegionMake(
+                                    center, MKCoordinateSpanMake(spanLat, spanLng)
+                                ),
+                                animated = true
+                            )
+                            routeActive = true
+                        }
+                    }
+                    .padding(8.dp)
+            ) {
+                Text(text = "📍", fontSize = 18.sp)
+            }
+
+            // Satellite / Normal toggle
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.White)
+                    .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(8.dp))
+                    .clickable { isHybrid = !isHybrid }
+                    .padding(8.dp)
+            ) {
+                Text(
+                    text = if (!isHybrid) "🛰️" else "🗺️",
+                    fontSize = 18.sp
+                )
+            }
         }
     }
 }

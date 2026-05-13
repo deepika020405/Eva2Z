@@ -24,6 +24,7 @@ import com.developer.ev2z.ui.components.PhoneInputField
 import com.developer.ev2z.ui.components.defaultCountry
 import com.developer.ev2z.util.Analytics
 import com.developer.ev2z.utils.EmailValidator
+import com.developer.ev2z.utils.PhoneValidator
 import com.developer.ev2z.viewmodel.AuthViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -86,6 +87,7 @@ fun SignupScreen(
             onDismiss = { showPicker = false },
             onCountrySelected = { country ->
                 selectedCountry = country
+                if (phoneNumber.length > country.phoneLength) phoneNumber = phoneNumber.take(country.phoneLength)
                 showPicker = false
             }
         )
@@ -96,9 +98,10 @@ fun SignupScreen(
         val screenWidth  = maxWidth
         val isCompact    = screenHeight < 600.dp
 
-        val labelSize      = if (isCompact) 12.sp else 14.sp
-        val fieldHeight    = if (isCompact) 50.dp  else 56.dp
-        val buttonHeight   = if (isCompact) 46.dp  else 52.dp
+        val labelSize        = if (isCompact) 12.sp else 14.sp
+        val fieldHeight      = if (isCompact) 50.dp  else 56.dp
+        val emailFieldHeight = if (isCompact) 56.dp  else 64.dp
+        val buttonHeight     = if (isCompact) 46.dp  else 52.dp
         val buttonTextSize = if (isCompact) 15.sp  else 16.sp
         val verticalGap    = if (isCompact) 12.dp  else 18.dp
         val horizontalPad  = (screenWidth * 0.04f).coerceIn(12.dp, 24.dp)
@@ -170,13 +173,13 @@ fun SignupScreen(
                 selectedCountry = selectedCountry,
                 onCountryClick  = { showPicker = true },
                 fieldHeight     = fieldHeight,
-                isError         = submitAttempted && (phoneNumber.length < 5 || phoneAlreadyRegisteredError != null),
+                isError         = submitAttempted && (!PhoneValidator.isValid(phoneNumber, selectedCountry.dialCode, selectedCountry.phoneLength) || phoneAlreadyRegisteredError != null),
                 labelSize       = labelSize,
                 placeholder     = if (isCompact) "Phone number" else "Enter Your Valid Number"
             )
-            if (phoneNumber.isNotEmpty() && phoneNumber.length < 5) {
+            if (phoneNumber.isNotEmpty() && !PhoneValidator.isValid(phoneNumber, selectedCountry.dialCode, selectedCountry.phoneLength)) {
                 Text(
-                    text = "Enter a valid phone number",
+                    text = PhoneValidator.errorMessage(selectedCountry.dialCode, selectedCountry.phoneLength),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(start = 8.dp, top = 4.dp)
@@ -205,9 +208,14 @@ fun SignupScreen(
                 value = email,
                 onValueChange = { email = it },
                 placeholder = {
-                    Text("Enter Your Valid E-mail", color = Color(0xFFAAAAAA), fontSize = labelSize)
+                    Text(
+                        if (isCompact) "Email address" else "Enter Your Valid E-mail",
+                        color = Color(0xFFAAAAAA),
+                        fontSize = labelSize,
+                        maxLines = 1
+                    )
                 },
-                modifier = Modifier.fillMaxWidth().height(fieldHeight),
+                modifier = Modifier.fillMaxWidth().height(emailFieldHeight),
                 shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor   = Color(0xFFF8FAF7),
@@ -232,7 +240,7 @@ fun SignupScreen(
             Spacer(Modifier.height(if (isCompact) 20.dp else 32.dp))
 
             // Send OTP Button
-            val phoneValid = phoneNumber.length >= 5
+            val phoneValid = PhoneValidator.isValid(phoneNumber, selectedCountry.dialCode, selectedCountry.phoneLength)
             Button(
                 onClick = {
                     focusManager.clearFocus()

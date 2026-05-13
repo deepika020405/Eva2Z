@@ -58,6 +58,13 @@ actual class ChatSocketManager actual constructor(private val serverUrl: String)
                             timestamp = msgObj.optString("timestamp").ifBlank { null }
                         )
                         println("📨 [ChatSocket] newMessage — id=${dto.id} type=${dto.type} text='${dto.message?.take(40)}'")
+                        // System message = visitor ended the chat from their side
+                        if (dto.type.equals("system", ignoreCase = true)) {
+                            println("🔒 [ChatSocket] system newMessage → onChatClosed")
+                            listener.onNewMessage(dto)
+                            listener.onChatClosed()
+                            return@on
+                        }
                         listener.onNewMessage(dto)
                     } catch (e: Exception) {
                         println("❌ [ChatSocket] Failed to parse newMessage: ${e.message}  raw=${args.getOrNull(0)}")
@@ -142,8 +149,19 @@ actual class ChatSocketManager actual constructor(private val serverUrl: String)
                 }
 
                 on("chat_closed") { args ->
-                    println("🔒 [ChatSocket] chat_closed — chatId=$chatId  raw=${args.getOrNull(0)}")
-                    listener.onChatClosed()
+                    try {
+                        val data       = args.getOrNull(0) as? JSONObject
+                        val eventChatId = data?.optInt("chat_id", 0) ?: 0
+                        val closedBy   = data?.optString("closed_by") ?: "unknown"
+                        println("🔒 [ChatSocket] chat_closed — eventChatId=$eventChatId activeChatId=$chatId closedBy=$closedBy")
+                        // Only act if this event belongs to the room we joined
+                        if (eventChatId == 0 || eventChatId == chatId) {
+                            listener.onChatClosed()
+                        }
+                    } catch (e: Exception) {
+                        println("❌ [ChatSocket] Failed to parse chat_closed: ${e.message}")
+                        listener.onChatClosed()   // fallback: treat as closed
+                    }
                 }
 
                 connect()

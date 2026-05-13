@@ -136,61 +136,7 @@ fun AuthPagerScreen(
                         horizontalArrangement = Arrangement.spacedBy(0.dp, Alignment.Start),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        // Sign Up Tab (Left)
-                        if (pagerState.currentPage == 1) {
-                            Box(
-                                modifier = Modifier
-                                    .shadow(
-                                        elevation = 4.dp,
-                                        spotColor = Color(0x336A9F50),
-                                        ambientColor = Color(0x336A9F50)
-                                    )
-                                    .weight(1f)
-                                    .height(tabInnerHeight)
-                                    .background(
-                                        color = Color(0xFFFFFFFF),
-                                        shape = RoundedCornerShape(size = 40.dp)
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "Sign Up",
-                                    style = TextStyle(
-                                        fontSize = tabFontSize,
-                                        fontWeight = FontWeight(500),
-                                        color = Color(0xFF494E47),
-                                        textAlign = TextAlign.Center,
-                                    )
-                                )
-                            }
-                        } else {
-                            TextButton(
-                                onClick = {
-                                    coroutineScope.launch {
-                                        pagerState.animateScrollToPage(1)
-                                    }
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(tabInnerHeight),
-                                colors = ButtonDefaults.textButtonColors(
-                                    contentColor = Color(0xFF5D6858)
-                                ),
-                                shape = RoundedCornerShape(40.dp)
-                            ) {
-                                Text(
-                                    text = "Sign Up",
-                                    style = TextStyle(
-                                        fontSize = tabFontSize,
-                                        fontWeight = FontWeight(400),
-                                        color = Color(0xFF5D6858),
-                                        textAlign = TextAlign.Center,
-                                    )
-                                )
-                            }
-                        }
-
-                        // Log In Tab (Right)
+                        // Log In Tab (Left) — page 0
                         if (pagerState.currentPage == 0) {
                             Box(
                                 modifier = Modifier
@@ -234,6 +180,60 @@ fun AuthPagerScreen(
                             ) {
                                 Text(
                                     text = "Log In",
+                                    style = TextStyle(
+                                        fontSize = tabFontSize,
+                                        fontWeight = FontWeight(400),
+                                        color = Color(0xFF5D6858),
+                                        textAlign = TextAlign.Center,
+                                    )
+                                )
+                            }
+                        }
+
+                        // Sign Up Tab (Right) — page 1
+                        if (pagerState.currentPage == 1) {
+                            Box(
+                                modifier = Modifier
+                                    .shadow(
+                                        elevation = 4.dp,
+                                        spotColor = Color(0x336A9F50),
+                                        ambientColor = Color(0x336A9F50)
+                                    )
+                                    .weight(1f)
+                                    .height(tabInnerHeight)
+                                    .background(
+                                        color = Color(0xFFFFFFFF),
+                                        shape = RoundedCornerShape(size = 40.dp)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Sign Up",
+                                    style = TextStyle(
+                                        fontSize = tabFontSize,
+                                        fontWeight = FontWeight(500),
+                                        color = Color(0xFF494E47),
+                                        textAlign = TextAlign.Center,
+                                    )
+                                )
+                            }
+                        } else {
+                            TextButton(
+                                onClick = {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(1)
+                                    }
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(tabInnerHeight),
+                                colors = ButtonDefaults.textButtonColors(
+                                    contentColor = Color(0xFF5D6858)
+                                ),
+                                shape = RoundedCornerShape(40.dp)
+                            ) {
+                                Text(
+                                    text = "Sign Up",
                                     style = TextStyle(
                                         fontSize = tabFontSize,
                                         fontWeight = FontWeight(400),

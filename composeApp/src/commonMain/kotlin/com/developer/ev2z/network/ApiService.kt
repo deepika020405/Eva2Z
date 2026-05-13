@@ -64,6 +64,7 @@ class ApiService {
 
     private val client = KtorClient.client
     private val baseUrl = KtorClient.BASE_URL
+    private val gpsBaseUrl = "${KtorClient.SOCKET_SERVER_URL}/api/"
 
     // ===============================================
     // AUTHENTICATION APIs
@@ -588,7 +589,7 @@ class ApiService {
         form: CriminalForm
     ): JsonObject {
 
-        val bgvUrl = "https://gps.eva2z.in/api/submit-bgv"
+        val bgvUrl = "${gpsBaseUrl}submit-bgv"
         val appToken = AppTokenProvider.getToken()
 
         val body = buildJsonObject {
@@ -1680,10 +1681,10 @@ class ApiService {
     }
 
     // ---------------- ACCEPT INCOMING CALL ----------------
-    // POST https://app.eva2z.in/api/call/accept  { "room_id": "..." }
+    // POST gps/call/accept  { "room_id": "..." }
     suspend fun acceptCall(roomId: String): SosReplyResponse {
         val token = AppTokenProvider.getToken()
-        val url   = "https://gps.eva2z.in/api/call/accept"
+        val url   = "${gpsBaseUrl}call/accept"
         val body  = buildJsonObject { put("room_id", roomId) }
         println("🌐 acceptCall → POST $url  room_id=$roomId")
         return try {
@@ -1711,10 +1712,10 @@ class ApiService {
     }
 
     // ---------------- DECLINE INCOMING CALL ----------------
-    // POST https://app.eva2z.in/api/call/decline  { "room_id": "..." }
+    // POST gps/call/decline  { "room_id": "..." }
     suspend fun declineCall(roomId: String): SosReplyResponse {
         val token = AppTokenProvider.getToken()
-        val url   = "https://gps.eva2z.in/api/call/decline"
+        val url   = "${gpsBaseUrl}call/decline"
         val body  = buildJsonObject { put("room_id", roomId) }
         println("🌐 declineCall → POST $url  room_id=$roomId")
         return try {
@@ -1742,11 +1743,11 @@ class ApiService {
     }
 
     // ---------------- INITIATE CALL (OWNER → VISITOR) ----------------
-    // POST https://gps.eva2z.in/api/owner/call/initiate  { "chat_id": chatId }
+    // POST owner/call/initiate  { "chat_id": chatId }
     // Backend sends FCM to visitor and returns the room_id for WebRTC signaling.
     suspend fun initiateCall(chatId: Int): InitiateCallResponse {
         val token = AppTokenProvider.getToken()
-        val url   = "https://gps.eva2z.in/api/owner/call/initiate"
+        val url   = "${gpsBaseUrl}owner/call/initiate"
         val body  = buildJsonObject { put("chat_id", chatId) }
         println("🌐 initiateCall → POST $url  chat_id=$chatId")
         return try {

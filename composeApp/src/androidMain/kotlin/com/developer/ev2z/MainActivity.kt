@@ -16,6 +16,7 @@ import com.developer.ev2z.util.DeepLinkBus
 import com.developer.ev2z.util.MetaAnalytics
 import com.developer.ev2z.util.NotificationUtil
 import com.developer.ev2z.util.SosNotificationHandler
+import com.developer.ev2z.calling.VoiceCallManager
 import com.developer.ev2z.util.initGeocoder
 import com.developer.ev2z.util.initOpenUrl
 import com.facebook.appevents.AppEventsConstants
@@ -27,6 +28,15 @@ class MainActivity : ComponentActivity() {
         Log.d("MainActivity", "🚀 EVA2Z Connect v5.0.0 starting")
 
         try {
+            // If MainActivity is launched from IncomingCallActivity after the user accepted
+            // a call on the lock screen, keep it visible over the lock screen so the active
+            // call screen is not blocked by a PIN prompt mid-call. This does NOT dismiss the
+            // keyguard — the lock screen returns normally on the next screen timeout/power press.
+            if (intent?.getBooleanExtra("is_accepted_call", false) == true) {
+                setShowWhenLocked(true)
+                setTurnScreenOn(true)
+            }
+
             initOpenUrl(applicationContext)
 
             FcmBridge.tokenFetcher = { FcmManager.fetchAndRegisterToken() }
@@ -90,6 +100,13 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         AppState.isInForeground = false
+        // Clear show-when-locked whenever the app goes to background and no call is active.
+        // If left set, future notification taps would bypass the lock screen directly.
+        // During an active call we keep it so the call screen remains reachable from
+        // the lock screen without interrupting the call mid-conversation.
+        if (!VoiceCallManager.isCallActive) {
+            setShowWhenLocked(false)
+        }
     }
 
     override fun onDestroy() {

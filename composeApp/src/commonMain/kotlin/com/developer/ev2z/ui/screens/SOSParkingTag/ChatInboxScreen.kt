@@ -277,7 +277,7 @@ private fun ThreadCard(
     onClick: () -> Unit
 ) {
     val visitorName   = thread.visitor?.name?.takeIf { it.isNotBlank() } ?: "Visitor"
-    val displayName   = "Visitor #${thread.chat_id}"
+    val displayName   = "Visitor"
     val lastMsg       = thread.last_message
     val lastMsgText   = lastMsg?.text?.takeIf { it.isNotBlank() } ?: "Parking alert"
     val lastMsgTime   = lastMsg?.time?.takeIf { it.isNotBlank() }

@@ -82,6 +82,10 @@ class SosTagViewModel(
     private val _onlineChats = MutableStateFlow<Set<Int>>(emptySet())
     val onlineChats: StateFlow<Set<Int>> = _onlineChats.asStateFlow()
 
+    // True when the server pushes "chat_closed" — visitor ended the conversation.
+    private val _isChatClosed = MutableStateFlow(false)
+    val isChatClosed: StateFlow<Boolean> = _isChatClosed.asStateFlow()
+
     private var chatSocketManager: ChatSocketManager? = null
     private var activeChatId: Int = 0
     private var activeUserId: Int = 0
@@ -102,6 +106,7 @@ class SosTagViewModel(
         activeChatId = chatId
         activeUserId = userId
         socketConfirmedOffline = false
+        _isChatClosed.value = false
 
         chatSocketManager = ChatSocketManager(KtorClient.SOCKET_SERVER_URL)
         chatSocketManager?.connect(
@@ -126,6 +131,22 @@ class SosTagViewModel(
                 }
                 override fun onChatClosed() {
                     println("🔒 [SosTagVM] Server signalled chat_closed for chatId=$chatId")
+                    _isChatClosed.value = true
+                    _isVisitorOnline.value = false
+                    _onlineChats.value = _onlineChats.value - chatId
+                    val current = _threadListState.value as? ChatThreadListUiState.Success
+                    if (current != null) {
+                        _threadListState.value = ChatThreadListUiState.Success(
+                            current.threads.map { t ->
+                                if (t.chat_id == chatId) t.copy(status = "closed") else t
+                            }
+                        )
+                    }
+                    // Stop receiving events from this room — visitor is gone
+                    viewModelScope.launch {
+                        emitUserOffline()
+                        disconnectChatSocket()
+                    }
                 }
                 override fun onVisitorOnline() {
                     socketConfirmedOffline = false

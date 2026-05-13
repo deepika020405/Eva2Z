@@ -133,12 +133,17 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                 )
 
                 if (chatId != null) {
-                    SosNotificationHandler.onSosAlertReceived(
-                        alertId      = chatId,
-                        visitorName  = visitorName,
-                        visitorPhone = visitorPhone
-                    )
-                    // Point 4: mark delivered — message reached the device
+                    // Only emit in-app navigation when the app is actively in the foreground.
+                    // If the screen is locked or the app is backgrounded, the user must
+                    // authenticate via the notification tap first — handleSosIntent() in
+                    // MainActivity will emit then, at the correct moment.
+                    if (AppState.isInForeground) {
+                        SosNotificationHandler.onSosAlertReceived(
+                            alertId      = chatId,
+                            visitorName  = visitorName,
+                            visitorPhone = visitorPhone
+                        )
+                    }
                     callDeliveredApi(chatId, authToken)
                 }
 
@@ -290,12 +295,13 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             "chat", "vehicle_notification" -> {
                 if (alertId != null) {
                     println("🚨 SOS ALERT — type=$type alertId=$alertId foreground=${AppState.isInForeground}")
-                    SosNotificationHandler.onSosAlertReceived(
-                        alertId = alertId,
-                        visitorName = visitorName,
-                        visitorPhone = visitorPhone
-                    )
-                    // Point 4: mark delivered — message reached the device
+                    if (AppState.isInForeground) {
+                        SosNotificationHandler.onSosAlertReceived(
+                            alertId = alertId,
+                            visitorName = visitorName,
+                            visitorPhone = visitorPhone
+                        )
+                    }
                     callDeliveredApi(alertId, authToken)
                 }
             }

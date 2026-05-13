@@ -45,10 +45,12 @@ class IncomingCallActivity : ComponentActivity() {
 
         @Suppress("DEPRECATION")
         window.addFlags(
-            WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON      or
-            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON      or
-            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED    or
-            WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+            WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON   or
+            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON   or
+            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+            // FLAG_DISMISS_KEYGUARD intentionally omitted — it permanently dismisses
+            // the keyguard session, leaving the phone unlocked after the call ends.
+            // FLAG_SHOW_WHEN_LOCKED alone is enough to display over the lock screen.
         )
 
         // Belt-and-suspenders: Activity-level API (API 27+)
@@ -120,9 +122,12 @@ class IncomingCallActivity : ComponentActivity() {
                     acceptedOnThisDevice = true
                     CallRingtoneService.stop(applicationContext)
                     SosNotificationHandler.onCallAcceptedByOwner(callData)
-                    // Boot the main app — HomeNavGraph will read callAcceptedByOwnerFlow
+                    // Boot the main app — HomeNavGraph will read callAcceptedByOwnerFlow.
+                    // is_accepted_call=true tells MainActivity to set setShowWhenLocked(true)
+                    // so the active call screen remains visible without a mid-call PIN prompt.
                     val mainIntent = Intent(this, MainActivity::class.java).apply {
                         flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                        putExtra("is_accepted_call", true)
                     }
                     startActivity(mainIntent)
                     finish()

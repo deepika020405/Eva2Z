@@ -37,6 +37,7 @@ playServicesAuth = "21.4.0"
 playServicesAuthApiPhone = "18.3.0"
 playServicesMaps = "19.2.0"
 playServicesMapsVersion = "19.2.0"
+playServicesLocation = "21.3.0"
 voyagerNavigator = "1.0.1"
 coreKtx = "1.7.0"
 
@@ -85,6 +86,7 @@ play-services-auth = { module = "com.google.android.gms:play-services-auth", ver
 play-services-auth-api-phone = { module = "com.google.android.gms:play-services-auth-api-phone", version.ref = "playServicesAuthApiPhone" }
 play-services-maps = { module = "com.google.android.gms:play-services-maps", version.ref = "playServicesMaps" }
 play-services-maps-v1820 = { module = "com.google.android.gms:play-services-maps", version.ref = "playServicesMapsVersion" }
+play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "playServicesLocation" }
 voyager-navigator = { module = "cafe.adriel.voyager:voyager-navigator", version.ref = "voyagerNavigator" }
 voyager-tab-navigator = { module = "cafe.adriel.voyager:voyager-tab-navigator", version.ref = "voyagerNavigator" }
 core-ktx = { group = "androidx.test", name = "core-ktx", version.ref = "coreKtx" }

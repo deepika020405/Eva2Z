@@ -163,9 +163,10 @@ fun QuickReplyScreen(
     // Apply a server message. For new ids → add bubble. For known ids → update status only.
     fun applyServerMessage(msg: ChatMessageDto) {
         val mid = msg.id ?: return
-        val isCallType = msg.type.equals("call", ignoreCase = true)
-        val isOwner = msg.type.equals("sent", ignoreCase = true)
-        val newStatus = statusFromDto(msg, isOwner)
+        val isCallType   = msg.type.equals("call",   ignoreCase = true)
+        val isSystemType = msg.type.equals("system", ignoreCase = true)
+        val isOwner      = msg.type.equals("sent",   ignoreCase = true)
+        val newStatus    = statusFromDto(msg, isOwner)
 
         if (mid in seenServerMessageIds) {
             if (isOwner) {
@@ -184,17 +185,31 @@ fun QuickReplyScreen(
         }
 
         seenServerMessageIds.add(mid)
-        val sortMs = parseTimestampMs(msg.timestamp) ?: Clock.System.now().toEpochMilliseconds()
+        val sortMs  = parseTimestampMs(msg.timestamp) ?: Clock.System.now().toEpochMilliseconds()
         val display = msg.time ?: formatMsTime(sortMs)
+
+        // System message (e.g. "Visitor chat ended") — render as centered info pill
+        if (isSystemType) {
+            val text = msg.message?.takeIf { it.isNotBlank() } ?: "Visitor chat ended"
+            messages = (messages + ChatMessage(
+                text            = text,
+                isOwner         = false,
+                timestamp       = display,
+                sortKey         = sortMs,
+                localId         = mid.toLong(),
+                isSystemMessage = true
+            )).sortedWith(compareBy({ it.sortKey }, { it.localId }))
+            return
+        }
 
         if (isCallType) {
             messages = (messages + ChatMessage(
-                text = callStatusLabel(msg.call_status),
-                isOwner = false,
-                timestamp = display,
-                sortKey = sortMs,
-                localId = mid.toLong(),
-                isCall = true,
+                text       = callStatusLabel(msg.call_status),
+                isOwner    = false,
+                timestamp  = display,
+                sortKey    = sortMs,
+                localId    = mid.toLong(),
+                isCall     = true,
                 callStatus = msg.call_status
             )).sortedWith(compareBy({ it.sortKey }, { it.localId }))
             return
@@ -202,12 +217,12 @@ fun QuickReplyScreen(
 
         val text = msg.message?.takeIf { it.isNotBlank() } ?: return
         messages = (messages + ChatMessage(
-            text = text,
-            isOwner = isOwner,
+            text      = text,
+            isOwner   = isOwner,
             timestamp = display,
-            sortKey = sortMs,
-            localId = mid.toLong(),
-            status = newStatus
+            sortKey   = sortMs,
+            localId   = mid.toLong(),
+            status    = newStatus
         )).sortedWith(compareBy({ it.sortKey }, { it.localId }))
     }
 
@@ -246,9 +261,10 @@ fun QuickReplyScreen(
         viewModel.socketMessageFlow.collect { dto ->
             applyServerMessage(dto)
             // Fetch REST for any message that is NOT explicitly an owner echo ("sent").
-            // Server may omit id/type in newMessage events, so null type counts as incoming.
+            // System messages (visitor ended chat) are NOT treated as "visitor is online".
             val isIncoming = dto.type?.equals("sent", ignoreCase = true) != true
-            if (isIncoming && activeAlertId > 0) {
+            val isSystem   = dto.type?.equals("system", ignoreCase = true) == true
+            if (isIncoming && !isSystem && activeAlertId > 0) {
                 // Visitor just sent a message — they are online right now.
                 viewModel.setVisitorOnlineHint(true)
                 viewModel.markSeen(activeAlertId)
@@ -285,6 +301,18 @@ fun QuickReplyScreen(
     LaunchedEffect(isSocketConnected) {
         if (isSocketConnected && activeAlertId > 0 && !isChatClosed) {
             viewModel.fetchChatMessages(activeAlertId)?.let { applyChatThread(it) }
+        }
+    }
+
+    // Propagate "chat_closed" socket event from ViewModel to local UI state
+    val isChatClosedFromSocket by viewModel.isChatClosed.collectAsState()
+    LaunchedEffect(isChatClosedFromSocket) {
+        if (isChatClosedFromSocket) {
+            isChatClosed = true
+            snackbarHostState.showSnackbar(
+                message  = "Visitor ended the chat",
+                duration = SnackbarDuration.Short
+            )
         }
     }
 
@@ -563,9 +591,9 @@ fun QuickReplyScreen(
                     }
 
                     // Alert banner
-                    item {
-                        AlertInfoBanner(alertId = activeAlertId)
-                    }
+//                    item {
+//                        AlertInfoBanner(alertId = activeAlertId)
+//                    }
 
                     // Chat bubbles
                     items(messages) { message ->
@@ -801,44 +829,44 @@ private fun SystemMessage(text: String) {
 // Alert Info Banner
 // ─────────────────────────────────────────────────────────────────
 
-@Composable
-private fun AlertInfoBanner(alertId: Int) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 4.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Card(
-            shape = RoundedCornerShape(10.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = BrandGreenLight
-            ),
-            elevation = CardDefaults.cardElevation(0.5.dp)
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text("\uD83D\uDCAC", fontSize = 16.sp)
-                Column {
-                    Text(
-                        "Parking Alert #$alertId",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = BrandGreen
-                    )
-                    Text(
-                        "Respond to resolve this alert",
-                        fontSize = 11.sp,
-                        color = AccentGreen
-                    )
-                }
-            }
-        }
-    }
-}
+//@Composable
+//private fun AlertInfoBanner(alertId: Int) {
+//    Box(
+//        modifier = Modifier
+//            .fillMaxWidth()
+//            .padding(horizontal = 24.dp, vertical = 4.dp),
+//        contentAlignment = Alignment.Center
+//    ) {
+//        Card(
+//            shape = RoundedCornerShape(10.dp),
+//            colors = CardDefaults.cardColors(
+//                containerColor = BrandGreenLight
+//            ),
+//            elevation = CardDefaults.cardElevation(0.5.dp)
+//        ) {
+//            Row(
+//                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+//                verticalAlignment = Alignment.CenterVertically,
+//                horizontalArrangement = Arrangement.spacedBy(8.dp)
+//            ) {
+//                Text("\uD83D\uDCAC", fontSize = 16.sp)
+//                Column {
+//                    Text(
+//                        "Parking Alert",
+//                        fontSize = 12.sp,
+//                        fontWeight = FontWeight.SemiBold,
+//                        color = BrandGreen
+//                    )
+//                    Text(
+//                        "Respond to resolve this alert",
+//                        fontSize = 11.sp,
+//                        color = AccentGreen
+//                    )
+//                }
+//            }
+//        }
+//    }
+//}
 
 // ─────────────────────────────────────────────────────────────────
 // Chat Closed Banner — shown at the bottom of message list

@@ -28,6 +28,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.developer.ev2z.navigation.PlatformBackHandler
+import com.developer.ev2z.ui.components.CountryData
+import com.developer.ev2z.ui.components.CountryPickerDialog
+import com.developer.ev2z.ui.components.defaultCountry
 import com.developer.ev2z.util.saveQrImageToGallery
 import com.developer.ev2z.util.shareQrImage
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
@@ -67,23 +70,27 @@ fun ParkingScreen(
     viewModel: ParkingViewModel,
     onBackPressed: () -> Unit
 ) {
-    val vehicleType         by viewModel.vehicleType.collectAsState()
-    val vehicleNumber       by viewModel.vehicleNumber.collectAsState()
-    val phone               by viewModel.phone.collectAsState()
-    val alternatePhone      by viewModel.alternatePhone.collectAsState()
-    val vehicleTypeError    by viewModel.vehicleTypeError.collectAsState()
-    val vehicleNumberError  by viewModel.vehicleNumberError.collectAsState()
-    val phoneError          by viewModel.phoneError.collectAsState()
-    val alternatePhoneError by viewModel.alternatePhoneError.collectAsState()
-    val uiState             by viewModel.uiState.collectAsState()
-    val history             by viewModel.history.collectAsState()
-    val registeredPhone     by viewModel.registeredPhone.collectAsState()
-    val focusManager        = LocalFocusManager.current
+    val vehicleType              by viewModel.vehicleType.collectAsState()
+    val vehicleNumber            by viewModel.vehicleNumber.collectAsState()
+    val phone                    by viewModel.phone.collectAsState()
+    val alternatePhone           by viewModel.alternatePhone.collectAsState()
+    val phoneCountry             by viewModel.phoneCountry.collectAsState()
+    val alternatePhoneCountry    by viewModel.alternatePhoneCountry.collectAsState()
+    val vehicleTypeError         by viewModel.vehicleTypeError.collectAsState()
+    val vehicleNumberError       by viewModel.vehicleNumberError.collectAsState()
+    val phoneError               by viewModel.phoneError.collectAsState()
+    val alternatePhoneError      by viewModel.alternatePhoneError.collectAsState()
+    val uiState                  by viewModel.uiState.collectAsState()
+    val history                  by viewModel.history.collectAsState()
+    val registeredPhone          by viewModel.registeredPhone.collectAsState()
+    val focusManager             = LocalFocusManager.current
 
-    var deleteTargetId   by remember { mutableStateOf<Int?>(null) }
-    var deleteTargetName by remember { mutableStateOf("") }
-    val snackbarHostState = remember { SnackbarHostState() }
-    val scope             = rememberCoroutineScope()
+    var showPhonePicker    by remember { mutableStateOf(false) }
+    var showAltPhonePicker by remember { mutableStateOf(false) }
+    var deleteTargetId     by remember { mutableStateOf<Int?>(null) }
+    var deleteTargetName   by remember { mutableStateOf("") }
+    val snackbarHostState  = remember { SnackbarHostState() }
+    val scope              = rememberCoroutineScope()
 
     // System back → immediately close the overlay and return to home. This is
     // composed AFTER the home pager's Voyager handlers, so LIFO priority puts
@@ -102,6 +109,26 @@ fun ParkingScreen(
             viewModel.clearFormFields()
             focusManager.clearFocus()
         }
+    }
+
+    if (showPhonePicker) {
+        CountryPickerDialog(
+            onDismiss = { showPhonePicker = false },
+            onCountrySelected = { country ->
+                viewModel.onPhoneCountryChange(country)
+                showPhonePicker = false
+            }
+        )
+    }
+
+    if (showAltPhonePicker) {
+        CountryPickerDialog(
+            onDismiss = { showAltPhonePicker = false },
+            onCountrySelected = { country ->
+                viewModel.onAlternatePhoneCountryChange(country)
+                showAltPhonePicker = false
+            }
+        )
     }
 
     Scaffold(
@@ -167,21 +194,25 @@ fun ParkingScreen(
                 exit    = fadeOut() + shrinkVertically()
             ) {
                 ParkingFormCard(
-                    vehicleType         = vehicleType,
-                    vehicleNumber       = vehicleNumber,
-                    phone               = phone,
-                    alternatePhone      = alternatePhone,
-                    vehicleTypeError    = vehicleTypeError,
-                    vehicleNumberError  = vehicleNumberError,
-                    phoneError          = phoneError,
-                    alternatePhoneError = alternatePhoneError,
-                    isLoading           = uiState is ParkingUiState.Loading,
-                    isFormValid         = viewModel.isFormValid,
-                    onVehicleTypeChange    = viewModel::onVehicleTypeChange,
-                    onVehicleNumberChange  = viewModel::onVehicleNumberChange,
-                    onPhoneChange          = viewModel::onPhoneChange,
-                    onAlternatePhoneChange = viewModel::onAlternatePhoneChange,
-                    onChipSelect           = viewModel::selectVehicleType,
+                    vehicleType              = vehicleType,
+                    vehicleNumber            = vehicleNumber,
+                    phone                    = phone,
+                    alternatePhone           = alternatePhone,
+                    phoneCountry             = phoneCountry,
+                    alternatePhoneCountry    = alternatePhoneCountry,
+                    vehicleTypeError         = vehicleTypeError,
+                    vehicleNumberError       = vehicleNumberError,
+                    phoneError               = phoneError,
+                    alternatePhoneError      = alternatePhoneError,
+                    isLoading                = uiState is ParkingUiState.Loading,
+                    isFormValid              = viewModel.isFormValid,
+                    onVehicleTypeChange      = viewModel::onVehicleTypeChange,
+                    onVehicleNumberChange    = viewModel::onVehicleNumberChange,
+                    onPhoneChange            = viewModel::onPhoneChange,
+                    onAlternatePhoneChange   = viewModel::onAlternatePhoneChange,
+                    onPhoneCountryClick      = { showPhonePicker = true },
+                    onAltPhoneCountryClick   = { showAltPhonePicker = true },
+                    onChipSelect             = viewModel::selectVehicleType,
                     onSubmit = {
                         focusManager.clearFocus()
                         viewModel.submitParking()
@@ -348,6 +379,8 @@ private fun ParkingFormCard(
     vehicleNumber: String,
     phone: String,
     alternatePhone: String,
+    phoneCountry: CountryData,
+    alternatePhoneCountry: CountryData,
     vehicleTypeError: String?,
     vehicleNumberError: String?,
     phoneError: String?,
@@ -358,6 +391,8 @@ private fun ParkingFormCard(
     onVehicleNumberChange: (String) -> Unit,
     onPhoneChange: (String) -> Unit,
     onAlternatePhoneChange: (String) -> Unit,
+    onPhoneCountryClick: () -> Unit,
+    onAltPhoneCountryClick: () -> Unit,
     onChipSelect: (String) -> Unit,
     onSubmit: () -> Unit,
     onImeNext: () -> Unit
@@ -399,34 +434,28 @@ private fun ParkingFormCard(
 
             Divider(color = BorderColor)
 
-            Eva2zInputField(
-                value           = phone,
-                onValueChange   = { val d = it.filter { c -> c.isDigit() }; if (d.length <= 15) onPhoneChange(d) },
+            ParkingPhoneInputField(
                 label           = "EMERGENCY CONTACT 1 *",
-                placeholder     = "e.g. 9876543210",
-                icon            = Icons.Outlined.Phone,
+                phoneNumber     = phone,
+                onPhoneChange   = onPhoneChange,
+                selectedCountry = phoneCountry,
+                onCountryClick  = onPhoneCountryClick,
                 errorText       = phoneError,
                 imeAction       = ImeAction.Next,
-                capitalization  = KeyboardCapitalization.None,
-                keyboardType    = KeyboardType.Phone,
                 keyboardActions = KeyboardActions(onNext = { onImeNext() })
             )
 
             Divider(color = BorderColor)
 
-            Eva2zInputField(
-                value           = alternatePhone,
-                onValueChange   = { val d = it.filter { c -> c.isDigit() }; if (d.length <= 15) onAlternatePhoneChange(d) },
+            ParkingPhoneInputField(
                 label           = "EMERGENCY CONTACT 2 (OPTIONAL)",
-                placeholder     = "e.g. 9876543210",
-                icon            = Icons.Outlined.PhoneAndroid,
+                phoneNumber     = alternatePhone,
+                onPhoneChange   = onAlternatePhoneChange,
+                selectedCountry = alternatePhoneCountry,
+                onCountryClick  = onAltPhoneCountryClick,
                 errorText       = alternatePhoneError,
                 imeAction       = ImeAction.Done,
-                capitalization  = KeyboardCapitalization.None,
-                keyboardType    = KeyboardType.Phone,
-                keyboardActions = KeyboardActions(onDone = {
-                    if (isFormValid) onSubmit()
-                })
+                keyboardActions = KeyboardActions(onDone = { if (isFormValid) onSubmit() })
             )
 
             Row(
@@ -530,6 +559,127 @@ private fun Eva2zInputField(
                 fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary
             )
         )
+        errorText?.let { err ->
+            Row(
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(Icons.Default.Error, null, tint = ErrorColor, modifier = Modifier.size(13.dp))
+                Text(err, fontSize = 12.sp, color = ErrorColor)
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// Phone Input Field with Country Picker
+// ─────────────────────────────────────────────────────────────────
+
+@Composable
+private fun ParkingPhoneInputField(
+    label: String,
+    phoneNumber: String,
+    onPhoneChange: (String) -> Unit,
+    selectedCountry: CountryData,
+    onCountryClick: () -> Unit,
+    errorText: String?,
+    imeAction: ImeAction = ImeAction.Next,
+    keyboardActions: KeyboardActions = KeyboardActions.Default
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+            color = TextSecondary, letterSpacing = 0.4.sp
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Country picker button
+            Surface(
+                modifier = Modifier
+                    .width(96.dp)
+                    .defaultMinSize(minHeight = 56.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .clickable(onClick = onCountryClick),
+                shape  = RoundedCornerShape(14.dp),
+                color  = BackgroundColor,
+                border = BorderStroke(1.dp, if (errorText != null) ErrorColor else BorderColor)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text(selectedCountry.flag, fontSize = 18.sp)
+                    Spacer(Modifier.width(3.dp))
+                    Text(
+                        selectedCountry.dialCode, fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium, color = TextPrimary, maxLines = 1
+                    )
+                    Icon(
+                        Icons.Default.ArrowDropDown, null,
+                        tint = TextSecondary, modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
+            // Phone number field
+            val isComplete = phoneNumber.length == selectedCountry.phoneLength
+            OutlinedTextField(
+                value = phoneNumber,
+                onValueChange = { input ->
+                    val digits = input.filter { it.isDigit() }
+                    if (digits.length <= selectedCountry.phoneLength) onPhoneChange(digits)
+                },
+                placeholder = {
+                    Text(
+                        "Enter ${selectedCountry.phoneLength}-digit number",
+                        fontSize = 13.sp,
+                        color    = TextTertiary
+                    )
+                },
+                trailingIcon = when {
+                    isComplete -> ({
+                        Icon(Icons.Default.CheckCircle, null, tint = BrandGreen, modifier = Modifier.size(20.dp))
+                    })
+                    phoneNumber.isNotEmpty() -> ({
+                        Text(
+                            "${phoneNumber.length}/${selectedCountry.phoneLength}",
+                            fontSize  = 11.sp,
+                            color     = if (errorText != null) ErrorColor else TextSecondary,
+                            modifier  = Modifier.padding(end = 8.dp)
+                        )
+                    })
+                    else -> null
+                },
+                isError  = errorText != null,
+                modifier = Modifier.weight(1f),
+                shape    = RoundedCornerShape(14.dp),
+                colors   = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor      = BrandGreen,
+                    unfocusedBorderColor    = BorderColor,
+                    errorBorderColor        = ErrorColor,
+                    focusedContainerColor   = CardColor,
+                    unfocusedContainerColor = BackgroundColor,
+                    errorContainerColor     = Color(0xFFFEF2F2),
+                    focusedTextColor        = TextPrimary,
+                    unfocusedTextColor      = TextPrimary,
+                    cursorColor             = BrandGreen
+                ),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Phone,
+                    imeAction    = imeAction
+                ),
+                keyboardActions = keyboardActions,
+                singleLine      = true,
+                textStyle       = LocalTextStyle.current.copy(
+                    fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary
+                )
+            )
+        }
         errorText?.let { err ->
             Row(
                 verticalAlignment     = Alignment.CenterVertically,

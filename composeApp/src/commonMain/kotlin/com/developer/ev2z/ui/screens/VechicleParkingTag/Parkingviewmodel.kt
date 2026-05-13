@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.developer.ev2z.data.local.UserPrefs
 import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.ui.components.CountryData
+import com.developer.ev2z.ui.components.defaultCountry
 import com.developer.ev2z.util.ApiProvider
 import com.developer.ev2z.util.ApiProvider.apiService
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +33,12 @@ class ParkingViewModel(
 
     private val _alternatePhone = MutableStateFlow("")
     val alternatePhone: StateFlow<String> = _alternatePhone.asStateFlow()
+
+    private val _phoneCountry = MutableStateFlow(defaultCountry())
+    val phoneCountry: StateFlow<CountryData> = _phoneCountry.asStateFlow()
+
+    private val _alternatePhoneCountry = MutableStateFlow(defaultCountry())
+    val alternatePhoneCountry: StateFlow<CountryData> = _alternatePhoneCountry.asStateFlow()
 
     // ── Registered phone ──────────────────────────────────────────
     private val _registeredPhone = MutableStateFlow("")
@@ -67,10 +75,20 @@ class ParkingViewModel(
     val history: StateFlow<List<ParkingData>> = _history.asStateFlow()
 
     val isFormValid: Boolean
-        get() = _vehicleType.value.isNotBlank()
+        get() {
+            val phone    = _phone.value
+            val altPhone = _alternatePhone.value
+            val regPhone = _registeredPhone.value
+            val phoneLen = _phoneCountry.value.phoneLength
+            val altLen   = _alternatePhoneCountry.value.phoneLength
+            return _vehicleType.value.isNotBlank()
                 && _vehicleNumber.value.isNotBlank()
-                && _phone.value.length in 7..15
-                && (_alternatePhone.value.isEmpty() || _alternatePhone.value.length in 7..15)
+                && phone.length == phoneLen
+                && (altPhone.isEmpty() || altPhone.length == altLen)
+                && (regPhone.isBlank() || phone.takeLast(10) != regPhone)
+                && (regPhone.isBlank() || altPhone.isEmpty() || altPhone.takeLast(10) != regPhone)
+                && (altPhone.isEmpty() || phone != altPhone)
+        }
 
     // ── Input handlers ────────────────────────────────────────────
 
@@ -87,27 +105,49 @@ class ParkingViewModel(
     }
 
     fun onPhoneChange(value: String) {
-        val digits = value.filter { it.isDigit() }.take(15)
+        val maxLen   = _phoneCountry.value.phoneLength
+        val digits   = value.filter { it.isDigit() }.take(maxLen)
+        val regPhone = _registeredPhone.value
         _phone.value = digits
         _phoneError.value = when {
-            digits.isEmpty()       -> null
-            digits.length < 7      -> "Enter at least 7 digits"
-            digits.length > 15     -> "Max 15 digits allowed"
-            else                   -> null
+            digits.isEmpty()                                                      -> null
+            regPhone.isNotBlank() && digits.takeLast(10) == regPhone              -> "Cannot use your registered number"
+            _alternatePhone.value.isNotBlank() && digits == _alternatePhone.value -> "Both emergency numbers cannot be the same"
+            else                                                                  -> null
+        }
+        if (_alternatePhoneError.value == "Both emergency numbers cannot be the same" && digits != _alternatePhone.value) {
+            _alternatePhoneError.value = null
         }
         clearErrorState()
     }
 
     fun onAlternatePhoneChange(value: String) {
-        val digits = value.filter { it.isDigit() }.take(15)
+        val maxLen   = _alternatePhoneCountry.value.phoneLength
+        val digits   = value.filter { it.isDigit() }.take(maxLen)
+        val regPhone = _registeredPhone.value
         _alternatePhone.value = digits
         _alternatePhoneError.value = when {
-            digits.isEmpty()       -> null
-            digits.length < 7      -> "Enter at least 7 digits"
-            digits.length > 15     -> "Max 15 digits allowed"
-            else                   -> null
+            digits.isEmpty()                                             -> null
+            digits == _phone.value                                       -> "Both emergency numbers cannot be the same"
+            regPhone.isNotBlank() && digits.takeLast(10) == regPhone     -> "Cannot use your registered number"
+            else                                                         -> null
+        }
+        if (_phoneError.value == "Both emergency numbers cannot be the same" && digits != _phone.value) {
+            _phoneError.value = null
         }
         clearErrorState()
+    }
+
+    fun onPhoneCountryChange(country: CountryData) {
+        _phoneCountry.value = country
+        if (_phone.value.length > country.phoneLength) _phone.value = _phone.value.take(country.phoneLength)
+        _phoneError.value = null
+    }
+
+    fun onAlternatePhoneCountryChange(country: CountryData) {
+        _alternatePhoneCountry.value = country
+        if (_alternatePhone.value.length > country.phoneLength) _alternatePhone.value = _alternatePhone.value.take(country.phoneLength)
+        _alternatePhoneError.value = null
     }
 
     fun selectVehicleType(type: String) {
@@ -130,13 +170,14 @@ class ParkingViewModel(
             _vehicleNumberError.value = "Vehicle number is required"
             valid = false
         }
-        if (_phone.value.length !in 7..15) {
-            _phoneError.value = "Enter a valid number (7–15 digits)"
+        val phoneLen = _phoneCountry.value.phoneLength
+        val altLen   = _alternatePhoneCountry.value.phoneLength
+        if (_phone.value.length != phoneLen) {
+            _phoneError.value = "Enter a valid ${phoneLen}-digit number"
             valid = false
         }
-        // Alternate phone 2 is optional — only validate format if it was entered
-        if (_alternatePhone.value.isNotBlank() && _alternatePhone.value.length !in 7..15) {
-            _alternatePhoneError.value = "Enter a valid number (7–15 digits)"
+        if (_alternatePhone.value.isNotBlank() && _alternatePhone.value.length != altLen) {
+            _alternatePhoneError.value = "Enter a valid ${altLen}-digit number"
             valid = false
         }
 
@@ -176,8 +217,9 @@ class ParkingViewModel(
                 vehicleType     = _vehicleType.value,
                 vehicleNumber   = _vehicleNumber.value,
                 phone           = _registeredPhone.value,
-                alternatePhone1 = _phone.value,
+                alternatePhone1 = "${_phoneCountry.value.dialCode.filter { it.isDigit() }}${_phone.value}",
                 alternatePhone2 = _alternatePhone.value.ifEmpty { null }
+                    ?.let { "${_alternatePhoneCountry.value.dialCode.filter { it.isDigit() }}$it" }
             )
 
             if (!response.status) {
@@ -246,15 +288,17 @@ class ParkingViewModel(
     fun resetState() { _uiState.value = ParkingUiState.Idle }
 
     fun clearForm() {
-        _vehicleType.value         = ""
-        _vehicleNumber.value       = ""
-        _phone.value               = ""
-        _alternatePhone.value      = ""
-        _vehicleTypeError.value    = null
-        _vehicleNumberError.value  = null
-        _phoneError.value          = null
-        _alternatePhoneError.value = null
-        _uiState.value             = ParkingUiState.Idle
+        _vehicleType.value           = ""
+        _vehicleNumber.value         = ""
+        _phone.value                 = ""
+        _alternatePhone.value        = ""
+        _phoneCountry.value          = defaultCountry()
+        _alternatePhoneCountry.value = defaultCountry()
+        _vehicleTypeError.value      = null
+        _vehicleNumberError.value    = null
+        _phoneError.value            = null
+        _alternatePhoneError.value   = null
+        _uiState.value               = ParkingUiState.Idle
     }
 
     private fun clearErrorState() {
@@ -263,14 +307,16 @@ class ParkingViewModel(
 
     // ── clearFormFields — sirf fields clear, uiState preserve ────────
     fun clearFormFields() {
-        _vehicleType.value         = ""
-        _vehicleNumber.value       = ""
-        _phone.value               = ""
-        _alternatePhone.value      = ""
-        _vehicleTypeError.value    = null
-        _vehicleNumberError.value  = null
-        _phoneError.value          = null
-        _alternatePhoneError.value = null
+        _vehicleType.value           = ""
+        _vehicleNumber.value         = ""
+        _phone.value                 = ""
+        _alternatePhone.value        = ""
+        _phoneCountry.value          = defaultCountry()
+        _alternatePhoneCountry.value = defaultCountry()
+        _vehicleTypeError.value      = null
+        _vehicleNumberError.value    = null
+        _phoneError.value            = null
+        _alternatePhoneError.value   = null
     }
 
 

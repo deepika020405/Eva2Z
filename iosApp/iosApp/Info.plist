@@ -51,6 +51,8 @@
 			</dict>
 		</dict>
 	</dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Your location is used to show the route from your position to the vehicle.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Microphone access is required for voice calls with parking visitors.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

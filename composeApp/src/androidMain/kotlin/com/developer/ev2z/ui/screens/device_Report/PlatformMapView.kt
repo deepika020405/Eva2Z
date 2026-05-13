@@ -1,12 +1,18 @@
 package com.developer.ev2z.ui.screens.device_Report
 
+import android.annotation.SuppressLint
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,11 +34,13 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.developer.ev2z.R
 import com.developer.ev2z.ui.screens.trackTrace.TrailPoint
+import com.google.android.gms.location.LocationServices
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.MapView
 import com.google.android.gms.maps.model.BitmapDescriptor
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
 import com.google.android.gms.maps.model.MarkerOptions
 import com.google.android.gms.maps.model.Polyline
 import com.google.android.gms.maps.model.PolylineOptions
@@ -53,6 +61,51 @@ actual fun PlatformMapView(
     val startMarker    = remember { arrayOfNulls<com.google.android.gms.maps.model.Marker>(1) }
     val polylineHolder = remember { arrayOfNulls<Polyline>(1) }
     val lastLocation   = remember { doubleArrayOf(latitude, longitude) }
+    val mapHolder            = remember { arrayOfNulls<com.google.android.gms.maps.GoogleMap>(1) }
+    val userToDevicePolyline = remember { arrayOfNulls<Polyline>(1) }
+    val userMarkerHolder     = remember { arrayOfNulls<com.google.android.gms.maps.model.Marker>(1) }
+    var routeActive          by remember { mutableStateOf(false) }
+
+    @SuppressLint("MissingPermission")
+    fun drawUserToDeviceRoute() {
+        val map = mapHolder[0] ?: return
+        val fusedClient = LocationServices.getFusedLocationProviderClient(context)
+        fusedClient.lastLocation.addOnSuccessListener { loc ->
+            if (loc == null) return@addOnSuccessListener
+            val userLatLng   = LatLng(loc.latitude, loc.longitude)
+            val deviceLatLng = LatLng(latitude, longitude)
+
+            userMarkerHolder[0]?.remove()
+            userMarkerHolder[0] = map.addMarker(
+                MarkerOptions()
+                    .position(userLatLng)
+                    .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE))
+                    .title("Your Location")
+            )
+
+            userToDevicePolyline[0]?.remove()
+            userToDevicePolyline[0] = map.addPolyline(
+                PolylineOptions()
+                    .add(userLatLng, deviceLatLng)
+                    .color(android.graphics.Color.parseColor("#2196F3"))
+                    .width(10f)
+                    .geodesic(true)
+            )
+
+            val bounds = LatLngBounds.Builder()
+                .include(userLatLng)
+                .include(deviceLatLng)
+                .build()
+            map.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds, 120))
+            routeActive = true
+        }
+    }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) drawUserToDeviceRoute()
+    }
 
     // ✅ mapType toggle
     LaunchedEffect(isHybrid) {
@@ -71,6 +124,7 @@ actual fun PlatformMapView(
                 mapView.apply {
                     onCreate(null)
                     getMapAsync { map ->
+                        mapHolder[0] = map
                         val location = LatLng(latitude, longitude)
                         val bikeIcon = getNavigationIcon(ctx)
 
@@ -92,6 +146,7 @@ actual fun PlatformMapView(
                 val newLocation = LatLng(latitude, longitude)
 
                 mapView.getMapAsync { map ->
+                    mapHolder[0] = map
 
                     // ── 1. Vehicle marker move + rotate ──────────────
                     val bearing = calculateBearing(
@@ -150,21 +205,63 @@ actual fun PlatformMapView(
             modifier = Modifier.fillMaxSize()
         )
 
-        // ✅ Toggle Button
-        Box(
+        // ── Right-side map control buttons ──────────────────────────
+        Column(
             modifier = Modifier
-                .align(Alignment.CenterEnd)        // ← middle right
-                .padding(end = 10.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .background(Color.White)
-                .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(8.dp))
-                .clickable { isHybrid = !isHybrid }
-                .padding(8.dp)
+                .align(Alignment.CenterEnd)
+                .padding(end = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
-                text = if (!isHybrid) "🛰️" else "🗺️",
-                fontSize = 18.sp
-            )
+            // User → Device route button
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (routeActive) Color(0xFFE3F2FD) else Color.White)
+                    .border(
+                        1.dp,
+                        if (routeActive) Color(0xFF2196F3) else Color(0xFFE0E0E0),
+                        RoundedCornerShape(8.dp)
+                    )
+                    .clickable {
+                        if (routeActive) {
+                            userToDevicePolyline[0]?.remove()
+                            userMarkerHolder[0]?.remove()
+                            userToDevicePolyline[0] = null
+                            userMarkerHolder[0] = null
+                            routeActive = false
+                        } else {
+                            val hasPermission = ContextCompat.checkSelfPermission(
+                                context,
+                                android.Manifest.permission.ACCESS_FINE_LOCATION
+                            ) == PackageManager.PERMISSION_GRANTED
+                            if (hasPermission) {
+                                drawUserToDeviceRoute()
+                            } else {
+                                locationPermissionLauncher.launch(
+                                    android.Manifest.permission.ACCESS_FINE_LOCATION
+                                )
+                            }
+                        }
+                    }
+                    .padding(8.dp)
+            ) {
+                Text(text = "📍", fontSize = 18.sp)
+            }
+
+            // Satellite / Normal toggle
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.White)
+                    .border(1.dp, Color(0xFFE0E0E0), RoundedCornerShape(8.dp))
+                    .clickable { isHybrid = !isHybrid }
+                    .padding(8.dp)
+            ) {
+                Text(
+                    text = if (!isHybrid) "🛰️" else "🗺️",
+                    fontSize = 18.sp
+                )
+            }
         }
     }
 }
