@@ -6,16 +6,21 @@ import com.developer.ev2z.data.local.remote.LiveLocationResponse
 import com.developer.ev2z.network.UnauthorizedException
 import com.developer.ev2z.repository.TrackTraceRepository
 import com.developer.ev2z.response.Device
+import io.ktor.util.date.getTimeMillis
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 // Simple lat/lng data class for trail points
 data class TrailPoint(val latitude: Double, val longitude: Double)
 
+@OptIn(kotlin.time.ExperimentalTime::class)
 class TrackTraceViewModel(
     private val repository: TrackTraceRepository,
     private val tokenProvider: () -> String
@@ -71,6 +76,33 @@ class TrackTraceViewModel(
         startLiveLocationPolling(device.device_id)
     }
 
+    private suspend fun loadHistoricalTrail(deviceId: String) {
+        try {
+            val today = Instant.fromEpochMilliseconds(getTimeMillis())
+                .toLocalDateTime(TimeZone.currentSystemDefault())
+                .date
+                .toString()
+            val token = tokenProvider()
+            println("📍 [TrackTrace] Loading today's trail for $deviceId date=$today")
+            val result = repository.getTodayRouteHistory(token, deviceId, today)
+            if (result.success) {
+                val points = result.data
+                    .filter { it.isValid() }
+                    .mapNotNull { p ->
+                        val lat = p.getLatDouble() ?: return@mapNotNull null
+                        val lng = p.getLngDouble() ?: return@mapNotNull null
+                        TrailPoint(lat, lng)
+                    }
+                println("📍 [TrackTrace] Historical trail: ${points.size} valid points")
+                if (points.isNotEmpty()) {
+                    _trailPoints.value = points.takeLast(100)
+                }
+            }
+        } catch (e: Exception) {
+            println("💥 [TrackTrace] History trail load failed: ${e.message}")
+        }
+    }
+
     private fun startDevicesPolling() {
         devicesPollingJob?.cancel()
         devicesPollingJob = viewModelScope.launch {
@@ -104,7 +136,7 @@ class TrackTraceViewModel(
 
             val current = _selectedDevice.value
             if (current == null) {
-                // First load — auto-select first device and start live polling.
+                // First load — auto-select first device, load history, and start live polling.
                 res.devices.firstOrNull()?.let { first ->
                     _selectedDevice.value = first
                     startLiveLocationPolling(first.device_id)

@@ -5,6 +5,7 @@ import com.developer.ev2z.data.local.remote.LiveLocationResponse
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.response.Device
 import com.developer.ev2z.response.MyDevicesResponse
+import com.developer.ev2z.response.RouteHistoryResponse
 
 class TrackTraceRepository(
     private val api: ApiService
@@ -50,5 +51,13 @@ class TrackTraceRepository(
         deviceId: String
     ): LiveLocationResponse {
         return api.getDeviceLiveLocation(token, deviceId)
+    }
+
+    suspend fun getTodayRouteHistory(
+        token: String,
+        deviceId: String,
+        today: String
+    ): RouteHistoryResponse {
+        return api.getRouteHistory(token, today, today, deviceId)
     }
 }

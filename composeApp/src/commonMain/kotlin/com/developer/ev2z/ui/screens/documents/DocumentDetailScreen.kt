@@ -1,4 +1,4 @@
-/*
+
 package com.developer.ev2z.ui.screens.documents
 
 import androidx.compose.foundation.BorderStroke
@@ -67,10 +67,6 @@ enum class DocumentBadgeStatus { Valid, Expiring, Expired, Missing }
 fun DocumentDetailScreen(
     fileName: String,
     uploadedDate: String,
-    expiryDate: String?,
-    badgeLabel: String = "VALID",
-    badgeDetail: String = "",
-    status: DocumentBadgeStatus = DocumentBadgeStatus.Valid,
     onClose: () -> Unit,
     onReupload: () -> Unit,
     onDelete: () -> Unit,
@@ -96,10 +92,6 @@ fun DocumentDetailScreen(
         DocumentInfoCard(
             fileName     = fileName,
             uploadedDate = uploadedDate,
-            expiryDate   = expiryDate,
-            badgeLabel   = badgeLabel,
-            badgeDetail  = badgeDetail,
-            status       = status,
             onReupload   = onReupload,
             onDelete     = onDelete,
         )
@@ -240,10 +232,6 @@ fun PdfPreviewPlaceholder(message: String = "Loading document…") {
 private fun DocumentInfoCard(
     fileName: String,
     uploadedDate: String,
-    expiryDate: String?,
-    badgeLabel: String,
-    badgeDetail: String,
-    status: DocumentBadgeStatus,
     onReupload: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -264,25 +252,10 @@ private fun DocumentInfoCard(
 
         Spacer(Modifier.height(16.dp))
 
-        Row(
-            modifier              = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
-        ) {
-            InfoColumn(
-                label    = "Uploaded",
-                value    = uploadedDate.ifBlank { "—" },
-                modifier = Modifier.weight(1f),
-            )
-            InfoColumn(
-                label    = "Expires",
-                value    = expiryDate?.ifBlank { "—" } ?: "—",
-                modifier = Modifier.weight(1f),
-            )
-        }
-
-        Spacer(Modifier.height(14.dp))
-
-        DetailStatusBadge(label = badgeLabel, detail = badgeDetail, status = status)
+        InfoColumn(
+            label = "Uploaded",
+            value = uploadedDate.ifBlank { "—" },
+        )
 
         Spacer(Modifier.height(20.dp))
 
@@ -491,4 +464,3 @@ private fun UploadSourceRow(
         }
     }
 }
-*/
