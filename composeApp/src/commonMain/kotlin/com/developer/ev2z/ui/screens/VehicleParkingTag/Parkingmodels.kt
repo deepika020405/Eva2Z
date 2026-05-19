@@ -1,4 +1,4 @@
-package com.developer.ev2z.ui.screens.VechicleParkingTag
+package com.developer.ev2z.ui.screens.VehicleParkingTag
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

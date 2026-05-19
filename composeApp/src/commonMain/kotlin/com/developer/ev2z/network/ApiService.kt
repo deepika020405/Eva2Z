@@ -2,7 +2,6 @@ package com.developer.ev2z.network
 
 import com.developer.ev2z.data.local.model.DeviceResponse
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
-import com.developer.ev2z.network.KtorClient.client
 import com.developer.ev2z.request.CandidateDto
 import com.developer.ev2z.request.CandidateRequest
 import com.developer.ev2z.request.CartAddRequest
@@ -15,7 +14,6 @@ import com.developer.ev2z.request.RenewPlanRequest
 import com.developer.ev2z.request.SupportRequest
 import com.developer.ev2z.response.SupportResponse
 import com.developer.ev2z.response.*
-import com.developer.ev2z.ui.screens.ChangePlan.ChangePlanScreenHost
 import com.developer.ev2z.ui.screens.ChangePlan.UserDevicesResponse
 import com.developer.ev2z.ui.screens.CriminalVerification.CandidateResult
 import com.developer.ev2z.ui.screens.CriminalVerification.CriminalForm
@@ -26,16 +24,14 @@ import com.developer.ev2z.ui.screens.SOSParkingTag.MyChatsResponse
 import com.developer.ev2z.ui.screens.SOSParkingTag.OwnerReplyRequest
 import com.developer.ev2z.ui.screens.SOSParkingTag.SosAlertDetailResponse
 import com.developer.ev2z.ui.screens.SOSParkingTag.SosAlertListResponse
-import com.developer.ev2z.ui.screens.SOSParkingTag.SosReplyRequest
 import com.developer.ev2z.ui.screens.SOSParkingTag.SosReplyResponse
-import com.developer.ev2z.ui.screens.VechicleParkingTag.ParkingData
-import com.developer.ev2z.ui.screens.VechicleParkingTag.ParkingRequest
-import com.developer.ev2z.ui.screens.VechicleParkingTag.ParkingResponse
-import com.developer.ev2z.ui.screens.VechicleParkingTag.UserParkingListResponse
+import com.developer.ev2z.ui.screens.VehicleParkingTag.ParkingData
+import com.developer.ev2z.ui.screens.VehicleParkingTag.ParkingRequest
+import com.developer.ev2z.ui.screens.VehicleParkingTag.ParkingResponse
+import com.developer.ev2z.ui.screens.VehicleParkingTag.UserParkingListResponse
 import com.developer.ev2z.util.AppTokenProvider
 import io.ktor.client.call.*
 import io.ktor.client.plugins.ClientRequestException
-import io.ktor.client.plugins.HttpRequestTimeoutException
 import io.ktor.client.plugins.ResponseException
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
@@ -1342,6 +1338,56 @@ class ApiService {
         } catch (e: Exception) {
             println("❌ deleteVehicle: ${e.message}")
             throw e
+        }
+    }
+
+
+    // ---------------- UPDATE VEHICLE ----------------
+    suspend fun updateVehicle(
+        vehicleId: Int,
+        vehicleType: String,
+        vehicleNumber: String,
+        phone: String,
+        alternatePhone1: String?,
+        alternatePhone2: String?
+    ): ParkingResponse {
+        val token = AppTokenProvider.getToken()
+        val url   = "${baseUrl}vehicle-parking/update/$vehicleId"
+
+        val requestBody = ParkingRequest(
+            vehicle_type      = vehicleType.trim(),
+            vehicle_number    = vehicleNumber.trim(),
+            phone             = phone.trim(),
+            alternate_phone_1 = alternatePhone1?.trim() ?: "",
+            alternate_phone_2 = alternatePhone2?.trim()?.ifEmpty { null }
+        )
+
+        println("🌐 updateVehicle → POST $url")
+
+        return try {
+            val response = client.post(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                contentType(ContentType.Application.Json)
+                setBody(requestBody)
+            }
+            val raw = response.bodyAsText()
+            println("✔️ updateVehicle ${response.status}: $raw")
+            val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
+            when {
+                response.status.isSuccess() ->
+                    json.decodeFromString(ParkingResponse.serializer(), raw)
+                response.status == HttpStatusCode.UnprocessableEntity -> {
+                    val body = runCatching { json.decodeFromString(ParkingResponse.serializer(), raw) }.getOrNull()
+                    ParkingResponse(status = false, message = body?.message ?: "Validation failed.", errors = body?.errors)
+                }
+                response.status == HttpStatusCode.Unauthorized ->
+                    ParkingResponse(status = false, message = "Session expired. Please login again.")
+                else ->
+                    ParkingResponse(status = false, message = "Error: ${response.status.value}")
+            }
+        } catch (e: Exception) {
+            println("❌ updateVehicle: ${e.message}")
+            ParkingResponse(status = false, message = "Network error: ${e.message ?: "Unknown"}")
         }
     }
 

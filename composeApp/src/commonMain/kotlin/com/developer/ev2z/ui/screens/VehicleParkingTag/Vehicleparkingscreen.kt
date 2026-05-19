@@ -1,4 +1,4 @@
-package com.developer.ev2z.ui.screens.VechicleParkingTag
+package com.developer.ev2z.ui.screens.VehicleParkingTag
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.*
@@ -30,14 +30,7 @@ import androidx.compose.ui.window.Dialog
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.ui.components.CountryData
 import com.developer.ev2z.ui.components.CountryPickerDialog
-import com.developer.ev2z.ui.components.defaultCountry
-import com.developer.ev2z.util.saveQrImageToGallery
-import com.developer.ev2z.util.shareQrImage
-import eva2z_connect_multiplatform.composeapp.generated.resources.Res
-import eva2z_connect_multiplatform.composeapp.generated.resources.qr_image
 import kotlinx.coroutines.launch
-import org.jetbrains.compose.resources.ExperimentalResourceApi
-import org.jetbrains.compose.resources.painterResource
 
 // ─────────────────────────────────────────────────────────────────
 // Design tokens
@@ -89,6 +82,7 @@ fun ParkingScreen(
     var showAltPhonePicker by remember { mutableStateOf(false) }
     var deleteTargetId     by remember { mutableStateOf<Int?>(null) }
     var deleteTargetName   by remember { mutableStateOf("") }
+    var editTargetItem     by remember { mutableStateOf<ParkingData?>(null) }
     val snackbarHostState  = remember { SnackbarHostState() }
     val scope              = rememberCoroutineScope()
 
@@ -255,11 +249,39 @@ fun ParkingScreen(
                 onDelete = { id, name ->
                     deleteTargetId   = id
                     deleteTargetName = name
-                }
+                },
+                onEdit = { item -> editTargetItem = item }
             )
 
             Spacer(Modifier.height(16.dp))
         }
+    }
+
+    // ── Edit Vehicle Dialog ───────────────────────────────────────
+    editTargetItem?.let { item ->
+        EditVehicleDialog(
+            item      = item,
+            onDismiss = { editTargetItem = null },
+            onSave    = { type, number, alt1, alt2 ->
+                val id = item.id ?: return@EditVehicleDialog
+                viewModel.updateVehicle(
+                    vehicleId       = id,
+                    vehicleType     = type,
+                    vehicleNumber   = number,
+                    phone           = item.phone ?: "",
+                    alternatePhone1 = alt1.ifEmpty { null },
+                    alternatePhone2 = alt2.ifEmpty { null },
+                    onSuccess = {
+                        editTargetItem = null
+                        scope.launch { snackbarHostState.showSnackbar("Vehicle updated successfully") }
+                    },
+                    onError = { msg ->
+                        editTargetItem = null
+                        scope.launch { snackbarHostState.showSnackbar(msg) }
+                    }
+                )
+            }
+        )
     }
 
     // ── Delete Confirmation Dialog ────────────────────────────────
@@ -841,7 +863,8 @@ private fun ParkingErrorBanner(message: String, onDismiss: () -> Unit) {
 @Composable
 private fun RecentParkingsCard(
     history: List<ParkingData>,
-    onDelete: (id: Int, name: String) -> Unit
+    onDelete: (id: Int, name: String) -> Unit,
+    onEdit: (ParkingData) -> Unit
 ) {
     var qrItem by remember { mutableStateOf<ParkingData?>(null) }
 
@@ -873,6 +896,7 @@ private fun RecentParkingsCard(
                         onDelete = {
                             item.id?.let { id -> onDelete(id, item.vehicle_type ?: "Vehicle") }
                         },
+                        onEdit   = { onEdit(item) },
                         onShowQr = { qrItem = item }
                     )
                 }
@@ -893,6 +917,7 @@ private fun RecentParkingsCard(
 private fun ParkingHistoryRow(
     item: ParkingData,
     onDelete: () -> Unit = {},
+    onEdit: () -> Unit = {},
     onShowQr: () -> Unit = {}
 ) {
     Column(
@@ -931,6 +956,16 @@ private fun ParkingHistoryRow(
 //            ) {
 //                Icon(Icons.Default.QrCode, null, tint = BrandGreen, modifier = Modifier.size(16.dp))
 //            }
+
+            IconButton(
+                onClick  = onEdit,
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(GreenLight)
+            ) {
+                Icon(Icons.Default.Edit, null, tint = BrandGreen, modifier = Modifier.size(14.dp))
+            }
 
             IconButton(
                 onClick  = onDelete,
@@ -1203,6 +1238,125 @@ private fun ParkingHistoryRow(
 //        )
 //    }
 //}
+
+// ─────────────────────────────────────────────────────────────────
+// Edit Vehicle Dialog
+// ─────────────────────────────────────────────────────────────────
+
+@Composable
+private fun EditVehicleDialog(
+    item: ParkingData,
+    onDismiss: () -> Unit,
+    onSave: (vehicleType: String, vehicleNumber: String, alternatePhone1: String, alternatePhone2: String) -> Unit
+) {
+    var vehicleType     by remember { mutableStateOf(item.vehicle_type ?: "") }
+    var vehicleNumber   by remember { mutableStateOf(item.vehicle_number ?: "") }
+    var alternatePhone1 by remember { mutableStateOf(item.alternate_phone_1 ?: item.phone ?: "") }
+    var alternatePhone2 by remember { mutableStateOf(item.alternate_phone_2 ?: item.alternate_phone ?: "") }
+    val focusManager    = LocalFocusManager.current
+
+    val isSaveEnabled = vehicleType.isNotBlank() && vehicleNumber.isNotBlank() && alternatePhone1.isNotBlank()
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape     = RoundedCornerShape(24.dp),
+            colors    = CardDefaults.cardColors(containerColor = CardColor),
+            elevation = CardDefaults.cardElevation(8.dp)
+        ) {
+            Column(
+                modifier            = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment     = Alignment.CenterVertically
+                ) {
+                    Text("Edit Vehicle", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                    IconButton(
+                        onClick  = onDismiss,
+                        modifier = Modifier.size(30.dp).clip(RoundedCornerShape(8.dp)).background(BackgroundColor)
+                    ) {
+                        Icon(Icons.Default.Close, null, tint = TextSecondary, modifier = Modifier.size(16.dp))
+                    }
+                }
+
+                Divider(color = BorderColor)
+
+                Eva2zInputField(
+                    value           = vehicleType,
+                    onValueChange   = { if (it.all { c -> c.isLetterOrDigit() || c == ' ' }) vehicleType = it },
+                    label           = "VEHICLE NAME",
+                    placeholder     = "e.g. Honda City",
+                    icon            = Icons.Outlined.DirectionsCar,
+                    imeAction       = ImeAction.Next,
+                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
+                )
+
+                Eva2zInputField(
+                    value           = vehicleNumber,
+                    onValueChange   = { val f = it.filter { c -> c.isLetterOrDigit() }; if (f.length <= 12) vehicleNumber = f },
+                    label           = "VEHICLE NUMBER",
+                    placeholder     = "e.g. DL01AB1234",
+                    icon            = Icons.Outlined.Tag,
+                    capitalization  = KeyboardCapitalization.Characters,
+                    imeAction       = ImeAction.Next,
+                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
+                )
+
+                Eva2zInputField(
+                    value           = alternatePhone1,
+                    onValueChange   = { val d = it.filter { c -> c.isDigit() }; if (d.length <= 15) alternatePhone1 = d },
+                    label           = "EMERGENCY CONTACT 1 *",
+                    placeholder     = "Enter phone number",
+                    icon            = Icons.Outlined.Phone,
+                    keyboardType    = KeyboardType.Phone,
+                    imeAction       = ImeAction.Next,
+                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
+                )
+
+                Eva2zInputField(
+                    value           = alternatePhone2,
+                    onValueChange   = { val d = it.filter { c -> c.isDigit() }; if (d.length <= 15) alternatePhone2 = d },
+                    label           = "EMERGENCY CONTACT 2 (OPTIONAL)",
+                    placeholder     = "Enter phone number",
+                    icon            = Icons.Outlined.Phone,
+                    keyboardType    = KeyboardType.Phone,
+                    imeAction       = ImeAction.Done,
+                    keyboardActions = KeyboardActions(onDone = {
+                        focusManager.clearFocus()
+                        if (isSaveEnabled) onSave(vehicleType, vehicleNumber, alternatePhone1, alternatePhone2)
+                    })
+                )
+
+                Row(
+                    modifier              = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedButton(
+                        onClick  = onDismiss,
+                        shape    = RoundedCornerShape(50),
+                        modifier = Modifier.weight(1f).height(48.dp)
+                    ) { Text("Cancel") }
+
+                    Button(
+                        onClick  = {
+                            focusManager.clearFocus()
+                            onSave(vehicleType, vehicleNumber, alternatePhone1, alternatePhone2)
+                        },
+                        enabled  = isSaveEnabled,
+                        modifier = Modifier.weight(1f).height(48.dp),
+                        shape    = RoundedCornerShape(50),
+                        colors   = ButtonDefaults.buttonColors(
+                            containerColor         = BrandGreen,
+                            disabledContainerColor = BrandGreen.copy(alpha = 0.35f)
+                        )
+                    ) { Text("Save", fontWeight = FontWeight.Bold) }
+                }
+            }
+        }
+    }
+}
 
 // ─────────────────────────────────────────────────────────────────
 // Banner Row helper

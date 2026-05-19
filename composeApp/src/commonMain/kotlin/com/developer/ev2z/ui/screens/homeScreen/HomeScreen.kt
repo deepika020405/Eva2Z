@@ -434,6 +434,37 @@ private fun InstallationSupportCard(onClick: () -> Unit) {
     }
 }
 
+@Composable
+private fun CriminalVerificationCard(onClick: () -> Unit) {
+    Card(
+        onClick   = onClick,
+        modifier  = Modifier.fillMaxWidth(),
+        shape     = RoundedCornerShape(18.dp),
+        colors    = CardDefaults.cardColors(containerColor = CardWhite),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Row(
+            modifier          = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier         = Modifier
+                    .size(50.dp)
+                    .clip(RoundedCornerShape(15.dp))
+                    .background(BrandGreenLight),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.VerifiedUser, null, tint = BrandGreen, modifier = Modifier.size(24.dp))
+            }
+            Spacer(Modifier.width(14.dp))
+            Text("Criminal Verification", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary, modifier = Modifier.weight(1f))
+            Icon(Icons.Default.ChevronRight, null, tint = TextHint, modifier = Modifier.size(22.dp))
+        }
+    }
+}
+
 // ─────────────────────────── GENERAL SECTION ───────────────────────
 
 private data class GeneralItemData(val title: String, val icon: ImageVector, val onClick: () -> Unit)
@@ -445,10 +476,9 @@ private fun GeneralSection(
     onCriminalVerification: () -> Unit,
     hPad: Dp
 ) {
-    val items = listOf(
-        GeneralItemData("Document\nVault",        Icons.Default.FolderOpen,   onDocumentVault),
-        GeneralItemData("Community",              Icons.Default.Groups,        onCommunity),
-        GeneralItemData("Criminal\nVerification", Icons.Default.VerifiedUser,  onCriminalVerification),
+    val gridItems = listOf(
+        GeneralItemData("Document\nVault", Icons.Default.FolderOpen, onDocumentVault),
+        GeneralItemData("Community",       Icons.Default.Groups,      onCommunity),
     )
 
     Column(modifier = Modifier.padding(horizontal = hPad)) {
@@ -456,20 +486,18 @@ private fun GeneralSection(
 
         Spacer(Modifier.height(16.dp))
 
-        val rows = items.chunked(2)
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            rows.forEach { row ->
-                Row(
-                    modifier              = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    row.forEach { item ->
-                        GeneralItem(title = item.title, icon = item.icon, onClick = item.onClick, modifier = Modifier.weight(1f))
-                    }
-                    if (row.size < 2) Spacer(Modifier.weight(1f))
-                }
+        Row(
+            modifier              = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            gridItems.forEach { item ->
+                GeneralItem(title = item.title, icon = item.icon, onClick = item.onClick, modifier = Modifier.weight(1f))
             }
         }
+
+        Spacer(Modifier.height(12.dp))
+
+        CriminalVerificationCard(onClick = onCriminalVerification)
     }
 }
 

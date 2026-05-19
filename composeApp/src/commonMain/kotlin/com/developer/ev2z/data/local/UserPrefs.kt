@@ -1,7 +1,5 @@
 package com.developer.ev2z.data.local
 
-import kotlinx.serialization.encodeToString
-import org.jetbrains.compose.resources.getString
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -74,17 +72,17 @@ class UserPrefs(private val storage: StorageManager) {  // ✅ Storage → Stora
         coerceInputValues = true
     }
 
-    fun saveParkingEntry(entry: com.developer.ev2z.ui.screens.VechicleParkingTag.ParkingData) {
+    fun saveParkingEntry(entry: com.developer.ev2z.ui.screens.VehicleParkingTag.ParkingData) {
         val existing = getParkingHistory()
         val updated  = listOf(migrateParkingEntry(entry)) + existing.take(49)  // max 50 entries
         storage.saveString("parking_history", parkingJson.encodeToString(updated))
     }
 
-    fun getParkingHistory(): List<com.developer.ev2z.ui.screens.VechicleParkingTag.ParkingData> {
+    fun getParkingHistory(): List<com.developer.ev2z.ui.screens.VehicleParkingTag.ParkingData> {
         val raw = storage.getString("parking_history", "")
         if (raw.isBlank()) return emptyList()
         return runCatching {
-            parkingJson.decodeFromString<List<com.developer.ev2z.ui.screens.VechicleParkingTag.ParkingData>>(raw)
+            parkingJson.decodeFromString<List<com.developer.ev2z.ui.screens.VehicleParkingTag.ParkingData>>(raw)
                 .map { migrateParkingEntry(it) }
         }.getOrElse { emptyList() }
     }
@@ -95,8 +93,8 @@ class UserPrefs(private val storage: StorageManager) {  // ✅ Storage → Stora
      * and new API responses are consistent in local storage.
      */
     private fun migrateParkingEntry(
-        entry: com.developer.ev2z.ui.screens.VechicleParkingTag.ParkingData
-    ): com.developer.ev2z.ui.screens.VechicleParkingTag.ParkingData {
+        entry: com.developer.ev2z.ui.screens.VehicleParkingTag.ParkingData
+    ): com.developer.ev2z.ui.screens.VehicleParkingTag.ParkingData {
         return entry.copy(
             alternate_phone_1 = entry.alternate_phone_1 ?: entry.phone,
             alternate_phone_2 = entry.alternate_phone_2 ?: entry.alternate_phone

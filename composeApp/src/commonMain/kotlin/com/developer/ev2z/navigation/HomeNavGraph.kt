@@ -73,8 +73,8 @@ import com.developer.ev2z.ui.screens.Profile.ProfileViewModel
 import com.developer.ev2z.ui.screens.Profile.VaultPasswordDialog
 import com.developer.ev2z.ui.screens.ReferAndEarn.ReferAndEarnScreen
 import com.developer.ev2z.ui.screens.SupportAndWarrenty.WarrantyRoute
-import com.developer.ev2z.ui.screens.VechicleParkingTag.ParkingScreen
-import com.developer.ev2z.ui.screens.VechicleParkingTag.ParkingViewModel
+import com.developer.ev2z.ui.screens.VehicleParkingTag.ParkingScreen
+import com.developer.ev2z.ui.screens.VehicleParkingTag.ParkingViewModel
 import com.developer.ev2z.ui.screens.community.CommunityScreenRoot
 import com.developer.ev2z.ui.screens.community.CreatePostScreen
 import com.developer.ev2z.ui.screens.community.CreateStoryScreen

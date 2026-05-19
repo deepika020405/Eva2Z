@@ -1,4 +1,4 @@
-package com.developer.ev2z.ui.screens.VechicleParkingTag
+package com.developer.ev2z.ui.screens.VehicleParkingTag
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -7,7 +7,6 @@ import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.ui.components.CountryData
 import com.developer.ev2z.ui.components.defaultCountry
 import com.developer.ev2z.util.ApiProvider
-import com.developer.ev2z.util.ApiProvider.apiService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -319,6 +318,42 @@ class ParkingViewModel(
         _alternatePhoneError.value   = null
     }
 
+
+    // ── Update Vehicle ────────────────────────────────────────────
+    fun updateVehicle(
+        vehicleId: Int,
+        vehicleType: String,
+        vehicleNumber: String,
+        phone: String,
+        alternatePhone1: String?,
+        alternatePhone2: String?,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                val response = apiService.updateVehicle(
+                    vehicleId       = vehicleId,
+                    vehicleType     = vehicleType,
+                    vehicleNumber   = vehicleNumber,
+                    phone           = phone,
+                    alternatePhone1 = alternatePhone1,
+                    alternatePhone2 = alternatePhone2
+                )
+                if (response.status) {
+                    response.data?.let { updated ->
+                        _history.value = _history.value.map { if (it.id == vehicleId) updated else it }
+                    }
+                    onSuccess()
+                } else {
+                    onError(response.message ?: "Update failed")
+                }
+            } catch (e: Exception) {
+                println("❌ updateVehicle: ${e.message}")
+                onError(e.message ?: "Something went wrong")
+            }
+        }
+    }
 
     // ── Delete Vehicle ────────────────────────────────────────────
     fun deleteVehicle(vehicleId: Int, onSuccess: () -> Unit, onError: (String) -> Unit) {
