@@ -11,6 +11,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -275,8 +277,6 @@ fun DocumentsScreen(
     onOpenViewer: (ByteArray, String) -> Unit,
     onOpenUpload: () -> Unit,
 ) {
-    PlatformBackHandler(enabled = true) { onBack() }
-
     val viewModel = remember {
         DocumentsViewModel(apiService = apiService, storageManager = storageManager)
     }
@@ -291,6 +291,10 @@ fun DocumentsScreen(
     var newDocPrefilledName by remember { mutableStateOf<String?>(null) }
     var alertDismissed      by remember { mutableStateOf(false) }
     var selectedDoc         by remember { mutableStateOf<Pair<VaultDocumentDto, DocumentSlot?>?>(null) }
+
+    // Disable the screen-level back handler while detail overlay is open so it
+    // can handle its own close action instead of popping the whole screen.
+    PlatformBackHandler(enabled = selectedDoc == null) { onBack() }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
@@ -308,19 +312,24 @@ fun DocumentsScreen(
             .background(VaultColors.Background),
     ) {
         when {
-            loading -> CircularProgressIndicator(
-                color = VaultColors.Green,
-                modifier = Modifier.align(Alignment.Center),
-            )
+            loading -> Box(
+                modifier         = Modifier.fillMaxSize().statusBarsPadding(),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(color = VaultColors.Green)
+            }
 
-            error != null -> Text(
-                text      = error ?: "Something went wrong",
-                color     = MaterialTheme.colorScheme.error,
-                textAlign = TextAlign.Center,
-                modifier  = Modifier
-                    .align(Alignment.Center)
-                    .padding(24.dp),
-            )
+            error != null -> Box(
+                modifier         = Modifier.fillMaxSize().statusBarsPadding(),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text      = error ?: "Something went wrong",
+                    color     = MaterialTheme.colorScheme.error,
+                    textAlign = TextAlign.Center,
+                    modifier  = Modifier.padding(24.dp),
+                )
+            }
 
             else -> {
                 val matched = remember(documents) { matchDocumentsToSlots(documents) }
@@ -363,6 +372,40 @@ fun DocumentsScreen(
                 },
                 dismissButton    = {
                     TextButton(onClick = { deleteDocId = null }) { Text("Cancel") }
+                },
+            )
+        }
+
+        // Detail overlay is the last child of the Box so it sits on top of
+        // the vault list and dialogs with correct z-order and touch dispatch.
+        if (selectedDoc != null) {
+            val (doc, slot) = selectedDoc!!
+            var previewBytes by remember(doc.id) { mutableStateOf<ByteArray?>(null) }
+
+            LaunchedEffect(doc.id) {
+                viewModel.openDocument(
+                    documentId = doc.id,
+                    onResult   = { bytes -> previewBytes = bytes },
+                )
+            }
+
+            PlatformBackHandler(enabled = true) { selectedDoc = null }
+
+            DocumentDetailScreen(
+                fileName     = slot?.title ?: doc.fileName,
+                uploadedDate = formatIsoDateToReadable(doc.createdAt),
+                onClose      = { selectedDoc = null },
+                onReupload   = { selectedDoc = null; editDocument = doc },
+                onDelete     = { selectedDoc = null; deleteDocId = doc.id },
+                preview      = {
+                    if (previewBytes != null) {
+                        PlatformDocumentViewer(
+                            bytes    = previewBytes!!,
+                            modifier = Modifier.fillMaxSize(),
+                        )
+                    } else {
+                        PdfPreviewPlaceholder()
+                    }
                 },
             )
         }
@@ -411,37 +454,6 @@ fun DocumentsScreen(
             )
         }
     }
-
-    // Document detail full-screen overlay
-    if (selectedDoc != null) {
-        val (doc, slot) = selectedDoc!!
-        var previewBytes by remember(doc.id) { mutableStateOf<ByteArray?>(null) }
-
-        LaunchedEffect(doc.id) {
-            viewModel.openDocument(
-                documentId = doc.id,
-                onResult   = { bytes -> previewBytes = bytes },
-            )
-        }
-
-        DocumentDetailScreen(
-            fileName     = slot?.title ?: doc.fileName,
-            uploadedDate = formatIsoDateToReadable(doc.createdAt),
-            onClose      = { selectedDoc = null },
-            onReupload   = { selectedDoc = null; editDocument = doc },
-            onDelete     = { selectedDoc = null; deleteDocId = doc.id },
-            preview      = {
-                if (previewBytes != null) {
-                    PlatformDocumentViewer(
-                        bytes    = previewBytes!!,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    PdfPreviewPlaceholder()
-                }
-            },
-        )
-    }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -464,9 +476,12 @@ private fun DocumentsContent(
     onBack: () -> Unit,
 ) {
     LazyColumn(
-        modifier              = Modifier.fillMaxSize(),
-        contentPadding        = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement   = Arrangement.spacedBy(16.dp),
+        modifier            = Modifier
+            .fillMaxSize()
+            .statusBarsPadding()
+            .navigationBarsPadding(),
+        contentPadding      = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         item { VaultHeader(onBack = onBack, onAdd = onAddDocumentTapped) }
 
@@ -1074,6 +1089,7 @@ private fun DocumentTypeSheet(
     Column(
         modifier = Modifier
             .fillMaxWidth()
+            .navigationBarsPadding()
             .padding(horizontal = 20.dp)
             .padding(top = 8.dp, bottom = 32.dp),
     ) {
@@ -1380,9 +1396,11 @@ fun UploadDocumentScreen(
     ) { padding ->
         Column(
             modifier            = Modifier
+                .fillMaxWidth()
                 .padding(padding)
-                .padding(16.dp)
-                .fillMaxSize(),
+                .verticalScroll(rememberScrollState())
+                .imePadding()
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             OutlinedTextField(

@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.ui.components.CountryData
 import com.developer.ev2z.ui.components.CountryPickerDialog
@@ -531,6 +532,7 @@ private fun Eva2zInputField(
     placeholder: String,
     icon: ImageVector,
     errorText: String?                     = null,
+    readOnly: Boolean                      = false,
     imeAction: ImeAction                   = ImeAction.Next,
     capitalization: KeyboardCapitalization = KeyboardCapitalization.Words,
     keyboardType: KeyboardType             = KeyboardType.Text,
@@ -545,29 +547,32 @@ private fun Eva2zInputField(
             value         = value,
             onValueChange = onValueChange,
             placeholder   = { Text(placeholder, fontSize = 14.sp, color = TextTertiary) },
+            readOnly      = readOnly,
             leadingIcon = {
                 Box(
-                    modifier = Modifier.size(32.dp).clip(RoundedCornerShape(9.dp)).background(GreenLight),
+                    modifier = Modifier.size(32.dp).clip(RoundedCornerShape(9.dp)).background(if (readOnly) BorderColor else GreenLight),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(icon, null, tint = BrandGreen, modifier = Modifier.size(16.dp))
+                    Icon(icon, null, tint = if (readOnly) TextTertiary else BrandGreen, modifier = Modifier.size(16.dp))
                 }
             },
-            trailingIcon = if (value.isNotBlank()) ({
+            trailingIcon = if (readOnly) ({
+                Icon(Icons.Default.Lock, null, tint = TextTertiary, modifier = Modifier.size(16.dp))
+            }) else if (value.isNotBlank()) ({
                 Icon(Icons.Default.CheckCircle, null, tint = BrandGreen, modifier = Modifier.size(20.dp))
             }) else null,
             isError  = errorText != null,
             modifier = Modifier.fillMaxWidth(),
             shape    = RoundedCornerShape(14.dp),
             colors   = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor      = BrandGreen,
+                focusedBorderColor      = if (readOnly) BorderColor else BrandGreen,
                 unfocusedBorderColor    = BorderColor,
                 errorBorderColor        = ErrorColor,
-                focusedContainerColor   = CardColor,
-                unfocusedContainerColor = BackgroundColor,
+                focusedContainerColor   = if (readOnly) Color(0xFFF0F0F0) else CardColor,
+                unfocusedContainerColor = if (readOnly) Color(0xFFF0F0F0) else BackgroundColor,
                 errorContainerColor     = Color(0xFFFEF2F2),
-                focusedTextColor        = TextPrimary,
-                unfocusedTextColor      = TextPrimary,
+                focusedTextColor        = if (readOnly) TextSecondary else TextPrimary,
+                unfocusedTextColor      = if (readOnly) TextSecondary else TextPrimary,
                 cursorColor             = BrandGreen
             ),
             keyboardOptions = KeyboardOptions(
@@ -578,7 +583,7 @@ private fun Eva2zInputField(
             keyboardActions = keyboardActions,
             singleLine      = true,
             textStyle       = LocalTextStyle.current.copy(
-                fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary
+                fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = if (readOnly) TextSecondary else TextPrimary
             )
         )
         errorText?.let { err ->
@@ -1255,103 +1260,126 @@ private fun EditVehicleDialog(
     var alternatePhone2 by remember { mutableStateOf(item.alternate_phone_2 ?: item.alternate_phone ?: "") }
     val focusManager    = LocalFocusManager.current
 
-    val isSaveEnabled = vehicleType.isNotBlank() && vehicleNumber.isNotBlank() && alternatePhone1.isNotBlank()
+    val isSaveEnabled = alternatePhone1.isNotBlank()
 
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            shape     = RoundedCornerShape(24.dp),
-            colors    = CardDefaults.cardColors(containerColor = CardColor),
-            elevation = CardDefaults.cardElevation(8.dp)
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties       = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(0.94f)
+                .windowInsetsPadding(WindowInsets.ime),
+            contentAlignment = Alignment.Center
         ) {
-            Column(
-                modifier            = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+            Card(
+                shape     = RoundedCornerShape(24.dp),
+                colors    = CardDefaults.cardColors(containerColor = CardColor),
+                elevation = CardDefaults.cardElevation(8.dp),
+                modifier  = Modifier.fillMaxWidth()
             ) {
-                Row(
-                    modifier              = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment     = Alignment.CenterVertically
-                ) {
-                    Text("Edit Vehicle", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
-                    IconButton(
-                        onClick  = onDismiss,
-                        modifier = Modifier.size(30.dp).clip(RoundedCornerShape(8.dp)).background(BackgroundColor)
+                Column(modifier = Modifier.fillMaxWidth()) {
+
+                    // ── Sticky header ─────────────────────────────────
+                    Row(
+                        modifier              = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 20.dp, end = 12.dp, top = 20.dp, bottom = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment     = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Close, null, tint = TextSecondary, modifier = Modifier.size(16.dp))
+                        Text("Edit Vehicle", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                        IconButton(
+                            onClick  = onDismiss,
+                            modifier = Modifier.size(30.dp).clip(RoundedCornerShape(8.dp)).background(BackgroundColor)
+                        ) {
+                            Icon(Icons.Default.Close, null, tint = TextSecondary, modifier = Modifier.size(16.dp))
+                        }
                     }
-                }
 
-                Divider(color = BorderColor)
+                    Divider(color = BorderColor)
 
-                Eva2zInputField(
-                    value           = vehicleType,
-                    onValueChange   = { if (it.all { c -> c.isLetterOrDigit() || c == ' ' }) vehicleType = it },
-                    label           = "VEHICLE NAME",
-                    placeholder     = "e.g. Honda City",
-                    icon            = Icons.Outlined.DirectionsCar,
-                    imeAction       = ImeAction.Next,
-                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
-                )
-
-                Eva2zInputField(
-                    value           = vehicleNumber,
-                    onValueChange   = { val f = it.filter { c -> c.isLetterOrDigit() }; if (f.length <= 12) vehicleNumber = f },
-                    label           = "VEHICLE NUMBER",
-                    placeholder     = "e.g. DL01AB1234",
-                    icon            = Icons.Outlined.Tag,
-                    capitalization  = KeyboardCapitalization.Characters,
-                    imeAction       = ImeAction.Next,
-                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
-                )
-
-                Eva2zInputField(
-                    value           = alternatePhone1,
-                    onValueChange   = { val d = it.filter { c -> c.isDigit() }; if (d.length <= 15) alternatePhone1 = d },
-                    label           = "EMERGENCY CONTACT 1 *",
-                    placeholder     = "Enter phone number",
-                    icon            = Icons.Outlined.Phone,
-                    keyboardType    = KeyboardType.Phone,
-                    imeAction       = ImeAction.Next,
-                    keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
-                )
-
-                Eva2zInputField(
-                    value           = alternatePhone2,
-                    onValueChange   = { val d = it.filter { c -> c.isDigit() }; if (d.length <= 15) alternatePhone2 = d },
-                    label           = "EMERGENCY CONTACT 2 (OPTIONAL)",
-                    placeholder     = "Enter phone number",
-                    icon            = Icons.Outlined.Phone,
-                    keyboardType    = KeyboardType.Phone,
-                    imeAction       = ImeAction.Done,
-                    keyboardActions = KeyboardActions(onDone = {
-                        focusManager.clearFocus()
-                        if (isSaveEnabled) onSave(vehicleType, vehicleNumber, alternatePhone1, alternatePhone2)
-                    })
-                )
-
-                Row(
-                    modifier              = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    OutlinedButton(
-                        onClick  = onDismiss,
-                        shape    = RoundedCornerShape(50),
-                        modifier = Modifier.weight(1f).height(48.dp)
-                    ) { Text("Cancel") }
-
-                    Button(
-                        onClick  = {
-                            focusManager.clearFocus()
-                            onSave(vehicleType, vehicleNumber, alternatePhone1, alternatePhone2)
-                        },
-                        enabled  = isSaveEnabled,
-                        modifier = Modifier.weight(1f).height(48.dp),
-                        shape    = RoundedCornerShape(50),
-                        colors   = ButtonDefaults.buttonColors(
-                            containerColor         = BrandGreen,
-                            disabledContainerColor = BrandGreen.copy(alpha = 0.35f)
+                    // ── Scrollable fields ─────────────────────────────
+                    Column(
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 20.dp, vertical = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
+                        Eva2zInputField(
+                            value         = vehicleType,
+                            onValueChange = {},
+                            label         = "VEHICLE NAME",
+                            placeholder   = "e.g. Honda City",
+                            icon          = Icons.Outlined.DirectionsCar,
+                            readOnly      = true
                         )
-                    ) { Text("Save", fontWeight = FontWeight.Bold) }
+
+                        Eva2zInputField(
+                            value         = vehicleNumber,
+                            onValueChange = {},
+                            label         = "VEHICLE NUMBER",
+                            placeholder   = "e.g. DL01AB1234",
+                            icon          = Icons.Outlined.Tag,
+                            readOnly      = true
+                        )
+
+                        Eva2zInputField(
+                            value           = alternatePhone1,
+                            onValueChange   = { val d = it.filter { c -> c.isDigit() }; if (d.length <= 15) alternatePhone1 = d },
+                            label           = "EMERGENCY CONTACT 1 *",
+                            placeholder     = "Enter phone number",
+                            icon            = Icons.Outlined.Phone,
+                            keyboardType    = KeyboardType.Phone,
+                            imeAction       = ImeAction.Next,
+                            keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
+                        )
+
+                        Eva2zInputField(
+                            value           = alternatePhone2,
+                            onValueChange   = { val d = it.filter { c -> c.isDigit() }; if (d.length <= 15) alternatePhone2 = d },
+                            label           = "EMERGENCY CONTACT 2 (OPTIONAL)",
+                            placeholder     = "Enter phone number",
+                            icon            = Icons.Outlined.Phone,
+                            keyboardType    = KeyboardType.Phone,
+                            imeAction       = ImeAction.Done,
+                            keyboardActions = KeyboardActions(onDone = {
+                                focusManager.clearFocus()
+                                if (isSaveEnabled) onSave(vehicleType, vehicleNumber, alternatePhone1, alternatePhone2)
+                            })
+                        )
+                    }
+
+                    Divider(color = BorderColor)
+
+                    // ── Sticky action buttons ─────────────────────────
+                    Row(
+                        modifier              = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick  = onDismiss,
+                            shape    = RoundedCornerShape(50),
+                            modifier = Modifier.weight(1f).height(48.dp)
+                        ) { Text("Cancel") }
+
+                        Button(
+                            onClick  = {
+                                focusManager.clearFocus()
+                                onSave(vehicleType, vehicleNumber, alternatePhone1, alternatePhone2)
+                            },
+                            enabled  = isSaveEnabled,
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape    = RoundedCornerShape(50),
+                            colors   = ButtonDefaults.buttonColors(
+                                containerColor         = BrandGreen,
+                                disabledContainerColor = BrandGreen.copy(alpha = 0.35f)
+                            )
+                        ) { Text("Save", fontWeight = FontWeight.Bold) }
+                    }
                 }
             }
         }

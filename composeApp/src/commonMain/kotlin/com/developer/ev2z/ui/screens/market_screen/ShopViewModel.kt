@@ -201,29 +201,24 @@ class ShopViewModel(
         productId: Int,
         quantity: Int = 1,
         plan_type: String,
-        device_type: String
+        device_type: String,
+        onSuccess: (() -> Unit)? = null,
+        onError: (() -> Unit)? = null
     ) {
         val token = tokenProvider()
         scope.launch {
             try {
-                val ok = repo.addToCart(
-                    token,
-                    add,
-                    productId,
-                    quantity,
-                    plan_type,
-                    device_type
-                )
-
+                val ok = repo.addToCart(token, add, productId, quantity, plan_type, device_type)
                 if (ok) {
-                    // 🔥 IMPORTANT: Refresh cart & update UI
                     refreshCart()
+                    onSuccess?.invoke()
                 } else {
                     println("❌ Failed to add to cart")
+                    onError?.invoke()
                 }
-
             } catch (e: Exception) {
                 println("❌ addToCart error: ${e.message}")
+                onError?.invoke()
             }
         }
     }

@@ -2,14 +2,10 @@ package com.developer.ev2z.navigation
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.PagerState
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -28,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.Navigator
+import kotlinx.coroutines.launch
 import cafe.adriel.voyager.navigator.tab.*
 import com.developer.ev2z.LocalPlatformActivity
 import com.developer.ev2z.data.local.StorageManager
@@ -87,8 +84,6 @@ import com.developer.ev2z.ui.screens.homeScreen.LiveLocationScreen
 import com.developer.ev2z.util.BottomBarController
 import com.developer.ev2z.util.DeepLinkBus
 import com.developer.ev2z.util.platformDownloadFile
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 
 
 // ✅ SOS Tag imports
@@ -367,7 +362,7 @@ class ProfileTab(
 
 // ------------------ MAIN NAV GRAPH -------------------
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalComposeUiApi::class)
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun HomeNavGraph(
     viewModel: HomeViewModel,
@@ -386,8 +381,7 @@ fun HomeNavGraph(
     SetupStatusBar()
 
 
-    // ✅ CREATE pagerState and coroutineScope HERE (at parent level)
-    val pagerState = rememberPagerState(pageCount = { 4 })
+    var selectedTabIndex by remember { mutableStateOf(0) }
     val coroutineScope = rememberCoroutineScope()
 
     var shopCategory by remember { mutableStateOf<String?>(null) }
@@ -399,29 +393,29 @@ fun HomeNavGraph(
                 dest.startsWith("product_detail_10") -> {
                     pendingProductId = 10
                     shopCategory = null
-                    pagerState.animateScrollToPage(2)
+                    selectedTabIndex = 2
                 }
                 dest.startsWith("product_detail_11") -> {
                     pendingProductId = 11
                     shopCategory = null
-                    pagerState.animateScrollToPage(2)
+                    selectedTabIndex = 2
                 }
                 dest.startsWith("product_detail_26") -> {
                     pendingProductId = 26
                     shopCategory = null
-                    pagerState.animateScrollToPage(2)
+                    selectedTabIndex = 2
                 }
                 dest.startsWith("shop_wired") -> {
                     shopCategory = "wired"
-                    pagerState.animateScrollToPage(2)
+                    selectedTabIndex = 2
                 }
                 dest.startsWith("shop_wireless") -> {
                     shopCategory = "wireless"
-                    pagerState.animateScrollToPage(2)
+                    selectedTabIndex = 2
                 }
                 dest.startsWith("shop") -> {
                     shopCategory = null
-                    pagerState.animateScrollToPage(2)
+                    selectedTabIndex = 2
                 }
             }
             DeepLinkBus.clear()
@@ -522,7 +516,7 @@ fun HomeNavGraph(
             if (showSosChatInbox) {
                 // User is on the inbox list — refresh it so the new message appears,
                 // then open the specific chat directly.
-                sosTagViewModel.loadChatsWithMessages()
+                sosTagViewModel.refreshChatsWithMessages()
             }
 
             // Close all unrelated overlays and open the chat for this alert
@@ -1033,9 +1027,7 @@ fun HomeNavGraph(
                 storageManager = storageManager,
                 onBackPressed = {
                     showChangePassword = false
-                    coroutineScope.launch {
-                        pagerState.animateScrollToPage(3)
-                    }
+                    selectedTabIndex = 3
                 }
             )
 
@@ -1119,9 +1111,7 @@ fun HomeNavGraph(
                 onBackPressed = { showReferAndEarn = false },
                 onNavigateToShop = {
                     showReferAndEarn = false
-                    coroutineScope.launch {
-                        pagerState.animateScrollToPage(2)
-                    }
+                    selectedTabIndex = 2
                 },
                 onNavigateToAddDevice = {
                     showReferAndEarn = false
@@ -1182,9 +1172,9 @@ fun HomeNavGraph(
                 pendingProductId = pendingProductId,
                 onProductConsumed = { pendingProductId = null },
                 profileRefreshTrigger = profileRefresh,
-                pagerState = pagerState,
+                selectedTabIndex = selectedTabIndex,
+                onTabSelected = { selectedTabIndex = it },
                 shopCategory = shopCategory,
-                coroutineScope = coroutineScope,
                 onNavigateToAddDevice = onNavigateToAddDevice,
                 onNavigateToDeviceReport = onNavigateToDeviceReport,
                 documentsGateState = documentsGateState,
@@ -1419,10 +1409,7 @@ fun HomeNavGraph(
     // ── Root back handler — composed LAST so it has highest LIFO priority.
     // Disabled when any overlay is open (overlay-specific handlers above take over).
     PlatformBackHandler(enabled = !isAnyOverlayOpen) {
-        when (pagerState.currentPage) {
-            0 -> showExitDialog = true
-            1, 2, 3 -> coroutineScope.launch { pagerState.animateScrollToPage(0) }
-        }
+        if (selectedTabIndex == 0) showExitDialog = true else selectedTabIndex = 0
     }
 }
 
@@ -1519,18 +1506,17 @@ fun LockedDocumentsPlaceholder(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeNavGraphContent(
     viewModel: HomeViewModel,
     apiService: ApiService,
     storageManager: StorageManager,
     token: String,
-    pendingProductId: Int? = null,           // ✅ ADD
-    onProductConsumed: () -> Unit = {},      // ✅ ADD
+    pendingProductId: Int? = null,
+    onProductConsumed: () -> Unit = {},
     profileRefreshTrigger: Int = 0,
-    pagerState: PagerState, // ✅ RECEIVE pagerState
-    coroutineScope: CoroutineScope, // ✅ RECEIVE coroutineScope
+    selectedTabIndex: Int,
+    onTabSelected: (Int) -> Unit,
     shopCategory: String?,
     onNavigateToAddDevice: () -> Unit,
     onNavigateToDeviceReport: () -> Unit,
@@ -1680,47 +1666,29 @@ fun HomeNavGraphContent(
     }
     val tabs = listOf(homeTab, documentsTab, ordersTab, profileTab)
 
-    // ✅ DON'T CREATE pagerState here - use the passed one
-
     Scaffold(
         containerColor = Color.White,
         bottomBar = {
             if (BottomBarController.visible) {
-//                CustomBottomNavBar(
-//                    tabs = tabs,
-//                    selectedIndex = pagerState.currentPage,
-//                    onTabSelected = { index ->
-//                        coroutineScope.launch {
-//                            pagerState.animateScrollToPage(index)
-//                        }
-//                    }
-//                )
                 CustomBottomNavBar(
                     tabs = tabs,
-                    selectedIndex = pagerState.currentPage,
+                    selectedIndex = selectedTabIndex,
                     onTabSelected = { index ->
-                        coroutineScope.launch {
-
-                            // ✅ DOCUMENTS TAB CLICK
-                            if (index == 1 && pagerState.currentPage != 1) {
-                                onDocumentsTabSelected()   // 🔐 LOCK + dialog trigger
-                            }
-
-                            pagerState.animateScrollToPage(index)
+                        if (index == 1 && selectedTabIndex != 1) {
+                            onDocumentsTabSelected()
                         }
+                        onTabSelected(index)
                     }
                 )
             }
         }
     ) { padding ->
-        HorizontalPager(
-            state = pagerState,
-            beyondViewportPageCount = 1,
+        Box(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-        ) { page ->
-            tabs[page].Content()
+        ) {
+            tabs[selectedTabIndex].Content()
         }
     }
 

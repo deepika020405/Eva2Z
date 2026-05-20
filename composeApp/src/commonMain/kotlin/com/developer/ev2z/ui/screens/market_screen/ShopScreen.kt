@@ -1,12 +1,18 @@
 package com.developer.ev2z.ui.screens.market_screen
 
-import androidx.compose.foundation.Image
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -18,12 +24,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -32,401 +41,706 @@ import com.developer.ev2z.ui.components.FloatingContactButton
 import com.developer.ev2z.util.Analytics
 import com.developer.ev2z.util.DeepLinkBus
 import eva2z_connect_multiplatform.composeapp.generated.resources.*
+import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.painterResource
 
-// ── Design Tokens — light green + white theme ─────────────────────
-internal val P_Green        = Color(0xFF6A9F50)   // light green primary
-internal val P_GreenLight   = Color(0xFF85B070)   // lighter green
-internal val P_GreenSurface = Color(0xFFF0F7EC)   // very light green tint
-internal val P_GreenBorder  = Color(0xFFD4E4CD)   // soft green border
-internal val P_Bg           = Color(0xFFF9FBF7)   // near-white with green hint
-internal val P_Card         = Color(0xFFFFFFFF)    // pure white
-internal val P_Dark         = Color(0xFF1C2418)    // dark text
-internal val P_Mid          = Color(0xFF5D6858)    // secondary text
-internal val P_Light        = Color(0xFFA0A99B)    // hint text
-internal val P_Border       = Color(0xFFECF0E8)    // light border
-internal val P_Red          = Color(0xFFE5565B)    // app Red
-internal val P_Gold         = Color(0xFFF4C44E)    // app Yellow
-
+// ── Design Tokens ────────────────────────────────────────────────
+internal val P_Green        = Color(0xFF10B981)
+internal val P_GreenDark    = Color(0xFF059669)
+internal val P_GreenLight   = Color(0xFF34D399)
+internal val P_GreenSurface = Color(0xFFECFDF5)
+internal val P_GreenBorder  = Color(0xFFD1FAE5)
+internal val P_Bg           = Color(0xFFF5F6F8)
+internal val P_Card         = Color(0xFFFFFFFF)
+internal val P_Dark         = Color(0xFF111827)
+internal val P_Mid          = Color(0xFF6B7280)
+internal val P_Light        = Color(0xFF9CA3AF)
+internal val P_Border       = Color(0xFFE5E7EB)
+internal val P_Red          = Color(0xFFEF4444)
+internal val P_Gold         = Color(0xFFF59E0B)
+internal val P_BannerBg     = Color(0xFF1F2937)
+internal val P_ChipBg       = Color(0xFFF3F4F6)
+internal val P_ImageBg      = Color(0xFFF9FAFB)
+internal val P_InfoBoxBg    = Color(0xFFEEF0F3)
 
 private fun getRatingCount(productId: Int): Int = when (productId) {
-    1 -> 128
-    2 -> 94
-    3 -> 213
-    4 -> 67
-    5 -> 156
-    6 -> 89
-    7 -> 174
-    8 -> 102
-    9 -> 231
-    10 -> 78
-    11 -> 143
-    else -> 50
+    1 -> 128; 2 -> 94; 3 -> 213; 4 -> 67; 5 -> 156
+    6 -> 89;  7 -> 174; 8 -> 102; 9 -> 231; 10 -> 78
+    11 -> 143; else -> 50
 }
 
 private fun getRating(productId: Int): Double = when (productId) {
-    1 -> 4.7
-    2 -> 4.5
-    3 -> 4.9
-    4 -> 4.3
-    5 -> 4.8
-    6 -> 4.4
-    7 -> 4.6
-    8 -> 4.2
-    9 -> 4.9
-    10 -> 4.5
-    11 -> 4.7
-    else -> 4.8
+    1 -> 4.7; 2 -> 4.5; 3 -> 4.9; 4 -> 4.3; 5 -> 4.8
+    6 -> 4.4; 7 -> 4.6; 8 -> 4.2; 9 -> 4.9; 10 -> 4.5
+    11 -> 4.7; else -> 4.8
 }
 
-// ── Shop Screen ───────────────────────────────────────────────────
+private fun getProductTagline(product: ShopProduct): String {
+    if (product.description.isNotBlank()) return product.description
+    val t = product.title.lowercase()
+    return when {
+        "wireless" in t || "wireless" in product.deviceType.lowercase() ->
+            "Battery-powered GPS with live tracking"
+        "wired" in t || "wired" in product.deviceType.lowercase() ->
+            "Hardwired GPS for permanent installation"
+        "roadside" in t -> "24x7 roadside assistance, Pan India"
+        "qr" in t       -> "Smart QR tag for recovery & alerts"
+        else            -> "Protect your vehicle, 24x7"
+    }
+}
+
+private val FEATURED_BADGES = listOf("BESTSELLER", "TOP RATED", "POPULAR", "NEW", "HOT")
+
+// ── Shop Screen ──────────────────────────────────────────────────
 @Composable
 fun ShopScreen(
     products: List<ShopProduct>,
     cartCount: Int,
     onBackClick: () -> Unit = {},
-    onToggleFavorite: (ShopProduct) -> Unit = {},
     onPlaceOrder: (ShopProduct) -> Unit = {},
+    onAddToCart: (ShopProduct) -> Unit = {},
     onCartClick: () -> Unit = {}
 ) {
+    var selectedCategory by remember { mutableStateOf("all") }
+    var showPlanDetails   by remember { mutableStateOf(false) }
+    var addedProduct      by remember { mutableStateOf<ShopProduct?>(null) }
+
+    LaunchedEffect(addedProduct) {
+        if (addedProduct != null) {
+            delay(3000)
+            addedProduct = null
+        }
+    }
+
+    val filtered = remember(products, selectedCategory) {
+        when (selectedCategory) {
+            "gps" -> products.filter {
+                val s = (it.subtitle + " " + it.deviceType + " " + it.title).lowercase()
+                "gps" in s || "wired" in s || "wireless" in s
+            }
+            "trackers" -> products.filter {
+                val s = (it.subtitle + " " + it.deviceType + " " + it.title).lowercase()
+                "tracker" in s
+            }
+            "qr" -> products.filter {
+                val s = (it.subtitle + " " + it.deviceType + " " + it.title).lowercase()
+                "qr" in s || "tag" in s
+            }
+            else -> products
+        }
+    }
+
+    val featured = filtered.take(5)
+
+    val proProduct = remember(products) {
+        products.firstOrNull { it.deviceType.lowercase().contains("wireless") }
+            ?: products.firstOrNull { it.title.lowercase().contains("pro") }
+            ?: products.firstOrNull()
+    }
+    val proPrice = proProduct?.price?.toInt() ?: 4200
+
     Box(modifier = Modifier.fillMaxSize().background(P_Bg)) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 90.dp)
+            contentPadding = PaddingValues(bottom = 100.dp)
         ) {
-            item { PremiumTopBar(cartCount, onCartClick) }
-            item { PremiumBanner() }
-            item { PremiumSectionHeader(products.size) }
-            items(products) { product ->
-                PremiumProductCard(
+            item { ShopTopBar(cartCount = cartCount, onCartClick = onCartClick) }
+
+            item {
+                Spacer(Modifier.height(4.dp))
+                CategoryChips(selected = selectedCategory, onSelect = { selectedCategory = it })
+                Spacer(Modifier.height(14.dp))
+            }
+
+            item { Spacer(Modifier.height(10.dp)) }
+
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text("⭐", fontSize = 16.sp)
+                    Text(
+                        "Featured", fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold, color = P_Dark
+                    )
+                }
+            }
+
+            if (featured.isNotEmpty()) {
+                item {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        itemsIndexed(featured) { i, product ->
+                            FeaturedCard(
+                                product = product,
+                                badge   = FEATURED_BADGES.getOrElse(i) { "FEATURED" },
+                                onClick = { onPlaceOrder(product) },
+                                onAdd   = {
+                                    onAddToCart(product)
+                                    addedProduct = product
+                                }
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(22.dp))
+                }
+            }
+
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp)
+                        .padding(bottom = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment     = Alignment.Bottom
+                ) {
+                    Text(
+                        "All Products", fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold, color = P_Dark
+                    )
+                    Text("${filtered.size} items", fontSize = 12.sp, color = P_Mid)
+                }
+            }
+
+            items(filtered) { product ->
+                ListProductCard(
                     product = product,
-                    onToggleFavorite = { onToggleFavorite(product) },
-                    onPlaceOrder = { onPlaceOrder(product) }
+                    onClick = { onPlaceOrder(product) },
+                    onAdd   = {
+                        onAddToCart(product)
+                        addedProduct = product
+                    }
                 )
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(12.dp))
+            }
+        }
+
+        // ── Added-to-cart confirmation bar ───────────────────────
+        AnimatedVisibility(
+            visible  = addedProduct != null,
+            enter    = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+            exit     = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 90.dp)
+        ) {
+            addedProduct?.let { p ->
+                AddedToCartBar(
+                    product    = p,
+                    onViewCart = { addedProduct = null; onCartClick() },
+                    onDismiss  = { addedProduct = null }
+                )
             }
         }
 
         FloatingContactButton(
             phoneNumber = "919755273822",
-            modifier = Modifier
+            modifier    = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = 80.dp)
+                .padding(end = 16.dp, bottom = 16.dp)
         )
 
-        PremiumCartBar(count = cartCount, onClick = onCartClick,
-            modifier = Modifier.align(Alignment.BottomCenter))
-    }
-}
-
-// ── Top Bar ────────────────────────────────────────────────────────
-@Composable
-private fun PremiumTopBar(cartCount: Int, onCartClick: () -> Unit) {
-    Surface(color = P_Card, shadowElevation = 0.dp) {
-        Column {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .statusBarsPadding()
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Logo
-                Box(
-                    modifier = Modifier
-                        .size(42.dp)
-                        .clip(RoundedCornerShape(13.dp))
-                        .background(
-                            Brush.linearGradient(listOf(P_Green, P_GreenLight))
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("E", color = Color.White,
-                        fontWeight = FontWeight.Black, fontSize = 20.sp)
+        if (showPlanDetails) {
+            PlanDetailsBottomSheet(
+                price      = proPrice,
+                onDismiss  = { showPlanDetails = false },
+                onGetGpsPro = {
+                    showPlanDetails = false
+                    Analytics.logEvent("select_promotion", mapOf(
+                        "promotion_id"   to "gps_pro_1yr_plan",
+                        "promotion_name" to "GPS + 1 Year Plan Free"
+                    ))
+                    proProduct?.let(onPlaceOrder)
                 }
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("EVA2Z Store",
-                        fontSize = 17.sp, fontWeight = FontWeight.Bold, color = P_Dark)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        repeat(5) { Text("★", fontSize = 10.sp, color = P_Gold) }
-                        Spacer(Modifier.width(4.dp))
-                        Text("4.8  ·  Trusted by 10K+",
-                            fontSize = 11.sp, color = P_Light)
-                    }
-                }
-                // Cart
-                Box {
-                    IconButton(
-                        onClick = onCartClick,
-                        modifier = Modifier.size(42.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(P_Bg)
-                    ) {
-                        Icon(Icons.Outlined.ShoppingBag, null,
-                            tint = P_Dark, modifier = Modifier.size(22.dp))
-                    }
-                    if (cartCount > 0) {
-                        Box(
-                            modifier = Modifier
-                                .size(17.dp).clip(CircleShape)
-                                .background(P_Red)
-                                .align(Alignment.TopEnd)
-                                .offset(x = 2.dp, y = (-2).dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(cartCount.toString(),
-                                fontSize = 9.sp, fontWeight = FontWeight.Black, color = Color.White)
-                        }
-                    }
-                }
-            }
-            HorizontalDivider(color = P_Border, thickness = 0.5.dp)
+            )
         }
     }
 }
 
-// ── Banner ─────────────────────────────────────────────────────────
+// ── Added to Cart Bar ────────────────────────────────────────────
 @Composable
-private fun PremiumBanner() {
+private fun AddedToCartBar(
+    product: ShopProduct,
+    onViewCart: () -> Unit,
+    onDismiss: () -> Unit
+) {
     Card(
-        modifier = Modifier
+        shape     = RoundedCornerShape(16.dp),
+        colors    = CardDefaults.cardColors(containerColor = P_GreenSurface),
+        elevation = CardDefaults.cardElevation(6.dp),
+        modifier  = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 18.dp)
-            .height(160.dp),
-        shape = RoundedCornerShape(18.dp),
-        elevation = CardDefaults.cardElevation(3.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+            .border(1.dp, P_GreenBorder, RoundedCornerShape(16.dp))
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(Color(0xFF5A8F42), P_Green, P_GreenLight),
-                        start = androidx.compose.ui.geometry.Offset(0f, 0f),
-                        end = androidx.compose.ui.geometry.Offset(800f, 400f)
-                    )
-                )
+        Row(
+            modifier          = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 11.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Decorative rings
             Box(
-                Modifier.size(100.dp).offset(x = 250.dp, y = (-15).dp)
-                    .border(2.dp, Color.White.copy(alpha = 0.08f), CircleShape)
-            )
-            Box(
-                Modifier.size(60.dp).offset(x = 270.dp, y = 90.dp)
-                    .background(Color.White.copy(alpha = 0.05f), CircleShape)
-            )
-
-            Row(
-                modifier = Modifier.fillMaxSize()
-                    .padding(horizontal = 22.dp, vertical = 20.dp),
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(P_Green),
+                contentAlignment = Alignment.Center
             ) {
-                Column(modifier = Modifier.weight(1f)) {
+                Icon(
+                    Icons.Default.Check, null,
+                    tint     = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Spacer(Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Added to cart!",
+                    fontSize   = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color      = P_GreenDark
+                )
+                Spacer(Modifier.height(1.dp))
+                Text(
+                    product.title,
+                    fontSize  = 11.sp,
+                    color     = P_Mid,
+                    maxLines  = 1,
+                    overflow  = TextOverflow.Ellipsis
+                )
+            }
+
+            Spacer(Modifier.width(10.dp))
+
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(P_Green)
+                    .clickable { onViewCart() }
+                    .padding(horizontal = 14.dp, vertical = 9.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    verticalAlignment     = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(
+                        "View Cart",
+                        fontSize   = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color      = Color.White
+                    )
+                    Icon(
+                        Icons.Default.ArrowForward, null,
+                        tint     = Color.White,
+                        modifier = Modifier.size(12.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ── Top Bar ──────────────────────────────────────────────────────
+@Composable
+private fun ShopTopBar(cartCount: Int, onCartClick: () -> Unit) {
+    Surface(color = P_Bg, shadowElevation = 0.dp) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Shop", fontSize = 26.sp,
+                    fontWeight = FontWeight.Black, color = P_Dark
+                )
+                Text(
+                    "Protect every vehicle you own",
+                    fontSize = 12.sp, color = P_Mid
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .size(40.dp).clip(CircleShape).background(P_ChipBg)
+                    .clickable { /* TODO open search */ },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Search, null, tint = P_Dark, modifier = Modifier.size(20.dp))
+            }
+            Spacer(Modifier.width(10.dp))
+            Box {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp).clip(CircleShape).background(P_ChipBg)
+                        .clickable { onCartClick() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Outlined.ShoppingCart, null,
+                        tint = P_Dark, modifier = Modifier.size(20.dp)
+                    )
+                }
+                if (cartCount > 0) {
                     Box(
                         modifier = Modifier
-                            .background(Color.White.copy(alpha = 0.18f), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                            .size(17.dp).clip(CircleShape).background(P_Red)
+                            .border(1.5.dp, P_Bg, CircleShape)
+                            .align(Alignment.TopEnd).offset(x = 3.dp, y = (-3).dp),
+                        contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            "INDIA'S #1 GPS",
-                            fontSize = 8.5.sp, fontWeight = FontWeight.ExtraBold,
-                            color = Color.White, letterSpacing = 1.2.sp
+                            cartCount.toString(), fontSize = 9.sp,
+                            fontWeight = FontWeight.Black, color = Color.White
                         )
                     }
-                    Spacer(Modifier.height(10.dp))
+                }
+            }
+        }
+    }
+}
+
+// ── Category Chips ───────────────────────────────────────────────
+@Composable
+private fun CategoryChips(selected: String, onSelect: (String) -> Unit) {
+    data class Chip(val id: String, val label: String, val emoji: String)
+    val chips = listOf(
+        Chip("all",      "All",        "🛒"),
+        Chip("gps",      "GPS Devices","📡"),
+        Chip("trackers", "Trackers",   "🎯"),
+        Chip("qr",       "QR Tags",    "🏷️")
+    )
+    LazyRow(
+        contentPadding          = PaddingValues(horizontal = 20.dp),
+        horizontalArrangement   = Arrangement.spacedBy(10.dp)
+    ) {
+        items(chips) { chip ->
+            val isSel = chip.id == selected
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(if (isSel) P_Green else P_Card)
+                    .border(1.dp, if (isSel) P_Green else P_Border, RoundedCornerShape(22.dp))
+                    .clickable { onSelect(chip.id) }
+                    .padding(horizontal = 14.dp, vertical = 9.dp),
+                verticalAlignment     = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Text(chip.emoji, fontSize = 14.sp)
+                Text(
+                    chip.label, fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color      = if (isSel) Color.White else P_Dark
+                )
+            }
+        }
+    }
+}
+
+// ── Dark Promo Banner ────────────────────────────────────────────
+@Composable
+private fun DarkPromoBanner(onPlanDetails: () -> Unit, onGetGpsPro: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+        shape    = RoundedCornerShape(18.dp),
+        colors   = CardDefaults.cardColors(containerColor = P_BannerBg),
+        elevation = CardDefaults.cardElevation(0.dp)
+    ) {
+        Row(
+            modifier          = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(64.dp).clip(RoundedCornerShape(14.dp))
+                    .background(Color.White.copy(alpha = 0.08f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.SettingsInputAntenna, null,
+                    tint = Color.White, modifier = Modifier.size(32.dp)
+                )
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "GPS + 1 Year Plan Free", fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold, color = Color.White
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "Save ₹2,000 on Eva2z GPS Pro this month",
+                    fontSize = 11.sp, color = Color.White.copy(alpha = 0.65f),
+                    lineHeight = 15.sp
+                )
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .border(1.dp, Color.White.copy(alpha = 0.35f), RoundedCornerShape(20.dp))
+                            .clickable { onPlanDetails() }
+                            .padding(horizontal = 12.dp, vertical = 7.dp)
+                    ) {
+                        Text(
+                            "Plan details", fontSize = 11.sp,
+                            color = Color.White, fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(P_Green)
+                            .clickable { onGetGpsPro() }
+                            .padding(horizontal = 12.dp, vertical = 7.dp),
+                        verticalAlignment     = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            "Get GPS Pro", fontSize = 11.sp,
+                            color = Color.White, fontWeight = FontWeight.SemiBold
+                        )
+                        Icon(
+                            Icons.Default.ArrowForward, null,
+                            tint = Color.White, modifier = Modifier.size(12.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ── Plan Details Bottom Sheet ────────────────────────────────────
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PlanDetailsBottomSheet(price: Int, onDismiss: () -> Unit, onGetGpsPro: () -> Unit) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState       = sheetState,
+        containerColor   = P_Bg,
+        dragHandle       = null,
+        shape            = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(top = 18.dp)
+        ) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                     Text(
-                        "Track Smarter.\nDrive Safer.",
-                        fontSize = 20.sp, fontWeight = FontWeight.ExtraBold,
-                        color = Color.White, lineHeight = 26.sp
+                        "1 Year Plan — what's included",
+                        fontSize = 17.sp, fontWeight = FontWeight.Bold,
+                        color = P_Dark, lineHeight = 22.sp
                     )
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        "Trusted by 10,000+ users",
-                        fontSize = 11.sp, color = Color.White.copy(alpha = 0.75f)
+                        "Eva2z GPS Pro device + 12 months of premium tracking, geofencing & alerts. Worth ₹2,000, free this month.",
+                        fontSize = 12.sp, color = P_Mid, lineHeight = 17.sp
                     )
                 }
                 Box(
-                    modifier = Modifier.size(56.dp)
-                        .background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(16.dp)),
+                    modifier = Modifier
+                        .size(30.dp).clip(CircleShape)
+                        .border(1.dp, P_Border, CircleShape)
+                        .background(P_Card)
+                        .clickable { onDismiss() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        Icons.Default.GpsFixed, null,
-                        tint = Color.White, modifier = Modifier.size(28.dp)
-                    )
+                    Icon(Icons.Default.Close, null, tint = P_Mid, modifier = Modifier.size(15.dp))
                 }
             }
+
+            Spacer(Modifier.height(18.dp))
+            FeatureRow(Icons.Default.LocationOn, "Live GPS tracking",
+                "Real-time location refreshed every 10 seconds, with full trip history for 90 days.")
+            Spacer(Modifier.height(10.dp))
+            FeatureRow(Icons.Default.Shield, "Geofencing",
+                "Draw safe zones on the map. Get instant alerts when your vehicle enters or exits.")
+            Spacer(Modifier.height(10.dp))
+            FeatureRow(Icons.Default.Notifications, "Smart alerts",
+                "Tow detection, ignition on/off, harsh braking, overspeed, and SOS alerts.")
+            Spacer(Modifier.height(10.dp))
+            FeatureRow(Icons.Default.Build, "Engine immobilise",
+                "Remotely cut fuel pump in case of theft, straight from the app.")
+
+            Spacer(Modifier.height(16.dp))
+
+            InfoBlock(title = "How geofencing works") {
+                NumberedStep(num = 1, text = buildAnnotatedString {
+                    append("Open ")
+                    withStyle(SpanStyle(fontWeight = FontWeight.SemiBold, color = P_Dark)) {
+                        append("Track → Geofences")
+                    }
+                    append(" and drop a pin.")
+                })
+                NumberedStep(num = 2, text = buildAnnotatedString {
+                    append("Set a radius (50m – 5km) and choose entry/exit alerts.")
+                })
+                NumberedStep(num = 3, text = buildAnnotatedString {
+                    append("Phone gets a push notification within ~10s of crossing the boundary.")
+                })
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            InfoBlock(title = "How live GPS works") {
+                Text(
+                    "The wired GPS Pro device installs under your dashboard and sends a location ping every 10 seconds while moving and every 5 minutes when parked.",
+                    fontSize = 12.sp, color = P_Mid, lineHeight = 17.sp
+                )
+            }
+
+            Spacer(Modifier.height(20.dp))
+
+            Button(
+                onClick   = onGetGpsPro,
+                modifier  = Modifier.fillMaxWidth().height(52.dp),
+                shape     = RoundedCornerShape(14.dp),
+                colors    = ButtonDefaults.buttonColors(containerColor = P_Green),
+                elevation = ButtonDefaults.buttonElevation(0.dp)
+            ) {
+                Icon(Icons.Default.Check, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Get GPS Pro — ₹$price", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            }
+
+            Spacer(Modifier.height(4.dp))
+            TextButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth().height(46.dp)) {
+                Text("Maybe later", color = P_Mid, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            }
+            Spacer(Modifier.navigationBarsPadding())
         }
     }
 }
 
-// ── Section Header ─────────────────────────────────────────────────
 @Composable
-private fun PremiumSectionHeader(count: Int) {
+private fun FeatureRow(icon: ImageVector, title: String, desc: String) {
     Row(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .padding(bottom = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+            .fillMaxWidth().clip(RoundedCornerShape(14.dp))
+            .background(P_Card).padding(14.dp),
+        verticalAlignment = Alignment.Top
     ) {
-        Column {
-            Text("All Products",
-                fontSize = 20.sp, fontWeight = FontWeight.Bold, color = P_Dark)
-            Text("$count items available",
-                fontSize = 13.sp, color = P_Light)
-        }
         Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .border(1.dp, P_Border, RoundedCornerShape(8.dp))
-                .padding(horizontal = 12.dp, vertical = 7.dp)
+            modifier = Modifier.size(36.dp).clip(CircleShape).background(P_GreenSurface),
+            contentAlignment = Alignment.Center
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Icon(Icons.Default.FilterList, null,
-                    tint = P_Mid, modifier = Modifier.size(14.dp))
-                Text("Filter", fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium, color = P_Mid)
-            }
+            Icon(icon, null, tint = P_Green, modifier = Modifier.size(18.dp))
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = P_Dark)
+            Spacer(Modifier.height(3.dp))
+            Text(desc, fontSize = 12.sp, color = P_Mid, lineHeight = 17.sp)
         }
     }
 }
 
-// ── Premium Product Card ───────────────────────────────────────────
 @Composable
-private fun PremiumProductCard(
-    product: ShopProduct,
-    onToggleFavorite: () -> Unit,
-    onPlaceOrder: () -> Unit
-) {
+private fun InfoBlock(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth().clip(RoundedCornerShape(12.dp))
+            .background(P_InfoBoxBg).padding(14.dp)
+    ) {
+        Text(title, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = P_Dark)
+        Spacer(Modifier.height(8.dp))
+        content()
+    }
+}
+
+@Composable
+private fun NumberedStep(num: Int, text: androidx.compose.ui.text.AnnotatedString) {
+    Row(modifier = Modifier.padding(vertical = 2.dp), verticalAlignment = Alignment.Top) {
+        Text("$num. ", fontSize = 12.sp, color = P_Mid, fontWeight = FontWeight.SemiBold, lineHeight = 17.sp)
+        Text(text = text, fontSize = 12.sp, color = P_Mid, lineHeight = 17.sp)
+    }
+}
+
+// ── Featured Card ────────────────────────────────────────────────
+@Composable
+private fun FeaturedCard(product: ShopProduct, badge: String, onClick: () -> Unit, onAdd: () -> Unit) {
     val fakeOld = (product.price * 1.5).toInt()
-    val disc = (((fakeOld - product.price) / fakeOld) * 100).toInt()
 
     Card(
         modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .shadow(6.dp, RoundedCornerShape(16.dp), ambientColor = Color(0x14000000))
-            .clickable { onPlaceOrder() },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = P_Card),
+            .width(178.dp)
+            .clickable { onClick() }
+            .shadow(3.dp, RoundedCornerShape(16.dp), ambientColor = Color(0x10000000)),
+        shape     = RoundedCornerShape(16.dp),
+        colors    = CardDefaults.cardColors(containerColor = P_Card),
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Column {
-            // Image area
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(180.dp)
-                    .background(Color(0xFFF9FAFB))
-            ) {
+            Box(modifier = Modifier.fillMaxWidth().height(128.dp).background(P_ImageBg)) {
                 AsyncImage(
-                    model = product.imageUrl,
+                    model              = product.imageUrl,
                     contentDescription = null,
-                    modifier = Modifier.fillMaxSize().padding(20.dp),
-                    contentScale = ContentScale.Fit,
-                    placeholder = painterResource(Res.drawable.app_logo),
-                    error = painterResource(Res.drawable.app_logo)
+                    modifier           = Modifier.fillMaxSize().padding(14.dp),
+                    contentScale       = ContentScale.Fit,
+                    placeholder        = painterResource(Res.drawable.app_logo),
+                    error              = painterResource(Res.drawable.app_logo)
                 )
-                // Discount tag
                 Box(
                     modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(12.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(P_Red)
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                        .align(Alignment.TopStart).padding(10.dp)
+                        .clip(RoundedCornerShape(4.dp)).background(P_Green)
+                        .padding(horizontal = 7.dp, vertical = 3.dp)
                 ) {
-                    Text("$disc% OFF", fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold, color = Color.White)
-                }
-                // Fav button
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(12.dp)
-                        .size(34.dp)
-                        .clip(CircleShape)
-                        .background(Color.White)
-                        .shadow(2.dp, CircleShape)
-                        .clickable { onToggleFavorite() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        if (product.isFavorite) Icons.Default.Favorite
-                        else Icons.Default.FavoriteBorder,
-                        null,
-                        tint = if (product.isFavorite) P_Red else P_Light,
-                        modifier = Modifier.size(16.dp)
+                    Text(
+                        badge, fontSize = 8.sp, fontWeight = FontWeight.Black,
+                        color = Color.White, letterSpacing = 0.6.sp
                     )
                 }
             }
-
-            // Info area
-            Column(modifier = Modifier.padding(16.dp)) {
-                // Subtitle chip
-                if (product.subtitle.isNotBlank()) {
-                    Text(
-                        product.subtitle.uppercase(),
-                        fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
-                        color = P_Green, letterSpacing = 0.8.sp
-                    )
-                    Spacer(Modifier.height(4.dp))
-                }
-
+            Column(modifier = Modifier.padding(12.dp)) {
                 Text(
-                    product.title,
-                    fontSize = 16.sp, fontWeight = FontWeight.Bold,
-                    color = P_Dark, maxLines = 2, overflow = TextOverflow.Ellipsis,
-                    lineHeight = 22.sp
+                    product.title, fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold, color = P_Dark,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    lineHeight = 17.sp, modifier = Modifier.height(34.dp)
                 )
-
-                Spacer(Modifier.height(10.dp))
-
-                // Rating
+                Spacer(Modifier.height(6.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    repeat(5) {
-                        Icon(Icons.Default.Star, null,
-                            tint = P_Gold, modifier = Modifier.size(13.dp))
-                    }
-                    Spacer(Modifier.width(6.dp))
-                    Text("${product.rating}",
-                        fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = P_Mid)
-                    Text("  (${product.ratingCount})",
-                        fontSize = 12.sp, color = P_Light)
+                    Icon(Icons.Default.Star, null, tint = P_Gold, modifier = Modifier.size(12.dp))
+                    Spacer(Modifier.width(3.dp))
+                    Text("${product.rating}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = P_Dark)
+                    Text(" · ${product.ratingCount}", fontSize = 11.sp, color = P_Light)
                 }
-
-                Spacer(Modifier.height(12.dp))
-                HorizontalDivider(color = P_Border, thickness = 0.5.dp)
-                Spacer(Modifier.height(12.dp))
-
-                // Price + CTA row
+                Spacer(Modifier.height(8.dp))
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier              = Modifier.fillMaxWidth(),
+                    verticalAlignment     = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column {
-                        Text("₹${product.price.toInt()}",
-                            fontSize = 22.sp, fontWeight = FontWeight.Black, color = P_Dark)
-                        Text("₹$fakeOld",
-                            fontSize = 13.sp, color = P_Light,
-                            textDecoration = TextDecoration.LineThrough)
+                        Text("₹${product.price.toInt()}", fontSize = 15.sp, fontWeight = FontWeight.Black, color = P_Dark)
+                        Text("₹$fakeOld", fontSize = 10.sp, color = P_Light, textDecoration = TextDecoration.LineThrough)
                     }
-                    Button(
-                        onClick = onPlaceOrder,
-                        shape = RoundedCornerShape(10.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = P_Green),
-                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
-                        elevation = ButtonDefaults.buttonElevation(0.dp)
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp).clip(CircleShape).background(P_Green)
+                            .clickable { onAdd() }
+                            .shadow(2.dp, CircleShape, ambientColor = P_Green.copy(alpha = 0.4f)),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text("View Details",
-                            fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        Icon(Icons.Default.Add, null, tint = Color.White, modifier = Modifier.size(20.dp))
                     }
                 }
             }
@@ -434,130 +748,147 @@ private fun PremiumProductCard(
     }
 }
 
-// ── Cart Bar ───────────────────────────────────────────────────────
+// ── List Product Card ────────────────────────────────────────────
 @Composable
-private fun PremiumCartBar(count: Int, onClick: () -> Unit, modifier: Modifier) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = P_Card,
-        shadowElevation = 8.dp,
-        tonalElevation = 0.dp
+private fun ListProductCard(product: ShopProduct, onClick: () -> Unit, onAdd: () -> Unit) {
+    val fakeOld = (product.price * 1.5).toInt()
+    val disc    = if (fakeOld > 0) (((fakeOld - product.price) / fakeOld) * 100).toInt() else 0
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth().padding(horizontal = 20.dp)
+            .shadow(3.dp, RoundedCornerShape(16.dp), ambientColor = Color(0x10000000))
+            .clickable { onClick() },
+        shape     = RoundedCornerShape(16.dp),
+        colors    = CardDefaults.cardColors(containerColor = P_Card),
+        elevation = CardDefaults.cardElevation(0.dp)
     ) {
-        // ✅ navigationBarsPadding() hatao — bottom nav khud handle karta hai
-        Button(
-            onClick = onClick,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 8.dp)
-                .height(46.dp),
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = P_Green),
-            elevation = ButtonDefaults.buttonElevation(0.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(88.dp).clip(RoundedCornerShape(12.dp)).background(P_ImageBg)
             ) {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.ShoppingCart, null,
-                        modifier = Modifier.size(17.dp))
-                    Text("View Cart", fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold)
+                AsyncImage(
+                    model              = product.imageUrl,
+                    contentDescription = null,
+                    modifier           = Modifier.fillMaxSize().padding(10.dp),
+                    contentScale       = ContentScale.Fit,
+                    placeholder        = painterResource(Res.drawable.app_logo),
+                    error              = painterResource(Res.drawable.app_logo)
+                )
+                if (disc > 0) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart).padding(5.dp)
+                            .clip(RoundedCornerShape(5.dp)).background(P_Red)
+                            .padding(horizontal = 5.dp, vertical = 2.dp)
+                    ) {
+                        Text("$disc% OFF", fontSize = 8.sp, fontWeight = FontWeight.Black, color = Color.White)
+                    }
                 }
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color.White.copy(alpha = 0.2f))
-                        .padding(horizontal = 8.dp, vertical = 3.dp)
-                ) {
-                    Text("$count items", fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium, color = Color.White)
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    product.title, fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                    color = P_Dark, maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(3.dp))
+                Text(
+                    getProductTagline(product), fontSize = 11.sp,
+                    color = P_Mid, maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+                Spacer(Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Star, null, tint = P_Gold, modifier = Modifier.size(11.dp))
+                    Spacer(Modifier.width(3.dp))
+                    Text("${product.rating}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = P_Dark)
+                    Text("  (${product.ratingCount})", fontSize = 11.sp, color = P_Light)
                 }
+                Spacer(Modifier.height(5.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("₹${product.price.toInt()}", fontSize = 15.sp, fontWeight = FontWeight.Black, color = P_Dark)
+                    Spacer(Modifier.width(6.dp))
+                    Text("₹$fakeOld", fontSize = 11.sp, color = P_Light, textDecoration = TextDecoration.LineThrough)
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(22.dp)).background(P_Green)
+                    .clickable { onAdd() }
+                    .padding(horizontal = 14.dp, vertical = 9.dp)
+            ) {
+                Text("Add", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
             }
         }
     }
 }
 
-// ── ShopScreenHost — Logic unchanged ──────────────────────────────
+// ── ShopScreenHost ───────────────────────────────────────────────
 @Composable
 fun ShopScreenHost(category: String? = null) {
     val viewModel = ShopViewModelProvider.viewModel
-    val state by viewModel.state.collectAsState()
+    val state     by viewModel.state.collectAsState()
     val navigator = LocalNavigator.current
-    val deepLinkDestination by DeepLinkBus.navigateTo.collectAsState(initial = "") // ✅ ADD
+    val deepLinkDestination by DeepLinkBus.navigateTo.collectAsState(initial = "")
 
     val filteredProducts = state.products.filter { dto ->
         when (category) {
-            "wired" -> dto.device_type?.lowercase() == "wired"
+            "wired"    -> dto.device_type?.lowercase() == "wired"
             "wireless" -> dto.device_type?.lowercase() == "wireless"
-            else -> true
+            else       -> true
         }
     }
 
     LaunchedEffect(Unit) {
         Analytics.logEvent("screen_view", mapOf(
-            "screen_name" to "shop_screen", "screen_class" to "ShopScreen",
-            "item_category" to "iot_devices", "source" to "home_or_menu"))
+            "screen_name"    to "shop_screen",
+            "screen_class"   to "ShopScreen",
+            "item_category"  to "iot_devices",
+            "source"         to "home_or_menu"
+        ))
         viewModel.loadData()
     }
 
-    // ✅ Product deeplink handle
     LaunchedEffect(deepLinkDestination, state.products) {
         val dest = deepLinkDestination ?: return@LaunchedEffect
 
-        // ✅ Dono prefix handle karo
-        if (!dest.startsWith("open_product_") && !dest.startsWith("product_detail_")) return@LaunchedEffect
+        if (!dest.startsWith("open_product_") && !dest.startsWith("product_detail_"))
+            return@LaunchedEffect
 
-        // ✅ Dono se pid nikalo
         val pid = when {
-            dest.startsWith("open_product_") -> dest.removePrefix("open_product_")
+            dest.startsWith("open_product_")   -> dest.removePrefix("open_product_")
                 .substringBefore("_").toIntOrNull()
             dest.startsWith("product_detail_") -> dest.removePrefix("product_detail_")
                 .substringBefore("_").toIntOrNull()
             else -> null
         } ?: return@LaunchedEffect
 
-        if (state.products.isEmpty()) {
-            viewModel.loadData()
-            return@LaunchedEffect
-        }
+        if (state.products.isEmpty()) { viewModel.loadData(); return@LaunchedEffect }
 
         val dto = state.products.firstOrNull { it.id == pid } ?: return@LaunchedEffect
-
         val product = ShopProduct(
-            id = dto.id, title = dto.name ?: "",
-            subtitle = dto.device_type ?: "",
+            id = dto.id, title = dto.name ?: "", subtitle = dto.device_type ?: "",
             price = dto.sale_price?.toDoubleOrNull() ?: 0.0,
             rechargePrice = dto.recharge_price?.toDoubleOrNull() ?: 0.0,
             promoAmount = dto.promo_amt?.toDoubleOrNull() ?: 0.0,
-            promoCode = dto.promo_code ?: "",
-            imageUrl = dto.image ?: "",
+            promoCode = dto.promo_code ?: "", imageUrl = dto.image ?: "",
             description = dto.description ?: "",
-            features = listOfNotNull(
-                dto.features1, dto.features2, dto.features3,
-                dto.features4, dto.features5, dto.features6, dto.features7
-            ),
+            features = listOfNotNull(dto.features1, dto.features2, dto.features3,
+                dto.features4, dto.features5, dto.features6, dto.features7),
             deviceType = dto.device_type ?: "",
             rating = getRating(dto.id), ratingCount = getRatingCount(dto.id),
             isFavorite = viewModel.isFavorite(dto.id)
         )
-
         DeepLinkBus.clear()
-
         navigator?.push(
-            ProductDetailsScreen(
-                product = product,
-                onToggleFavorite = { p -> viewModel.toggleWishlist(p.id) }
-            )
+            ProductDetailsScreen(product = product, onToggleFavorite = { p -> viewModel.toggleWishlist(p.id) })
         )
     }
 
     if (state.loading) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.fillMaxSize().background(P_Bg), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(color = P_Green, strokeWidth = 2.dp)
         }
         return
@@ -566,974 +897,89 @@ fun ShopScreenHost(category: String? = null) {
     LaunchedEffect(state.products) {
         if (state.products.isNotEmpty()) {
             Analytics.logEvent("view_item_list", mapOf(
-                "item_list_id" to "shop_device_list",
+                "item_list_id"   to "shop_device_list",
                 "item_list_name" to "Location Tracker Device",
-                "currency" to "INR",
-                "items" to state.products.mapIndexed { index, p ->
+                "currency"       to "INR",
+                "items"          to state.products.mapIndexed { index, p ->
                     mapOf("item_id" to p.id.toString(), "item_name" to (p.name ?: ""),
                         "item_brand" to "EVA2Z", "item_category" to "iot_devices",
                         "item_variant" to (p.device_type ?: ""),
                         "price" to (p.sale_price?.toDoubleOrNull() ?: 0.0),
                         "index" to index).toString()
-                }))
+                }
+            ))
         }
     }
 
+    val mappedProducts = filteredProducts.map { dto ->
+        ShopProduct(
+            id = dto.id, title = dto.name ?: "", subtitle = dto.device_type ?: "",
+            price = dto.sale_price?.toDoubleOrNull() ?: 0.0,
+            rechargePrice = dto.recharge_price?.toDoubleOrNull() ?: 0.0,
+            promoAmount = dto.promo_amt?.toDoubleOrNull() ?: 0.0,
+            promoCode = dto.promo_code ?: "", imageUrl = dto.image ?: "",
+            description = dto.description ?: "",
+            features = listOfNotNull(dto.features1, dto.features2, dto.features3,
+                dto.features4, dto.features5, dto.features6, dto.features7),
+            deviceType = dto.device_type ?: "", rating = getRating(dto.id),
+            ratingCount = getRatingCount(dto.id), isFavorite = viewModel.isFavorite(dto.id)
+        )
+    }
+
     ShopScreen(
-        products = filteredProducts.map { dto ->
-            ShopProduct(
-                id = dto.id, title = dto.name ?: "", subtitle = dto.device_type ?: "",
-                price = dto.sale_price?.toDoubleOrNull() ?: 0.0,
-                rechargePrice = dto.recharge_price?.toDoubleOrNull() ?: 0.0,
-                promoAmount = dto.promo_amt?.toDoubleOrNull() ?: 0.0,
-                promoCode = dto.promo_code ?: "", imageUrl = dto.image ?: "",
-                description = dto.description ?: "",
-                features = listOfNotNull(dto.features1, dto.features2, dto.features3,
-                    dto.features4, dto.features5, dto.features6, dto.features7),
-                deviceType = dto.device_type ?: "", rating = getRating(dto.id), ratingCount = getRatingCount(dto.id),
-                isFavorite = viewModel.isFavorite(dto.id))
-        },
-        cartCount = state.cartCount,
-        onToggleFavorite = { p ->
-            viewModel.toggleWishlist(p.id.toInt())
-            Analytics.logEvent("add_to_wishlist", mapOf("currency" to "INR",
-                "items" to listOf(mapOf("item_id" to p.id.toString(),
-                    "item_name" to p.title, "item_brand" to "EVA2Z",
-                    "item_category" to "iot_devices", "item_variant" to p.subtitle,
-                    "price" to p.price))))
-        },
+        products   = mappedProducts,
+        cartCount  = state.cartCount,
         onCartClick = { navigator?.push(CartScreen()) },
+        onAddToCart = { product ->
+            viewModel.addToCart(
+                add         = "add",
+                productId   = product.id,
+                quantity    = 1,
+                plan_type   = "",
+                device_type = "",
+                onSuccess   = {
+                    Analytics.logEvent("add_to_cart", mapOf(
+                        "currency"  to "INR",
+                        "value"     to product.price,
+                        "item_id"   to product.id,
+                        "item_name" to product.title,
+                        "source"    to "shop_listing"
+                    ))
+                }
+            )
+        },
         onPlaceOrder = { product ->
-            navigator?.push(ProductDetailsScreen(product = product,
-                onToggleFavorite = { p ->
-                    viewModel.toggleWishlist(p.id)
-                    Analytics.logEvent("add_to_wishlist", mapOf("currency" to "INR",
-                        "items" to listOf(mapOf("item_id" to p.id.toString(),
-                            "item_name" to p.title, "item_brand" to "EVA2Z",
-                            "item_category" to "iot_devices",
-                            "item_variant" to p.subtitle, "price" to p.price))))
-                }))
+            navigator?.push(
+                ProductDetailsScreen(
+                    product          = product,
+                    onToggleFavorite = { p ->
+                        viewModel.toggleWishlist(p.id)
+                        Analytics.logEvent("add_to_wishlist", mapOf(
+                            "currency" to "INR",
+                            "items"    to listOf(mapOf(
+                                "item_id"       to p.id.toString(),
+                                "item_name"     to p.title,
+                                "item_brand"    to "EVA2Z",
+                                "item_category" to "iot_devices",
+                                "item_variant"  to p.subtitle,
+                                "price"         to p.price
+                            ))
+                        ))
+                    }
+                )
+            )
         }
     )
 }
 
-// Aliases for other screens in market_screen folder
-internal val ShopGreen = P_Green
-internal val ShopGreenDark = P_Green
-internal val ShopGreenSoft = P_GreenSurface
-internal val ShopGreenMid = P_GreenBorder
-internal val ShopBg = P_Bg
-internal val ShopCard = P_Card
+// ── Aliases used by other screens in this package ────────────────
+internal val ShopGreen       = P_Green
+internal val ShopGreenDark   = P_GreenDark
+internal val ShopGreenSoft   = P_GreenSurface
+internal val ShopGreenMid    = P_GreenBorder
+internal val ShopBg          = P_Bg
+internal val ShopCard        = P_Card
 internal val ShopTextPrimary = P_Dark
-internal val ShopTextSec = P_Mid
-internal val ShopTextTert = P_Light
-internal val ShopError = P_Red
-
-// ══════════════════════════════════════════════════════════════════
-// COMMENTED OUT: NEW WIRED/WIRELESS UI CODE (for reference)
-// ══════════════════════════════════════════════════════════════════
-
-// 
-// import androidx.compose.foundation.Image
-// import androidx.compose.foundation.background
-// import androidx.compose.foundation.border
-// import androidx.compose.foundation.clickable
-// import androidx.compose.foundation.layout.*
-// import androidx.compose.foundation.lazy.LazyColumn
-// import androidx.compose.foundation.lazy.items
-// import androidx.compose.foundation.shape.CircleShape
-// import androidx.compose.foundation.shape.RoundedCornerShape
-// import androidx.compose.material.icons.Icons
-// import androidx.compose.material.icons.filled.*
-// import androidx.compose.material.icons.outlined.*
-// import androidx.compose.material3.*
-// import androidx.compose.runtime.*
-// import androidx.compose.ui.Alignment
-// import androidx.compose.ui.Modifier
-// import androidx.compose.ui.draw.clip
-// import androidx.compose.ui.draw.shadow
-// import androidx.compose.ui.graphics.Brush
-// import androidx.compose.ui.graphics.Color
-// import androidx.compose.ui.layout.ContentScale
-// import androidx.compose.ui.text.font.FontWeight
-// import androidx.compose.ui.text.style.TextDecoration
-// import androidx.compose.ui.text.style.TextOverflow
-// import androidx.compose.ui.unit.dp
-// import androidx.compose.ui.unit.sp
-// import cafe.adriel.voyager.navigator.LocalNavigator
-// import coil3.compose.AsyncImage
-// import com.developer.ev2z.ui.components.FloatingContactButton
-// import com.developer.ev2z.util.Analytics
-// import com.developer.ev2z.response.ProductDto
-// import com.developer.ev2z.util.DeepLinkBus
-// import eva2z_connect_multiplatform.composeapp.generated.resources.*
-// import org.jetbrains.compose.resources.painterResource
-// 
-// // ── Premium Design Tokens ──────────────────────────────────────────
-// internal val P_Green        = Color(0xFF00875A)
-// internal val P_GreenLight   = Color(0xFF00A86B)
-// internal val P_GreenSurface = Color(0xFFF0FAF5)
-// internal val P_GreenBorder  = Color(0xFFB7E4CC)
-// internal val P_Bg           = Color(0xFFF7F8FA)
-// internal val P_Card         = Color(0xFFFFFFFF)
-// internal val P_Dark         = Color(0xFF0A0F0D)
-// internal val P_Mid          = Color(0xFF4A5568)
-// internal val P_Light        = Color(0xFF9AA5B1)
-// internal val P_Border       = Color(0xFFE8ECF0)
-// internal val P_Red          = Color(0xFFD93025)
-// internal val P_Gold         = Color(0xFFF59E0B)
-// 
-// private fun getRatingCount(productId: Int): Int = when (productId) {
-//     1 -> 128; 2 -> 94; 3 -> 213; 4 -> 67; 5 -> 156
-//     6 -> 89; 7 -> 174; 8 -> 102; 9 -> 231; 10 -> 78; 11 -> 143; else -> 50
-// }
-// private fun getRating(productId: Int): Double = when (productId) {
-//     1 -> 4.7; 2 -> 4.5; 3 -> 4.9; 4 -> 4.3; 5 -> 4.8
-//     6 -> 4.4; 7 -> 4.6; 8 -> 4.2; 9 -> 4.9; 10 -> 4.5; 11 -> 4.7; else -> 4.8
-// }
-// 
-// // ── Shop Screen ───────────────────────────────────────────────────
-// @Composable
-// fun ShopScreen(
-//     products: List<ShopProduct>,
-//     cartCount: Int,
-//     onBackClick: () -> Unit = {},
-//     onToggleFavorite: (ShopProduct) -> Unit = {},
-//     onPlaceOrder: (ShopProduct) -> Unit = {},
-//     onGpsTrackerClick: () -> Unit = {},   // ✅ NEW — merged GPS card tap
-//     onCartClick: () -> Unit = {}
-// ) {
-//     // Robust GPS detect — works regardless of exact API value
-//     fun isGps(p: ShopProduct): Boolean {
-//         val s = p.subtitle.lowercase().trim()
-//         val d = p.deviceType.lowercase().trim()
-//         return s.contains("wired") || s.contains("wireless") ||
-//                 d.contains("wired") || d.contains("wireless")
-//     }
-//     fun isWired(p: ShopProduct): Boolean {
-//         val s = p.subtitle.lowercase().trim()
-//         val d = p.deviceType.lowercase().trim()
-//         return s.contains("wired") || d.contains("wired")
-//     }
-//     fun isWireless(p: ShopProduct): Boolean {
-//         val s = p.subtitle.lowercase().trim()
-//         val d = p.deviceType.lowercase().trim()
-//         return (s.contains("wireless") || d.contains("wireless")) && !isWired(p)
-//     }
-//     // Fallback: agar koi match nahi toh id 10,11 ko GPS consider karo
-//     val gpsProducts = products.filter { isGps(it) }.let { list ->
-//         if (list.isEmpty()) products.filter { it.id == 10 || it.id == 11 }
-//         else list
-//     }
-//     val otherProducts = products.filter { p -> gpsProducts.none { it.id == p.id } }
-// 
-//     Box(modifier = Modifier.fillMaxSize().background(P_Bg)) {
-//         LazyColumn(
-//             modifier = Modifier.fillMaxSize(),
-//             contentPadding = PaddingValues(bottom = 90.dp)
-//         ) {
-//             item { PremiumTopBar(cartCount, onCartClick) }
-//             item { PremiumBanner() }
-//             item { PremiumSectionHeader(otherProducts.size + if (gpsProducts.isNotEmpty()) 1 else 0) }
-// 
-//             // ✅ Merged GPS Tracker card (replaces wired + wireless separate cards)
-//             if (gpsProducts.isNotEmpty()) {
-//                 item {
-//                     MergedGpsTrackerCard(
-//                         wiredProduct = gpsProducts.firstOrNull { isWired(it) },
-//                         wirelessProduct = gpsProducts.firstOrNull { isWireless(it) },
-//                         onClick = onGpsTrackerClick
-//                     )
-//                     Spacer(Modifier.height(16.dp))
-//                 }
-//             }
-// 
-//             // Other products (non-GPS)
-//             items(otherProducts) { product ->
-//                 PremiumProductCard(
-//                     product = product,
-//                     onToggleFavorite = { onToggleFavorite(product) },
-//                     onPlaceOrder = { onPlaceOrder(product) }
-//                 )
-//                 Spacer(Modifier.height(16.dp))
-//             }
-//         }
-// 
-//         FloatingContactButton(
-//             phoneNumber = "919755273822",
-//             modifier = Modifier
-//                 .align(Alignment.BottomEnd)
-//                 .padding(end = 16.dp, bottom = 80.dp)
-//         )
-// 
-//         PremiumCartBar(
-//             count = cartCount,
-//             onClick = onCartClick,
-//             modifier = Modifier.align(Alignment.BottomCenter)
-//         )
-//     }
-// }
-// 
-// @Composable
-// private fun MergedGpsTrackerCard(
-//     wiredProduct: ShopProduct?,
-//     wirelessProduct: ShopProduct?,
-//     onClick: () -> Unit
-// ) {
-//     val wiredPrice    = wiredProduct?.price?.toInt() ?: 3200
-//     val wirelessPrice = wirelessProduct?.price?.toInt() ?: 4200
-//     val startingPrice = minOf(wiredPrice, wirelessPrice)
-//     val fakeOld       = (startingPrice * 1.4).toInt()
-//     val savings       = fakeOld - startingPrice
-// 
-//     Card(
-//         modifier = Modifier
-//             .fillMaxWidth()
-//             .padding(horizontal = 20.dp)
-//             .shadow(6.dp, RoundedCornerShape(20.dp),
-//                 ambientColor = P_Green.copy(alpha = 0.12f))
-//             .clickable { onClick() },
-//         shape     = RoundedCornerShape(20.dp),
-//         colors    = CardDefaults.cardColors(containerColor = Color.White),
-//         elevation = CardDefaults.cardElevation(0.dp)
-//     ) {
-//         Column {
-// 
-//             // ── Image Area — wired + wireless side by side ────
-//             Box(
-//                 modifier = Modifier
-//                     .fillMaxWidth()
-//                     .height(200.dp)
-//                     .background(
-//                         Brush.verticalGradient(
-//                             listOf(Color(0xFFF0FAF5), Color(0xFFE3F5EC))
-//                         )
-//                     )
-//             ) {
-//                 // Decorative bg circles
-//                 Box(
-//                     modifier = Modifier
-//                         .size(140.dp).clip(CircleShape)
-//                         .background(P_Green.copy(alpha = 0.04f))
-//                         .align(Alignment.Center)
-//                 )
-//                 Box(
-//                     modifier = Modifier
-//                         .size(90.dp).clip(CircleShape)
-//                         .background(P_Green.copy(alpha = 0.06f))
-//                         .align(Alignment.Center)
-//                 )
-// 
-//                 // ── Dono images side by side ──────────────────
-//                 Row(
-//                     modifier = Modifier
-//                         .fillMaxSize()
-//                         .padding(horizontal = 14.dp, vertical = 10.dp),
-//                     horizontalArrangement = Arrangement.spacedBy(10.dp),
-//                     verticalAlignment     = Alignment.CenterVertically
-//                 ) {
-//                     // Wired image card
-//                     Box(
-//                         modifier = Modifier
-//                             .weight(1f)
-//                             .fillMaxHeight()
-//                             .clip(RoundedCornerShape(14.dp))
-//                             .background(Color.White.copy(alpha = 0.7f))
-//                             .border(1.dp, P_GreenBorder, RoundedCornerShape(14.dp)),
-//                         contentAlignment = Alignment.Center
-//                     ) {
-//                         // ✅ wiredProduct ki imageUrl use kar raha hai
-//                         if (!wiredProduct?.imageUrl.isNullOrBlank()) {
-//                             AsyncImage(
-//                                 model              = wiredProduct!!.imageUrl,
-//                                 contentDescription = "Wired GPS Tracker",
-//                                 modifier           = Modifier
-//                                     .fillMaxSize()
-//                                     .padding(10.dp),
-//                                 contentScale       = ContentScale.Fit
-//                             )
-//                         } else {
-//                             Icon(
-//                                 Icons.Default.GpsFixed, null,
-//                                 tint     = P_GreenBorder,
-//                                 modifier = Modifier.size(44.dp)
-//                             )
-//                         }
-//                         // Wired label
-//                         Box(
-//                             modifier = Modifier
-//                                 .align(Alignment.BottomCenter)
-//                                 .padding(bottom = 8.dp)
-//                                 .clip(RoundedCornerShape(6.dp))
-//                                 .background(P_Green)
-//                                 .padding(horizontal = 8.dp, vertical = 3.dp)
-//                         ) {
-//                             Text("Wired · ₹$wiredPrice",
-//                                 fontSize   = 9.sp,
-//                                 fontWeight = FontWeight.Bold,
-//                                 color      = Color.White)
-//                         }
-//                     }
-// 
-//                     // Wireless image card
-//                     Box(
-//                         modifier = Modifier
-//                             .weight(1f)
-//                             .fillMaxHeight()
-//                             .clip(RoundedCornerShape(14.dp))
-//                             .background(Color.White.copy(alpha = 0.7f))
-//                             .border(1.dp, P_GreenBorder, RoundedCornerShape(14.dp)),
-//                         contentAlignment = Alignment.Center
-//                     ) {
-//                         // ✅ wirelessProduct ki imageUrl use kar raha hai
-//                         if (!wirelessProduct?.imageUrl.isNullOrBlank()) {
-//                             AsyncImage(
-//                                 model              = wirelessProduct!!.imageUrl,
-//                                 contentDescription = "Wireless GPS Tracker",
-//                                 modifier           = Modifier
-//                                     .fillMaxSize()
-//                                     .padding(10.dp),
-//                                 contentScale       = ContentScale.Fit
-//                             )
-//                         } else {
-//                             Icon(
-//                                 Icons.Default.GpsFixed, null,
-//                                 tint     = P_GreenBorder,
-//                                 modifier = Modifier.size(44.dp)
-//                             )
-//                         }
-//                         // Wireless label
-//                         Box(
-//                             modifier = Modifier
-//                                 .align(Alignment.BottomCenter)
-//                                 .padding(bottom = 8.dp)
-//                                 .clip(RoundedCornerShape(6.dp))
-//                                 .background(Color(0xFF7C3AED))
-//                                 .padding(horizontal = 8.dp, vertical = 3.dp)
-//                         ) {
-//                             Text("Wireless · ₹$wirelessPrice",
-//                                 fontSize   = 9.sp,
-//                                 fontWeight = FontWeight.Bold,
-//                                 color      = Color.White)
-//                         }
-//                     }
-//                 }
-// 
-//                 // Top-left badge
-//                 Box(
-//                     modifier = Modifier
-//                         .align(Alignment.TopStart)
-//                         .padding(12.dp)
-//                         .clip(RoundedCornerShape(8.dp))
-//                         .background(P_GreenSurface)
-//                         .border(1.dp, P_GreenBorder, RoundedCornerShape(8.dp))
-//                         .padding(horizontal = 9.dp, vertical = 4.dp)
-//                 ) {
-//                     Row(
-//                         verticalAlignment     = Alignment.CenterVertically,
-//                         horizontalArrangement = Arrangement.spacedBy(4.dp)
-//                     ) {
-//                         Box(
-//                             modifier = Modifier
-//                                 .size(5.dp).clip(CircleShape)
-//                                 .background(P_Green)
-//                         )
-//                         Text("INDIA'S #1 GPS",
-//                             fontSize      = 9.sp,
-//                             fontWeight    = FontWeight.Bold,
-//                             color         = P_Green,
-//                             letterSpacing = 0.5.sp)
-//                     }
-//                 }
-// 
-//                 // Top-right discount
-//                 Box(
-//                     modifier = Modifier
-//                         .align(Alignment.TopEnd)
-//                         .padding(12.dp)
-//                         .clip(RoundedCornerShape(8.dp))
-//                         .background(Color(0xFFFFF3EE))
-//                         .border(1.dp, Color(0xFFFFCDB8), RoundedCornerShape(8.dp))
-//                         .padding(horizontal = 8.dp, vertical = 4.dp)
-//                 ) {
-//                     Text("33% OFF",
-//                         fontSize   = 10.sp,
-//                         fontWeight = FontWeight.Bold,
-//                         color      = P_Red)
-//                 }
-//             }
-// 
-//             // ── Info Section ──────────────────────────────────
-//             Column(modifier = Modifier.padding(16.dp)) {
-// 
-//                 Text("GPS TRACKER",
-//                     fontSize      = 9.sp,
-//                     fontWeight    = FontWeight.Bold,
-//                     color         = P_Green,
-//                     letterSpacing = 1.2.sp)
-// 
-//                 Spacer(Modifier.height(5.dp))
-// 
-//                 Text("EVA2Z Smart GPS Tracker",
-//                     fontSize   = 18.sp,
-//                     fontWeight = FontWeight.Bold,
-//                     color      = P_Dark,
-//                     lineHeight = 24.sp)
-// 
-//                 Spacer(Modifier.height(5.dp))
-// 
-//                 Text("Real-time tracking · Anti-theft · Engine cut-off · Pan India",
-//                     fontSize  = 12.sp,
-//                     color     = P_Light,
-//                     lineHeight = 17.sp)
-// 
-//                 Spacer(Modifier.height(10.dp))
-// 
-//                 Row(verticalAlignment = Alignment.CenterVertically) {
-//                     repeat(5) {
-//                         Icon(Icons.Default.Star, null,
-//                             tint = P_Gold, modifier = Modifier.size(13.dp))
-//                     }
-//                     Spacer(Modifier.width(6.dp))
-//                     Text("4.9",
-//                         fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = P_Dark)
-//                     Text("  ·  231 reviews", fontSize = 12.sp, color = P_Light)
-//                 }
-// 
-//                 Spacer(Modifier.height(10.dp))
-// 
-//                 Box(
-//                     modifier = Modifier
-//                         .clip(RoundedCornerShape(6.dp))
-//                         .background(P_GreenSurface)
-//                         .border(1.dp, P_GreenBorder, RoundedCornerShape(6.dp))
-//                         .padding(horizontal = 10.dp, vertical = 5.dp)
-//                 ) {
-//                     Row(
-//                         verticalAlignment     = Alignment.CenterVertically,
-//                         horizontalArrangement = Arrangement.spacedBy(5.dp)
-//                     ) {
-//                         Icon(Icons.Default.LocalOffer, null,
-//                             tint = P_Green, modifier = Modifier.size(12.dp))
-//                         Text("Save ₹$savings on this device",
-//                             fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = P_Green)
-//                     }
-//                 }
-// 
-//                 Spacer(Modifier.height(14.dp))
-//                 HorizontalDivider(color = P_Border, thickness = 0.5.dp)
-//                 Spacer(Modifier.height(14.dp))
-// 
-//                 Row(
-//                     modifier              = Modifier.fillMaxWidth(),
-//                     horizontalArrangement = Arrangement.SpaceBetween,
-//                     verticalAlignment     = Alignment.CenterVertically
-//                 ) {
-//                     Column {
-//                         Row(verticalAlignment = Alignment.CenterVertically) {
-//                             Text("₹$startingPrice",
-//                                 fontSize   = 22.sp,
-//                                 fontWeight = FontWeight.Black,
-//                                 color      = P_Dark)
-//                             Spacer(Modifier.width(6.dp))
-//                             Text("₹$fakeOld",
-//                                 fontSize       = 13.sp,
-//                                 color          = P_Light,
-//                                 textDecoration = TextDecoration.LineThrough)
-//                         }
-//                         Text("Starting price · 2 variants",
-//                             fontSize = 11.sp, color = P_Light)
-//                     }
-// 
-//                     Button(
-//                         onClick        = onClick,
-//                         shape          = RoundedCornerShape(12.dp),
-//                         colors         = ButtonDefaults.buttonColors(containerColor = P_Green),
-//                         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 13.dp),
-//                         elevation      = ButtonDefaults.buttonElevation(0.dp)
-//                     ) {
-//                         Text("Explore",
-//                             fontSize = 13.sp, fontWeight = FontWeight.Bold)
-//                         Spacer(Modifier.width(4.dp))
-//                         Icon(Icons.Default.ArrowForward, null,
-//                             modifier = Modifier.size(14.dp))
-//                     }
-//                 }
-//             }
-//         }
-//     }
-// }
-// 
-// // ── Light Variant Chip — replaces dark one ─────────────────────
-// @Composable
-// private fun LightVariantChip(label: String, price: String) {
-//     Box(
-//         modifier = Modifier
-//             .clip(RoundedCornerShape(8.dp))
-//             .background(Color.White.copy(alpha = 0.85f))
-//             .border(1.dp, P_GreenBorder, RoundedCornerShape(8.dp))
-//             .padding(horizontal = 10.dp, vertical = 6.dp)
-//     ) {
-//         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-//             Text(label,
-//                 fontSize   = 10.sp,
-//                 fontWeight = FontWeight.Bold,
-//                 color      = P_Dark)
-//             Text(price,
-//                 fontSize   = 11.sp,
-//                 fontWeight = FontWeight.SemiBold,
-//                 color      = P_Green)
-//         }
-//     }
-// }
-// 
-// @Composable
-// private fun VariantChip(label: String, price: String) {
-//     Box(
-//         modifier = Modifier
-//             .clip(RoundedCornerShape(8.dp))
-//             .background(Color.White.copy(alpha = 0.15f))
-//             .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
-//             .padding(horizontal = 10.dp, vertical = 6.dp)
-//     ) {
-//         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-//             Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
-//             Text(price, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = P_GreenLight)
-//         }
-//     }
-// }
-// 
-// // ── Top Bar ────────────────────────────────────────────────────────
-// @Composable
-// private fun PremiumTopBar(cartCount: Int, onCartClick: () -> Unit) {
-//     Surface(color = P_Card, shadowElevation = 0.dp) {
-//         Column {
-//             Row(
-//                 modifier = Modifier
-//                     .fillMaxWidth()
-//                     .statusBarsPadding()
-//                     .padding(horizontal = 20.dp, vertical = 16.dp),
-//                 verticalAlignment = Alignment.CenterVertically
-//             ) {
-//                 Box(
-//                     modifier = Modifier
-//                         .size(42.dp)
-//                         .clip(RoundedCornerShape(13.dp))
-//                         .background(Brush.linearGradient(listOf(P_GreenLight, P_Green))),
-//                     contentAlignment = Alignment.Center
-//                 ) {
-//                     Text("E", color = Color.White, fontWeight = FontWeight.Black, fontSize = 20.sp)
-//                 }
-//                 Spacer(Modifier.width(12.dp))
-//                 Column(modifier = Modifier.weight(1f)) {
-//                     Text("EVA2Z Store", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = P_Dark)
-//                     Row(verticalAlignment = Alignment.CenterVertically) {
-//                         repeat(5) { Text("★", fontSize = 10.sp, color = P_Gold) }
-//                         Spacer(Modifier.width(4.dp))
-//                         Text("4.8  ·  Trusted by 10K+", fontSize = 11.sp, color = P_Light)
-//                     }
-//                 }
-//                 Box {
-//                     IconButton(
-//                         onClick = onCartClick,
-//                         modifier = Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(P_Bg)
-//                     ) {
-//                         Icon(Icons.Outlined.ShoppingBag, null, tint = P_Dark, modifier = Modifier.size(22.dp))
-//                     }
-//                     if (cartCount > 0) {
-//                         Box(
-//                             modifier = Modifier
-//                                 .size(17.dp).clip(CircleShape).background(P_Red)
-//                                 .align(Alignment.TopEnd).offset(x = 2.dp, y = (-2).dp),
-//                             contentAlignment = Alignment.Center
-//                         ) {
-//                             Text(cartCount.toString(), fontSize = 9.sp, fontWeight = FontWeight.Black, color = Color.White)
-//                         }
-//                     }
-//                 }
-//             }
-//             HorizontalDivider(color = P_Border, thickness = 0.5.dp)
-//         }
-//     }
-// }
-// 
-// // ── Banner ─────────────────────────────────────────────────────────
-// @Composable
-// private fun PremiumBanner() {
-//     Box(
-//         modifier = Modifier
-//             .fillMaxWidth()
-//             .padding(horizontal = 20.dp, vertical = 20.dp)
-//             .height(180.dp)
-//             .clip(RoundedCornerShape(20.dp))
-//     ) {
-//         Image(
-//             painter = painterResource(Res.drawable.banner_img_2),
-//             contentDescription = null,
-//             modifier = Modifier.fillMaxSize(),
-//             contentScale = ContentScale.Crop
-//         )
-//         Box(
-//             modifier = Modifier.fillMaxSize()
-//                 .background(Brush.horizontalGradient(
-//                     listOf(Color(0xF0061C0E), Color(0x3000875A), Color.Transparent)
-//                 ))
-//         )
-//         Column(modifier = Modifier.align(Alignment.BottomStart).padding(20.dp)) {
-//             Text("India's #1 GPS", fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
-//                 color = P_GreenLight, letterSpacing = 1.5.sp)
-//             Spacer(Modifier.height(4.dp))
-//             Text("Track Smarter.\nDrive Safer.", fontSize = 22.sp,
-//                 fontWeight = FontWeight.Black, color = Color.White, lineHeight = 28.sp)
-//             Spacer(Modifier.height(14.dp))
-//             Box(
-//                 modifier = Modifier.clip(RoundedCornerShape(8.dp))
-//                     .background(P_GreenLight).padding(horizontal = 16.dp, vertical = 9.dp)
-//             ) {
-//                 Text("Explore Now", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
-//             }
-//         }
-//     }
-// }
-// 
-// // ── Section Header ─────────────────────────────────────────────────
-// @Composable
-// private fun PremiumSectionHeader(count: Int) {
-//     Row(
-//         modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 12.dp),
-//         horizontalArrangement = Arrangement.SpaceBetween,
-//         verticalAlignment = Alignment.CenterVertically
-//     ) {
-//         Column {
-//             Text("All Products", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = P_Dark)
-//             Text("$count items available", fontSize = 13.sp, color = P_Light)
-//         }
-//         Box(
-//             modifier = Modifier.clip(RoundedCornerShape(8.dp))
-//                 .border(1.dp, P_Border, RoundedCornerShape(8.dp))
-//                 .padding(horizontal = 12.dp, vertical = 7.dp)
-//         ) {
-//             Row(verticalAlignment = Alignment.CenterVertically,
-//                 horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-//                 Icon(Icons.Default.FilterList, null, tint = P_Mid, modifier = Modifier.size(14.dp))
-//                 Text("Filter", fontSize = 12.sp, fontWeight = FontWeight.Medium, color = P_Mid)
-//             }
-//         }
-//     }
-// }
-// 
-// // ── Premium Product Card (non-GPS) ─────────────────────────────────
-// @Composable
-// private fun PremiumProductCard(
-//     product: ShopProduct,
-//     onToggleFavorite: () -> Unit,
-//     onPlaceOrder: () -> Unit
-// ) {
-//     val fakeOld = (product.price * 1.5).toInt()
-//     val disc = (((fakeOld - product.price) / fakeOld) * 100).toInt()
-// 
-//     Card(
-//         modifier = Modifier
-//             .fillMaxWidth()
-//             .padding(horizontal = 20.dp)
-//             .shadow(6.dp, RoundedCornerShape(16.dp), ambientColor = Color(0x14000000))
-//             .clickable { onPlaceOrder() },
-//         shape = RoundedCornerShape(16.dp),
-//         colors = CardDefaults.cardColors(containerColor = P_Card),
-//         elevation = CardDefaults.cardElevation(0.dp)
-//     ) {
-//         Column {
-//             Box(
-//                 modifier = Modifier.fillMaxWidth().height(180.dp).background(Color(0xFFF9FAFB))
-//             ) {
-//                 AsyncImage(
-//                     model = product.imageUrl, contentDescription = null,
-//                     modifier = Modifier.fillMaxSize().padding(20.dp),
-//                     contentScale = ContentScale.Fit,
-//                     placeholder = painterResource(Res.drawable.app_logo),
-//                     error = painterResource(Res.drawable.app_logo)
-//                 )
-//                 Box(
-//                     modifier = Modifier.align(Alignment.TopStart).padding(12.dp)
-//                         .clip(RoundedCornerShape(6.dp)).background(P_Red)
-//                         .padding(horizontal = 8.dp, vertical = 4.dp)
-//                 ) {
-//                     Text("$disc% OFF", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
-//                 }
-//                 Box(
-//                     modifier = Modifier.align(Alignment.TopEnd).padding(12.dp)
-//                         .size(34.dp).clip(CircleShape).background(Color.White)
-//                         .shadow(2.dp, CircleShape).clickable { onToggleFavorite() },
-//                     contentAlignment = Alignment.Center
-//                 ) {
-//                     Icon(
-//                         if (product.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-//                         null,
-//                         tint = if (product.isFavorite) P_Red else P_Light,
-//                         modifier = Modifier.size(16.dp)
-//                     )
-//                 }
-//             }
-//             Column(modifier = Modifier.padding(16.dp)) {
-//                 if (product.subtitle.isNotBlank()) {
-//                     Text(product.subtitle.uppercase(), fontSize = 10.sp,
-//                         fontWeight = FontWeight.SemiBold, color = P_Green, letterSpacing = 0.8.sp)
-//                     Spacer(Modifier.height(4.dp))
-//                 }
-//                 Text(product.title, fontSize = 16.sp, fontWeight = FontWeight.Bold,
-//                     color = P_Dark, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 22.sp)
-//                 Spacer(Modifier.height(10.dp))
-//                 Row(verticalAlignment = Alignment.CenterVertically) {
-//                     repeat(5) { Icon(Icons.Default.Star, null, tint = P_Gold, modifier = Modifier.size(13.dp)) }
-//                     Spacer(Modifier.width(6.dp))
-//                     Text("${product.rating}", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = P_Mid)
-//                     Text("  (${product.ratingCount})", fontSize = 12.sp, color = P_Light)
-//                 }
-//                 Spacer(Modifier.height(12.dp))
-//                 HorizontalDivider(color = P_Border, thickness = 0.5.dp)
-//                 Spacer(Modifier.height(12.dp))
-//                 Row(
-//                     modifier = Modifier.fillMaxWidth(),
-//                     horizontalArrangement = Arrangement.SpaceBetween,
-//                     verticalAlignment = Alignment.CenterVertically
-//                 ) {
-//                     Column {
-//                         Text("₹${product.price.toInt()}", fontSize = 22.sp,
-//                             fontWeight = FontWeight.Black, color = P_Dark)
-//                         Text("₹$fakeOld", fontSize = 13.sp, color = P_Light,
-//                             textDecoration = TextDecoration.LineThrough)
-//                     }
-//                     Button(
-//                         onClick = onPlaceOrder,
-//                         shape = RoundedCornerShape(10.dp),
-//                         colors = ButtonDefaults.buttonColors(containerColor = P_Green),
-//                         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
-//                         elevation = ButtonDefaults.buttonElevation(0.dp)
-//                     ) {
-//                         Text("View Details", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-//                     }
-//                 }
-//             }
-//         }
-//     }
-// }
-// 
-// // ── Cart Bar ───────────────────────────────────────────────────────
-// @Composable
-// private fun PremiumCartBar(count: Int, onClick: () -> Unit, modifier: Modifier) {
-//     Surface(modifier = modifier.fillMaxWidth(), color = P_Card,
-//         shadowElevation = 8.dp, tonalElevation = 0.dp) {
-//         Button(
-//             onClick = onClick,
-//             modifier = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp).height(46.dp),
-//             shape = RoundedCornerShape(14.dp),
-//             colors = ButtonDefaults.buttonColors(containerColor = P_Green),
-//             elevation = ButtonDefaults.buttonElevation(0.dp)
-//         ) {
-//             Row(
-//                 modifier = Modifier.fillMaxWidth(),
-//                 verticalAlignment = Alignment.CenterVertically,
-//                 horizontalArrangement = Arrangement.SpaceBetween
-//             ) {
-//                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
-//                     verticalAlignment = Alignment.CenterVertically) {
-//                     Icon(Icons.Default.ShoppingCart, null, modifier = Modifier.size(17.dp))
-//                     Text("View Cart", fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-//                 }
-//                 Box(
-//                     modifier = Modifier.clip(RoundedCornerShape(6.dp))
-//                         .background(Color.White.copy(alpha = 0.2f))
-//                         .padding(horizontal = 8.dp, vertical = 3.dp)
-//                 ) {
-//                     Text("$count items", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = Color.White)
-//                 }
-//             }
-//         }
-//     }
-// }
-// 
-// // ── ShopScreenHost ────────────────────────────────────────────────
-// @Composable
-// fun ShopScreenHost(category: String? = null) {
-//     val viewModel = ShopViewModelProvider.viewModel
-//     val state by viewModel.state.collectAsState()
-//     val navigator = LocalNavigator.current
-//     val filteredProducts = state.products.filter { dto ->
-//         when (category) {
-//             "wired"    -> dto.device_type?.lowercase() == "wired"
-//             "wireless" -> dto.device_type?.lowercase() == "wireless"
-//             else       -> true
-//         }
-//     }
-// 
-//     LaunchedEffect(Unit) {
-//         Analytics.logEvent("screen_view", mapOf(
-//             "screen_name" to "shop_screen", "screen_class" to "ShopScreen",
-//             "item_category" to "iot_devices", "source" to "home_or_menu"))
-//         viewModel.loadData()
-//     }
-// 
-//     // Deep link handling via SharedFlow collection
-//     LaunchedEffect(Unit) {
-//         DeepLinkBus.navigateTo.collect { dest ->
-//             if (!dest.startsWith("open_product_") && !dest.startsWith("product_detail_")) return@collect
-//             val pid = when {
-//                 dest.startsWith("open_product_")   -> dest.removePrefix("open_product_").substringBefore("_").toIntOrNull()
-//                 dest.startsWith("product_detail_") -> dest.removePrefix("product_detail_").substringBefore("_").toIntOrNull()
-//                 else -> null
-//             } ?: return@collect
-//             val currentProducts = viewModel.state.value.products
-//             if (currentProducts.isEmpty()) { viewModel.loadData(); return@collect }
-//             val dto = currentProducts.firstOrNull { it.id == pid } ?: return@collect
-//             val product = ShopProduct(
-//                 id = dto.id, title = dto.name ?: "", subtitle = dto.device_type ?: "",
-//                 price = dto.sale_price?.toDoubleOrNull() ?: 0.0,
-//                 rechargePrice = dto.recharge_price?.toDoubleOrNull() ?: 0.0,
-//                 promoAmount = dto.promo_amt?.toDoubleOrNull() ?: 0.0,
-//                 promoCode = dto.promo_code ?: "", imageUrl = dto.image ?: "",
-//                 description = dto.description ?: "",
-//                 features = listOfNotNull(dto.features1, dto.features2, dto.features3,
-//                     dto.features4, dto.features5, dto.features6, dto.features7),
-//                 deviceType = dto.device_type ?: "", rating = getRating(dto.id),
-//                 ratingCount = getRatingCount(dto.id), isFavorite = viewModel.isFavorite(dto.id)
-//             )
-//             DeepLinkBus.clear()
-//             navigator?.push(ProductDetailsScreen(product = product,
-//                 onToggleFavorite = { p -> viewModel.toggleWishlist(p.id) }))
-//         }
-//     }
-// 
-//     if (state.loading) {
-//         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-//             CircularProgressIndicator(color = P_Green, strokeWidth = 2.dp)
-//         }
-//         return
-//     }
-// 
-//     LaunchedEffect(state.products) {
-//         if (state.products.isNotEmpty()) {
-//             Analytics.logEvent("view_item_list", mapOf(
-//                 "item_list_id" to "shop_device_list",
-//                 "item_list_name" to "Location Tracker Device",
-//                 "currency" to "INR",
-//                 "items" to state.products.mapIndexed { index, p ->
-//                     mapOf("item_id" to p.id.toString(), "item_name" to (p.name ?: ""),
-//                         "item_brand" to "EVA2Z", "item_category" to "iot_devices",
-//                         "item_variant" to (p.device_type ?: ""),
-//                         "price" to (p.sale_price?.toDoubleOrNull() ?: 0.0),
-//                         "index" to index).toString()
-//                 }))
-//         }
-//     }
-// 
-//     val mappedProducts = filteredProducts.map { dto ->
-//         ShopProduct(
-//             id = dto.id, title = dto.name ?: "", subtitle = dto.device_type ?: "",
-//             price = dto.sale_price?.toDoubleOrNull() ?: 0.0,
-//             rechargePrice = dto.recharge_price?.toDoubleOrNull() ?: 0.0,
-//             promoAmount = dto.promo_amt?.toDoubleOrNull() ?: 0.0,
-//             promoCode = dto.promo_code ?: "", imageUrl = dto.image ?: "",
-//             description = dto.description ?: "",
-//             features = listOfNotNull(dto.features1, dto.features2, dto.features3,
-//                 dto.features4, dto.features5, dto.features6, dto.features7),
-//             deviceType = dto.device_type ?: "", rating = getRating(dto.id),
-//             ratingCount = getRatingCount(dto.id), isFavorite = viewModel.isFavorite(dto.id)
-//         )
-//     }
-// 
-//     ShopScreen(
-//         products = mappedProducts,
-//         cartCount = state.cartCount,
-//         // ✅ Merged GPS card tap → GpsTrackerFlowScreen
-//         onGpsTrackerClick = {
-//             Analytics.logEvent("select_item", mapOf(
-//                 "item_list_id" to "shop_device_list",
-//                 "item_name" to "GPS Tracker", "item_brand" to "EVA2Z"))
-// 
-//             // Debug: print all product subtitles/deviceTypes to find exact API values
-//             mappedProducts.forEach { p ->
-//                 println("🔍 Product id=${p.id} title=${p.title} subtitle='${p.subtitle}' deviceType='${p.deviceType}'")
-//             }
-// 
-//             // Smart lookup: contains check + ID fallback
-//             val allDtos = state.products
-//             val wiredDto = allDtos.firstOrNull {
-//                 (it.device_type?.lowercase()?.contains("wired") == true) ||
-//                         it.id == 10
-//             }
-//             val wirelessDto = allDtos.firstOrNull {
-//                 val dt = it.device_type?.lowercase() ?: ""
-//                 (dt.contains("wireless")) ||
-//                         it.id == 11
-//             }
-// 
-//             fun dtoToProduct(dto: com.developer.ev2z.response.ProductDto) = ShopProduct(
-//                 id = dto.id, title = dto.name ?: "",
-//                 subtitle = dto.device_type ?: "",
-//                 price = dto.sale_price?.toDoubleOrNull() ?: 0.0,
-//                 rechargePrice = dto.recharge_price?.toDoubleOrNull() ?: 0.0,
-//                 promoAmount = dto.promo_amt?.toDoubleOrNull() ?: 0.0,
-//                 promoCode = dto.promo_code ?: "",
-//                 imageUrl = dto.image ?: "",
-//                 description = dto.description ?: "",
-//                 features = listOfNotNull(dto.features1, dto.features2, dto.features3,
-//                     dto.features4, dto.features5, dto.features6, dto.features7),
-//                 deviceType = dto.device_type ?: "",
-//                 rating = getRating(dto.id),
-//                 ratingCount = getRatingCount(dto.id),
-//                 isFavorite = viewModel.isFavorite(dto.id)
-//             )
-// 
-//             println("✅ Wired: ${wiredDto?.device_type} id=${wiredDto?.id}")
-//             println("✅ Wireless: ${wirelessDto?.device_type} id=${wirelessDto?.id}")
-// 
-//             navigator?.push(GpsHeroScreen(
-//                 wiredProduct = wiredDto?.let { dtoToProduct(it) },
-//                 wirelessProduct = wirelessDto?.let { dtoToProduct(it) },
-//                 // AFTER — GPS products (id 10, 11) ke liye sahi plan_type
-//                 onAddToCart = { product, planType, deviceType ->
-//                     val finalPlan = if (product.id == 10 || product.id == 11) {
-//                         "without_recharge"  // default — recharge sheet nahi dikhaya
-//                     } else planType
-// 
-//                     val finalDevice = deviceType.ifBlank { "" }
-// 
-//                     println("🛒 addToCart → id=${product.id} plan=$finalPlan device=$finalDevice")
-//                     viewModel.addToCart("add", product.id, 1, finalPlan, finalDevice)
-//                 }
-//             ))
-//         },
-//         onToggleFavorite = { p ->
-//             viewModel.toggleWishlist(p.id.toInt())
-//             Analytics.logEvent("add_to_wishlist", mapOf("currency" to "INR",
-//                 "items" to listOf(mapOf("item_id" to p.id.toString(),
-//                     "item_name" to p.title, "item_brand" to "EVA2Z",
-//                     "item_category" to "iot_devices", "item_variant" to p.subtitle,
-//                     "price" to p.price))))
-//         },
-//         onCartClick = { navigator?.push(CartScreen()) },
-//         onPlaceOrder = { product ->
-//             navigator?.push(ProductDetailsScreen(product = product,
-//                 onToggleFavorite = { p ->
-//                     viewModel.toggleWishlist(p.id)
-//                     Analytics.logEvent("add_to_wishlist", mapOf("currency" to "INR",
-//                         "items" to listOf(mapOf("item_id" to p.id.toString(),
-//                             "item_name" to p.title, "item_brand" to "EVA2Z",
-//                             "item_category" to "iot_devices",
-//                             "item_variant" to p.subtitle, "price" to p.price))))
-//                 }))
-//         }
-//     )
-// }
-// 
-// // Compatibility tokens
-// internal val ShopGreen = P_Green
-// internal val ShopGreenDark = P_Green
-// internal val ShopGreenSoft = P_GreenSurface
-// internal val ShopGreenMid = P_GreenBorder
-// internal val ShopBg = P_Bg
-// internal val ShopCard = P_Card
-// internal val ShopTextPrimary = P_Dark
-// internal val ShopTextSec = P_Mid
-// internal val ShopTextTert = P_Light
-// internal val ShopError = P_Red
+internal val ShopTextSec     = P_Mid
+internal val ShopTextTert    = P_Light
+internal val ShopError       = P_Red

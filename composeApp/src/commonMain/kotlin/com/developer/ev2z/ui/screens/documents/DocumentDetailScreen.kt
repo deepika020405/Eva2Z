@@ -84,6 +84,7 @@ fun DocumentDetailScreen(
             modifier         = Modifier
                 .fillMaxWidth()
                 .weight(1f)
+                .heightIn(min = 180.dp)
                 .background(DetailColors.PreviewBg),
             contentAlignment = Alignment.Center,
             content          = preview,
