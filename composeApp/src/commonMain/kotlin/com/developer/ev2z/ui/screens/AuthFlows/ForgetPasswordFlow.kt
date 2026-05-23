@@ -70,6 +70,10 @@ fun ForgetPasswordFlow(
             confirmButton = {
                 TextButton(onClick = {
                     showExitDialog = false
+                    // Cancel backend session so normal login is never blocked
+                    if (phoneNumber.isNotBlank()) {
+                        authViewModel.cancelForgotPasswordSession(phoneNumber)
+                    }
                     onBack()
                 }) {
                     Text("Yes", color = Color(0xFF6A9F50), fontWeight = FontWeight.Bold)
@@ -153,7 +157,13 @@ fun ForgetPasswordFlow(
                         ForgetPasswordPhoneScreen(
                             viewModel = authViewModel,
                             preFilledPhone = initialPhone,
-                            onBack = onBack,
+                            onBack = {
+                                // Cancel if OTP was already sent and user is abandoning
+                                if (phoneNumber.isNotBlank()) {
+                                    authViewModel.cancelForgotPasswordSession(phoneNumber)
+                                }
+                                onBack()
+                            },
                             onOtpSent = { phone ->
                                 // phone already includes country code (e.g. "+916789546789")
                                 println("✅ OTP sent! Phone: $phone")

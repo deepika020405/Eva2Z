@@ -80,8 +80,11 @@ class ParkingViewModel(
             val regPhone = _registeredPhone.value
             val phoneLen = _phoneCountry.value.phoneLength
             val altLen   = _alternatePhoneCountry.value.phoneLength
+            val vNum = _vehicleNumber.value
             return _vehicleType.value.isNotBlank()
-                && _vehicleNumber.value.isNotBlank()
+                && vNum.length >= 4
+                && vNum.any { it.isLetter() }
+                && vNum.any { it.isDigit() }
                 && phone.length == phoneLen
                 && (altPhone.isEmpty() || altPhone.length == altLen)
                 && (regPhone.isBlank() || phone.takeLast(10) != regPhone)
@@ -165,8 +168,15 @@ class ParkingViewModel(
             _vehicleTypeError.value = "Vehicle type is required"
             valid = false
         }
-        if (_vehicleNumber.value.isBlank()) {
+        val vNum = _vehicleNumber.value
+        if (vNum.isBlank()) {
             _vehicleNumberError.value = "Vehicle number is required"
+            valid = false
+        } else if (vNum.length < 4) {
+            _vehicleNumberError.value = "Enter a valid vehicle number (min 4 characters)"
+            valid = false
+        } else if (!vNum.any { it.isLetter() } || !vNum.any { it.isDigit() }) {
+            _vehicleNumberError.value = "Vehicle number must contain both letters and digits (e.g. DL01AB1234)"
             valid = false
         }
         val phoneLen = _phoneCountry.value.phoneLength

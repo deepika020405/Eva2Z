@@ -141,21 +141,40 @@ class AuthRepository(private val api: ApiService) {
     suspend fun forgotPassword(phone: String): ForgotPasswordResponse {
         val jsonResponse = api.forgotPassword(phone)
 
-        // ✅ Check for both message and error fields
         val message = jsonResponse["message"]?.jsonPrimitive?.content
-        val error = jsonResponse["error"]?.jsonPrimitive?.content
+        val error   = jsonResponse["error"]?.jsonPrimitive?.content
+
+        // Detect 429 rate-limit response from backend
+        val isRateLimited = error?.contains("wait", ignoreCase = true) == true
+            || error?.contains("seconds", ignoreCase = true) == true
+            || error?.contains("429", ignoreCase = true) == true
 
         val success = when {
-            error != null -> false // Has error field = user not registered
+            isRateLimited -> false
+            error != null -> false
             message?.contains("OTP sent successfully", ignoreCase = true) == true -> true
             message?.contains("sent successfully", ignoreCase = true) == true -> true
             else -> false
         }
 
         return ForgotPasswordResponse(
-            success = success,
-            message = error ?: message ?: "Unknown error"
+            success     = success,
+            message     = error ?: message ?: "Unknown error",
+            rateLimited = isRateLimited
         )
+    }
+
+    // ============================================
+    // CANCEL FORGOT PASSWORD SESSION
+    // ============================================
+    suspend fun cancelForgotPassword(phone: String) {
+        try {
+            api.cancelForgotPassword(phone)
+            println("✅ Forgot password session cancelled for $phone")
+        } catch (e: Exception) {
+            println("❌ Cancel forgot password failed: ${e.message}")
+            // Fire-and-forget — swallow so caller is never blocked
+        }
     }
 
     // ============================================

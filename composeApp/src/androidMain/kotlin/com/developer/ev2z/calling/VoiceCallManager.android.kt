@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.media.ToneGenerator
 import android.media.AudioManager
 import androidx.core.content.ContextCompat
+import com.developer.ev2z.ActiveCallService
 import com.developer.ev2z.AppContextHolder
 import com.developer.ev2z.network.KtorClient
 import com.developer.ev2z.util.NotificationUtil
@@ -71,6 +72,8 @@ actual class VoiceCallManager actual constructor() {
         println("📞 [VoiceCall] ── START AS CALLEE ── roomId=$roomId  isCallActive=true")
         // Stop the ringing notification immediately when user accepts
         NotificationUtil.cancelCallNotification(AppContextHolder.context)
+        // Keep WebRTC audio alive in background via foreground service
+        ActiveCallService.start(AppContextHolder.context, "Visitor")
         if (!checkMicPermission()) return
         initWebRtc()
         signalingClient.connect(roomId, signalingListener)
@@ -82,6 +85,8 @@ actual class VoiceCallManager actual constructor() {
         println("📞 [VoiceCall] ── START AS CALLER ── roomId=$roomId  isCallActive=true")
         if (!checkMicPermission()) return
         startRingback()
+        // Keep WebRTC audio alive in background via foreground service
+        ActiveCallService.start(AppContextHolder.context, "Visitor")
         initWebRtc()
         signalingClient.connect(roomId, signalingListener)
         // Auto-cancel: if visitor never joins within 60 s, treat as declined
@@ -196,6 +201,7 @@ actual class VoiceCallManager actual constructor() {
         ringTimeoutJob?.cancel()
         ringTimeoutJob = null
         stopRingback()
+        ActiveCallService.stop(AppContextHolder.context)
         signalingClient.disconnect()
         webRtc.dispose()
         println("✅ [VoiceCall] Call session fully disposed")

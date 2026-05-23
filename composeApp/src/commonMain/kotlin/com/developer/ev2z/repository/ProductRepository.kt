@@ -6,9 +6,11 @@ import com.developer.ev2z.request.CreateOrderRequest
 import com.developer.ev2z.response.CartItemDto
 import com.developer.ev2z.response.BillingDto
 import com.developer.ev2z.response.CartResponse
+import com.developer.ev2z.response.MyDevicesResponse
 import com.developer.ev2z.response.ProductDto
 import com.developer.ev2z.response.PromoResponse
 import com.developer.ev2z.response.WishlistProductWrapper
+import com.developer.ev2z.ui.screens.VehicleParkingTag.UserParkingListResponse
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
@@ -152,6 +154,14 @@ class ProductRepository(
         return api.createPhonePeOrder(token, body)
     }
 
+
+    suspend fun getMyDevices(token: String): MyDevicesResponse {
+        return try { api.getMyDevices(token) } catch (e: Exception) { MyDevicesResponse() }
+    }
+
+    suspend fun getUserParkingList(): UserParkingListResponse {
+        return try { api.getUserParkingDetails() } catch (e: Exception) { UserParkingListResponse() }
+    }
 
     // ProductRepository.kt
 

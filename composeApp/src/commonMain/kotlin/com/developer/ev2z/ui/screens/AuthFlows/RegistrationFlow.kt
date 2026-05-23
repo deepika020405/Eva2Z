@@ -4,7 +4,12 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
@@ -12,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.BackPressHandler
@@ -43,7 +49,9 @@ fun RegistrationFlow(
     val isLoading by authViewModel.loading.collectAsState()
     val otpVerified by authViewModel.otpVerified.collectAsState()
     val emailOtpVerified by authViewModel.emailOtpVerified.collectAsState()
+    val loginSuccess by authViewModel.loginSuccess.collectAsState()
     val error by authViewModel.error.collectAsState()
+    var showSuccessDialog by remember { mutableStateOf(false) }
 
     // Cross-platform back button — only on first screen
     if (currentStep == RegistrationStep.VERIFY_PHONE_OTP) {
@@ -96,6 +104,62 @@ fun RegistrationFlow(
             currentStep = RegistrationStep.CREATE_PASSWORD
             authViewModel.resetEmailOtpVerified()
         }
+    }
+
+    // Registration complete → show success dialog
+    LaunchedEffect(loginSuccess) {
+        if (loginSuccess) {
+            println("✅ Registration complete! Auto-login successful")
+            authViewModel.resetLoginSuccess()
+            showSuccessDialog = true
+        }
+    }
+
+    if (showSuccessDialog) {
+        AlertDialog(
+            onDismissRequest = {},
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = Color(0xFF6A9F50),
+                    modifier = Modifier.size(52.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = "Welcome to Eva2z!",
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            },
+            text = {
+                Text(
+                    text = "Your account has been created successfully. You're all set to start tracking your vehicles.",
+                    textAlign = TextAlign.Center,
+                    color = Color(0xFF555555),
+                    lineHeight = 22.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showSuccessDialog = false
+                        onSuccess()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6A9F50)),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+                ) {
+                    Text(
+                        text = "Get Started",
+                        color = Color.White,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            },
+            shape = RoundedCornerShape(24.dp)
+        )
     }
 
     Column(
@@ -188,15 +252,6 @@ fun RegistrationFlow(
 
                     // ── Step 3: Create Password ───────────────────────────
                     RegistrationStep.CREATE_PASSWORD -> {
-                        val loginSuccess by authViewModel.loginSuccess.collectAsState()
-
-                        LaunchedEffect(loginSuccess) {
-                            if (loginSuccess) {
-                                println("✅ Registration complete! Auto-login successful")
-                                onSuccess()
-                            }
-                        }
-
                         PasswordScreen(
                             title = "Create Password",
                             subtitle = "Secure your account with a strong password",

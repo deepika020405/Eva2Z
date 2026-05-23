@@ -360,6 +360,24 @@ class ApiService {
         }
     }
 
+    // ---------------- CANCEL FORGOT PASSWORD SESSION ----------------
+    suspend fun cancelForgotPassword(phone: String): JsonObject {
+        println("🌐 API: Cancelling forgot password session for phone=$phone")
+        return try {
+            val response = client.submitForm(
+                url = "${baseUrl}forgot-password-cancel",
+                formParameters = Parameters.build { append("phone", phone) }
+            ) {
+                header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+            }
+            println("✔️ Cancel Forgot Password Status: ${response.status}")
+            response.body()
+        } catch (e: Exception) {
+            println("❌ Cancel Forgot Password Error: ${e.message}")
+            buildJsonObject { put("error", e.message ?: "cancel failed") }
+        }
+    }
+
     // ---------------- RESET PASSWORD ----------------
     suspend fun resetPassword(
         phone: String,

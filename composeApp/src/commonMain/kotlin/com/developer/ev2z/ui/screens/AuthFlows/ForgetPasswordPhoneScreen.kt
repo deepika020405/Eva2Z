@@ -36,11 +36,14 @@ fun ForgetPasswordPhoneScreen(
     var hasHandledResult by remember { mutableStateOf(false) }
     var manuallyEdited   by remember { mutableStateOf(false) }
 
-    val isLoading by viewModel.loading.collectAsState()
-    val error     by viewModel.error.collectAsState()
-    val scrollState = rememberScrollState()
-    var phoneError      by remember { mutableStateOf<String?>(null) }
-    var previousLoading by remember { mutableStateOf(false) }
+    val isLoading         by viewModel.loading.collectAsState()
+    val error             by viewModel.error.collectAsState()
+    val rateLimitCountdown by viewModel.rateLimitCountdown.collectAsState()
+    val scrollState       = rememberScrollState()
+    var phoneError        by remember { mutableStateOf<String?>(null) }
+    var previousLoading   by remember { mutableStateOf(false) }
+
+    val isRateLimited = rateLimitCountdown > 0
 
     val phoneValid = phoneNumber.length >= 5
 
@@ -198,7 +201,7 @@ fun ForgetPasswordPhoneScreen(
                 modifier = Modifier.fillMaxWidth().height(buttonHeight),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor         = Color(0xFF6A9F50),
+                    containerColor         = if (isRateLimited) Color(0xFFD97706) else Color(0xFF6A9F50),
                     contentColor           = Color.White,
                     disabledContainerColor = Color(0xFFB5D4A5),
                     disabledContentColor   = Color.White
@@ -207,20 +210,30 @@ fun ForgetPasswordPhoneScreen(
                     defaultElevation = 2.dp,
                     pressedElevation = 4.dp
                 ),
-                enabled = !isLoading && phoneValid
+                enabled = !isLoading && phoneValid && !isRateLimited
             ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        color       = Color.White,
-                        modifier    = Modifier.size(22.dp),
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Text(
-                        text       = "Send OTP",
-                        fontSize   = buttonTextSize,
-                        fontWeight = FontWeight.SemiBold
-                    )
+                when {
+                    isLoading -> {
+                        CircularProgressIndicator(
+                            color       = Color.White,
+                            modifier    = Modifier.size(22.dp),
+                            strokeWidth = 2.dp
+                        )
+                    }
+                    isRateLimited -> {
+                        Text(
+                            text       = "Resend in ${rateLimitCountdown}s",
+                            fontSize   = buttonTextSize,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    else -> {
+                        Text(
+                            text       = "Send OTP",
+                            fontSize   = buttonTextSize,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
                 }
             }
 

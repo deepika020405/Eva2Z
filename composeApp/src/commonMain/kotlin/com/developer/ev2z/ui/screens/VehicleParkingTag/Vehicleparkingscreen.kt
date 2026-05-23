@@ -31,6 +31,7 @@ import androidx.compose.ui.window.DialogProperties
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.ui.components.CountryData
 import com.developer.ev2z.ui.components.CountryPickerDialog
+import com.developer.ev2z.ui.components.defaultCountry
 import kotlinx.coroutines.launch
 
 // ─────────────────────────────────────────────────────────────────
@@ -445,7 +446,10 @@ private fun ParkingFormCard(
 
             Eva2zInputField(
                 value           = vehicleNumber,
-                onValueChange   = { val filtered = it.filter { c -> c.isLetterOrDigit() }; if (filtered.length <= 12) onVehicleNumberChange(filtered) },
+                onValueChange   = {
+                    val filtered = it.uppercase().filter { c -> c.isLetterOrDigit() }
+                    if (filtered.length <= 15) onVehicleNumberChange(filtered)
+                },
                 label           = "VEHICLE NUMBER",
                 placeholder     = "e.g. DL01AB1234",
                 icon            = Icons.Outlined.Tag,
@@ -454,6 +458,45 @@ private fun ParkingFormCard(
                 capitalization  = KeyboardCapitalization.Characters,
                 keyboardActions = KeyboardActions(onNext = { onImeNext() })
             )
+
+            if (vehicleNumber.isNotBlank()) {
+                val hasLetters = vehicleNumber.any { it.isLetter() }
+                val hasDigits  = vehicleNumber.any { it.isDigit() }
+                val isValid    = vehicleNumber.length >= 4 && hasLetters && hasDigits
+                val hintColor  = when {
+                    isValid                   -> BrandGreen
+                    vehicleNumber.length >= 2 -> WarningText
+                    else                      -> TextSecondary
+                }
+                Row(
+                    modifier              = Modifier.fillMaxWidth().padding(horizontal = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment     = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment     = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            if (isValid) Icons.Default.CheckCircle else Icons.Default.Info,
+                            contentDescription = null,
+                            tint     = hintColor,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Text(
+                            if (isValid) "Valid format — letters & digits" else "Must contain both letters & digits",
+                            fontSize = 11.sp,
+                            color    = hintColor
+                        )
+                    }
+                    Text(
+                        "${vehicleNumber.length}/15",
+                        fontSize   = 11.sp,
+                        color      = hintColor,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
 
             Divider(color = BorderColor)
 
@@ -491,7 +534,7 @@ private fun ParkingFormCard(
             ) {
                 Icon(Icons.Default.Info, null, tint = BrandGreen, modifier = Modifier.size(16.dp))
                 Text(
-                    "Enter registration number exactly as on RC (e.g. DL01AB1234)",
+                    "Enter registration number exactly as on RC. India: DL01AB1234 · UK: AB12CDE · USA: 6ABC123",
                     fontSize = 12.sp, color = Color(0xFF2D6A3F), lineHeight = 18.sp
                 )
             }
@@ -1256,11 +1299,47 @@ private fun EditVehicleDialog(
 ) {
     var vehicleType     by remember { mutableStateOf(item.vehicle_type ?: "") }
     var vehicleNumber   by remember { mutableStateOf(item.vehicle_number ?: "") }
-    var alternatePhone1 by remember { mutableStateOf(item.alternate_phone_1 ?: item.phone ?: "") }
-    var alternatePhone2 by remember { mutableStateOf(item.alternate_phone_2 ?: item.alternate_phone ?: "") }
     val focusManager    = LocalFocusManager.current
 
-    val isSaveEnabled = alternatePhone1.isNotBlank()
+    var phone1Country   by remember { mutableStateOf(defaultCountry()) }
+    var phone2Country   by remember { mutableStateOf(defaultCountry()) }
+
+    // Strip stored dial-code prefix so only the local digits are shown
+    fun stripDialCode(full: String?, country: CountryData): String {
+        if (full.isNullOrBlank()) return ""
+        val prefix = country.dialCode.filter { it.isDigit() }
+        val digits  = full.filter { it.isDigit() }
+        return if (digits.startsWith(prefix)) digits.drop(prefix.length) else digits
+    }
+
+    var alternatePhone1 by remember { mutableStateOf(stripDialCode(item.alternate_phone_1 ?: item.phone, defaultCountry())) }
+    var alternatePhone2 by remember { mutableStateOf(stripDialCode(item.alternate_phone_2 ?: item.alternate_phone, defaultCountry())) }
+
+    var showPhone1Picker by remember { mutableStateOf(false) }
+    var showPhone2Picker by remember { mutableStateOf(false) }
+
+    val isSaveEnabled = alternatePhone1.length == phone1Country.phoneLength
+
+    if (showPhone1Picker) {
+        CountryPickerDialog(
+            onDismiss        = { showPhone1Picker = false },
+            onCountrySelected = { country ->
+                phone1Country = country
+                if (alternatePhone1.length > country.phoneLength) alternatePhone1 = alternatePhone1.take(country.phoneLength)
+                showPhone1Picker = false
+            }
+        )
+    }
+    if (showPhone2Picker) {
+        CountryPickerDialog(
+            onDismiss        = { showPhone2Picker = false },
+            onCountrySelected = { country ->
+                phone2Country = country
+                if (alternatePhone2.length > country.phoneLength) alternatePhone2 = alternatePhone2.take(country.phoneLength)
+                showPhone2Picker = false
+            }
+        )
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -1325,28 +1404,32 @@ private fun EditVehicleDialog(
                             readOnly      = true
                         )
 
-                        Eva2zInputField(
-                            value           = alternatePhone1,
-                            onValueChange   = { val d = it.filter { c -> c.isDigit() }; if (d.length <= 15) alternatePhone1 = d },
+                        ParkingPhoneInputField(
                             label           = "EMERGENCY CONTACT 1 *",
-                            placeholder     = "Enter phone number",
-                            icon            = Icons.Outlined.Phone,
-                            keyboardType    = KeyboardType.Phone,
+                            phoneNumber     = alternatePhone1,
+                            onPhoneChange   = { alternatePhone1 = it },
+                            selectedCountry = phone1Country,
+                            onCountryClick  = { showPhone1Picker = true },
+                            errorText       = null,
                             imeAction       = ImeAction.Next,
                             keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
                         )
 
-                        Eva2zInputField(
-                            value           = alternatePhone2,
-                            onValueChange   = { val d = it.filter { c -> c.isDigit() }; if (d.length <= 15) alternatePhone2 = d },
+                        ParkingPhoneInputField(
                             label           = "EMERGENCY CONTACT 2 (OPTIONAL)",
-                            placeholder     = "Enter phone number",
-                            icon            = Icons.Outlined.Phone,
-                            keyboardType    = KeyboardType.Phone,
+                            phoneNumber     = alternatePhone2,
+                            onPhoneChange   = { alternatePhone2 = it },
+                            selectedCountry = phone2Country,
+                            onCountryClick  = { showPhone2Picker = true },
+                            errorText       = null,
                             imeAction       = ImeAction.Done,
                             keyboardActions = KeyboardActions(onDone = {
                                 focusManager.clearFocus()
-                                if (isSaveEnabled) onSave(vehicleType, vehicleNumber, alternatePhone1, alternatePhone2)
+                                if (isSaveEnabled) {
+                                    val p1 = "${phone1Country.dialCode.filter { it.isDigit() }}$alternatePhone1"
+                                    val p2 = if (alternatePhone2.isNotBlank()) "${phone2Country.dialCode.filter { it.isDigit() }}$alternatePhone2" else ""
+                                    onSave(vehicleType, vehicleNumber, p1, p2)
+                                }
                             })
                         )
                     }
@@ -1369,7 +1452,9 @@ private fun EditVehicleDialog(
                         Button(
                             onClick  = {
                                 focusManager.clearFocus()
-                                onSave(vehicleType, vehicleNumber, alternatePhone1, alternatePhone2)
+                                val p1 = "${phone1Country.dialCode.filter { it.isDigit() }}$alternatePhone1"
+                                val p2 = if (alternatePhone2.isNotBlank()) "${phone2Country.dialCode.filter { it.isDigit() }}$alternatePhone2" else ""
+                                onSave(vehicleType, vehicleNumber, p1, p2)
                             },
                             enabled  = isSaveEnabled,
                             modifier = Modifier.weight(1f).height(48.dp),

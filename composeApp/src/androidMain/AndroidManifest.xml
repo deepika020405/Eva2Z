@@ -42,6 +42,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <!-- Android 14+ — foreground service type declaration -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
+    <!-- Android 14+ — required for ActiveCallService (keeps WebRTC mic alive in background) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/>
     <!-- Proximity sensor — turn off screen when phone is held to ear -->
     <uses-feature android:name="android.hardware.sensor.proximity" android:required="false" />
     <!-- Microphone hardware declaration -->
@@ -189,6 +191,12 @@
             android:name=".CallRingtoneService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+
+        <!-- 🎙️ Foreground service for active call — keeps WebRTC audio alive in background -->
+        <service
+            android:name=".ActiveCallService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
 
         <!-- META -->
         <meta-data

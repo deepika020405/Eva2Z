@@ -35,7 +35,10 @@ data class ShopUiState(
     val originalAmount: String? = null,
     val finalAmount: String? = null,
     val discountApplied: Double? = null,
-    val promoError: String? = null
+    val promoError: String? = null,
+    // Smart promo banner: what the user already owns
+    val hasGpsDevice: Boolean = false,
+    val hasParkingTag: Boolean = false
 )
 
 data class BillingAddress(
@@ -68,6 +71,8 @@ class ShopViewModel(
     private var cachedCart: List<CartItemDto>? = null
     private var cachedCartCount: Int = 0
     private var cachedTotalPrice: String? = null
+    private var cachedHasGpsDevice: Boolean = false
+    private var cachedHasParkingTag: Boolean = false
     private var lastLoadedAt: Long = 0L
 
 @OptIn(ExperimentalTime::class)
@@ -89,6 +94,8 @@ class ShopViewModel(
                 cart = cachedCart!!,
                 cartCount = cachedCartCount,
                 totalPrice = cachedTotalPrice,
+                hasGpsDevice = cachedHasGpsDevice,
+                hasParkingTag = cachedHasParkingTag,
                 error = null
             )
             return
@@ -104,12 +111,20 @@ class ShopViewModel(
                 val cartResp = repo.getCart(token)
                 val count = cartResp.cart.sumOf { it.quantity }
 
+                // Determine what the user already owns for the smart promo banner
+                val devicesResp = repo.getMyDevices(token)
+                val hasGps = devicesResp.devices.isNotEmpty()
+                val parkingResp = repo.getUserParkingList()
+                val hasParking = (parkingResp.data?.size ?: 0) > 0
+
                 // 🔥 SAVE CACHE
                 cachedProducts = products
                 cachedWishlist = wishlist
                 cachedCart = cartResp.cart
                 cachedCartCount = count
                 cachedTotalPrice = cartResp.totalPrice
+                cachedHasGpsDevice = hasGps
+                cachedHasParkingTag = hasParking
                 lastLoadedAt = Clock.System.now().toEpochMilliseconds()
 
                 _state.value = _state.value.copy(
@@ -119,6 +134,8 @@ class ShopViewModel(
                     cart = cartResp.cart,
                     cartCount = count,
                     totalPrice = cartResp.totalPrice,
+                    hasGpsDevice = hasGps,
+                    hasParkingTag = hasParking,
                     error = null
                 )
 

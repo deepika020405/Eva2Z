@@ -61,7 +61,8 @@ data class SavePasswordResponse(
 @Serializable
 data class ForgotPasswordResponse(
     val success: Boolean,
-    val message: String
+    val message: String,
+    val rateLimited: Boolean = false
 )
 
 @Serializable

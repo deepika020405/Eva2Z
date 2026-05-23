@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.util.SosNotificationHandler
 import kotlinx.coroutines.launch
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
@@ -88,6 +89,15 @@ private data class ChatMessage(
 private enum class MessageStatus { SENDING, SENT, DELIVERED, READ, ERROR }
 
 // ─────────────────────────────────────────────────────────────────
+// Chat list items — date dividers + messages interleaved
+// ─────────────────────────────────────────────────────────────────
+
+private sealed class ChatListItem {
+    data class DateDivider(val label: String) : ChatListItem()
+    data class Msg(val chatMessage: ChatMessage) : ChatListItem()
+}
+
+// ─────────────────────────────────────────────────────────────────
 // QuickReplyScreen — Direct Chat UI (opens from notification)
 // ─────────────────────────────────────────────────────────────────
 
@@ -113,6 +123,22 @@ fun QuickReplyScreen(
     val preloadedThread by viewModel.selectedThread.collectAsState()
 
     var messages by remember { mutableStateOf(listOf<ChatMessage>()) }
+
+    // Group messages by calendar day → insert a DateDivider before each new day
+    val chatItems = remember(messages) {
+        buildList {
+            var lastLabel = ""
+            messages.forEach { msg ->
+                val label = formatDateHeader(msg.sortKey)
+                if (label != lastLabel) {
+                    add(ChatListItem.DateDivider(label))
+                    lastLabel = label
+                }
+                add(ChatListItem.Msg(msg))
+            }
+        }
+    }
+
     var inputText by remember { mutableStateOf("") }
     var hasReplied by remember { mutableStateOf(false) }
     // Tracks the localId of the optimistic bubble we added before server confirms.
@@ -585,22 +611,15 @@ fun QuickReplyScreen(
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    // Date header
-                    item {
-                        DateHeader(text = "Today")
-                    }
-
-                    // Alert banner
-//                    item {
-//                        AlertInfoBanner(alertId = activeAlertId)
-//                    }
-
-                    // Chat bubbles
-                    items(messages) { message ->
-                        when {
-                            message.isCall        -> CallHistoryCard(message)
-                            message.isSystemMessage -> SystemMessage(text = message.text)
-                            else                  -> ChatBubble(message = message)
+                    // Date-grouped chat bubbles — each new calendar day gets its own header
+                    items(chatItems) { item ->
+                        when (item) {
+                            is ChatListItem.DateDivider -> DateHeader(text = item.label)
+                            is ChatListItem.Msg -> when {
+                                item.chatMessage.isCall         -> CallHistoryCard(item.chatMessage)
+                                item.chatMessage.isSystemMessage -> SystemMessage(text = item.chatMessage.text)
+                                else                            -> ChatBubble(message = item.chatMessage)
+                            }
                         }
                     }
 
@@ -1274,6 +1293,29 @@ private fun callStatusLabel(status: String?): String = when (status?.lowercase()
 // ─────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────
+
+// Returns "Today", "Yesterday", or "23 May 2026" for a given epoch-millisecond value.
+@OptIn(ExperimentalTime::class)
+private fun formatDateHeader(epochMs: Long): String {
+    return try {
+        val tz      = TimeZone.currentSystemDefault()
+        val msgDate = Instant.fromEpochMilliseconds(epochMs).toLocalDateTime(tz).date
+        val today   = Clock.System.now().toLocalDateTime(tz).date
+        when {
+            msgDate == today                              -> "Today"
+            today.toEpochDays() - msgDate.toEpochDays() == 1L -> "Yesterday"
+            else -> {
+                val month = msgDate.month.name
+                    .lowercase()
+                    .replaceFirstChar { it.uppercase() }
+                    .take(3)
+                "${msgDate.dayOfMonth} $month ${msgDate.year}"
+            }
+        }
+    } catch (_: Exception) {
+        "Today"
+    }
+}
 
 // Parses an ISO-8601 timestamp like "2026-04-10T05:59:02.000000Z" into ms-since-epoch.
 // Returns null if the string is missing or unparsable so the caller can fall back to clock time.

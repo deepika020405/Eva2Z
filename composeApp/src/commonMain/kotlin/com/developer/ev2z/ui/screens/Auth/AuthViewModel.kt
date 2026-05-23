@@ -42,6 +42,10 @@ class AuthViewModel(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error
 
+    // Rate-limit countdown (seconds remaining before user can resend OTP)
+    private val _rateLimitCountdown = MutableStateFlow(0)
+    val rateLimitCountdown: StateFlow<Int> = _rateLimitCountdown
+
     // User info state
     private val _userName = MutableStateFlow<String?>(null)
     val userName: StateFlow<String?> = _userName
@@ -377,11 +381,24 @@ class AuthViewModel(
             try {
                 val result = repository.forgotPassword(phone)
 
-                if (result.success) {
-                    println("🔥 Forgot password OTP sent!")
-                } else {
-                    println("❌ Forgot password failed: ${result.message}")
-                    _error.value = result.message
+                when {
+                    result.success -> {
+                        println("🔥 Forgot password OTP sent!")
+                    }
+                    result.rateLimited -> {
+                        println("⏳ Rate limited — starting 60s countdown")
+                        _loading.value = false
+                        for (i in 60 downTo 1) {
+                            _rateLimitCountdown.value = i
+                            kotlinx.coroutines.delay(1000)
+                        }
+                        _rateLimitCountdown.value = 0
+                        return@launch
+                    }
+                    else -> {
+                        println("❌ Forgot password failed: ${result.message}")
+                        _error.value = result.message
+                    }
                 }
 
             } catch (e: Exception) {
@@ -390,6 +407,19 @@ class AuthViewModel(
                 _error.value = mapToUserError(e)
             } finally {
                 _loading.value = false
+            }
+        }
+    }
+
+    // ============================================
+    // CANCEL FORGOT PASSWORD SESSION
+    // ============================================
+    fun cancelForgotPasswordSession(phone: String) {
+        viewModelScope.launch {
+            try {
+                repository.cancelForgotPassword(phone)
+            } catch (e: Exception) {
+                println("❌ Cancel forgot password session failed: ${e.message}")
             }
         }
     }
