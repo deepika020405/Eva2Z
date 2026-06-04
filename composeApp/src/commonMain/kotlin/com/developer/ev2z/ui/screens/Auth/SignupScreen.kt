@@ -132,7 +132,7 @@ fun SignupScreen(
                 placeholder = {
                     Text("Enter Your Full Name", color = Color(0xFFAAAAAA), fontSize = labelSize)
                 },
-                modifier = Modifier.fillMaxWidth().height(fieldHeight),
+                modifier = Modifier.fillMaxWidth().heightIn(min = fieldHeight),
                 shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor   = Color(0xFFF8FAF7),
@@ -215,7 +215,7 @@ fun SignupScreen(
                         maxLines = 1
                     )
                 },
-                modifier = Modifier.fillMaxWidth().height(emailFieldHeight),
+                modifier = Modifier.fillMaxWidth().heightIn(min = fieldHeight),
                 shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor   = Color(0xFFF8FAF7),

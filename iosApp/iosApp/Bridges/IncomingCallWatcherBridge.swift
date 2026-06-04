@@ -18,12 +18,14 @@ import ComposeApp
     private var socketManager: SocketManager?
     private var socket: SocketIOClient?
     private var currentRoomId: String = ""
+    private var hasEnded: Bool = false
 
     // MARK: - IOSIncomingCallWatcherDelegate
 
     func startWatching(roomId: String) {
         stopWatching()
         currentRoomId = roomId
+        hasEnded      = false
         print("🔌 [IncomingCallWatcher] Connecting for room=\(roomId)")
 
         guard let url = URL(string: signalingServerURL) else { return }
@@ -63,9 +65,11 @@ import ComposeApp
         // Caller cancelled or another device declined — dismiss on all devices
         s.on("call-ended") { [weak self] data, _ in
             guard let self = self,
+                  !self.hasEnded,
                   let dict      = data.first as? [String: Any],
                   let eventRoom = dict["roomId"] as? String,
                   eventRoom == self.currentRoomId else { return }
+            self.hasEnded = true
             print("📡 [IncomingCallWatcher] call-ended — dismissing IncomingCallScreen")
             DispatchQueue.main.async {
                 RingtoneManager.shared.stopRinging()
@@ -75,9 +79,11 @@ import ComposeApp
 
         s.on("end-call") { [weak self] data, _ in
             guard let self = self,
+                  !self.hasEnded,
                   let dict      = data.first as? [String: Any],
                   let eventRoom = dict["roomId"] as? String,
                   eventRoom == self.currentRoomId else { return }
+            self.hasEnded = true
             print("📡 [IncomingCallWatcher] end-call — dismissing IncomingCallScreen")
             DispatchQueue.main.async {
                 RingtoneManager.shared.stopRinging()

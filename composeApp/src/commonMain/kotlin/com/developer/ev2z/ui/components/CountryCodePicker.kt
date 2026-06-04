@@ -169,7 +169,7 @@ fun PhoneInputField(
         Surface(
             modifier = Modifier
                 .width(108.dp)
-                .height(fieldHeight)
+                .heightIn(min = fieldHeight)
                 .clip(RoundedCornerShape(16.dp))
                 .clickable(onClick = onCountryClick),
             shape = RoundedCornerShape(16.dp),
@@ -226,7 +226,7 @@ fun PhoneInputField(
             },
             modifier = Modifier
                 .weight(1f)
-                .height(fieldHeight),
+                .heightIn(min = fieldHeight),
             shape = RoundedCornerShape(16.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor   = Color(0xFFF8FAF7),

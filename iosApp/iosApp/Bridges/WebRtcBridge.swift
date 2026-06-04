@@ -348,14 +348,17 @@ private let kStunServer2        = "stun:stun1.l.google.com:19302"
 
         socket?.on("end-call") { [weak self] _, _ in
             guard let self = self, self.isCallActive else { return }
+            self.isCallActive = false
             print("📵 [WebRtcBridge] end-call received — remote peer ended call")
             DispatchQueue.main.async { SosNotificationHandler.shared.onCallEnded() }
         }
 
-        // Alternative event names the backend may emit on REST decline/reject
+        // Alternative event names the backend may emit on REST decline/reject.
+        // isCallActive is flipped immediately so only the first event fires onCallEnded.
         for eventName in ["call_declined", "call_rejected", "call_ended"] {
             socket?.on(eventName) { [weak self] _, _ in
                 guard let self = self, self.isCallActive else { return }
+                self.isCallActive = false
                 print("📵 [WebRtcBridge] \(eventName) received — ending call")
                 DispatchQueue.main.async { SosNotificationHandler.shared.onCallEnded() }
             }
