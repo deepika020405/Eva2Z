@@ -13,8 +13,8 @@ data class ParkingRequest(
     @SerialName("vehicle_number")     val vehicle_number: String,
     @SerialName("phone")              val phone: String,
     @SerialName("alternate_phone_1")  val alternate_phone_1: String,
-    @SerialName("alternate_phone_2")  val alternate_phone_2: String? = null
-)
+    @SerialName("alternate_phone_2")  val alternate_phone_2: String? = null,
+    @SerialName("refral_code")        val refral_code: String? = null)
 
 // ─────────────────────────────────────────────────────────────────
 // Response  — API returns "status": true
@@ -43,6 +43,7 @@ data class ParkingData(
     @SerialName("vehicle_number")    val vehicle_number: String?      = null,
     @SerialName("alternate_phone_1") val alternate_phone_1: String?   = null,
     @SerialName("alternate_phone_2") val alternate_phone_2: String?   = null,
+    @SerialName("refral_code")       val refral_code: String? = null,   // ADD THIS
     // Keep old field names for backward compatibility with existing API responses
     @SerialName("phone")             val phone: String?               = null,
     @SerialName("alternate_phone")   val alternate_phone: String?     = null,

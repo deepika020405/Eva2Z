@@ -85,6 +85,8 @@ fun ParkingScreen(
     var deleteTargetId     by remember { mutableStateOf<Int?>(null) }
     var deleteTargetName   by remember { mutableStateOf("") }
     var editTargetItem     by remember { mutableStateOf<ParkingData?>(null) }
+    var promoCode by remember { mutableStateOf("") }
+    var showPromoField by remember { mutableStateOf(false) }
     val snackbarHostState  = remember { SnackbarHostState() }
     val scope              = rememberCoroutineScope()
 
@@ -190,30 +192,44 @@ fun ParkingScreen(
                 exit    = fadeOut() + shrinkVertically()
             ) {
                 ParkingFormCard(
-                    vehicleType              = vehicleType,
-                    vehicleNumber            = vehicleNumber,
-                    phone                    = phone,
-                    alternatePhone           = alternatePhone,
-                    phoneCountry             = phoneCountry,
-                    alternatePhoneCountry    = alternatePhoneCountry,
-                    vehicleTypeError         = vehicleTypeError,
-                    vehicleNumberError       = vehicleNumberError,
-                    phoneError               = phoneError,
-                    alternatePhoneError      = alternatePhoneError,
-                    isLoading                = uiState is ParkingUiState.Loading,
-                    isFormValid              = viewModel.isFormValid,
-                    onVehicleTypeChange      = viewModel::onVehicleTypeChange,
-                    onVehicleNumberChange    = viewModel::onVehicleNumberChange,
-                    onPhoneChange            = viewModel::onPhoneChange,
-                    onAlternatePhoneChange   = viewModel::onAlternatePhoneChange,
-                    onPhoneCountryClick      = { showPhonePicker = true },
-                    onAltPhoneCountryClick   = { showAltPhonePicker = true },
-                    onChipSelect             = viewModel::selectVehicleType,
+                    vehicleType = vehicleType,
+                    vehicleNumber = vehicleNumber,
+                    phone = phone,
+                    alternatePhone = alternatePhone,
+                    phoneCountry = phoneCountry,
+                    alternatePhoneCountry = alternatePhoneCountry,
+                    vehicleTypeError = vehicleTypeError,
+                    vehicleNumberError = vehicleNumberError,
+                    phoneError = phoneError,
+                    alternatePhoneError = alternatePhoneError,
+                    isLoading = uiState is ParkingUiState.Loading,
+                    isFormValid = viewModel.isFormValid,
+
+                    promoCode = promoCode,
+                    showPromoField = showPromoField,
+                    onPromoCodeChange = { promoCode = it },
+                    onPromoClick = {
+                        showPromoField = !showPromoField
+                    },
+
+                    onVehicleTypeChange = viewModel::onVehicleTypeChange,
+                    onVehicleNumberChange = viewModel::onVehicleNumberChange,
+                    onPhoneChange = viewModel::onPhoneChange,
+                    onAlternatePhoneChange = viewModel::onAlternatePhoneChange,
+                    onPhoneCountryClick = { showPhonePicker = true },
+                    onAltPhoneCountryClick = { showAltPhonePicker = true },
+                    onChipSelect = viewModel::selectVehicleType,
+
                     onSubmit = {
                         focusManager.clearFocus()
-                        viewModel.submitParking()
+                        viewModel.submitParking(
+                            promoCode.trim()
+                        )
                     },
-                    onImeNext = { focusManager.moveFocus(FocusDirection.Down) }
+
+                    onImeNext = {
+                        focusManager.moveFocus(FocusDirection.Down)
+                    }
                 )
             }
 
@@ -411,6 +427,10 @@ private fun ParkingFormCard(
     alternatePhoneError: String?,
     isLoading: Boolean,
     isFormValid: Boolean,
+    promoCode: String,
+    showPromoField: Boolean,
+    onPromoCodeChange: (String) -> Unit,
+    onPromoClick: () -> Unit,
     onVehicleTypeChange: (String) -> Unit,
     onVehicleNumberChange: (String) -> Unit,
     onPhoneChange: (String) -> Unit,
@@ -498,6 +518,21 @@ private fun ParkingFormCard(
                 }
             }
 
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(GreenLight)
+                    .padding(11.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(Icons.Default.Info, null, tint = BrandGreen, modifier = Modifier.size(16.dp))
+                Text(
+                    "Enter registration number exactly as on RC. India: DL01AB1234 · UK: AB12CDE · USA: 6ABC123",
+                    fontSize = 12.sp, color = Color(0xFF2D6A3F), lineHeight = 18.sp
+                )
+            }
+
             Divider(color = BorderColor)
 
             ParkingPhoneInputField(
@@ -524,19 +559,84 @@ private fun ParkingFormCard(
                 keyboardActions = KeyboardActions(onDone = { if (isFormValid) onSubmit() })
             )
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(GreenLight)
-                    .padding(11.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            Divider(color = BorderColor)
+
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.Default.Info, null, tint = BrandGreen, modifier = Modifier.size(16.dp))
-                Text(
-                    "Enter registration number exactly as on RC. India: DL01AB1234 · UK: AB12CDE · USA: 6ABC123",
-                    fontSize = 12.sp, color = Color(0xFF2D6A3F), lineHeight = 18.sp
-                )
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            onPromoClick()
+                        },
+                    shape = RoundedCornerShape(12.dp),
+                    color = BackgroundColor,
+                    border = BorderStroke(1.dp, BorderColor)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(
+                            horizontal = 14.dp,
+                            vertical = 14.dp
+                        ),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+
+                            Icon(
+                                Icons.Default.LocalOffer,
+                                contentDescription = null,
+                                tint = BrandGreen
+                            )
+
+                            Spacer(modifier = Modifier.width(10.dp))
+
+                            Column {
+                                Text(
+                                    text = "Do you have a Promo Code?",
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.sp
+                                )
+
+                                Text(
+                                    text = "Use Promo Code",
+                                    fontSize = 12.sp,
+                                    color = TextSecondary
+                                )
+                            }
+                        }
+
+                        Icon(
+                            imageVector =
+                                if (showPromoField)
+                                    Icons.Default.KeyboardArrowUp
+                                else
+                                    Icons.Default.KeyboardArrowDown,
+                            contentDescription = null
+                        )
+                    }
+                }
+
+                AnimatedVisibility(
+                    visible = showPromoField
+                ) {
+                    Eva2zInputField(
+                        value = promoCode,
+                        onValueChange = {
+                            onPromoCodeChange(it.uppercase())
+                        },
+                        label = "PROMO CODE",
+                        placeholder = "Enter Promo Code",
+                        icon = Icons.Default.LocalOffer,
+                        capitalization = KeyboardCapitalization.Characters,
+                        imeAction = ImeAction.Done
+                    )
+                }
             }
 
             Button(

@@ -159,7 +159,9 @@ class ParkingViewModel(
 
     // ── Submit ────────────────────────────────────────────────────
 
-    fun submitParking() {
+    fun submitParking(
+        promoCode: String = ""
+    ) {
         if (_uiState.value is ParkingUiState.Loading) return
 
         var valid = true
@@ -228,7 +230,8 @@ class ParkingViewModel(
                 phone           = _registeredPhone.value,
                 alternatePhone1 = "${_phoneCountry.value.dialCode.filter { it.isDigit() }}${_phone.value}",
                 alternatePhone2 = _alternatePhone.value.ifEmpty { null }
-                    ?.let { "${_alternatePhoneCountry.value.dialCode.filter { it.isDigit() }}$it" }
+                    ?.let { "${_alternatePhoneCountry.value.dialCode.filter { it.isDigit() }}$it" },
+                referralCode    = promoCode.ifEmpty { null }
             )
 
             if (!response.status) {

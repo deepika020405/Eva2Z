@@ -1208,18 +1208,20 @@ class ApiService {
         vehicleNumber: String,
         phone: String,
         alternatePhone1: String,
-        alternatePhone2: String? = null
+        alternatePhone2: String? = null,
+        referralCode: String? = null
     ): ParkingResponse {
 
         val token = AppTokenProvider.getToken()
         val url   = "${baseUrl}vehicle-parking"
 
         val requestBody = ParkingRequest(
-            vehicle_type      = vehicleType.trim(),
-            vehicle_number    = vehicleNumber.trim(),
-            phone             = phone.trim(),
+            vehicle_type = vehicleType.trim(),
+            vehicle_number = vehicleNumber.trim(),
+            phone = phone.trim(),
             alternate_phone_1 = alternatePhone1.trim(),
-            alternate_phone_2 = alternatePhone2?.trim()?.ifEmpty { null }
+            alternate_phone_2 = alternatePhone2?.trim()?.ifEmpty { null },
+            refral_code = referralCode?.trim()?.ifEmpty { null }
         )
 
         println("🌐 parkVehicle → POST $url")
