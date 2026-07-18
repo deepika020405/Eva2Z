@@ -95,8 +95,8 @@ fun CreateStoryScreen(
                     Text(
                         "Add Story",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        color = Color(0xFF222222)
+                        fontSize = 18.sp,
+                        color = Color(0xFF0F172A)
                     )
                 },
                 navigationIcon = {
@@ -107,7 +107,7 @@ fun CreateStoryScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             null,
-                            tint = Color(0xFF333333)
+                            tint = Color(0xFF0F172A)
                         )
                     }
                 },
@@ -125,10 +125,10 @@ fun CreateStoryScreen(
                     ) {
                         Text(
                             "Create",
-                            color = if (image != null && !isUploading) Color(0xFF6A9F50)
-                            else Color(0xFFCCCCCC),
+                            color = if (image != null && !isUploading) Color(0xFF00A844)
+                            else Color(0xFF94A3B8),
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = 15.sp
+                            fontSize = 13.sp
                         )
                     }
                 },
@@ -144,7 +144,7 @@ fun CreateStoryScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(Color(0xFFF5F6F8))
+                .background(Color(0xFFF8FAFC))
         ) {
             val screenHeight = maxHeight
             val screenWidth = maxWidth
@@ -163,8 +163,8 @@ fun CreateStoryScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(imageBoxHeight)
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(if (image == null) Color(0xFFF0F7EC) else Color(0xFFE8F5E9))
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(if (image == null) Color(0xFFDCFCE7) else Color(0xFFDCFCE7))
                         .clickable(enabled = !isUploading) {
                             imagePickerLauncher.launch()
                         },
@@ -176,22 +176,22 @@ fun CreateStoryScreen(
                                 modifier = Modifier
                                     .size(56.dp)
                                     .background(
-                                        Color(0xFF6A9F50).copy(alpha = 0.15f),
-                                        RoundedCornerShape(16.dp)
+                                        Color(0xFF00A844).copy(alpha = 0.15f),
+                                        RoundedCornerShape(18.dp)
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
                                     Icons.Rounded.CameraAlt,
                                     contentDescription = null,
-                                    tint = Color(0xFF6A9F50),
+                                    tint = Color(0xFF00A844),
                                     modifier = Modifier.size(28.dp)
                                 )
                             }
                             Spacer(Modifier.height(12.dp))
                             Text(
                                 "Tap to capture / select image",
-                                color = Color(0xFF6A9F50),
+                                color = Color(0xFF00A844),
                                 fontWeight = FontWeight.Medium,
                                 fontSize = if (isCompact) 14.sp else 15.sp
                             )
@@ -201,21 +201,21 @@ fun CreateStoryScreen(
                             Icon(
                                 Icons.Rounded.CameraAlt,
                                 contentDescription = null,
-                                tint = Color(0xFF6A9F50),
+                                tint = Color(0xFF00A844),
                                 modifier = Modifier.size(32.dp)
                             )
                             Spacer(Modifier.height(8.dp))
                             Text(
                                 "Image selected",
-                                color = Color(0xFF6A9F50),
+                                color = Color(0xFF00A844),
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = if (isCompact) 15.sp else 16.sp
                             )
                             Spacer(Modifier.height(4.dp))
                             Text(
                                 "Tap to change",
-                                color = Color(0xFF999999),
-                                fontSize = 13.sp
+                                color = Color(0xFF94A3B8),
+                                fontSize = 12.sp
                             )
                         }
                     }
@@ -230,7 +230,7 @@ fun CreateStoryScreen(
                         .background(Color.Black.copy(alpha = 0.3f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = Color(0xFF6A9F50))
+                    CircularProgressIndicator(color = Color(0xFF00A844))
                 }
             }
         }

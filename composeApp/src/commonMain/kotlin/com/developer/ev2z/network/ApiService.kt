@@ -62,6 +62,19 @@ class ApiService {
     private val baseUrl = KtorClient.BASE_URL
     private val gpsBaseUrl = "${KtorClient.SOCKET_SERVER_URL}/api/"
 
+    companion object {
+        /**
+         * Resolves a possibly-relative image URL (e.g. "/storage/vault/x.jpeg")
+         * returned by the API into an absolute URL against the app host.
+         */
+        fun absoluteImageUrl(imageUrl: String?): String? {
+            if (imageUrl.isNullOrBlank()) return null
+            if (imageUrl.startsWith("http")) return imageUrl
+            val host = KtorClient.BASE_URL.removeSuffix("api/").removeSuffix("/")
+            return host + if (imageUrl.startsWith("/")) imageUrl else "/$imageUrl"
+        }
+    }
+
     // ===============================================
     // AUTHENTICATION APIs
     // ===============================================
@@ -2122,7 +2135,7 @@ class ApiService {
 
 
     // ---------------- COMMUNITY POSTS ----------------
-    suspend fun getCommunityPosts(): CommunityResponse {
+    suspend fun getCommunityPosts(): List<Post> {
         val token = AppTokenProvider.getToken()
 
         println("🌐 API: Fetching community posts")
@@ -2133,7 +2146,20 @@ class ApiService {
             }
 
             println("✔️ Posts Status: ${response.status}")
-            response.body()
+
+            val raw = response.bodyAsText()
+            val json = Json { ignoreUnknownKeys = true }
+            val element = json.parseToJsonElement(raw)
+
+            // API may return either a bare array [ {...} ] or a wrapper { "data": [ {...} ] }
+            val arrayElement = when {
+                element is kotlinx.serialization.json.JsonArray -> element
+                element is JsonObject && element["data"] is kotlinx.serialization.json.JsonArray ->
+                    element["data"]!!.jsonArray
+                else -> kotlinx.serialization.json.JsonArray(emptyList())
+            }
+
+            json.decodeFromJsonElement(ListSerializer(Post.serializer()), arrayElement)
 
         } catch (e: Exception) {
             println("❌ Community Posts Error: ${e.message}")
@@ -2145,7 +2171,11 @@ class ApiService {
     suspend fun createCommunityPost(
         title: String,
         body: String,
-        images: List<ByteArray>
+        images: List<ByteArray>,
+        lat: Double?,
+        long: Double?,
+        city: String?,
+        category: String?
     ): JsonObject {
 
         val token = AppTokenProvider.getToken()
@@ -2155,6 +2185,10 @@ class ApiService {
             formData = formData {
                 append("title", title)
                 append("body", body)
+                lat?.let { append("lat", it.toString()) }
+                long?.let { append("long", it.toString()) }
+                city?.takeIf { it.isNotBlank() }?.let { append("city", it) }
+                category?.takeIf { it.isNotBlank() }?.let { append("category", it) }
 
                 images.forEachIndexed { index, bytes ->
                     append(
@@ -2557,6 +2591,38 @@ class ApiService {
     }
 
 
+    suspend fun getVaultDocumentDetail(
+        documentId: String,
+        vaultToken: String,
+        authToken: String
+    ): VaultDocumentDetail? {
+
+        val url = "${baseUrl}document/$documentId"
+
+        println("🌐 API: Fetching document detail $documentId")
+
+        return try {
+            val response = client.get(url) {
+                header("X-Vault-Token", vaultToken)
+                header(HttpHeaders.Authorization, "Bearer $authToken")
+                header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+            }
+
+            val raw = response.bodyAsText()
+            println("📥 document/$documentId ${response.status}")
+
+            if (!response.status.isSuccess()) return null
+
+            kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+                .decodeFromString(VaultDocumentDetailResponse.serializer(), raw)
+                .data
+
+        } catch (e: Exception) {
+            println("❌ document detail error: ${e.message}")
+            null
+        }
+    }
+
     suspend fun getVaultDocumentFile(
         documentId: String,
         vaultToken: String,
@@ -2573,7 +2639,9 @@ class ApiService {
         }
 
         if (response.status != HttpStatusCode.OK) {
-            throw Exception("Failed to fetch document")
+            val errorBody = try { response.bodyAsText() } catch (e: Exception) { "<no body>" }
+            println("❌ vault/$documentId ${response.status} → $errorBody")
+            throw Exception("Failed to fetch document (${response.status}): $errorBody")
         }
 
         return response.body()
@@ -2584,18 +2652,60 @@ class ApiService {
         vaultToken: String,
         authToken: String
     ) {
-        val url = "${baseUrl}vault/$documentId"
+        // Delete lives at vault/document/{id} (the file fetch is vault/{id}).
+        val url = "${baseUrl}vault/document/$documentId"
 
         val response = client.delete(url) {
             header("X-Vault-Token", vaultToken)
             header(HttpHeaders.Authorization, "Bearer $authToken")
         }
+        println("🗑️ vault delete $documentId → ${response.status}")
 
-        if (response.status != HttpStatusCode.OK) {
+        if (!response.status.isSuccess()) {
             throw Exception("Failed to delete document")
         }
     }
 
+
+    suspend fun reuploadDocument(
+        documentId: String,
+        vaultToken: String,
+        authToken: String,
+        encryptedFile: ByteArray,
+        fileName: String,
+        fileType: String,
+        salt: String,
+        iv: String,
+        authTag: String,
+        checksum: String
+    ): VaultUploadResponse {
+        val response = client.submitFormWithBinaryData(
+            url = "${baseUrl}reupload",
+            formData = formData {
+                append("id", documentId)
+                append("encrypted_file", encryptedFile, Headers.build {
+                    append(HttpHeaders.ContentType, "image/jpeg")
+                    append(
+                        HttpHeaders.ContentDisposition,
+                        "filename=\"$fileName.jpg\""
+                    )
+                })
+                append("file_name", fileName)
+                append("file_type", fileType)
+                append("salt", salt)
+                append("iv", iv)
+                append("auth_tag", authTag)
+                append("checksum", checksum)
+            }
+        ) {
+            headers {
+                append("X-Vault-Token", vaultToken)
+                append("Authorization", "Bearer $authToken")
+            }
+        }
+
+        return parseVaultUploadResponse(response)
+    }
 
     suspend fun uploadVaultDocument(
         vaultToken: String,
@@ -2607,7 +2717,7 @@ class ApiService {
         iv: String,
         authTag: String,
         checksum: String
-    ) {
+    ): VaultUploadResponse {
         val response = client.submitFormWithBinaryData(
             url = "${baseUrl}vault/upload",
             formData = formData {
@@ -2632,12 +2742,7 @@ class ApiService {
             }
         }
 
-        val raw = response.bodyAsText()
-        println("📤 uploadVaultDocument ${response.status}: $raw")
-
-        if (!response.status.isSuccess()) {
-            throw Exception("Upload failed (${response.status.value}): $raw")
-        }
+        return parseVaultUploadResponse(response)
     }
 
 
@@ -2652,8 +2757,8 @@ class ApiService {
         iv: String,
         authTag: String,
         checksum: String
-    ) {
-        client.submitFormWithBinaryData(
+    ): VaultUploadResponse {
+        val response = client.submitFormWithBinaryData(
             url = "${baseUrl}vault/update/$documentId",
             formData = formData {
 
@@ -2675,6 +2780,29 @@ class ApiService {
             headers {
                 append("X-Vault-Token", vaultToken)
                 append("Authorization", "Bearer $authToken")
+            }
+        }
+
+        return parseVaultUploadResponse(response)
+    }
+
+
+    private suspend fun parseVaultUploadResponse(response: HttpResponse): VaultUploadResponse {
+        val raw = response.bodyAsText()
+        println("📤 vault upload/update ${response.status}: $raw")
+
+        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+        return try {
+            json.decodeFromString(VaultUploadResponse.serializer(), raw)
+        } catch (e: Exception) {
+            println("❌ Could not parse vault upload response: ${e.message}")
+            if (response.status.isSuccess()) {
+                VaultUploadResponse(success = true)
+            } else {
+                VaultUploadResponse(
+                    success = false,
+                    message = "Upload failed (${response.status.value}). Please try again."
+                )
             }
         }
     }

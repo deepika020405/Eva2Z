@@ -12,18 +12,20 @@ class CommunityRepository(
 ) {
 
     suspend fun fetchPosts(): List<Post> {
-        return apiService
-            .getCommunityPosts()
-            .data
+        return apiService.getCommunityPosts()
     }
 
 
     suspend fun createPost(
         title: String,
         body: String,
-        images: List<ByteArray>
+        images: List<ByteArray>,
+        lat: Double?,
+        long: Double?,
+        city: String?,
+        category: String?
     ): JsonObject {
-        return apiService.createCommunityPost(title, body, images)
+        return apiService.createCommunityPost(title, body, images, lat, long, city, category)
     }
 
 

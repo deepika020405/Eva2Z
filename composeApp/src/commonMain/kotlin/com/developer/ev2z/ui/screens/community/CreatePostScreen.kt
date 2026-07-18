@@ -3,6 +3,8 @@ package com.developer.ev2z.ui.screens.community
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
@@ -20,9 +22,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.border
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.filled.LocationOn
+import com.developer.ev2z.fetchPhoneLocation
+import com.developer.ev2z.openLocationSettings
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.util.Analytics
 import com.developer.ev2z.util.rememberImagePicker
+
+private val postCategories = listOf("Tips", "Traffic", "Stolen", "Lost", "Found", "Police")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,6 +43,14 @@ fun CreatePostScreen(
     var title by remember { mutableStateOf("") }
     var body by remember { mutableStateOf("") }
     var images by remember { mutableStateOf<List<ByteArray>>(emptyList()) }
+    var selectedCategory by remember { mutableStateOf(postCategories.first()) }
+
+    // 📍 Auto-detected location → city (sent with the post so it lands in the right community)
+    var lat by remember { mutableStateOf<Double?>(null) }
+    var long by remember { mutableStateOf<Double?>(null) }
+    var city by remember { mutableStateOf("") }
+    var locating by remember { mutableStateOf(true) }
+    var locationOff by remember { mutableStateOf(false) }
 
     var isPosting by remember { mutableStateOf(false) }
     var postSuccess by remember { mutableStateOf(false) }
@@ -43,6 +60,28 @@ fun CreatePostScreen(
     LaunchedEffect(Unit) {
         Analytics.logEvent("create_post_screen_view")
     }
+
+    // Fetch device location, then reverse-geocode to a city name.
+    fun fetchLocation() {
+        locating = true
+        locationOff = false
+        fetchPhoneLocation { lt, ln ->
+            if (lt != 0.0 || ln != 0.0) {
+                lat = lt
+                long = ln
+                viewModel.resolveCity(lt, ln) { resolved ->
+                    city = resolved
+                    locating = false
+                }
+            } else {
+                // Permission denied or location services off.
+                locating = false
+                locationOff = true
+            }
+        }
+    }
+
+    LaunchedEffect(Unit) { fetchLocation() }
 
     PlatformBackHandler(true) { onBack() }
 
@@ -68,8 +107,8 @@ fun CreatePostScreen(
                     Text(
                         "Create Post",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        color = Color(0xFF222222)
+                        fontSize = 18.sp,
+                        color = Color(0xFF0F172A)
                     )
                 },
                 navigationIcon = {
@@ -80,7 +119,7 @@ fun CreatePostScreen(
                         Icon(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             null,
-                            tint = Color(0xFF333333)
+                            tint = Color(0xFF0F172A)
                         )
                     }
                 },
@@ -92,17 +131,21 @@ fun CreatePostScreen(
                             viewModel.createPost(
                                 title = title,
                                 body = body,
-                                images = images
+                                images = images,
+                                lat = lat,
+                                long = long,
+                                city = city.takeIf { it.isNotBlank() },
+                                category = selectedCategory
                             )
                             postSuccess = true
                         }
                     ) {
                         Text(
                             "Post",
-                            color = if (body.isNotBlank() && !isPosting) Color(0xFF6A9F50)
-                            else Color(0xFFCCCCCC),
+                            color = if (body.isNotBlank() && !isPosting) Color(0xFF00A844)
+                            else Color(0xFF94A3B8),
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = 15.sp
+                            fontSize = 13.sp
                         )
                     }
                 },
@@ -118,7 +161,7 @@ fun CreatePostScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(Color(0xFFF5F6F8))
+                .background(Color(0xFFF8FAFC))
         ) {
             val screenHeight = maxHeight
             val screenWidth = maxWidth
@@ -130,6 +173,8 @@ fun CreatePostScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .imePadding()
+                    .verticalScroll(rememberScrollState())
                     .padding(horizontal = horizontalPad, vertical = if (isCompact) 12.dp else 16.dp)
             ) {
                 // Title Field
@@ -139,7 +184,7 @@ fun CreatePostScreen(
                     placeholder = {
                         Text(
                             "Title (optional)",
-                            color = Color(0xFFAAAAAA),
+                            color = Color(0xFF94A3B8),
                             fontSize = labelSize
                         )
                     },
@@ -148,9 +193,9 @@ fun CreatePostScreen(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = Color.White,
                         unfocusedContainerColor = Color.White,
-                        unfocusedBorderColor = Color(0xFFE0E0E0),
-                        focusedBorderColor = Color(0xFF6A9F50),
-                        cursorColor = Color(0xFF6A9F50)
+                        unfocusedBorderColor = Color(0xFFE2E8F0),
+                        focusedBorderColor = Color(0xFF00A844),
+                        cursorColor = Color(0xFF00A844)
                     ),
                     singleLine = true
                 )
@@ -164,7 +209,7 @@ fun CreatePostScreen(
                     placeholder = {
                         Text(
                             "What's on your mind?",
-                            color = Color(0xFFAAAAAA),
+                            color = Color(0xFF94A3B8),
                             fontSize = labelSize
                         )
                     },
@@ -175,11 +220,80 @@ fun CreatePostScreen(
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = Color.White,
                         unfocusedContainerColor = Color.White,
-                        unfocusedBorderColor = Color(0xFFE0E0E0),
-                        focusedBorderColor = Color(0xFF6A9F50),
-                        cursorColor = Color(0xFF6A9F50)
+                        unfocusedBorderColor = Color(0xFFE2E8F0),
+                        focusedBorderColor = Color(0xFF00A844),
+                        cursorColor = Color(0xFF00A844)
                     )
                 )
+
+                Spacer(Modifier.height(if (isCompact) 12.dp else 16.dp))
+
+                // Category selector
+                Text(
+                    "Category",
+                    fontSize = labelSize,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF475569)
+                )
+                Spacer(Modifier.height(8.dp))
+                LazyRow {
+                    items(postCategories) { cat ->
+                        val selected = cat == selectedCategory
+                        Box(
+                            modifier = Modifier
+                                .padding(end = 8.dp)
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(if (selected) Color(0xFF00A844) else Color.White)
+                                .border(
+                                    1.dp,
+                                    if (selected) Color(0xFF00A844) else Color(0xFFE2E8F0),
+                                    RoundedCornerShape(18.dp)
+                                )
+                                .clickable(enabled = !isPosting) { selectedCategory = cat }
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                cat,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = if (selected) Color.White else Color(0xFF475569)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(if (isCompact) 12.dp else 16.dp))
+
+                // Detected location (auto from device, sent as the post's city)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(enabled = !locating && !isPosting) {
+                            if (locationOff) openLocationSettings()
+                            fetchLocation()
+                        }
+                        .padding(vertical = 4.dp)
+                ) {
+                    Icon(
+                        Icons.Default.LocationOn,
+                        null,
+                        tint = if (locationOff) Color(0xFFDC2626) else Color(0xFF00A844),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        when {
+                            locating -> "Detecting location…"
+                            locationOff -> "Location is off — tap to enable"
+                            city.isNotBlank() -> city
+                            else -> "Location unavailable — tap to retry"
+                        },
+                        fontSize = 12.sp,
+                        color = if (locationOff) Color(0xFFDC2626) else Color(0xFF94A3B8)
+                    )
+                }
 
                 Spacer(Modifier.height(if (isCompact) 12.dp else 16.dp))
 
@@ -192,13 +306,13 @@ fun CreatePostScreen(
                                     .size(if (isCompact) 80.dp else 90.dp)
                                     .padding(end = 8.dp)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(Color(0xFFF0F7EC)),
+                                    .background(Color(0xFFDCFCE7)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
                                     "Image ${index + 1}",
-                                    color = Color(0xFF6A9F50),
-                                    fontSize = 12.sp,
+                                    color = Color(0xFF00A844),
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Medium
                                 )
                                 // Close button
@@ -208,7 +322,7 @@ fun CreatePostScreen(
                                         .padding(4.dp)
                                         .size(20.dp)
                                         .clip(CircleShape)
-                                        .background(Color(0xFF6A9F50))
+                                        .background(Color(0xFF00A844))
                                         .clickable {
                                             images = images.toMutableList().also {
                                                 it.removeAt(index)
@@ -237,19 +351,19 @@ fun CreatePostScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(if (isCompact) 46.dp else 48.dp),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.outlinedButtonColors(
-                        contentColor = Color(0xFF6A9F50)
+                        contentColor = Color(0xFF00A844)
                     ),
                     border = androidx.compose.foundation.BorderStroke(
                         1.dp,
-                        if (images.size < 5) Color(0xFF6A9F50) else Color(0xFFE0E0E0)
+                        if (images.size < 5) Color(0xFF00A844) else Color(0xFFE2E8F0)
                     )
                 ) {
                     Icon(
                         Icons.Default.Image,
                         null,
-                        tint = Color(0xFF6A9F50),
+                        tint = Color(0xFF00A844),
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(Modifier.width(8.dp))
@@ -269,7 +383,7 @@ fun CreatePostScreen(
                         .background(Color.Black.copy(alpha = 0.3f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    CircularProgressIndicator(color = Color(0xFF6A9F50))
+                    CircularProgressIndicator(color = Color(0xFF00A844))
                 }
             }
         }

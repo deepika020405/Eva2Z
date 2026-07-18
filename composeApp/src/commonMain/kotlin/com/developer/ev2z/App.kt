@@ -34,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import com.developer.ev2z.data.local.DeepLinkManager
 import com.developer.ev2z.ui.screens.SplashScreen
+import com.developer.ev2z.ui.screens.onboarding.OnboardingScreen
 import com.developer.ev2z.ui.screens.deviceStatus.DeviceStatusScreen
 import com.developer.ev2z.ui.screens.trackTrace.TrackTraceScreen
 import com.developer.ev2z.util.FcmRegistrar
@@ -75,6 +76,7 @@ fun App() {
     var showAddDeviceSuccess by remember { mutableStateOf(false) }
     var showDeviceStatus by remember { mutableStateOf(false) }
     var showTrackTrace by remember { mutableStateOf(false) }
+    var showOnboarding by remember { mutableStateOf(false) }
     var deviceStatusSource by remember { mutableStateOf(OpenSource.HOME) }
     var trackTraceSource by remember { mutableStateOf(OpenSource.HOME) }
 
@@ -149,6 +151,14 @@ fun App() {
                 isLoggedIn = true
                 AppTokenProvider.getToken = { token }
                 authViewModel.resetLoginSuccess()
+
+                // Onboarding is shown ONLY to brand-new registrations, and only once.
+                // Existing users (normal login, password reset, splash auto-login) never
+                // see it — their Home sections are managed from real ownership instead.
+                val isNewUser = userPrefs.getString("is_new_user", "").isNotEmpty()
+                if (isNewUser && userPrefs.getString("onboarding_done", "").isEmpty()) {
+                    showOnboarding = true
+                }
             }
         }
     }
@@ -357,6 +367,27 @@ fun App() {
             }
 
 
+
+            showOnboarding -> {
+                // Shown once, right after the user's first successful login.
+                // Any plan selection simply proceeds into the app.
+                OnboardingScreen(
+                    onBack = {
+                        userPrefs.saveString("onboarding_done", "true")
+                        userPrefs.saveString("is_new_user", "")
+                        showOnboarding = false
+                    },
+                    onContinue = { planId ->
+                        userPrefs.saveString("onboarding_done", "true")
+                        userPrefs.saveString("is_new_user", "")
+                        // Persist the chosen plan so Home can lock the other section:
+                        //   "qr" locks GPS Tracking, "gps" locks QR Parking Tag,
+                        //   "other" locks both (only General usable).
+                        userPrefs.saveString("user_plan", planId)
+                        showOnboarding = false
+                    }
+                )
+            }
 
             isLoggedIn && authToken.isNotEmpty() -> {
                 HomeNavGraph(

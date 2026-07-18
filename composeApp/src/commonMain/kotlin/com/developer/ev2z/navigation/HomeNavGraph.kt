@@ -52,6 +52,7 @@ import com.developer.ev2z.ui.screens.market_screen.ShopViewModel
 import com.developer.ev2z.ui.screens.GeneralSettings.GeneralSettingsScreen
 import com.developer.ev2z.ui.screens.AccountActivity.AccountActivityScreen
 import com.developer.ev2z.ui.screens.AddDevice.AddDeviceDetailsCommon
+import com.developer.ev2z.ui.screens.AddDevice.AddDeviceResult
 import com.developer.ev2z.ui.screens.AddDevice.AddDeviceViewModel
 import com.developer.ev2z.ui.screens.BillDetails.BillDetailsScreen
 import com.developer.ev2z.ui.screens.BillDetails.BillDetailsViewModel
@@ -126,6 +127,9 @@ class HomeTab(
     private val onSosTagManual: () -> Unit,
     private val onSosChatInbox: () -> Unit,
     private val onNavigateToInstallationSupport: () -> Unit,
+    private val parkingLocked: Boolean = false,
+    private val gpsLocked: Boolean = false,
+    private val onNavigateToShop: () -> Unit = {},
     private val onLogout: () -> Unit = {},
 ) : Tab {
 
@@ -205,7 +209,10 @@ class HomeTab(
                 onCriminalVerification = onNavigateToCriminalVerification,
                 onInstallationSupport = onNavigateToInstallationSupport,
                 onOpenNotifications = { onSosTagManual() },
-                unreadNotificationCount = unreadNotifCount
+                unreadNotificationCount = unreadNotifCount,
+                parkingLocked = parkingLocked,
+                gpsLocked = gpsLocked,
+                onNavigateToShop = onNavigateToShop
             )
         }
     }
@@ -682,6 +689,16 @@ fun HomeNavGraph(
 
     val addDeviceViewModel = remember { AddDeviceViewModel() }
 
+    // When a device is successfully added (device id verified by backend), permanently
+    // unlock the GPS Tracking section and refresh the device list so ownership updates.
+    val addDeviceResult by addDeviceViewModel.addDeviceResult.collectAsState()
+    LaunchedEffect(addDeviceResult) {
+        if (addDeviceResult is AddDeviceResult.Success) {
+            storageManager.saveBoolean("gps_device_added", true)
+            viewModel.refreshDevices(token)
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
 
         if (showActiveCallScreen) {
@@ -894,9 +911,7 @@ fun HomeNavGraph(
 
             CommunityScreenRoot(
                 onBack = { showCommunity = false },
-                onOpenCreatePost = { showCreatePost = true },
-                onOpenCreateStory = { showCreateStory = true },
-                onOpenStoryViewer = { showStoryViewer = true }
+                onOpenCreatePost = { showCreatePost = true }
             )
 
         } else if (showDocumentViewer && viewerBytes != null) {
@@ -1599,8 +1614,47 @@ fun HomeNavGraphContent(
     val latestOnSosTag by rememberUpdatedState(onNavigateToSosTag)
     val latestOnSosTagManual by rememberUpdatedState(onSosTagManual)
     val latestOnSosChatInbox by rememberUpdatedState(onSosChatInbox)
+    val latestOnTabSelected by rememberUpdatedState(onTabSelected)
 
-    val homeTab = remember {
+    // ── Home section locking ──────────────────────────────────────────
+    // Golden rule: a section is NEVER locked if the user actually owns it.
+    // Access to a section = they OWN it OR their onboarding plan grants it.
+    //   Ownership: GPS = total_devices > 0, QR = a registered parking tag exists.
+    //   Plan (new signups only): gps→GPS, qr→QR, both→both, other→neither.
+    // A section is locked whenever the user has no access to it — a user who
+    // owns nothing sees both QR Parking Tag and GPS Tracking locked (only the
+    // General section is usable). Locks are applied only once ownership has
+    // resolved, so a paying owner never briefly sees their section greyed out.
+    val userPlan = remember { storageManager.getString("user_plan", "") }
+    val homeUiStateForLock by viewModel.uiState.collectAsState()
+    val ownsGps = remember(homeUiStateForLock) {
+        (homeUiStateForLock as? HomeUiState.Success)?.deviceResponse?.let { it.totalDevices > 0 } ?: false
+    }
+    val gpsResolved = homeUiStateForLock !is HomeUiState.Loading
+    var ownsQrTag by remember { mutableStateOf(false) }
+    var qrResolved by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        ownsQrTag = try {
+            apiService.getUserParkingDetails().data?.isNotEmpty() == true
+        } catch (_: Exception) {
+            false
+        }
+        qrResolved = true
+    }
+
+    // Persisted after a device is successfully added — keeps GPS unlocked across restarts,
+    // even before the device-list API refreshes.
+    val gpsDeviceAdded = storageManager.getBoolean("gps_device_added", false)
+
+    val ownershipReady = gpsResolved && qrResolved
+    val hasGpsAccess     = ownsGps || gpsDeviceAdded || userPlan == "gps" || userPlan == "both"
+    val hasParkingAccess = ownsQrTag  || userPlan == "qr"  || userPlan == "both"
+
+    // QR Parking Tag section is always unlocked in every situation (plan/ownership ignored)
+    val parkingSectionLocked = false
+    val gpsSectionLocked     = ownershipReady && !hasGpsAccess
+
+    val homeTab = remember(parkingSectionLocked, gpsSectionLocked) {
         HomeTab(
             viewModel = viewModel,
             token = token,
@@ -1622,6 +1676,9 @@ fun HomeNavGraphContent(
             onSosTagManual = { latestOnSosTagManual() },
             onSosChatInbox = { latestOnSosChatInbox() },
             onNavigateToInstallationSupport = onNavigateToInstallationSupport,
+            parkingLocked = parkingSectionLocked,
+            gpsLocked = gpsSectionLocked,
+            onNavigateToShop = { latestOnTabSelected(2) },
             onLogout = onLogout,
         )
     }

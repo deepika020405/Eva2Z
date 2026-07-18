@@ -144,7 +144,24 @@ fun ShopScreen(
                     && (dt.contains("qr") || dt.contains("parking") || dt.contains("tag")
                     || (it.title + " " + it.subtitle).lowercase().let { s -> "qr" in s || "parking tag" in s })
             }
-            else -> products
+            // All Products order: parking tags → GPS devices (wired/wireless) → trackers (GPS Tracker + Kids Tracker)
+            else -> products.sortedBy { p ->
+                val dt = p.deviceType.lowercase()
+                val s  = (p.title + " " + p.subtitle).lowercase()
+                val isParking = dt != "wired" && dt != "wireless" &&
+                    (dt.contains("qr") || dt.contains("parking") || dt.contains("tag")
+                        || "qr" in s || "parking tag" in s || "sos" in s)
+                val isTracker = dt.contains("tracker") || "tracker" in s
+                    || dt.contains("kids") || "kids" in s || "child" in s
+                val isGps = dt == "wired" || dt == "wireless" || dt.contains("gps")
+                    || "wired" in s || "wireless" in s
+                when {
+                    isParking -> 0   // parking / QR / SOS tags first
+                    isTracker -> 2   // GPS Tracker + Kids Tracker last
+                    isGps     -> 1   // wired / wireless GPS devices in the middle
+                    else      -> 3
+                }
+            }
         }
     }
 
@@ -212,48 +229,49 @@ fun ShopScreen(
 //                Spacer(Modifier.height(18.dp))
 //            }
 
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text("⭐", fontSize = 16.sp)
-                    Text(
-                        "Featured", fontSize = 17.sp,
-                        fontWeight = FontWeight.Bold, color = P_Dark
-                    )
-                }
-            }
-
-            if (featured.isNotEmpty()) {
-                item {
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 20.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        itemsIndexed(featured) { i, product ->
-                            FeaturedCard(
-                                product = product,
-                                badge   = FEATURED_BADGES.getOrElse(i) { "FEATURED" },
-                                onClick = { onPlaceOrder(product) },
-                                onAdd   = {
-                                    if (product.deviceType != "none") {
-                                        deviceTypeProduct = product
-                                    } else {
-                                        onAddToCart(product, "")
-                                        addedProduct = product
-                                        addToCartKey++
-                                    }
-                                }
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(22.dp))
-                }
-            }
+            // Featured row commented out
+//            item {
+//                Row(
+//                    modifier = Modifier
+//                        .fillMaxWidth()
+//                        .padding(horizontal = 20.dp, vertical = 8.dp),
+//                    verticalAlignment = Alignment.CenterVertically,
+//                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+//                ) {
+//                    Text("⭐", fontSize = 16.sp)
+//                    Text(
+//                        "Featured", fontSize = 17.sp,
+//                        fontWeight = FontWeight.Bold, color = P_Dark
+//                    )
+//                }
+//            }
+//
+//            if (featured.isNotEmpty()) {
+//                item {
+//                    LazyRow(
+//                        contentPadding = PaddingValues(horizontal = 20.dp),
+//                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+//                    ) {
+//                        itemsIndexed(featured) { i, product ->
+//                            FeaturedCard(
+//                                product = product,
+//                                badge   = FEATURED_BADGES.getOrElse(i) { "FEATURED" },
+//                                onClick = { onPlaceOrder(product) },
+//                                onAdd   = {
+//                                    if (product.deviceType != "none") {
+//                                        deviceTypeProduct = product
+//                                    } else {
+//                                        onAddToCart(product, "")
+//                                        addedProduct = product
+//                                        addToCartKey++
+//                                    }
+//                                }
+//                            )
+//                        }
+//                    }
+//                    Spacer(Modifier.height(22.dp))
+//                }
+//            }
 
             item {
                 val sectionTitle = when (selectedCategory) {
@@ -716,9 +734,9 @@ private fun CategoryChips(selected: String, onSelect: (String) -> Unit) {
     data class Chip(val id: String, val label: String, val emoji: String)
     val chips = listOf(
         Chip("all",      "All",        "🛒"),
+        Chip("qr",       "QR Tags",    "🏷️"),
         Chip("gps",      "GPS Devices","📡"),
-        Chip("trackers", "Trackers",   "🎯"),
-        Chip("qr",       "QR Tags",    "🏷️")
+        Chip("trackers", "Trackers",   "🎯")
     )
     LazyRow(
         contentPadding          = PaddingValues(horizontal = 20.dp),

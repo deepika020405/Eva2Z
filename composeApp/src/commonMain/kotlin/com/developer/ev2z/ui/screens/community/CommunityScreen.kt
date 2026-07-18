@@ -1,7 +1,10 @@
 package com.developer.ev2z.ui.screens.community
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -18,33 +21,32 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -66,10 +68,13 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.developer.ev2z.fetchPhoneLocation
+import com.developer.ev2z.openLocationSettings
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.response.Comment
 import com.developer.ev2z.response.Post
@@ -77,6 +82,7 @@ import com.developer.ev2z.response.Story
 import com.developer.ev2z.response.StoryGroup
 import com.developer.ev2z.response.Users
 import com.developer.ev2z.ui.screens.Profile.ProfileImageZoomDialog
+import com.developer.ev2z.ui.screens.homeScreen.LocalHomeTheme
 import com.developer.ev2z.ui.screens.social_media.openUrl
 import io.ktor.util.date.getTimeMillis
 import kotlinx.coroutines.delay
@@ -84,47 +90,175 @@ import kotlinx.datetime.*
 import kotlin.text.firstOrNull
 import kotlin.time.ExperimentalTime
 
+// ─────────────────────────────────────────────────────────────────
+// Design tokens
+// ─────────────────────────────────────────────────────────────────
+private val CommScreenBg  = Color(0xFFF8FAFC)
+private val CommCardBg    = Color(0xFFFFFFFF)
+private val CommTopBarBg  = Color(0xFFFFFFFF)
+private val CommGreen     = Color(0xFF00A844)
+private val CommGreenSoft = Color(0xFFDCFCE7)
+private val CommGreenText = Color(0xFF15803D)
+private val CommTitleDark = Color(0xFF0F172A)
+private val CommBodyGray  = Color(0xFF475569)
+private val CommSubtle    = Color(0xFF94A3B8)
+private val CommDivider   = Color(0xFFE2E8F0)
+private val CommChipBg    = Color(0xFFF8FAFC)
+private val CommStar      = Color(0xFFD97706)
+
+// ─────────────────────────────────────────────────────────────────
+// Category helper
+// ─────────────────────────────────────────────────────────────────
+private data class PostCategoryStyle(val label: String, val textColor: Color, val bgColor: Color)
+
+private fun styleForLabel(label: String): PostCategoryStyle = when (label.uppercase()) {
+    "FOUND"   -> PostCategoryStyle("FOUND",   Color(0xFF15803D), Color(0xFFDCFCE7))
+    "STOLEN"  -> PostCategoryStyle("STOLEN",  Color(0xFFB91C1C), Color(0xFFFEE2E2))
+    "LOST"    -> PostCategoryStyle("LOST",    Color(0xFFB45309), Color(0xFFFEF3C7))
+    "POLICE"  -> PostCategoryStyle("POLICE",  Color(0xFF1D4ED8), Color(0xFFDBEAFE))
+    "TIPS"    -> PostCategoryStyle("TIPS",    Color(0xFF92400E), Color(0xFFFEF3C7))
+    "TRAFFIC" -> PostCategoryStyle("TRAFFIC", Color(0xFFC2410C), Color(0xFFFFEDD5))
+    else      -> PostCategoryStyle("POST",    Color(0xFF475569), Color(0xFFF8FAFC))
+}
+
+private fun derivePostCategory(post: Post): PostCategoryStyle {
+    // Prefer the explicit category from the API; fall back to keyword detection.
+    post.category?.takeIf { it.isNotBlank() }?.let { return styleForLabel(it) }
+
+    val text = "${post.title.orEmpty()} ${post.body.orEmpty()}".lowercase()
+    return when {
+        "found"   in text || "recover" in text             -> styleForLabel("FOUND")
+        "stolen"  in text || "theft"   in text             -> styleForLabel("STOLEN")
+        "lost"    in text || "missing" in text             -> styleForLabel("LOST")
+        "police"  in text || "fir"     in text             -> styleForLabel("POLICE")
+        "tips"    in text || "advice"  in text             -> styleForLabel("TIPS")
+        "traffic" in text || "jam"     in text             -> styleForLabel("TRAFFIC")
+        else                                               -> styleForLabel("POST")
+    }
+}
+
+private fun filterKey(post: Post): String = derivePostCategory(post).label.lowercase()
+
+private val avatarColors = listOf(
+    Color(0xFF2563EB), Color(0xFFA855F7), Color(0xFF10B981),
+    Color(0xFFDC2626), Color(0xFFD97706), Color(0xFF06B6D4),
+)
+private fun postAvatarColor(userId: Int) = avatarColors[kotlin.math.abs(userId) % avatarColors.size]
+
+private data class CommTab(val id: String, val label: String, val emoji: String)
+
+
+private val communityTabs = listOf(
+    CommTab("all",     "All",     "📍"),
+    CommTab("stolen",  "Stolen",  "🚗"),
+    CommTab("lost",    "Lost",    "🔍"),
+    CommTab("found",   "Found",   "✋"),
+    CommTab("tips",    "Tips",    "💡"),
+    CommTab("traffic", "Traffic", "🚦"),
+    CommTab("police",  "Police",  "🚓"),
+)
 
 @Composable
 fun CommunityScreen(
     posts: List<Post>,
-    stories: List<Story>,
     authUserId: Int,
     onCreatePostClick: () -> Unit,
     onLikeClick: (Int) -> Unit,
     viewModel: CommunityViewModel,
     onCommentClick: (Int) -> Unit,
-    onAddStory: () -> Unit,
-    onStoryClick: () -> Unit
 ) {
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFF5F6F8)),
-        contentPadding = PaddingValues(bottom = 96.dp)
-    ) {
-        val BASE_IMAGE_URL = "https://gps.eva2z.in"
+    val _ht           = LocalHomeTheme.current
+    val CommScreenBg  = if (_ht.isDark) _ht.palette.pageBg        else CommScreenBg
+    val CommCardBg    = if (_ht.isDark) _ht.palette.cardBg         else CommCardBg
+    val CommTitleDark = if (_ht.isDark) _ht.palette.textPrimary    else CommTitleDark
+    val CommBodyGray  = if (_ht.isDark) _ht.palette.textSecondary  else CommBodyGray
+    val CommSubtle    = if (_ht.isDark) _ht.palette.textMuted      else CommSubtle
+    val CommDivider   = if (_ht.isDark) _ht.palette.borderSoft     else CommDivider
 
-        item {
-            StoriesRow(
-                groups = viewModel.storyGroups,
-                viewModel = viewModel,
-                onAddStory = onAddStory,
-                onStoryClick = onStoryClick
-            )
-        }
+    val BASE_IMAGE_URL   = "https://gps.eva2z.in"
+    var selectedTab by remember { mutableStateOf("all") }
 
-        item {
-            CreatePostCard(onClick = onCreatePostClick)
-        }
+    val filteredPosts = remember(selectedTab, posts) {
+        if (selectedTab == "all") posts
+        else posts.filter { filterKey(it) == selectedTab }
+    }
 
-        items(posts) { post ->
-            PostItem(
-                post = post,
-                BASE_IMAGE_URL = BASE_IMAGE_URL,
-                onLikeClick = onLikeClick,
-                onCommentClick = onCommentClick
-            )
+    Surface(modifier = Modifier.fillMaxSize(), color = CommScreenBg) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            // Responsive horizontal padding: tighter on small phones, roomier on wide screens.
+            val hPad = (maxWidth * 0.04f).coerceIn(12.dp, 22.dp)
+
+            // ── Main list ──────────────────────────────────────────
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .widthIn(max = 560.dp)
+                    .align(Alignment.TopCenter),
+                contentPadding = PaddingValues(
+                    start = hPad, end = hPad,
+                    top = 8.dp, bottom = 100.dp,
+                ),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                // Tab row
+                item {
+                    CommunityTabRow(
+                        tabs       = communityTabs,
+                        selectedId = selectedTab,
+                        onSelect   = { selectedTab = it },
+                    )
+                }
+
+                // Posts
+                items(filteredPosts, key = { it.id }) { post ->
+                    PostItem(
+                        post           = post,
+                        BASE_IMAGE_URL = BASE_IMAGE_URL,
+                        onLikeClick    = onLikeClick,
+                        onCommentClick = onCommentClick,
+                    )
+                }
+
+                // Empty state
+                if (filteredPosts.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 48.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("📭", fontSize = 35.sp)
+                                Spacer(Modifier.height(12.dp))
+                                Text("No posts in this category", fontSize = 13.sp, color = CommSubtle)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ── FAB ───────────────────────────────────────────────
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .widthIn(max = 560.dp)
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.systemBars)
+                    .padding(bottom = 20.dp),
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(CommGreen)
+                        .clickable(onClick = onCreatePostClick),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("✏️", fontSize = 20.sp)
+                }
+            }
         }
     }
 }
@@ -132,40 +266,76 @@ fun CommunityScreen(
 
 @Composable
 fun CreatePostCard(onClick: () -> Unit) {
-    Card(
+    val _ht         = LocalHomeTheme.current
+    val CommCardBg  = if (_ht.isDark) _ht.palette.cardBg     else CommCardBg
+    val CommDivider = if (_ht.isDark) _ht.palette.borderSoft else CommDivider
+    Row(
         modifier = Modifier
-            .padding(horizontal = 12.dp, vertical = 6.dp)
             .fillMaxWidth()
-            .clickable { onClick() },
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(1.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+            .clip(RoundedCornerShape(18.dp))
+            .background(CommCardBg)
+            .border(BorderStroke(1.dp, CommDivider), RoundedCornerShape(18.dp))
+            .clickable { onClick() }
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Box(
+            modifier = Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(CommGreenSoft),
+            contentAlignment = Alignment.Center,
         ) {
-            Spacer(Modifier.width(8.dp))
+            Text("✏️", fontSize = 14.sp)
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(
+            "Share something with community…",
+            color    = CommSubtle,
+            fontSize = 13.sp,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
 
-            Text(
-                text = "Share something with community...",
-                color = Color(0xFF999999),
-                fontSize = 14.sp,
-                modifier = Modifier.weight(1f)
-            )
+// ─────────────────────────────────────────────────────────────────
+// Tab row
+// ─────────────────────────────────────────────────────────────────
 
-            Box(
+@Composable
+private fun CommunityTabRow(
+    tabs: List<CommTab>,
+    selectedId: String,
+    onSelect: (String) -> Unit,
+) {
+    val _ht          = LocalHomeTheme.current
+    val CommCardBg   = if (_ht.isDark) _ht.palette.cardBg        else CommCardBg
+    val CommBodyGray = if (_ht.isDark) _ht.palette.textSecondary else CommBodyGray
+    val CommDivider  = if (_ht.isDark) _ht.palette.borderSoft    else CommDivider
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        tabs.forEach { tab ->
+            val selected = tab.id == selectedId
+            Row(
                 modifier = Modifier
-                    .size(32.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xFFF0F7EC)),
-                contentAlignment = Alignment.Center
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(if (selected) CommGreenSoft else CommCardBg)
+                    .border(BorderStroke(1.dp, if (selected) CommGreen else CommDivider), RoundedCornerShape(18.dp))
+                    .clickable { onSelect(tab.id) }
+                    .padding(horizontal = 12.dp, vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Create",
-                    tint = Color(0xFF6A9F50),
-                    modifier = Modifier.size(18.dp)
+                Text(tab.emoji, fontSize = 12.sp)
+                Spacer(Modifier.width(5.dp))
+                Text(
+                    tab.label,
+                    fontSize   = 12.sp,
+                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                    color      = if (selected) CommGreenText else CommBodyGray,
                 )
             }
         }
@@ -178,58 +348,79 @@ fun PostItem(
     post: Post,
     BASE_IMAGE_URL: String,
     onLikeClick: (Int) -> Unit,
-    onCommentClick: (Int) -> Unit
+    onCommentClick: (Int) -> Unit,
 ) {
-    Card(
+    val _ht           = LocalHomeTheme.current
+    val CommCardBg    = if (_ht.isDark) _ht.palette.cardBg        else CommCardBg
+    val CommTitleDark = if (_ht.isDark) _ht.palette.textPrimary   else CommTitleDark
+    val CommBodyGray  = if (_ht.isDark) _ht.palette.textSecondary else CommBodyGray
+    val CommDivider   = if (_ht.isDark) _ht.palette.borderSoft    else CommDivider
+    val category = remember(post.id) { derivePostCategory(post) }
+
+    Column(
         modifier = Modifier
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-            .fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        elevation = CardDefaults.cardElevation(1.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(CommCardBg)
+            .padding(14.dp),
     ) {
-        Column(
-            modifier = Modifier
-                .clip(RoundedCornerShape(18.dp))
-                .clipToBounds()
-                .padding(14.dp)
-        ) {
-            PostHeader(post.user, post.created_at, BASE_IMAGE_URL)
+        // ── Header ────────────────────────────────────────────────
+        PostHeader(post.user, post.created_at, BASE_IMAGE_URL)
 
-            Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(10.dp))
 
-            post.title?.takeIf { it.isNotBlank() }?.let {
-                Text(
-                    it,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF222222)
-                )
-                Spacer(Modifier.height(4.dp))
+        // ── Category badge + city ─────────────────────────────────
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(category.bgColor)
+                    .padding(horizontal = 8.dp, vertical = 3.dp),
+            ) {
+                Text(category.label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = category.textColor)
             }
 
-            post.body?.takeIf { it.isNotBlank() }?.let {
-                Text(
-                    it,
-                    color = Color(0xFF444444),
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp
-                )
-                Spacer(Modifier.height(8.dp))
+            post.city?.takeIf { it.isNotBlank() }?.let { city ->
+                Spacer(Modifier.width(8.dp))
+                Text("📍", fontSize = 10.sp)
+                Spacer(Modifier.width(2.dp))
+                Text(city, fontSize = 11.sp, color = CommBodyGray)
             }
-
-            if (post.media_urls.isNotEmpty()) {
-                FacebookPostImages(
-                    images = post.media_urls.map { "$BASE_IMAGE_URL$it" }
-                )
-                Spacer(Modifier.height(8.dp))
-            }
-
-            PostFooter(
-                post = post,
-                onLikeClick = onLikeClick,
-                onCommentClick = onCommentClick
-            )
         }
+
+        Spacer(Modifier.height(8.dp))
+
+        // ── Title ─────────────────────────────────────────────────
+        post.title?.takeIf { it.isNotBlank() }?.let {
+            Text(it, fontSize = 15.sp, fontWeight = FontWeight.Bold, color = CommTitleDark)
+            Spacer(Modifier.height(5.dp))
+        }
+
+        // ── Body ──────────────────────────────────────────────────
+        post.body?.takeIf { it.isNotBlank() }?.let {
+            LinkText(text = it, normalColor = CommBodyGray)
+            Spacer(Modifier.height(8.dp))
+        }
+
+        // ── Images ────────────────────────────────────────────────
+        if (post.media_urls.isNotEmpty()) {
+            FacebookPostImages(images = post.media_urls.map { "$BASE_IMAGE_URL$it" })
+            Spacer(Modifier.height(8.dp))
+        }
+
+        // ── Verified ──────────────────────────────────────────────
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("✓", color = CommGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.width(4.dp))
+            Text("Verified by Eva2z", fontSize = 11.sp, color = CommGreen)
+        }
+
+        Spacer(Modifier.height(10.dp))
+        Box(Modifier.fillMaxWidth().height(0.5.dp).background(CommDivider))
+        Spacer(Modifier.height(10.dp))
+
+        // ── Footer ────────────────────────────────────────────────
+        PostFooter(post = post, onLikeClick = onLikeClick, onCommentClick = onCommentClick)
     }
 }
 
@@ -272,7 +463,7 @@ fun FBOneImage(
             .fillMaxWidth()
             .height(imageHeight)
             .clip(RoundedCornerShape(14.dp))
-            .background(Color(0xFFF5F5F5))
+            .background(Color(0xFFF8FAFC))
             .clickable { onClick(url) }
     ) {
         AsyncImage(
@@ -302,7 +493,7 @@ fun FBTwoImages(
                     .weight(1f)
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFFF5F5F5))
+                    .background(Color(0xFFF8FAFC))
                     .clickable { onClick(url) }
             ) {
                 AsyncImage(
@@ -332,7 +523,7 @@ fun FBThreeImages(
                 .fillMaxWidth()
                 .weight(1.2f)
                 .clip(RoundedCornerShape(12.dp))
-                .background(Color(0xFFF5F5F5))
+                .background(Color(0xFFF8FAFC))
                 .clickable { onClick(urls[0]) }
         ) {
             AsyncImage(
@@ -352,7 +543,7 @@ fun FBThreeImages(
                         .weight(1f)
                         .fillMaxHeight()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFFF5F5F5))
+                        .background(Color(0xFFF8FAFC))
                         .clickable { onClick(url) }
                 ) {
                     AsyncImage(
@@ -388,7 +579,7 @@ fun FBFourPlusImages(
                         .weight(1f)
                         .fillMaxHeight()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFFF5F5F5))
+                        .background(Color(0xFFF8FAFC))
                         .clickable { onClick(url) }
                 ) {
                     AsyncImage(
@@ -410,7 +601,7 @@ fun FBFourPlusImages(
                         .weight(1f)
                         .fillMaxHeight()
                         .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFFF5F5F5))
+                        .background(Color(0xFFF8FAFC))
                         .clickable { onClick(url) }
                 ) {
                     AsyncImage(
@@ -430,7 +621,7 @@ fun FBFourPlusImages(
                                 "+${urls.size - 4}",
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 24.sp
+                                fontSize = 22.sp
                             )
                         }
                     }
@@ -445,47 +636,64 @@ fun FBFourPlusImages(
 fun PostHeader(
     user: Users?,
     createdAt: String,
-    BASE_IMAGE_URL: String
+    BASE_IMAGE_URL: String,
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
+    val _ht           = LocalHomeTheme.current
+    val CommTitleDark = if (_ht.isDark) _ht.palette.textPrimary else CommTitleDark
+    val CommSubtle    = if (_ht.isDark) _ht.palette.textMuted   else CommSubtle
+    val avatarColor = postAvatarColor(user?.id ?: 0)
+    Row(
+        modifier          = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top,
+    ) {
+        // Avatar
         Box(
             modifier = Modifier
-                .size(40.dp)
+                .size(42.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFF0F7EC)),
-            contentAlignment = Alignment.Center
+                .background(avatarColor),
+            contentAlignment = Alignment.Center,
         ) {
             if (!user?.photo.isNullOrEmpty()) {
                 AsyncImage(
-                    model = "$BASE_IMAGE_URL/storage/${user.photo}",
+                    model              = "$BASE_IMAGE_URL/storage/${user!!.photo}",
                     contentDescription = "Profile Picture",
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop
+                    modifier           = Modifier.fillMaxSize().clip(CircleShape),
+                    contentScale       = ContentScale.Crop,
                 )
             } else {
                 Text(
-                    text = user?.name?.firstOrNull()?.uppercase() ?: "U",
+                    text       = user?.name?.firstOrNull()?.uppercase() ?: "U",
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF6A9F50)
+                    color      = Color.White,
+                    fontSize   = 14.sp,
                 )
             }
         }
 
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(12.dp))
 
-        Column {
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    user?.name ?: "—",
+                    fontSize   = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color      = CommTitleDark,
+                    maxLines   = 1,
+                    overflow   = TextOverflow.Ellipsis,
+                    modifier   = Modifier.weight(1f, fill = false)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text("⭐", fontSize = 10.sp)
+                Spacer(Modifier.width(2.dp))
+                Text("Community", fontSize = 11.sp, color = CommStar)
+            }
+            Spacer(Modifier.height(2.dp))
             Text(
-                text = user?.name ?: "N/A",
-                fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF222222),
-                fontSize = 15.sp
-            )
-            Text(
-                text = formatPostDateCmp(createdAt),
-                fontSize = 12.sp,
-                color = Color(0xFF999999)
+                formatPostDateCmp(createdAt),
+                fontSize = 11.sp,
+                color    = CommSubtle,
             )
         }
     }
@@ -533,38 +741,52 @@ fun formatPostDateCmp(apiDate: String): String {
 fun PostFooter(
     post: Post,
     onLikeClick: (Int) -> Unit,
-    onCommentClick: (Int) -> Unit
+    onCommentClick: (Int) -> Unit,
 ) {
+    val _ht          = LocalHomeTheme.current
+    val CommBodyGray = if (_ht.isDark) _ht.palette.textSecondary else CommBodyGray
+    val CommSubtle   = if (_ht.isDark) _ht.palette.textMuted     else CommSubtle
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        modifier          = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
+        // Like
         Row(
+            modifier          = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { onLikeClick(post.id) }
+                .padding(vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.clickable { onLikeClick(post.id) }
         ) {
             Icon(
-                imageVector = if (post.liked) Icons.Filled.Favorite
-                else Icons.Outlined.FavoriteBorder,
+                imageVector        = if (post.liked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
                 contentDescription = "Like",
-                tint = if (post.liked) Color(0xFFE53935) else Color(0xFFCCCCCC),
-                modifier = Modifier.size(22.dp)
+                tint               = if (post.liked) Color(0xFFE53935) else CommSubtle,
+                modifier           = Modifier.size(18.dp),
             )
-            Spacer(Modifier.width(6.dp))
-            Text(
-                text = post.likes_count.toString(),
-                color = Color(0xFF888888),
-                fontSize = 14.sp
-            )
+            Spacer(Modifier.width(5.dp))
+            Text(post.likes_count.toString(), fontSize = 12.sp, color = CommBodyGray)
         }
 
-        Text(
-            text = "${post.comments_count} Comments",
-            color = Color(0xFF888888),
-            fontSize = 14.sp,
-            modifier = Modifier.clickable { onCommentClick(post.id) }
-        )
+        Spacer(Modifier.width(20.dp))
+
+        // Comment
+        Row(
+            modifier          = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable { onCommentClick(post.id) }
+                .padding(vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("💬", fontSize = 13.sp)
+            Spacer(Modifier.width(5.dp))
+            Text(post.comments_count.toString(), fontSize = 12.sp, color = CommBodyGray)
+        }
+
+        Spacer(Modifier.weight(1f))
+
+        // Report
+        Text("🚩  Report", fontSize = 11.sp, color = CommSubtle)
     }
 }
 
@@ -596,14 +818,14 @@ fun CommentBottomSheet(
             Text(
                 text = "Comments",
                 fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                color = Color(0xFF222222),
+                fontSize = 16.sp,
+                color = Color(0xFF0F172A),
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
                     .padding(vertical = 12.dp)
             )
 
-            HorizontalDivider(color = Color(0xFFF0F0F0), thickness = 0.8.dp)
+            HorizontalDivider(color = Color(0xFFE2E8F0), thickness = 0.8.dp)
 
             val orderedComments = remember(state.comments) {
                 val parents = state.comments.filter { it.parent_id == null }
@@ -688,13 +910,13 @@ fun CommentInputBar(
             ) {
                 Text(
                     text = "Replying to ${it.user.name}",
-                    color = Color(0xFF888888),
-                    fontSize = 13.sp
+                    color = Color(0xFF94A3B8),
+                    fontSize = 12.sp
                 )
                 Text(
                     text = "✕",
-                    fontSize = 16.sp,
-                    color = Color(0xFF888888),
+                    fontSize = 14.sp,
+                    color = Color(0xFF94A3B8),
                     modifier = Modifier
                         .clickable { onCancelReply() }
                         .padding(4.dp)
@@ -715,14 +937,14 @@ fun CommentInputBar(
                 placeholder = {
                     Text(
                         "Add a comment…",
-                        color = Color(0xFFAAAAAA)
+                        color = Color(0xFF94A3B8)
                     )
                 },
                 shape = RoundedCornerShape(14.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFF6A9F50),
-                    unfocusedBorderColor = Color(0xFFE0E0E0),
-                    cursorColor = Color(0xFF6A9F50)
+                    focusedBorderColor = Color(0xFF00A844),
+                    unfocusedBorderColor = Color(0xFFE2E8F0),
+                    cursorColor = Color(0xFF00A844)
                 )
             )
 
@@ -732,8 +954,8 @@ fun CommentInputBar(
             ) {
                 Text(
                     "Post",
-                    color = if (input.isNotBlank()) Color(0xFF6A9F50)
-                    else Color(0xFFCCCCCC),
+                    color = if (input.isNotBlank()) Color(0xFF00A844)
+                    else Color(0xFF94A3B8),
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -766,7 +988,7 @@ fun CommentItem(
             modifier = Modifier
                 .size(36.dp)
                 .clip(CircleShape)
-                .background(Color(0xFFF0F7EC)),
+                .background(Color(0xFFDCFCE7)),
             contentScale = ContentScale.Crop
         )
 
@@ -777,29 +999,29 @@ fun CommentItem(
                 Text(
                     text = comment.user.name,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF222222),
-                    fontSize = 14.sp
+                    color = Color(0xFF0F172A),
+                    fontSize = 13.sp
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text = formatPostDateCmp(comment.created_at),
-                    fontSize = 11.sp,
-                    color = Color(0xFF999999)
+                    fontSize = 10.sp,
+                    color = Color(0xFF94A3B8)
                 )
             }
 
             if (replyToName != null) {
                 Text(
                     text = "@$replyToName",
-                    color = Color(0xFF6A9F50),
+                    color = Color(0xFF00A844),
                     fontWeight = FontWeight.Medium,
-                    fontSize = 13.sp
+                    fontSize = 12.sp
                 )
             }
 
             LinkText(
                 text = comment.comment,
-                normalColor = Color(0xFF333333)
+                normalColor = Color(0xFF0F172A)
             )
 
             Spacer(Modifier.height(4.dp))
@@ -808,15 +1030,15 @@ fun CommentItem(
                 Text(
                     text = if (comment.liked) "❤️ ${comment.likes_count}"
                     else "🤍 ${comment.likes_count}",
-                    fontSize = 13.sp,
+                    fontSize = 12.sp,
                     modifier = Modifier.clickable { onLike() }
                 )
                 Spacer(Modifier.width(16.dp))
                 Text(
                     "Reply",
-                    color = Color(0xFF6A9F50),
+                    color = Color(0xFF00A844),
                     fontWeight = FontWeight.Medium,
-                    fontSize = 13.sp,
+                    fontSize = 12.sp,
                     modifier = Modifier.clickable { onReply() }
                 )
             }
@@ -827,7 +1049,7 @@ fun CommentItem(
 @Composable
 fun LinkText(
     text: String,
-    normalColor: Color = Color(0xFF333333)
+    normalColor: Color = Color(0xFF0F172A)
 ) {
     val annotatedString = remember(text) {
         buildAnnotatedString {
@@ -845,7 +1067,7 @@ fun LinkText(
                 pushStringAnnotation(tag = "URL", annotation = finalUrl)
                 withStyle(
                     style = SpanStyle(
-                        color = Color(0xFF6A9F50),
+                        color = Color(0xFF00A844),
                         fontWeight = FontWeight.Medium
                     )
                 ) {
@@ -925,13 +1147,13 @@ fun AddStoryItem(onClick: () -> Unit) {
                 modifier = Modifier
                     .size(64.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFFF0F7EC)),
+                    .background(Color(0xFFDCFCE7)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     Icons.Default.Add,
                     contentDescription = null,
-                    tint = Color(0xFF6A9F50),
+                    tint = Color(0xFF00A844),
                     modifier = Modifier.size(28.dp)
                 )
             }
@@ -939,8 +1161,8 @@ fun AddStoryItem(onClick: () -> Unit) {
         Spacer(Modifier.height(4.dp))
         Text(
             "Your story",
-            fontSize = 12.sp,
-            color = Color(0xFF666666)
+            fontSize = 11.sp,
+            color = Color(0xFF475569)
         )
     }
 }
@@ -953,10 +1175,10 @@ fun StoryItem(
     onClick: () -> Unit
 ) {
     val ring = if (isViewed)
-        Brush.linearGradient(listOf(Color(0xFFCCCCCC), Color(0xFFE0E0E0)))
+        Brush.linearGradient(listOf(Color(0xFF94A3B8), Color(0xFFE2E8F0)))
     else
         Brush.linearGradient(
-            listOf(Color(0xFF6A9F50), Color(0xFF8BC34A))
+            listOf(Color(0xFF00A844), Color(0xFF00A844))
         )
 
     Column(
@@ -985,8 +1207,8 @@ fun StoryItem(
         Text(
             user.name,
             maxLines = 1,
-            fontSize = 12.sp,
-            color = Color(0xFF555555)
+            fontSize = 11.sp,
+            color = Color(0xFF475569)
         )
     }
 }
@@ -997,83 +1219,168 @@ fun StoryItem(
 fun CommunityScreenRoot(
     onBack: () -> Unit,
     onOpenCreatePost: () -> Unit,
-    onOpenCreateStory: () -> Unit,
-    onOpenStoryViewer: () -> Unit
 ) {
-    // System back → close the overlay and return to home immediately.
-    // Composed AFTER the home pager's Voyager handlers so it wins LIFO priority
-    // and a single back press is enough.
     PlatformBackHandler(enabled = true) { onBack() }
 
     val viewModel = CommunityViewModelProvider.viewModel
-    val state = viewModel.state
+    val state     = viewModel.state
 
     var openCommentsPostId by remember { mutableStateOf<Int?>(null) }
 
-    DisposableEffect(Unit) {
-        onDispose { viewModel.cancelActiveJobs() }
-    }
+    // ── Current location for the "Nearby" pill ────────────────────
+    var locationLabel by remember { mutableStateOf("Nearby") }
+    var locating by remember { mutableStateOf(false) }
+    var showEnableLocation by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        if (state.posts.isEmpty()) {
-            viewModel.loadPosts()
+    fun fetchCurrentLocation() {
+        if (locating) return
+        locating = true
+        locationLabel = "Locating…"
+        // Requests location permission if needed, then delivers lat/lng.
+        fetchPhoneLocation { lat, lng ->
+            if (lat != 0.0 || lng != 0.0) {
+                viewModel.resolveCity(lat, lng) { city ->
+                    locationLabel = city.takeIf { it.isNotBlank() } ?: "Nearby"
+                    locating = false
+                }
+            } else {
+                // Permission denied or location services are off → ask the user.
+                locationLabel = "Enable location"
+                locating = false
+                showEnableLocation = true
+            }
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Community",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
-                        color = Color(0xFF222222)
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = {
-                        viewModel.cancelActiveJobs()
-                        onBack()
-                    }) {
-                        Icon(
-                            Icons.Default.ArrowBack,
-                            contentDescription = null,
-                            tint = Color(0xFF333333)
+    DisposableEffect(Unit) { onDispose { viewModel.cancelActiveJobs() } }
+
+    LaunchedEffect(Unit) {
+        if (state.posts.isEmpty()) viewModel.loadPosts()
+        // Proactively show the user's current location (will prompt for permission).
+        fetchCurrentLocation()
+    }
+
+    Surface(modifier = Modifier.fillMaxSize(), color = CommScreenBg) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .widthIn(max = 560.dp)
+                    .align(Alignment.TopCenter),
+            ) {
+                // ── Custom top bar ────────────────────────────────
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(CommTopBarBg)
+                        .windowInsetsPadding(WindowInsets.statusBars),
+                ) {
+                    Row(
+                        modifier          = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(CommChipBg)
+                                .clickable { viewModel.cancelActiveJobs(); onBack() },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text("‹", fontSize = 22.sp, color = CommTitleDark, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            "Community",
+                            fontSize   = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color      = CommTitleDark,
+                            modifier   = Modifier.weight(1f),
                         )
+                        // Location pill — tap to (re)fetch current location
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(CommChipBg)
+                                .clickable { fetchCurrentLocation() }
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                                .widthIn(max = 160.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text("📍", fontSize = 11.sp)
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                locationLabel,
+                                fontSize = 12.sp,
+                                color = CommBodyGray,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            )
+                        }
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White
-                )
-            )
-        },
-        contentWindowInsets = WindowInsets(0)
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            CommunityScreen(
-                posts = state.posts,
-                stories = state.stories,
-                authUserId = state.authUserId,
-                viewModel = viewModel,
-                onCreatePostClick = onOpenCreatePost,
-                onAddStory = onOpenCreateStory,
-                onStoryClick = onOpenStoryViewer,
-                onLikeClick = viewModel::toggleLike,
-                onCommentClick = { openCommentsPostId = it }
-            )
+                }
+
+                // ── Feed ─────────────────────────────────────────
+                Box(modifier = Modifier.weight(1f)) {
+                    CommunityScreen(
+                        posts            = state.posts,
+                        authUserId       = state.authUserId,
+                        viewModel        = viewModel,
+                        onCreatePostClick = onOpenCreatePost,
+                        onLikeClick      = viewModel::toggleLike,
+                        onCommentClick   = { openCommentsPostId = it },
+                    )
+                }
+            }
         }
     }
 
     openCommentsPostId?.let {
         CommentBottomSheet(
-            postId = it,
+            postId    = it,
             viewModel = viewModel,
-            onDismiss = { openCommentsPostId = null }
+            onDismiss = { openCommentsPostId = null },
         )
     }
+
+    if (showEnableLocation) {
+        EnableLocationDialog(
+            onDismiss = { showEnableLocation = false },
+            onOpenSettings = {
+                showEnableLocation = false
+                openLocationSettings()
+            },
+        )
+    }
+}
+
+@Composable
+private fun EnableLocationDialog(
+    onDismiss: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Turn on location", fontWeight = FontWeight.Bold) },
+        text = {
+            Text(
+                "Location is off. Enable location to show your current city and nearby community posts.",
+                fontSize = 13.sp,
+                color = Color(0xFF475569),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onOpenSettings) {
+                Text("Open settings", color = CommGreen, fontWeight = FontWeight.SemiBold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Not now", color = Color(0xFF94A3B8))
+            }
+        },
+        containerColor = Color.White,
+    )
 }

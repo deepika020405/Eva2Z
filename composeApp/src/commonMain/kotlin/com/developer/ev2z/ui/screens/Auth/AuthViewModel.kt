@@ -235,6 +235,10 @@ class AuthViewModel(
                             photo = loginResult.user.photo ?: ""
                         )
 
+                        // This login is the completion of a brand-new registration →
+                        // mark it so the app shows onboarding only to first-time users.
+                        userPrefs.saveString("is_new_user", "true")
+
                         _loginSuccess.value = true
 
                     } catch (loginError: Exception) {

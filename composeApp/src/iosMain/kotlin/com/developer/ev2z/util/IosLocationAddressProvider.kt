@@ -41,3 +41,29 @@ actual suspend fun getAddressFromLatLng(
         )
     }
 }
+
+actual suspend fun getCityFromLatLng(
+    lat: Double,
+    lng: Double
+): String = suspendCancellableCoroutine<String> { cont ->
+
+    val geocoder = CLGeocoder()
+    val location = CLLocation(latitude = lat, longitude = lng)
+
+    geocoder.reverseGeocodeLocation(location) { placemarks, error ->
+
+        if (error != null) {
+            cont.resume("")
+            return@reverseGeocodeLocation
+        }
+
+        val placemark = placemarks?.firstOrNull() as? CLPlacemark
+
+        val city = placemark?.locality
+            ?: placemark?.subAdministrativeArea
+            ?: placemark?.administrativeArea
+            ?: ""
+
+        cont.resume(city)
+    }
+}

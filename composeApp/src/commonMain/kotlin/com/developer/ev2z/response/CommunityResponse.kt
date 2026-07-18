@@ -11,14 +11,19 @@ data class CommunityResponse(
 @Serializable
 data class Post(
     val id: Int,
-    val title: String?,
-    val body: String?,
-    val media_urls: List<String>,
-    val created_at: String,
-    val comments_count: Int,
-    val likes_count: Int,
-    val liked: Boolean,
+    val title: String? = null,
+    val body: String? = null,
+    val media_urls: List<String> = emptyList(),
+    val created_at: String = "",
+    val comments_count: Int = 0,
+    val likes_count: Int = 0,
+    val liked: Boolean = false,
     val user: Users? = null,   // ✅ IMPORTANT
+    // 📍 Location + classification (API sends lat/long as strings, e.g. "18.55900000")
+    val lat: String? = null,
+    val long: String? = null,
+    val city: String? = null,
+    val category: String? = null,
 )
 
 @Serializable

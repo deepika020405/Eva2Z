@@ -114,6 +114,26 @@ class MainActivity : ComponentActivity() {
         ActivityProvider.clearActivity()
     }
 
+    // Delivers the pending location result once the user responds to the runtime
+    // location-permission prompt (e.g. when creating a community post the first time).
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == LOCATION_PERMISSION_REQUEST) {
+            val callback = pendingLocationCallback
+            pendingLocationCallback = null
+            if (grantResults.isNotEmpty() &&
+                grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED &&
+                callback != null
+            ) {
+                fetchPhoneLocation(callback)
+            }
+        }
+    }
+
     // ✅ App open ho — notification tap
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)

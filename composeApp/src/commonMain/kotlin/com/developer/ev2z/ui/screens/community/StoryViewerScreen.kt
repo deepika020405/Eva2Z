@@ -131,7 +131,7 @@ fun StoryViewerScreen(
                             .weight(1f)
                             .padding(horizontal = 2.dp)
                             .height(3.dp),
-                        color = Color(0xFF6A9F50),
+                        color = Color(0xFF00A844),
                         trackColor = Color.White.copy(alpha = 0.3f)
                     )
                 }
@@ -151,7 +151,7 @@ fun StoryViewerScreen(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
                             .padding(16.dp)
-                            .clip(RoundedCornerShape(20.dp))
+                            .clip(RoundedCornerShape(18.dp))
                             .background(Color.Black.copy(alpha = 0.5f))
                             .clickable {
                                 vm.loadStoryViewers(story.id)
@@ -188,9 +188,9 @@ fun StoryViewerScreen(
             ) {
                 Text(
                     text = "Viewed by",
-                    fontSize = 18.sp,
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF222222)
+                    color = Color(0xFF0F172A)
                 )
 
                 Spacer(Modifier.height(12.dp))
@@ -198,8 +198,8 @@ fun StoryViewerScreen(
                 if (state.storyViewers.isEmpty()) {
                     Text(
                         text = "No views yet",
-                        color = Color(0xFF888888),
-                        fontSize = 14.sp
+                        color = Color(0xFF94A3B8),
+                        fontSize = 13.sp
                     )
                 } else {
                     state.storyViewers.forEach { viewer ->
@@ -213,7 +213,7 @@ fun StoryViewerScreen(
                                 modifier = Modifier
                                     .size(40.dp)
                                     .clip(CircleShape)
-                                    .background(Color(0xFFF0F7EC)),
+                                    .background(Color(0xFFDCFCE7)),
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (!viewer.user.photo.isNullOrBlank()) {
@@ -229,7 +229,7 @@ fun StoryViewerScreen(
                                     Text(
                                         text = viewer.user.name.first().uppercase(),
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF6A9F50)
+                                        color = Color(0xFF00A844)
                                     )
                                 }
                             }
@@ -238,8 +238,8 @@ fun StoryViewerScreen(
 
                             Text(
                                 text = viewer.user.name,
-                                fontSize = 15.sp,
-                                color = Color(0xFF333333),
+                                fontSize = 13.sp,
+                                color = Color(0xFF0F172A),
                                 fontWeight = FontWeight.Medium
                             )
                         }

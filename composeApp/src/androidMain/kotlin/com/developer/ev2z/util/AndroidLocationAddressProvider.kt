@@ -27,3 +27,19 @@ actual suspend fun getAddressFromLatLng(
         "Location unavailable"
     }
 }
+
+actual suspend fun getCityFromLatLng(
+    lat: Double,
+    lng: Double
+): String = withContext(Dispatchers.IO) {
+    try {
+        val geocoder = Geocoder(appContext, Locale.getDefault())
+        val address = geocoder.getFromLocation(lat, lng, 1)?.firstOrNull()
+        address?.locality
+            ?: address?.subAdminArea
+            ?: address?.adminArea
+            ?: ""
+    } catch (e: Exception) {
+        ""
+    }
+}

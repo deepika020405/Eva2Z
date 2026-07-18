@@ -12,6 +12,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,7 +46,21 @@ private val EngineRedLight  = Color(0xFFFDECEC)
 private val BellBg          = Color(0xFFEEEEEE)
 private val ShadowColor     = Color(0x14000000)
 
+// Locked-section palette (grey)
+private val LockedIcon      = Color(0xFF9CA3AF)
+private val LockedIconBg    = Color(0xFFE9ECEF)
+private val LockedText      = Color(0xFF9CA3AF)
+private val LockedCardBg    = Color(0xFFF3F4F6)
+
 // ─────────────────── DATA MODEL (compatibility) ─────────────────────
+
+/**
+ * Which home section is locked based on the plan the user picked during onboarding:
+ *  - PARKING → user chose GPS, so the QR Parking Tag section is locked
+ *  - GPS     → user chose the QR tag, so the GPS Tracking section is locked
+ *  - NONE    → nothing locked
+ */
+enum class HomeSectionLock { NONE, PARKING, GPS }
 
 data class QuickActionItem(val title: String, val icon: ImageVector, val onClick: () -> Unit)
 
@@ -73,8 +91,14 @@ fun HomeScreen(
     onInstallationSupport: () -> Unit = {},
     onOpenAllFeatures: () -> Unit = {},
     onOpenNotifications: () -> Unit = {},
-    unreadNotificationCount: Int = 0
+    unreadNotificationCount: Int = 0,
+    parkingLocked: Boolean = false,
+    gpsLocked: Boolean = false,
+    onNavigateToShop: () -> Unit = {}
 ) {
+    // Which locked section the user tapped — drives the popup content. null = no popup.
+    var lockedDialogFor by remember { mutableStateOf<HomeSectionLock?>(null) }
+
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val isTablet  = maxWidth >= 600.dp
         val isCompact = maxWidth < 360.dp
@@ -94,7 +118,9 @@ fun HomeScreen(
                         onVehicleTagRegistration = onParking,
                         onVisitorChats           = onSosTag,
                         onManageTags             = onParking,
-                        hPad                     = hPad
+                        hPad                     = hPad,
+                        locked                   = parkingLocked,
+                        onLocked                 = { lockedDialogFor = HomeSectionLock.PARKING }
                     )
                 }
                 item {
@@ -106,7 +132,9 @@ fun HomeScreen(
                         onDeviceReport = onOpenDeviceReport,
                         onAddDevice    = onOpenAddDevice,
                         onInstallation = onInstallationSupport,
-                        hPad           = hPad
+                        hPad           = hPad,
+                        locked         = gpsLocked,
+                        onLocked       = { lockedDialogFor = HomeSectionLock.GPS }
                     )
                 }
                 item {
@@ -119,7 +147,73 @@ fun HomeScreen(
                 }
             }
         }
+
+        lockedDialogFor?.let { section ->
+            LockedFeatureDialog(
+                lockedSection = section,
+                onDismiss = { lockedDialogFor = null },
+                onBuy = {
+                    lockedDialogFor = null
+                    onNavigateToShop()
+                }
+            )
+        }
     }
+}
+
+// ─────────────────────── LOCKED FEATURE DIALOG ─────────────────────
+
+@Composable
+private fun LockedFeatureDialog(
+    lockedSection: HomeSectionLock,
+    onDismiss: () -> Unit,
+    onBuy: () -> Unit
+) {
+    val featureName = when (lockedSection) {
+        HomeSectionLock.GPS     -> "GPS Tracking"
+        HomeSectionLock.PARKING -> "QR Parking Tag"
+        else                    -> "This feature"
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(CircleShape)
+                    .background(BrandGreenLight),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Lock, contentDescription = null, tint = BrandGreen, modifier = Modifier.size(26.dp))
+            }
+        },
+        title = {
+            Text("$featureName is locked", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+        },
+        text = {
+            Text(
+                "You need to buy this to unlock $featureName. Tap Buy to explore it in the shop.",
+                fontSize = 14.sp,
+                color = TextSecondary,
+                textAlign = TextAlign.Center
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onBuy,
+                colors = ButtonDefaults.buttonColors(containerColor = BrandGreen),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text("Buy", fontWeight = FontWeight.Bold, color = Color.White)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = TextSecondary, fontWeight = FontWeight.SemiBold)
+            }
+        },
+        containerColor = CardWhite
+    )
 }
 
 // ─────────────────────────── HEADER ────────────────────────────────
@@ -198,7 +292,9 @@ private fun ParkingTagSection(
     onVehicleTagRegistration: () -> Unit,
     onVisitorChats: () -> Unit,
     onManageTags: () -> Unit,
-    hPad: Dp
+    hPad: Dp,
+    locked: Boolean = false,
+    onLocked: () -> Unit = {}
 ) {
     Column(modifier = Modifier.padding(horizontal = hPad)) {
         // Section header
@@ -207,18 +303,29 @@ private fun ParkingTagSection(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment     = Alignment.CenterVertically
         ) {
-            Text("QR Parking Tag", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "QR Parking Tag",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = if (locked) LockedText else TextPrimary
+                )
+                if (locked) {
+                    Spacer(Modifier.width(6.dp))
+                    Icon(Icons.Default.Lock, contentDescription = "Locked", tint = LockedText, modifier = Modifier.size(16.dp))
+                }
+            }
             Surface(
-                onClick   = onManageTags,
+                onClick   = if (locked) onLocked else onManageTags,
                 shape     = RoundedCornerShape(20.dp),
-                color     = BrandGreenLight,
+                color     = if (locked) LockedIconBg else BrandGreenLight,
                 modifier  = Modifier
             ) {
                 Text(
                     "Manage Tags",
                     fontSize   = 12.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color      = BrandGreen,
+                    color      = if (locked) LockedText else BrandGreen,
                     modifier   = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                 )
             }
@@ -233,13 +340,15 @@ private fun ParkingTagSection(
             ParkingTagCard(
                 title    = "Vehicle TAG\nRegistration",
                 icon     = Icons.Default.QrCode2,
-                onClick  = onVehicleTagRegistration,
+                onClick  = if (locked) onLocked else onVehicleTagRegistration,
+                locked   = locked,
                 modifier = Modifier.weight(1f)
             )
             ParkingTagCard(
                 title    = "QR Scan\nMessages",
                 icon     = Icons.Default.ChatBubbleOutline,
-                onClick  = onVisitorChats,
+                onClick  = if (locked) onLocked else onVisitorChats,
+                locked   = locked,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -251,27 +360,31 @@ private fun ParkingTagCard(
     title: String,
     icon: ImageVector,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    locked: Boolean = false
 ) {
     Card(
         onClick   = onClick,
         modifier  = modifier.height(150.dp),
         shape     = RoundedCornerShape(20.dp),
-        colors    = CardDefaults.cardColors(containerColor = CardWhite),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        colors    = CardDefaults.cardColors(containerColor = if (locked) LockedCardBg else CardWhite),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border    = if (locked) BorderStroke(1.dp, Color.White) else null
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // Subtle green tint blob top-right
-            Box(
-                modifier = Modifier
-                    .size(90.dp)
-                    .align(Alignment.TopEnd)
-                    .offset(x = 24.dp, y = (-24).dp)
-                    .background(
-                        Brush.radialGradient(listOf(BrandGreen.copy(0.10f), Color.Transparent)),
-                        CircleShape
-                    )
-            )
+            // Subtle green tint blob top-right (hidden when locked)
+            if (!locked) {
+                Box(
+                    modifier = Modifier
+                        .size(90.dp)
+                        .align(Alignment.TopEnd)
+                        .offset(x = 24.dp, y = (-24).dp)
+                        .background(
+                            Brush.radialGradient(listOf(BrandGreen.copy(0.10f), Color.Transparent)),
+                            CircleShape
+                        )
+                )
+            }
             Column(
                 modifier            = Modifier
                     .fillMaxWidth()
@@ -283,20 +396,21 @@ private fun ParkingTagCard(
                         .size(48.dp)
                         .clip(RoundedCornerShape(14.dp))
                         .background(
-                            Brush.linearGradient(
+                            if (locked) Brush.linearGradient(listOf(LockedIconBg, LockedIconBg))
+                            else Brush.linearGradient(
                                 listOf(BrandGreen.copy(0.15f), BrandGreen.copy(0.07f))
                             )
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(icon, contentDescription = null, tint = BrandGreen, modifier = Modifier.size(24.dp))
+                    Icon(icon, contentDescription = null, tint = if (locked) LockedIcon else BrandGreen, modifier = Modifier.size(24.dp))
                 }
                 Spacer(Modifier.height(12.dp))
                 Text(
                     title,
                     fontSize   = 13.sp,
                     fontWeight = FontWeight.ExtraBold,
-                    color      = TextPrimary,
+                    color      = if (locked) LockedText else TextPrimary,
                     lineHeight = 18.sp
                 )
             }
@@ -322,19 +436,33 @@ private fun GpsTrackingSection(
     onDeviceReport: () -> Unit,
     onAddDevice: () -> Unit,
     onInstallation: () -> Unit,
-    hPad: Dp
+    hPad: Dp,
+    locked: Boolean = false,
+    onLocked: () -> Unit = {}
 ) {
+    // Add Device is intentionally NOT in this grid — it's a separate, always-unlocked button below.
     val items = listOf(
-        GpsItem("Live\nLocation",    Icons.Default.LocationOn,       BrandGreen, onLiveLocation),
-        GpsItem("History\nPlayback", Icons.Default.History,          BrandGreen, onHistory),
-        GpsItem("Engine\nOn/Off",    Icons.Default.PowerSettingsNew, EngineRed,  onEngineToggle),
-        GpsItem("Geofencing",        Icons.Default.Security,         BrandGreen, onGeofencing),
-        GpsItem("Device\nReport",    Icons.Default.Assessment,       BrandGreen, onDeviceReport),
-        GpsItem("Add\nDevice",       Icons.Default.AddCircleOutline, BrandGreen, onAddDevice),
+        GpsItem("Live\nLocation",       Icons.Default.LocationOn,       BrandGreen, onLiveLocation),
+        GpsItem("History\nPlayback",    Icons.Default.History,          BrandGreen, onHistory),
+        GpsItem("Engine\nOn/Off",       Icons.Default.PowerSettingsNew, EngineRed,  onEngineToggle),
+        GpsItem("Geofencing",           Icons.Default.Security,         BrandGreen, onGeofencing),
+        GpsItem("Device\nReport",       Icons.Default.Assessment,       BrandGreen, onDeviceReport),
+        GpsItem("Installation\nSupport", Icons.Default.Build,           BrandGreen, onInstallation),
     )
 
     Column(modifier = Modifier.padding(horizontal = hPad)) {
-        Text("GPS Tracking", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "GPS Tracking",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = if (locked) LockedText else TextPrimary
+            )
+            if (locked) {
+                Spacer(Modifier.width(6.dp))
+                Icon(Icons.Default.Lock, contentDescription = "Locked", tint = LockedText, modifier = Modifier.size(16.dp))
+            }
+        }
 
         Spacer(Modifier.height(16.dp))
 
@@ -347,7 +475,12 @@ private fun GpsTrackingSection(
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     row.forEach { item ->
-                        GpsBoxItem(item = item, modifier = Modifier.weight(1f))
+                        GpsBoxItem(
+                            item     = item,
+                            locked   = locked,
+                            onLocked = onLocked,
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                     // Fill remaining empty slots to keep alignment
                     repeat(3 - row.size) {
@@ -357,22 +490,64 @@ private fun GpsTrackingSection(
             }
         }
 
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(12.dp))
 
-        // Installation Support — premium wide card
-        InstallationSupportCard(onClick = onInstallation)
+        // Add Device — standalone, responsive, and always unlocked (never gated by `locked`)
+        AddDeviceButton(onClick = onAddDevice)
     }
 }
 
 @Composable
-private fun GpsBoxItem(item: GpsItem, modifier: Modifier = Modifier) {
-    val bgTint = if (item.tint == EngineRed) EngineRedLight else BrandGreenLight
+private fun AddDeviceButton(onClick: () -> Unit) {
+    // Full-width so it scales with any screen size; always active regardless of section lock.
+    Button(
+        onClick         = onClick,
+        modifier        = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 54.dp),
+        shape           = RoundedCornerShape(18.dp),
+        colors          = ButtonDefaults.buttonColors(
+            containerColor = BrandGreenLight,
+            contentColor   = BrandGreen
+        ),
+        elevation       = ButtonDefaults.buttonElevation(defaultElevation = 0.dp),
+        contentPadding  = PaddingValues(horizontal = 16.dp, vertical = 14.dp)
+    ) {
+        Icon(
+            Icons.Default.AddCircleOutline,
+            contentDescription = null,
+            tint = BrandGreen,
+            modifier = Modifier.size(22.dp)
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(
+            "Add Device",
+            fontSize   = 15.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color      = BrandGreen
+        )
+    }
+}
+
+@Composable
+private fun GpsBoxItem(
+    item: GpsItem,
+    modifier: Modifier = Modifier,
+    locked: Boolean = false,
+    onLocked: () -> Unit = {}
+) {
+    val bgTint = when {
+        locked                 -> LockedIconBg
+        item.tint == EngineRed -> EngineRedLight
+        else                   -> BrandGreenLight
+    }
     Card(
-        onClick   = item.onClick,
+        onClick   = if (locked) onLocked else item.onClick,
         modifier  = modifier.height(108.dp),
         shape     = RoundedCornerShape(18.dp),
-        colors    = CardDefaults.cardColors(containerColor = CardWhite),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        colors    = CardDefaults.cardColors(containerColor = if (locked) LockedCardBg else CardWhite),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border    = if (locked) BorderStroke(1.dp, Color.White) else null
     ) {
         Column(
             modifier            = Modifier
@@ -388,14 +563,14 @@ private fun GpsBoxItem(item: GpsItem, modifier: Modifier = Modifier) {
                     .background(bgTint),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(item.icon, contentDescription = null, tint = item.tint, modifier = Modifier.size(22.dp))
+                Icon(item.icon, contentDescription = null, tint = if (locked) LockedIcon else item.tint, modifier = Modifier.size(22.dp))
             }
             Spacer(Modifier.height(8.dp))
             Text(
                 item.title,
                 fontSize   = 10.sp,
                 fontWeight = FontWeight.Bold,
-                color      = TextPrimary,
+                color      = if (locked) LockedText else TextPrimary,
                 textAlign  = TextAlign.Center,
                 lineHeight = 13.sp
             )
@@ -404,13 +579,14 @@ private fun GpsBoxItem(item: GpsItem, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun InstallationSupportCard(onClick: () -> Unit) {
+private fun InstallationSupportCard(onClick: () -> Unit, locked: Boolean = false) {
     Card(
         onClick   = onClick,
         modifier  = Modifier.fillMaxWidth(),
         shape     = RoundedCornerShape(18.dp),
-        colors    = CardDefaults.cardColors(containerColor = CardWhite),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        colors    = CardDefaults.cardColors(containerColor = if (locked) LockedCardBg else CardWhite),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border    = if (locked) BorderStroke(1.dp, Color.White) else null
     ) {
         Row(
             modifier          = Modifier
@@ -422,13 +598,13 @@ private fun InstallationSupportCard(onClick: () -> Unit) {
                 modifier         = Modifier
                     .size(50.dp)
                     .clip(RoundedCornerShape(15.dp))
-                    .background(BrandGreenLight),
+                    .background(if (locked) LockedIconBg else BrandGreenLight),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Build, null, tint = BrandGreen, modifier = Modifier.size(24.dp))
+                Icon(Icons.Default.Build, null, tint = if (locked) LockedIcon else BrandGreen, modifier = Modifier.size(24.dp))
             }
             Spacer(Modifier.width(14.dp))
-            Text("Installation Support", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary, modifier = Modifier.weight(1f))
+            Text("Installation Support", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = if (locked) LockedText else TextPrimary, modifier = Modifier.weight(1f))
             Icon(Icons.Default.ChevronRight, null, tint = TextHint, modifier = Modifier.size(22.dp))
         }
     }

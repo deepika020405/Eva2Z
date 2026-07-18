@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.developer.ev2z.repository.CommunityRepository
 import com.developer.ev2z.response.*
+import com.developer.ev2z.util.getCityFromLatLng
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -71,15 +72,31 @@ class CommunityViewModel(
     fun createPost(
         title: String,
         body: String,
-        images: List<ByteArray>
+        images: List<ByteArray>,
+        lat: Double? = null,
+        long: Double? = null,
+        city: String? = null,
+        category: String? = null
     ) {
         scope.launch {
             _state = _state.copy(postUpdating = true)
 
             try {
-                val response = repository.createPost(title, body, images)
+                val response = repository.createPost(
+                    title = title,
+                    body = body,
+                    images = images,
+                    lat = lat,
+                    long = long,
+                    city = city,
+                    category = category
+                )
 
-                if (response["post"] != null) {
+                // New API returns the created post directly with an "id";
+                // older shape wrapped it in "post".
+                val created = response["id"] != null || response["post"] != null
+
+                if (created) {
                     val posts = repository.fetchPosts()
 
                     _state = _state.copy(
@@ -100,6 +117,18 @@ class CommunityViewModel(
                     error = e.message
                 )
             }
+        }
+    }
+
+    /** Reverse-geocode coordinates to a city name; result delivered on the main scope. */
+    fun resolveCity(lat: Double, lng: Double, onResult: (String) -> Unit) {
+        scope.launch {
+            val city = try {
+                getCityFromLatLng(lat, lng)
+            } catch (e: Exception) {
+                ""
+            }
+            onResult(city)
         }
     }
 

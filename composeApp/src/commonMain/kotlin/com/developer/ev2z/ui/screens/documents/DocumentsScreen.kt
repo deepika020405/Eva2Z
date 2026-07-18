@@ -48,6 +48,9 @@ import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.response.VaultDocumentDto
+import com.developer.ev2z.response.VaultDocumentDetail
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
 import com.developer.ev2z.util.PlatformDocumentViewer
 import com.developer.ev2z.util.compressStoryImage
 import com.developer.ev2z.util.rememberImagePicker
@@ -381,12 +384,20 @@ fun DocumentsScreen(
         if (selectedDoc != null) {
             val (doc, slot) = selectedDoc!!
             var previewBytes by remember(doc.id) { mutableStateOf<ByteArray?>(null) }
+            var detail by remember(doc.id) { mutableStateOf<VaultDocumentDetail?>(null) }
 
             LaunchedEffect(doc.id) {
                 viewModel.openDocument(
                     documentId = doc.id,
                     onResult   = { bytes -> previewBytes = bytes },
                 )
+            }
+
+            // The new backend serves the image via `image_url` (a plain URL),
+            // not the encrypted `vault/{id}` endpoint (which 404s), so fetch the
+            // detail to get that URL and fall back to loading it directly.
+            LaunchedEffect(doc.id) {
+                viewModel.loadDocumentDetail(doc.id) { detail = it }
             }
 
             PlatformBackHandler(enabled = true) { selectedDoc = null }
@@ -398,13 +409,19 @@ fun DocumentsScreen(
                 onReupload   = { selectedDoc = null; editDocument = doc },
                 onDelete     = { selectedDoc = null; deleteDocId = doc.id },
                 preview      = {
-                    if (previewBytes != null) {
-                        PlatformDocumentViewer(
+                    val imageUrl = ApiService.absoluteImageUrl(detail?.imageUrl) ?: doc.imageUrl
+                    when {
+                        previewBytes != null -> PlatformDocumentViewer(
                             bytes    = previewBytes!!,
                             modifier = Modifier.fillMaxSize(),
                         )
-                    } else {
-                        PdfPreviewPlaceholder()
+                        imageUrl != null -> AsyncImage(
+                            model              = imageUrl,
+                            contentDescription = doc.fileName,
+                            contentScale       = ContentScale.Fit,
+                            modifier           = Modifier.fillMaxSize(),
+                        )
+                        else -> PdfPreviewPlaceholder()
                     }
                 },
             )
@@ -1304,7 +1321,7 @@ fun DocumentViewerScreen(
 //  Upload / edit screen
 // ════════════════════════════════════════════════════════════════════════════
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, kotlin.time.ExperimentalTime::class)
 @Composable
 fun UploadDocumentScreen(
     apiService: ApiService,
@@ -1359,23 +1376,56 @@ fun UploadDocumentScreen(
                                 }
                                 try {
                                     isUploading = true
-                                    if (isEditMode) {
+
+                                    val result = if (isEditMode) {
                                         viewModel.updateDocument(
                                             documentId = editDocument!!.id,
                                             fileName   = fileName,
                                             imageBytes = imageBytes,
                                         )
-                                        snackbarHostState.showSnackbar("$fileName updated successfully ✅")
                                     } else {
                                         viewModel.uploadDocument(
                                             fileName   = fileName,
                                             imageBytes = imageBytes!!,
                                         )
-                                        snackbarHostState.showSnackbar("$fileName uploaded successfully ✅")
                                     }
-                                    onBack()
+
+                                    if (result.success) {
+                                        // The vault list endpoint may not return a
+                                        // freshly uploaded doc yet, so surface it right
+                                        // away from the upload response (real id, type,
+                                        // expiry) and cache the picked image for preview.
+                                        val uploadedId =
+                                            if (isEditMode) editDocument!!.id
+                                            else result.id?.toString()
+                                        if (!uploadedId.isNullOrBlank()) {
+                                            viewModel.addOrUpdateLocal(
+                                                VaultDocumentDto(
+                                                    id           = uploadedId,
+                                                    fileName     = fileName,
+                                                    fileType     = "image/jpeg",
+                                                    createdAt    = Clock.System.now().toString(),
+                                                    documentType = result.documentType,
+                                                    expiryDate   = result.expiryDate,
+                                                    imageUrl     = ApiService.absoluteImageUrl(result.imageUrl),
+                                                ),
+                                                imageBytes,
+                                            )
+                                        }
+                                        val action = if (isEditMode) "updated" else "uploaded"
+                                        snackbarHostState.showSnackbar(
+                                            uploadSuccessMessage(fileName, action, result),
+                                        )
+                                        onBack()
+                                    } else {
+                                        // Rejected by server validation (e.g. wrong
+                                        // document type). Keep the screen open so the
+                                        // user can pick the correct file.
+                                        snackbarHostState.showSnackbar(rejectionMessage(result))
+                                        isUploading = false
+                                    }
                                 } catch (_: Exception) {
-                                    snackbarHostState.showSnackbar("Operation failed. Please try again")
+                                    snackbarHostState.showSnackbar("Operation failed. Please check your connection and try again.")
                                     isUploading = false
                                 }
                             }
@@ -1649,3 +1699,65 @@ fun UploadDocumentScreen(
 //     ...
 // }
 // (full dummy UI omitted for brevity — was never connected to real data)
+
+// ════════════════════════════════════════════════════════════════════════════
+//  Vault upload result helpers
+// ════════════════════════════════════════════════════════════════════════════
+
+/** Maps a document-type code from the API to a human-readable label. */
+private fun readableDocType(code: String?): String = when (code?.lowercase()) {
+    "dl"                       -> "Driving Licence"
+    "rc"                       -> "Registration Certificate (RC)"
+    "puc"                      -> "Pollution Certificate (PUC)"
+    "insurance", "policy"      -> "Insurance Policy"
+    "service", "maintenance"   -> "Service Record"
+    null, ""                   -> "document"
+    else                       -> code.uppercase()
+}
+
+/** Builds a clear message when the server rejects an uploaded document. */
+private fun rejectionMessage(result: com.developer.ev2z.response.VaultUploadResponse): String {
+    if (result.isWrongDocumentType) {
+        val expected = readableDocType(result.expectedType)
+        val detected = readableDocType(result.detectedType)
+        return "This looks like a $detected, but a $expected was expected. " +
+                "Please upload the correct document."
+    }
+    return when (result.reason) {
+        "could_not_validate_try_again" ->
+            "We couldn't read this document clearly. Please upload a clearer, well-lit photo and try again."
+        "not_a_document" ->
+            "This image doesn't look like a document. Please upload a clear photo of the document."
+        else -> result.message?.takeIf { it.isNotBlank() }
+            ?: "We couldn't validate this document. Please upload a clear image of the correct document."
+    }
+}
+
+/** Builds a success message that surfaces the detected type and expiry, when present. */
+private fun uploadSuccessMessage(
+    fileName: String,
+    action: String,
+    result: com.developer.ev2z.response.VaultUploadResponse,
+): String {
+    val builder = StringBuilder("$fileName $action successfully ✅")
+    result.documentType?.let { builder.append(" · ${readableDocType(it)}") }
+    formatPlainDate(result.expiryDate)?.let { builder.append(" · Valid till $it") }
+    return builder.toString()
+}
+
+/** Formats a plain "yyyy-MM-dd" date (no time component) to "dd-MMM-yyyy". */
+private fun formatPlainDate(date: String?): String? {
+    if (date.isNullOrBlank()) return null
+    val parts = date.split("-")
+    if (parts.size != 3) return null
+    val year  = parts[0]
+    val month = parts[1].toIntOrNull() ?: return null
+    val day   = parts[2].toIntOrNull() ?: return null
+    val monthName = when (month) {
+        1 -> "Jan"; 2 -> "Feb"; 3 -> "Mar"; 4 -> "Apr"
+        5 -> "May"; 6 -> "Jun"; 7 -> "Jul"; 8 -> "Aug"
+        9 -> "Sep"; 10 -> "Oct"; 11 -> "Nov"; 12 -> "Dec"
+        else -> return null
+    }
+    return "$day-$monthName-$year"
+}
