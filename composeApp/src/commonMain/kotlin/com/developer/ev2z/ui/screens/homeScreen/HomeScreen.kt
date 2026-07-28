@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.times
+import kotlin.math.roundToInt
 
 // ─────────────────────────── COLORS ────────────────────────────────
 
@@ -94,7 +95,8 @@ fun HomeScreen(
     unreadNotificationCount: Int = 0,
     parkingLocked: Boolean = false,
     gpsLocked: Boolean = false,
-    onNavigateToShop: () -> Unit = {}
+    onNavigateToShop: () -> Unit = {},
+    onFuelPrice: () -> Unit = {}
 ) {
     // Which locked section the user tapped — drives the popup content. null = no popup.
     var lockedDialogFor by remember { mutableStateOf<HomeSectionLock?>(null) }
@@ -113,6 +115,16 @@ fun HomeScreen(
                 contentPadding = PaddingValues(bottom = 36.dp)
             ) {
                 item { HomeHeader(userName, hPad, onOpenNotifications, unreadNotificationCount) }
+                item {
+                    // TODO: wire locationLabel/petrolPrice/dieselPrice to a real fuel-price source.
+                    FuelPriceHomeWidget(
+                        locationLabel = "Noida, UP",
+                        petrolPrice   = 94.87,
+                        dieselPrice   = 87.66,
+                        onClick       = onFuelPrice,
+                        modifier      = Modifier.padding(horizontal = hPad)
+                    )
+                }
                 item {
                     ParkingTagSection(
                         onVehicleTagRegistration = onParking,
@@ -159,6 +171,82 @@ fun HomeScreen(
             )
         }
     }
+}
+
+// ─────────────────────── FUEL PRICE WIDGET ─────────────────────────
+
+/**
+ * Slim widget that sits right below the "Welcome back" header and above the
+ * QR Parking Tag section. Tapping it invokes [onClick] (e.g. open a fuel
+ * price screen). Adapted to the HomeScreen palette and KMP-safe formatting.
+ */
+@Composable
+fun FuelPriceHomeWidget(
+    locationLabel: String,
+    petrolPrice: Double,
+    dieselPrice: Double,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        onClick   = onClick,
+        modifier  = modifier.fillMaxWidth(),
+        shape     = RoundedCornerShape(12.dp),
+        colors    = CardDefaults.cardColors(containerColor = CardWhite),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border    = BorderStroke(1.5.dp, BrandGreen)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment     = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .background(BrandGreenLight, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector        = Icons.Default.LocalGasStation,
+                        contentDescription = null,
+                        tint               = BrandGreen,
+                        modifier           = Modifier.size(18.dp)
+                    )
+                }
+                Column(modifier = Modifier.padding(start = 10.dp)) {
+                    Text(
+                        text     = "Fuel price today · $locationLabel",
+                        fontSize = 11.sp,
+                        color    = TextSecondary
+                    )
+                    Text(
+                        text       = "Petrol ₹${formatPrice(petrolPrice)}  ·  Diesel ₹${formatPrice(dieselPrice)}",
+                        fontSize   = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color      = TextPrimary
+                    )
+                }
+            }
+            Icon(
+                imageVector        = Icons.Default.ChevronRight,
+                contentDescription = "View fuel price details",
+                tint               = BrandGreen,
+                modifier           = Modifier.size(18.dp)
+            )
+        }
+    }
+}
+
+/** KMP-safe 2-decimal formatter (String.format is JVM-only, unavailable in commonMain). */
+private fun formatPrice(value: Double): String {
+    val cents  = (value * 100).roundToInt()
+    val rupees = cents / 100
+    val paise  = cents % 100
+    return "$rupees.${paise.toString().padStart(2, '0')}"
 }
 
 // ─────────────────────── LOCKED FEATURE DIALOG ─────────────────────

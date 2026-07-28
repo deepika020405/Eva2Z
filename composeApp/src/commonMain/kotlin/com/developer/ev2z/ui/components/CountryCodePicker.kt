@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -17,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -156,7 +158,9 @@ fun PhoneInputField(
     isError: Boolean,
     labelSize: TextUnit,
     placeholder: String = "Phone number",
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    imeAction: ImeAction = ImeAction.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default
 ) {
     val unfocusedBorder = if (isError) MaterialTheme.colorScheme.error else Color(0xFFE0E0E0)
     val focusedBorder   = if (isError) MaterialTheme.colorScheme.error else Color(0xFF6A9F50)
@@ -237,8 +241,10 @@ fun PhoneInputField(
             ),
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Phone,
-                autoCorrect  = false
+                autoCorrect  = false,
+                imeAction    = imeAction
             ),
+            keyboardActions = keyboardActions,
             singleLine = true,
             isError    = isError
         )

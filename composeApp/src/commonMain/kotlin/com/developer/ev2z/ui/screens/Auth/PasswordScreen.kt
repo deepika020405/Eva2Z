@@ -3,6 +3,7 @@ package com.developer.ev2z.ui.screens.Auth
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -13,9 +14,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -23,6 +26,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.BackPressHandler
+import com.developer.ev2z.ui.components.dismissKeyboardOnTap
+import com.developer.ev2z.ui.components.isKeyboardVisible
+import com.developer.ev2z.ui.components.screenHeightDp
 
 @Composable
 fun PasswordScreen(
@@ -45,6 +51,8 @@ fun PasswordScreen(
     val isFormValid = isNewPasswordValid && doPasswordsMatch
 
     val scrollState = rememberScrollState()
+    val focusManager = LocalFocusManager.current
+    val keyboardVisible = isKeyboardVisible()
 
     BackPressHandler { showBackDialog = true }
 
@@ -76,9 +84,9 @@ fun PasswordScreen(
     }
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val screenHeight = maxHeight
         val screenWidth = maxWidth
-        val isCompact = screenHeight < 600.dp
+        // Window height, not this box's — the screen is hosted inside a card below a header.
+        val isCompact = screenHeightDp() < 700.dp
 
         // Responsive sizes
         val headerFontSize = if (isCompact) 18.sp else 20.sp
@@ -94,7 +102,11 @@ fun PasswordScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                // imePadding before the scroll so the keyboard shrinks the viewport — that
+                // is what lets the focused field scroll itself into view.
+                .imePadding()
                 .verticalScroll(scrollState)
+                .dismissKeyboardOnTap(focusManager)
                 .padding(horizontal = horizontalPad),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -121,31 +133,37 @@ fun PasswordScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(if (isCompact) 20.dp else 28.dp))
+            // Title + subtitle are folded away while typing so both password fields and the
+            // submit button stay above the keyboard.
+            if (!keyboardVisible) {
+                Spacer(modifier = Modifier.height(if (isCompact) 20.dp else 28.dp))
 
-            // Title
-            Text(
-                text = title,
-                fontSize = titleSize,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF222222),
-                textAlign = TextAlign.Center
-            )
+                // Title
+                Text(
+                    text = title,
+                    fontSize = titleSize,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF222222),
+                    textAlign = TextAlign.Center
+                )
 
-            Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-            // Subtitle
-            Text(
-                text = subtitle,
-                fontSize = subtitleSize,
-                fontWeight = FontWeight.Normal,
-                color = Color(0xFF888888),
-                textAlign = TextAlign.Center,
-                lineHeight = (subtitleSize.value * 1.5f).sp,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
+                // Subtitle
+                Text(
+                    text = subtitle,
+                    fontSize = subtitleSize,
+                    fontWeight = FontWeight.Normal,
+                    color = Color(0xFF888888),
+                    textAlign = TextAlign.Center,
+                    lineHeight = (subtitleSize.value * 1.5f).sp,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
 
-            Spacer(modifier = Modifier.height(if (isCompact) 32.dp else 48.dp))
+                Spacer(modifier = Modifier.height(if (isCompact) 32.dp else 48.dp))
+            } else {
+                Spacer(modifier = Modifier.height(16.dp))
+            }
 
             // New Password Label
             Text(
@@ -170,7 +188,7 @@ fun PasswordScreen(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(fieldHeight),
+                    .heightIn(min = fieldHeight),
                 shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = Color(0xFFF8FAF7),
@@ -181,7 +199,11 @@ fun PasswordScreen(
                     cursorColor = Color(0xFF6A9F50)
                 ),
                 visualTransformation = if (newPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Next
+                ),
+                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                 singleLine = true,
                 trailingIcon = {
                     IconButton(onClick = { newPasswordVisible = !newPasswordVisible }) {
@@ -231,7 +253,7 @@ fun PasswordScreen(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(fieldHeight),
+                    .heightIn(min = fieldHeight),
                 shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = Color(0xFFF8FAF7),
@@ -242,7 +264,11 @@ fun PasswordScreen(
                     cursorColor = Color(0xFF6A9F50)
                 ),
                 visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                 singleLine = true,
                 trailingIcon = {
                     IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {

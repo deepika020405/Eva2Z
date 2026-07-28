@@ -1,11 +1,10 @@
 package com.developer.ev2z.ui.screens.Auth
 
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Visibility
@@ -14,9 +13,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -27,6 +28,8 @@ import com.developer.ev2z.request.LoginRequest
 import com.developer.ev2z.ui.components.CountryPickerDialog
 import com.developer.ev2z.ui.components.PhoneInputField
 import com.developer.ev2z.ui.components.defaultCountry
+import com.developer.ev2z.ui.components.dismissKeyboardOnTap
+import com.developer.ev2z.ui.components.screenHeightDp
 import com.developer.ev2z.util.Analytics
 import com.developer.ev2z.utils.PhoneValidator
 import com.developer.ev2z.viewmodel.AuthViewModel
@@ -113,9 +116,10 @@ fun LoginScreen(
     }
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val screenHeight = maxHeight
         val screenWidth  = maxWidth
-        val isCompact    = screenHeight < 600.dp
+        // Measured on the window, not on this box — inside the pager the box is only a
+        // slice of the screen, which used to force compact sizing on every device.
+        val isCompact    = screenHeightDp() < 700.dp
 
         val labelSize      = if (isCompact) 12.sp else 14.sp
         val fieldHeight    = if (isCompact) 50.dp  else 56.dp
@@ -124,20 +128,14 @@ fun LoginScreen(
         val verticalGap    = if (isCompact) 12.dp  else 18.dp
         val horizontalPad  = (screenWidth * 0.04f).coerceIn(12.dp, 24.dp)
 
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .clickable(
-                    indication = null,
-                    interactionSource = remember { MutableInteractionSource() }
-                ) { focusManager.clearFocus() }
-        )
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                // imePadding before the scroll so the keyboard shrinks the viewport — that
+                // is what lets the focused field scroll itself into view.
                 .imePadding()
                 .verticalScroll(scrollState)
+                .dismissKeyboardOnTap(focusManager)
                 .padding(horizontal = horizontalPad, vertical = if (isCompact) 16.dp else 24.dp)
         ) {
             Spacer(Modifier.height(if (isCompact) 8.dp else 16.dp))
@@ -164,7 +162,9 @@ fun LoginScreen(
                 fieldHeight     = fieldHeight,
                 isError         = phoneNumber.isNotEmpty() && !PhoneValidator.isValid(phoneNumber, selectedCountry.dialCode, selectedCountry.phoneLength),
                 labelSize       = labelSize,
-                placeholder     = if (isCompact) "Phone number" else "Enter Your Registered Number"
+                placeholder     = if (isCompact) "Phone number" else "Enter Your Registered Number",
+                imeAction       = ImeAction.Next,
+                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
             )
             if (phoneNumber.isNotEmpty() && !PhoneValidator.isValid(phoneNumber, selectedCountry.dialCode, selectedCountry.phoneLength)) {
                 Text(
@@ -206,7 +206,7 @@ fun LoginScreen(
                 placeholder = {
                     Text("Enter Your Password", color = Color(0xFFAAAAAA), fontSize = labelSize)
                 },
-                modifier = Modifier.fillMaxWidth().height(fieldHeight),
+                modifier = Modifier.fillMaxWidth().heightIn(min = fieldHeight),
                 shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor   = Color(0xFFF8FAF7),
@@ -215,7 +215,11 @@ fun LoginScreen(
                     focusedBorderColor      = Color(0xFF6A9F50),
                     cursorColor             = Color(0xFF6A9F50)
                 ),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Password,
+                    imeAction    = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                 singleLine = true,
                 isError    = password.isNotEmpty() && password.length < 6,
                 visualTransformation =

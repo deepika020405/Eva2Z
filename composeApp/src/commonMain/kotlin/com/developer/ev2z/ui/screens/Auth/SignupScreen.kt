@@ -4,15 +4,18 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
@@ -22,6 +25,8 @@ import com.developer.ev2z.ui.components.CountryData
 import com.developer.ev2z.ui.components.CountryPickerDialog
 import com.developer.ev2z.ui.components.PhoneInputField
 import com.developer.ev2z.ui.components.defaultCountry
+import com.developer.ev2z.ui.components.dismissKeyboardOnTap
+import com.developer.ev2z.ui.components.screenHeightDp
 import com.developer.ev2z.util.Analytics
 import com.developer.ev2z.utils.EmailValidator
 import com.developer.ev2z.utils.PhoneValidator
@@ -94,9 +99,9 @@ fun SignupScreen(
     }
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val screenHeight = maxHeight
         val screenWidth  = maxWidth
-        val isCompact    = screenHeight < 600.dp
+        // Window height, not this box's — inside the pager the box only gets a slice.
+        val isCompact    = screenHeightDp() < 700.dp
 
         val labelSize        = if (isCompact) 12.sp else 14.sp
         val fieldHeight      = if (isCompact) 50.dp  else 56.dp
@@ -109,8 +114,11 @@ fun SignupScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                // imePadding before the scroll so the keyboard shrinks the viewport — that
+                // is what lets the focused field scroll itself into view.
                 .imePadding()
                 .verticalScroll(scrollState)
+                .dismissKeyboardOnTap(focusManager)
                 .padding(horizontal = horizontalPad, vertical = if (isCompact) 16.dp else 24.dp)
         ) {
             Spacer(Modifier.height(if (isCompact) 8.dp else 16.dp))
@@ -141,7 +149,11 @@ fun SignupScreen(
                     focusedBorderColor      = Color(0xFF6A9F50),
                     cursorColor             = Color(0xFF6A9F50)
                 ),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Text,
+                    imeAction    = ImeAction.Next
+                ),
+                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                 singleLine = true,
                 isError = submitAttempted && fullName.isBlank()
             )
@@ -175,7 +187,9 @@ fun SignupScreen(
                 fieldHeight     = fieldHeight,
                 isError         = submitAttempted && (!PhoneValidator.isValid(phoneNumber, selectedCountry.dialCode, selectedCountry.phoneLength) || phoneAlreadyRegisteredError != null),
                 labelSize       = labelSize,
-                placeholder     = if (isCompact) "Phone number" else "Enter Your Valid Number"
+                placeholder     = if (isCompact) "Phone number" else "Enter Your Valid Number",
+                imeAction       = ImeAction.Next,
+                keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
             )
             if (phoneNumber.isNotEmpty() && !PhoneValidator.isValid(phoneNumber, selectedCountry.dialCode, selectedCountry.phoneLength)) {
                 Text(
@@ -224,7 +238,11 @@ fun SignupScreen(
                     focusedBorderColor      = Color(0xFF6A9F50),
                     cursorColor             = Color(0xFF6A9F50)
                 ),
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Email,
+                    imeAction    = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                 singleLine = true,
                 isError = email.isNotEmpty() && !EmailValidator.isValidEmail(email)
             )

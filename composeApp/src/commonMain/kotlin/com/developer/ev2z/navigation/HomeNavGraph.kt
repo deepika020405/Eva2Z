@@ -100,6 +100,8 @@ import com.developer.ev2z.calling.startIncomingCallWatcher
 import com.developer.ev2z.calling.stopIncomingCallWatcher
 import com.developer.ev2z.util.IncomingCallData
 import com.developer.ev2z.ui.screens.InstallationSupport.InstallationSupportScreen
+import com.developer.ev2z.ui.screens.fuelPrice.FuelPriceScreen
+import com.developer.ev2z.ui.screens.fuelPrice.FuelPriceViewModel
 import com.developer.ev2z.ui.screens.market_screen.ShopProduct
 import com.developer.ev2z.util.SosNotificationHandler
 
@@ -137,6 +139,8 @@ class HomeTab(
     override fun Content() {
 
         var showLiveLocation by rememberSaveable { mutableStateOf(false) }
+        var showFuelPrice by rememberSaveable { mutableStateOf(false) }
+        val fuelPriceViewModel = remember { FuelPriceViewModel() }
         val unreadNotifCount by NotificationBadgeManager.unreadCount.collectAsState()
 
         val uiState by viewModel.uiState.collectAsState()
@@ -169,6 +173,16 @@ class HomeTab(
                 onOpenTrackTrace = onOpenTrackTrace,
                 onOpenCommunity = onOpenCommunity,
                 onSessionExpired = onLogout
+            )
+
+        } else if (showFuelPrice) {
+
+            val fuelUiState by fuelPriceViewModel.uiState.collectAsState()
+            FuelPriceScreen(
+                uiState = fuelUiState,
+                onBack = { showFuelPrice = false },
+                onStateSelected = fuelPriceViewModel::onStateSelected,
+                onRetry = fuelPriceViewModel::retry
             )
 
         } else {
@@ -212,7 +226,8 @@ class HomeTab(
                 unreadNotificationCount = unreadNotifCount,
                 parkingLocked = parkingLocked,
                 gpsLocked = gpsLocked,
-                onNavigateToShop = onNavigateToShop
+                onNavigateToShop = onNavigateToShop,
+                onFuelPrice = { showFuelPrice = true }
             )
         }
     }
@@ -774,6 +789,14 @@ fun HomeNavGraph(
 
         } else if (showNotificationsScreen) {
 
+            // Wire the full notification feed: QR (via sosTagViewModel) + GPS / Vault /
+            // Community (via apiService). Without these params the screen only shows QR.
+            val homeStateForNotif by viewModel.uiState.collectAsState()
+            val notifDevices = (homeStateForNotif as? HomeUiState.Success)
+                ?.deviceResponse?.data ?: emptyList()
+            val notifPrimaryDevice = notifDevices.firstOrNull()
+            val notifUserPlan = remember { storageManager.getString("user_plan", "") }
+
             NotificationsScreen(
                 viewModel = sosTagViewModel,
                 onBackPressed = {
@@ -788,7 +811,15 @@ fun HomeNavGraph(
                     showNotificationsScreen = false
                     sosOpenedFromInbox = true
                     showSosQuickReply = true
-                }
+                },
+                apiService = apiService,
+                token = token,
+                deviceId = notifPrimaryDevice?.deviceId,
+                deviceName = notifPrimaryDevice?.deviceName ?: "My Vehicle",
+                isGpsUser = notifDevices.isNotEmpty() ||
+                        notifUserPlan == "gps" || notifUserPlan == "both",
+                userPlan = notifUserPlan,
+                storageManager = storageManager,
             )
 
         } else if (showSosChatInbox) {

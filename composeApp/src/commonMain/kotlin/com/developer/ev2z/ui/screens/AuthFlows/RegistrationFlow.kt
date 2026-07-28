@@ -1,5 +1,6 @@
 package com.developer.ev2z.ui.screens.AuthFlows
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -15,18 +16,23 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.BackPressHandler
+import com.developer.ev2z.ui.components.isKeyboardVisible
 import com.developer.ev2z.ui.screens.Auth.OTPScreen
 import com.developer.ev2z.ui.screens.Auth.PasswordScreen
 import com.developer.ev2z.viewmodel.AuthViewModel
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
 import org.jetbrains.compose.resources.painterResource
+
+/** Logo (80.dp) + gap (12.dp) + the 24.sp title line + breathing room. */
+internal val AuthHeaderMinHeight = 142.dp
 
 enum class RegistrationStep {
     VERIFY_PHONE_OTP,
@@ -52,6 +58,7 @@ fun RegistrationFlow(
     val loginSuccess by authViewModel.loginSuccess.collectAsState()
     val error by authViewModel.error.collectAsState()
     var showSuccessDialog by remember { mutableStateOf(false) }
+    val keyboardVisible = isKeyboardVisible()
 
     // Cross-platform back button — only on first screen
     if (currentStep == RegistrationStep.VERIFY_PHONE_OTP) {
@@ -171,14 +178,27 @@ fun RegistrationFlow(
     ) {
 
         BoxWithConstraints(
-            modifier = Modifier.fillMaxSize()
+            // Keeps the logo clear of the notch / Dynamic Island — the iOS host view
+            // ignores the safe area, so nothing else insets this screen.
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
         ) {
             val screenHeight = maxHeight
+            // Never smaller than the logo block, so a short window shrinks the empty space
+            // instead of cropping the logo. Collapses while the keyboard is up so the step
+            // below keeps room to scroll.
+            val headerHeight by animateDpAsState(
+                targetValue = if (keyboardVisible) 0.dp
+                              else (screenHeight * 0.20f).coerceAtLeast(AuthHeaderMinHeight),
+                label = "registrationHeaderHeight"
+            )
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(screenHeight * 0.20f),
+                    .height(headerHeight)
+                    .clipToBounds(),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
@@ -205,7 +225,7 @@ fun RegistrationFlow(
             Box(
                 Modifier
                     .fillMaxSize()
-                    .padding(top = screenHeight * 0.20f)
+                    .padding(top = headerHeight)
                     .background(
                         color = Color(0xFFFFFFFF),
                         RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)

@@ -493,6 +493,32 @@ class ApiService {
         }
     }
 
+    // ---------------- FUEL PRICES ----------------
+    /**
+     * Public endpoint — no bearer token. Omit [state] for every state (also carries the
+     * per-state district breakdown); pass a state name to refresh just that state.
+     */
+    suspend fun getFuelPrices(state: String? = null): FuelPricesResponse {
+        println("🌐 API: Fetching fuel prices state=${state ?: "all"}")
+
+        return try {
+            val response = client.get("${baseUrl}fuel-prices") {
+                header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+                if (!state.isNullOrBlank()) parameter("state", state)
+            }
+
+            val raw = response.bodyAsText()
+            println("✔️ Fuel Prices Status: ${response.status}")
+
+            Json { ignoreUnknownKeys = true }
+                .decodeFromString(FuelPricesResponse.serializer(), raw)
+
+        } catch (e: Exception) {
+            println("❌ Fuel Prices Error: ${e.message}")
+            throw e
+        }
+    }
+
     // ---------------- MY DEVICES ----------------
     suspend fun getMyDevices(token: String): MyDevicesResponse {
         println("🌐 API: Fetching my devices")

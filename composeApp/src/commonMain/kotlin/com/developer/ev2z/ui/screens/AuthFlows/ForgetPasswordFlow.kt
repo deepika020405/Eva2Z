@@ -1,5 +1,6 @@
 package com.developer.ev2z.ui.screens.AuthFlows
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -10,11 +11,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.BackPressHandler
+import com.developer.ev2z.ui.components.isKeyboardVisible
 import com.developer.ev2z.ui.screens.Auth.OTPScreen
 import com.developer.ev2z.ui.screens.Auth.PasswordScreen
 import com.developer.ev2z.viewmodel.AuthViewModel
@@ -54,6 +57,7 @@ fun ForgetPasswordFlow(
     val otpVerified by authViewModel.otpVerified.collectAsState()
     val loginSuccess by authViewModel.loginSuccess.collectAsState()
     val error by authViewModel.error.collectAsState()
+    val keyboardVisible = isKeyboardVisible()
 
     // ✅ Cross-platform back button - ONLY on first screen
     if (currentStep == ForgetPasswordStep.ENTER_PHONE) {
@@ -111,15 +115,27 @@ fun ForgetPasswordFlow(
         verticalArrangement = Arrangement.Center
     ) {
         BoxWithConstraints(
-            modifier = Modifier.fillMaxSize()
+            // Keeps the logo clear of the notch / Dynamic Island — the iOS host view
+            // ignores the safe area, so nothing else insets this screen.
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
         ) {
             val screenHeight = maxHeight
-
+            // Never smaller than the logo block, so a short window shrinks the empty space
+            // instead of cropping the logo. Collapses while the keyboard is up so the step
+            // below keeps room to scroll.
+            val headerHeight by animateDpAsState(
+                targetValue = if (keyboardVisible) 0.dp
+                              else (screenHeight * 0.20f).coerceAtLeast(AuthHeaderMinHeight),
+                label = "forgetPasswordHeaderHeight"
+            )
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(screenHeight * 0.20f),
+                    .height(headerHeight)
+                    .clipToBounds(),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
@@ -146,7 +162,7 @@ fun ForgetPasswordFlow(
             Box(
                 Modifier
                     .fillMaxSize()
-                    .padding(top = screenHeight * 0.20f)
+                    .padding(top = headerHeight)
                     .background(
                         color = Color(0xFFFFFFFF),
                         RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)

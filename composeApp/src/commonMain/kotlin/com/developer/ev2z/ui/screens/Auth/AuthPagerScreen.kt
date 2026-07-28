@@ -1,5 +1,6 @@
 package com.developer.ev2z.ui.screens.Auth
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -11,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -18,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.developer.ev2z.ui.components.isKeyboardVisible
 import com.developer.ev2z.viewmodel.AuthViewModel
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
@@ -39,6 +42,8 @@ fun AuthPagerScreen(
     var preFilledPhoneLogin by remember { mutableStateOf("") }
     var preFilledPhoneSignup by remember { mutableStateOf("") }
 
+    val keyboardVisible = isKeyboardVisible()
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -47,26 +52,41 @@ fun AuthPagerScreen(
         verticalArrangement = Arrangement.Center
     ) {
         BoxWithConstraints(
-            modifier = Modifier.fillMaxSize()
+            // Keeps the logo clear of the notch / Dynamic Island — the iOS host view
+            // ignores the safe area, so nothing else insets this screen.
+            modifier = Modifier
+                .fillMaxSize()
+                .statusBarsPadding()
         ) {
             val screenHeight = maxHeight
             val isCompact = screenHeight < 700.dp
 
-            // Responsive header height
-            val headerFraction = if (isCompact) 0.16f else 0.20f
             val logoSize = if (isCompact) 60.dp else 80.dp
             val appTitleSize = if (isCompact) 20.sp else 24.sp
+            val logoGap = if (isCompact) 8.dp else 12.dp
+
+            // Never smaller than the logo block itself, so a short window shrinks the empty
+            // space rather than cropping the logo. Collapses to zero while the keyboard is up
+            // so the form below keeps enough room to stay visible and scrollable.
+            val headerContentHeight = logoSize + logoGap + (appTitleSize.value * 1.4f).dp + 16.dp
+            val headerHeight by animateDpAsState(
+                targetValue = if (keyboardVisible) 0.dp
+                              else (screenHeight * (if (isCompact) 0.16f else 0.20f))
+                                  .coerceAtLeast(headerContentHeight),
+                label = "authHeaderHeight"
+            )
             val tabTitleSize = if (isCompact) 20.sp else 24.sp
             val tabFontSize = if (isCompact) 16.sp else 18.sp
             val tabHeight = if (isCompact) 50.dp else 58.dp
             val tabInnerHeight = if (isCompact) 36.dp else 42.dp
             val contentHorizontalPad = if (isCompact) 24.dp else 32.dp
 
-            // Header with logo
+            // Header with logo — hidden while typing
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(screenHeight * headerFraction),
+                    .height(headerHeight)
+                    .clipToBounds(),
                 contentAlignment = Alignment.Center
             ) {
                 Column(
@@ -79,7 +99,7 @@ fun AuthPagerScreen(
                         modifier = Modifier.size(logoSize)
                     )
 
-                    Spacer(modifier = Modifier.height(if (isCompact) 8.dp else 12.dp))
+                    Spacer(modifier = Modifier.height(logoGap))
 
                     Text(
                         text = "Eva2z Connect",
@@ -94,7 +114,7 @@ fun AuthPagerScreen(
             Column(
                 Modifier
                     .fillMaxSize()
-                    .padding(top = screenHeight * headerFraction)
+                    .padding(top = headerHeight)
                     .background(
                         color = Color(0xFFFFFFFF),
                         RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
@@ -106,22 +126,24 @@ fun AuthPagerScreen(
                         .fillMaxSize()
                         .padding(horizontal = contentHorizontalPad, vertical = if (isCompact) 18.dp else 24.dp)
                 ) {
-                    Spacer(modifier = Modifier.height(if (isCompact) 16.dp else 24.dp))
+                    Spacer(modifier = Modifier.height(if (keyboardVisible) 4.dp else if (isCompact) 16.dp else 24.dp))
 
-                    // Title
-                    Text(
-                        text = "Log in or Sign up",
-                        modifier = Modifier.fillMaxWidth(),
-                        style = TextStyle(
-                            fontSize = tabTitleSize,
-                            lineHeight = (tabTitleSize.value * 1.3f).sp,
-                            fontWeight = FontWeight(500),
-                            color = Color(0xFF252A23),
-                            textAlign = TextAlign.Center,
+                    // Title — also folded away while typing
+                    if (!keyboardVisible) {
+                        Text(
+                            text = "Log in or Sign up",
+                            modifier = Modifier.fillMaxWidth(),
+                            style = TextStyle(
+                                fontSize = tabTitleSize,
+                                lineHeight = (tabTitleSize.value * 1.3f).sp,
+                                fontWeight = FontWeight(500),
+                                color = Color(0xFF252A23),
+                                textAlign = TextAlign.Center,
+                            )
                         )
-                    )
 
-                    Spacer(modifier = Modifier.height(if (isCompact) 20.dp else 32.dp))
+                        Spacer(modifier = Modifier.height(if (isCompact) 20.dp else 32.dp))
+                    }
 
                     // Tab Switcher
                     Row(

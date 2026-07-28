@@ -260,7 +260,11 @@ fun DeviceReportContent(
         )
 
         // Device Selector Overlay
+        // NOTE: zIndex must be on the AnimatedVisibility itself (a direct child of
+        // the outer Box) so the selector draws AND hit-tests above the bottom sheet,
+        // which is composed later. Without this the bottom sheet swallows the taps.
         AnimatedVisibility(
+            modifier = Modifier.zIndex(2000f),
             visible = isDropdownOpen,
             enter = fadeIn() + slideInVertically { -it / 3 },
             exit = fadeOut() + slideOutVertically { -it / 3 }
