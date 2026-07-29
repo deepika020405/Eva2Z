@@ -69,6 +69,17 @@ class NotificationPermissionHelper(
             ActivityResultContracts.RequestPermission()
         ) { granted: Boolean ->
             android.util.Log.d("Permissions", "🎤 RECORD_AUDIO granted=$granted")
+            requestLocationPermission()
+        }
+
+    // 📍 Location launcher — powers the home fuel-price card and the fuel screen.
+    private val locationLauncher =
+        activity.registerForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions()
+        ) { result ->
+            android.util.Log.d("Permissions", "📍 location granted=${result.values.any { it }}")
+            // Wake anything waiting on a fix (e.g. the fuel-price screen).
+            LocationPermissionEvents.notifyChanged()
             onGranted() // ✅ proceed regardless
         }
 
@@ -97,9 +108,25 @@ class NotificationPermissionHelper(
         ) == PackageManager.PERMISSION_GRANTED
 
         if (micGranted) {
-            onGranted()
+            requestLocationPermission()
         } else {
             micLauncher.launch(Manifest.permission.RECORD_AUDIO)
         }
+    }
+
+    // Asked once on app open, like other apps do, so the home fuel card can show
+    // rates for wherever the user actually is. The OS itself stops re-prompting
+    // after the user has declined twice.
+    private fun requestLocationPermission() {
+        if (hasLocationPermission()) {
+            onGranted()
+            return
+        }
+        locationLauncher.launch(
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        )
     }
 }

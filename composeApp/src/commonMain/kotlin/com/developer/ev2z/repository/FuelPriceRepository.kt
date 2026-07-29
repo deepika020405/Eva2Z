@@ -8,24 +8,23 @@ class FuelPriceRepository(
 ) {
 
     /** Every state / union territory — powers the picker and the nearby-state list. */
-    suspend fun getAllStates(): List<FuelStateDto> = fetch(state = null)
+    suspend fun getAllStates(): List<FuelStateDto> {
+        val response = api.getFuelPrices()
+        if (!response.status) {
+            throw IllegalStateException(response.message ?: "Couldn't load fuel prices")
+        }
+        return response.data.filter { it.stateName.isNotBlank() }
+    }
 
     /**
      * Re-fetches a single state so its rates are current when the user switches to it.
      * Returns null when the backend knows no such state.
      */
     suspend fun getState(stateName: String): FuelStateDto? {
-        val states = fetch(state = stateName)
-        return states.firstOrNull { it.stateName.equals(stateName, ignoreCase = true) }
-            ?: states.firstOrNull()
-    }
-
-    private suspend fun fetch(state: String?): List<FuelStateDto> {
-        val response = api.getFuelPrices(state)
-        val payload = response.data
-        if (!response.status || payload == null || !payload.success) {
+        val response = api.getFuelPriceForState(stateName)
+        if (!response.status) {
             throw IllegalStateException(response.message ?: "Couldn't load fuel prices")
         }
-        return payload.data
+        return response.data?.takeIf { it.stateName.isNotBlank() }
     }
 }

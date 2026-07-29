@@ -123,13 +123,18 @@ class MainActivity : ComponentActivity() {
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == LOCATION_PERMISSION_REQUEST) {
+            LocationPermissionEvents.notifyChanged()
             val callback = pendingLocationCallback
             pendingLocationCallback = null
-            if (grantResults.isNotEmpty() &&
-                grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED &&
-                callback != null
-            ) {
+            if (callback == null) return
+            val granted = grantResults.isNotEmpty() &&
+                grantResults.any { it == android.content.pm.PackageManager.PERMISSION_GRANTED }
+            if (granted) {
                 fetchPhoneLocation(callback)
+            } else {
+                // Always answer the caller — a dropped callback leaves callers (e.g. the
+                // fuel-price screen) stuck waiting on a fix that will never arrive.
+                callback(0.0, 0.0)
             }
         }
     }

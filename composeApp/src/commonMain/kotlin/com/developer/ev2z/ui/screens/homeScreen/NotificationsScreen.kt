@@ -117,6 +117,7 @@ fun NotificationsScreen(
     viewModel: SosTagViewModel,
     onBackPressed: () -> Unit,
     onNotificationClick: (chatId: Int, visitorName: String, visitorPhone: String?) -> Unit,
+    onCommunityClick: () -> Unit = {},
     apiService: ApiService? = null,
     token: String = "",
     deviceId: String? = null,
@@ -238,6 +239,7 @@ fun NotificationsScreen(
                 else -> NotificationsList(
                     items               = filteredItems,
                     onNotificationClick = onNotificationClick,
+                    onCommunityClick    = onCommunityClick,
                     isDark              = _ht.isDark,
                     cardBg              = cardColor,
                 )
@@ -320,6 +322,7 @@ private fun FilterChipsRow(selected: String, onSelect: (String) -> Unit) {
 private fun NotificationsList(
     items: List<NotifItem>,
     onNotificationClick: (chatId: Int, visitorName: String, visitorPhone: String?) -> Unit,
+    onCommunityClick: () -> Unit,
     isDark: Boolean,
     cardBg: Color,
 ) {
@@ -368,7 +371,12 @@ private fun NotificationsList(
         if (communityItems.isNotEmpty()) {
             item(key = "hdr_community") { SectionLabel("COMMUNITY") }
             items(communityItems, key = { "community_${it.post.id}" }) { item ->
-                CommunityNotificationCard(item = item, isDark = isDark, cardBg = cardBg)
+                CommunityNotificationCard(
+                    item    = item,
+                    isDark  = isDark,
+                    cardBg  = cardBg,
+                    onClick = onCommunityClick,
+                )
             }
         }
 
@@ -472,7 +480,12 @@ private fun GpsNotificationCard(item: NotifItem.GpsItem, isDark: Boolean, cardBg
 // ─── Community notification card ──────────────────────────────────────────────
 
 @Composable
-private fun CommunityNotificationCard(item: NotifItem.CommunityItem, isDark: Boolean, cardBg: Color) {
+private fun CommunityNotificationCard(
+    item: NotifItem.CommunityItem,
+    isDark: Boolean,
+    cardBg: Color,
+    onClick: () -> Unit,
+) {
     val tPrimary = if (isDark) LocalHomeTheme.current.palette.textPrimary else NC.TextDark
     val tGray    = if (isDark) LocalHomeTheme.current.palette.textSecondary else NC.TextGray
     val post = item.post
@@ -497,7 +510,7 @@ private fun CommunityNotificationCard(item: NotifItem.CommunityItem, isDark: Boo
         cardBg     = cardBg,
         titleColor = tPrimary,
         bodyColor  = tGray,
-        onClick    = {},
+        onClick    = onClick,
     )
 }
 

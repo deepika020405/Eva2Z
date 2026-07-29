@@ -4,55 +4,48 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /**
- * GET /api/fuel-prices  (optionally ?state=<state name>)
- *
- * The payload is double-wrapped: the outer envelope carries the app-level status,
- * the inner [FuelPricesPayload] carries the upstream provider's own success flag.
+ * GET /api/fuel-prices — every state / union territory for [date].
  */
 @Serializable
 data class FuelPricesResponse(
     val status: Boolean = false,
     val message: String? = null,
-    @SerialName("api_status") val apiStatus: Int? = null,
-    val data: FuelPricesPayload? = null
+    val date: String? = null,
+    val data: List<FuelStateDto> = emptyList()
 )
 
+/**
+ * GET /api/fuel-prices/{state} — a single state, same row shape as the list endpoint.
+ */
 @Serializable
-data class FuelPricesPayload(
-    val success: Boolean = false,
-    val data: List<FuelStateDto> = emptyList(),
-    val summary: FuelPricesSummary? = null
+data class FuelPriceStateResponse(
+    val status: Boolean = false,
+    val message: String? = null,
+    val date: String? = null,
+    val data: FuelStateDto? = null
 )
 
-@Serializable
-data class FuelPricesSummary(
-    @SerialName("total_states") val totalStates: Int = 0,
-    @SerialName("total_districts") val totalDistricts: Int = 0,
-    val countries: List<String> = emptyList(),
-    @SerialName("fuel_types") val fuelTypes: List<String> = emptyList()
-)
-
+/**
+ * One row of the fuel-price table. The backend sends the rates as strings
+ * ("117.51") and `is_default` as 0/1, so both are decoded raw and exposed
+ * through the typed accessors below.
+ */
 @Serializable
 data class FuelStateDto(
+    val id: Int = 0,
     @SerialName("state_id") val stateId: Int = 0,
     @SerialName("state_name") val stateName: String = "",
     val country: String? = null,
-    @SerialName("fuel_prices") val fuelPrices: FuelPricePairDto? = null,
-    @SerialName("is_default") val isDefault: Boolean = false,
-    // Absent for a few union territories (e.g. Daman Diu).
-    val coordinates: FuelCoordinatesDto? = null
-    // The payload also carries a per-state `districts` array; the app shows state/UT-wide
-    // rates only, so it is left unparsed (the decoder ignores unknown keys).
-)
-
-@Serializable
-data class FuelPricePairDto(
-    @SerialName("petrol_price") val petrolPrice: Double? = null,
-    @SerialName("diesel_price") val dieselPrice: Double? = null
-)
-
-@Serializable
-data class FuelCoordinatesDto(
-    val lat: Double? = null,
-    @SerialName("long") val long: Double? = null
-)
+    @SerialName("petrol_price") val petrolPriceRaw: String? = null,
+    @SerialName("diesel_price") val dieselPriceRaw: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    @SerialName("is_default") val isDefaultRaw: Int = 0,
+    @SerialName("price_date") val priceDate: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("updated_at") val updatedAt: String? = null
+) {
+    val petrolPrice: Double? get() = petrolPriceRaw?.trim()?.toDoubleOrNull()
+    val dieselPrice: Double? get() = dieselPriceRaw?.trim()?.toDoubleOrNull()
+    val isDefault: Boolean get() = isDefaultRaw != 0
+}

@@ -12,3 +12,12 @@ expect suspend fun getCityFromLatLng(
     lat: Double,
     lng: Double
 ): String
+
+/**
+ * Returns the state / administrative area (e.g. "Uttar Pradesh") for the given
+ * coordinates, or empty if unknown. Used to pick the right state's fuel rates.
+ */
+expect suspend fun getStateFromLatLng(
+    lat: Double,
+    lng: Double
+): String

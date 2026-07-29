@@ -43,6 +43,29 @@ actual fun fetchPhoneLocation(onResult: (Double, Double) -> Unit) {
     }
 }
 
+actual fun hasLocationPermission(): Boolean = try {
+    when (CLLocationManager().authorizationStatus) {
+        kCLAuthorizationStatusAuthorizedWhenInUse,
+        kCLAuthorizationStatusAuthorizedAlways -> true
+        else -> false
+    }
+} catch (_: Exception) {
+    false
+}
+
+// CoreLocation shows its prompt as a side effect of asking for a fix. The delegate
+// reports the answer through LocationPermissionEvents, so callers just fire and forget.
+actual fun requestLocationPermissionAtStartup() {
+    if (hasLocationPermission()) return
+    fetchPhoneLocation { _, _ -> }
+}
+
+actual fun isLocationEnabled(): Boolean = try {
+    CLLocationManager.locationServicesEnabled()
+} catch (_: Exception) {
+    true
+}
+
 actual fun openLocationSettings() {
     val url = NSURL.URLWithString(UIApplicationOpenSettingsURLString) ?: return
     val app = UIApplication.sharedApplication
@@ -50,6 +73,9 @@ actual fun openLocationSettings() {
         app.openURL(url, options = mapOf<Any?, Any?>(), completionHandler = null)
     }
 }
+
+// iOS has no per-app location toggle outside the app's own settings page.
+actual fun openAppSettings() = openLocationSettings()
 
 private class IosLocationDelegate(
     private val onResult: (Double, Double) -> Unit
@@ -68,6 +94,7 @@ private class IosLocationDelegate(
 
     // iOS 14+ authorization callback.
     override fun locationManagerDidChangeAuthorization(manager: CLLocationManager) {
+        LocationPermissionEvents.notifyChanged()
         when (manager.authorizationStatus) {
             kCLAuthorizationStatusAuthorizedWhenInUse,
             kCLAuthorizationStatusAuthorizedAlways -> manager.requestLocation()

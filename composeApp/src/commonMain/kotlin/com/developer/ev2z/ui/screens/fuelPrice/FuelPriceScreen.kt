@@ -29,6 +29,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
@@ -111,6 +112,9 @@ private data class FuelDimens(
     val tableHeaderSize: TextUnit,
     val tableRowSize: TextUnit,
     val tableRowPadV: Dp,
+    // Layout switches
+    val stackFuelCards: Boolean,
+    val compactTableHeaders: Boolean,
 )
 
 private fun fuelDimensFor(maxWidth: Dp): FuelDimens {
@@ -155,8 +159,14 @@ private fun fuelDimensFor(maxWidth: Dp): FuelDimens {
         tableHeaderSize = sp(12f),
         tableRowSize = sp(14f),
         tableRowPadV = d(12f),
+        // Side-by-side price cards get too cramped to read below ~340dp.
+        stackFuelCards = maxWidth < 340.dp,
+        compactTableHeaders = maxWidth < 400.dp,
     )
 }
+
+// Rows shown before the "Show all states" toggle kicks in.
+private const val NEARBY_PREVIEW = 5
 
 private fun formatRupees(value: Double): String {
     val cents = (value * 100).roundToInt()
@@ -179,9 +189,22 @@ fun FuelPriceScreen(
     onBack: () -> Unit,
     onStateSelected: (String) -> Unit,
     onRetry: () -> Unit,
+    onRequestLocation: () -> Unit = {},
+    onOpenLocationSettings: () -> Unit = {},
+    onDismissLocationIssue: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var showLocationPicker by remember { mutableStateOf(false) }
+    var showAllStates by remember { mutableStateOf(false) }
+
+    uiState.locationIssue?.let { issue ->
+        LocationIssueDialog(
+            issue = issue,
+            onDismiss = onDismissLocationIssue,
+            onOpenSettings = onOpenLocationSettings,
+            onRetry = onRequestLocation
+        )
+    }
 
     if (showLocationPicker) {
         LocationPickerDialog(
@@ -202,6 +225,35 @@ fun FuelPriceScreen(
             .navigationBarsPadding()
     ) {
         when {
+            // Ask before showing anything — rates are only useful once we know where you are.
+            uiState.needsLocationPermission -> {
+                LocationPermissionGate(
+                    onBack = onBack,
+                    onAllow = onRequestLocation,
+                    onPickManually = { showLocationPicker = true },
+                    canPickManually = uiState.availableStates.isNotEmpty(),
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
+
+            uiState.isLocating && uiState.current == null -> {
+                Column(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .verticalScroll(rememberScrollState())
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    CircularProgressIndicator(color = FuelColors.PetrolAccent)
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        text = "Finding your location…",
+                        color = FuelColors.TextSecondary,
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+
             uiState.isLoading && uiState.current == null -> {
                 CircularProgressIndicator(
                     modifier = Modifier.align(Alignment.Center),
@@ -211,7 +263,10 @@ fun FuelPriceScreen(
 
             uiState.error != null && uiState.current == null -> {
                 Column(
-                    modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .verticalScroll(rememberScrollState())
+                        .padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
@@ -235,19 +290,19 @@ fun FuelPriceScreen(
 
             else -> BoxWithConstraints(Modifier.fillMaxSize()) {
                 val d = fuelDimensFor(maxWidth)
-                val contentWidth = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = d.contentMaxWidth)
 
+                // The whole screen scrolls — header included — so nothing is stranded
+                // off-screen on short displays or in landscape.
                 Column(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Scrollable content — fills available space above the pinned CTA.
                     Column(
-                        modifier = contentWidth
-                            .weight(1f)
-                            .verticalScroll(rememberScrollState())
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .widthIn(max = d.contentMaxWidth)
                             .padding(horizontal = d.hPad)
                     ) {
                         Spacer(Modifier.height(12.dp))
@@ -257,41 +312,21 @@ fun FuelPriceScreen(
                         LocationSelector(
                             dimens = d,
                             location = uiState.selectedLocationLabel,
+                            detected = uiState.locationStatus == FuelLocationStatus.DETECTED,
                             onClick = { showLocationPicker = true }
                         )
 
-                        Spacer(Modifier.height(16.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(IntrinsicSize.Min),
-                            horizontalArrangement = Arrangement.spacedBy(d.cardGap)
-                        ) {
-                            // Falls back to naming the price's scope when the API gives no
-                            // previous-day rate to compare against.
-                            val scopeCaption = "Today's rate"
-
-                            FuelPriceCard(
+                        // Offer GPS whenever the shown state didn't come from a fix.
+                        if (uiState.locationStatus != FuelLocationStatus.DETECTED) {
+                            UseMyLocationRow(
                                 dimens = d,
-                                label = "Petrol",
-                                price = formatRupees(uiState.current?.petrolPrice ?: 0.0),
-                                changeValue = uiState.current?.petrolDeltaToday,
-                                fallbackCaption = scopeCaption,
-                                bgColor = FuelColors.PetrolBg,
-                                accentColor = FuelColors.PetrolAccent,
-                                modifier = Modifier.weight(1f).fillMaxHeight()
-                            )
-                            FuelPriceCard(
-                                dimens = d,
-                                label = "Diesel",
-                                price = formatRupees(uiState.current?.dieselPrice ?: 0.0),
-                                changeValue = uiState.current?.dieselDeltaToday,
-                                fallbackCaption = scopeCaption,
-                                bgColor = FuelColors.DieselBg,
-                                accentColor = FuelColors.DieselAccent,
-                                modifier = Modifier.weight(1f).fillMaxHeight()
+                                locating = uiState.isLocating,
+                                onClick = onRequestLocation
                             )
                         }
+
+                        Spacer(Modifier.height(16.dp))
+                        FuelPriceCards(dimens = d, current = uiState.current)
 
                         uiState.current?.let { price ->
                             Spacer(Modifier.height(10.dp))
@@ -302,16 +337,32 @@ fun FuelPriceScreen(
                             )
                         }
 
-                        if (uiState.nearbyStates.isNotEmpty()) {
+                        val nearby = uiState.nearbyStates
+                        if (nearby.isNotEmpty()) {
+                            val visible = if (showAllStates) nearby else nearby.take(NEARBY_PREVIEW)
+
                             Spacer(Modifier.height(24.dp))
                             Text(
-                                text = "Nearby States",
+                                text = if (showAllStates) "All States" else "Nearby States",
                                 fontSize = d.sectionSize,
                                 fontWeight = FontWeight.SemiBold,
                                 color = FuelColors.TextPrimary
                             )
                             Spacer(Modifier.height(8.dp))
-                            NearbyStatesTable(dimens = d, states = uiState.nearbyStates)
+                            NearbyStatesTable(
+                                dimens = d,
+                                states = visible,
+                                onStateClick = onStateSelected
+                            )
+
+                            if (nearby.size > NEARBY_PREVIEW) {
+                                ShowAllStatesToggle(
+                                    dimens = d,
+                                    expanded = showAllStates,
+                                    totalCount = nearby.size,
+                                    onToggle = { showAllStates = !showAllStates }
+                                )
+                            }
                         }
 
                         Spacer(Modifier.height(24.dp))
@@ -319,6 +370,91 @@ fun FuelPriceScreen(
                 }
             }
         }
+    }
+}
+
+// Side by side normally; stacked on very narrow phones so the rate never truncates.
+@Composable
+private fun FuelPriceCards(dimens: FuelDimens, current: FuelPrice?) {
+    // Falls back to naming the price's scope when the API gives no previous-day
+    // rate to compare against.
+    val scopeCaption = "Today's rate"
+
+    val petrol: @Composable (Modifier) -> Unit = { mod ->
+        FuelPriceCard(
+            dimens = dimens,
+            label = "Petrol",
+            price = formatRupees(current?.petrolPrice ?: 0.0),
+            changeValue = current?.petrolDeltaToday,
+            fallbackCaption = scopeCaption,
+            bgColor = FuelColors.PetrolBg,
+            accentColor = FuelColors.PetrolAccent,
+            modifier = mod
+        )
+    }
+    val diesel: @Composable (Modifier) -> Unit = { mod ->
+        FuelPriceCard(
+            dimens = dimens,
+            label = "Diesel",
+            price = formatRupees(current?.dieselPrice ?: 0.0),
+            changeValue = current?.dieselDeltaToday,
+            fallbackCaption = scopeCaption,
+            bgColor = FuelColors.DieselBg,
+            accentColor = FuelColors.DieselAccent,
+            modifier = mod
+        )
+    }
+
+    if (dimens.stackFuelCards) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(dimens.cardGap)
+        ) {
+            petrol(Modifier.fillMaxWidth())
+            diesel(Modifier.fillMaxWidth())
+        }
+    } else {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
+            horizontalArrangement = Arrangement.spacedBy(dimens.cardGap)
+        ) {
+            petrol(Modifier.weight(1f).fillMaxHeight())
+            diesel(Modifier.weight(1f).fillMaxHeight())
+        }
+    }
+}
+
+@Composable
+private fun ShowAllStatesToggle(
+    dimens: FuelDimens,
+    expanded: Boolean,
+    totalCount: Int,
+    onToggle: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(dimens.tableCorner))
+            .clickable(onClick = onToggle)
+            .padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = if (expanded) "Show fewer states" else "Show all $totalCount states",
+            fontSize = dimens.tableRowSize,
+            fontWeight = FontWeight.Medium,
+            color = FuelColors.ActionGreen
+        )
+        Spacer(Modifier.width(4.dp))
+        Icon(
+            imageVector = if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+            contentDescription = null,
+            tint = FuelColors.ActionGreen,
+            modifier = Modifier.size(dimens.locChevron)
+        )
     }
 }
 
@@ -348,8 +484,204 @@ private fun FuelPriceHeader(dimens: FuelDimens, onBackClick: () -> Unit) {
     }
 }
 
+// Explains why the location tap did nothing, and sends the user to the exact place
+// they can fix it — the phone's location toggle, or this app's permission page.
 @Composable
-private fun LocationSelector(dimens: FuelDimens, location: String, onClick: () -> Unit) {
+private fun LocationIssueDialog(
+    issue: LocationIssue,
+    onDismiss: () -> Unit,
+    onOpenSettings: () -> Unit,
+    onRetry: () -> Unit
+) {
+    val title = when (issue) {
+        LocationIssue.SERVICE_OFF -> "Location is off"
+        LocationIssue.PERMISSION_DENIED -> "Allow location access"
+        LocationIssue.NO_FIX -> "Couldn't find your location"
+    }
+    val message = when (issue) {
+        LocationIssue.SERVICE_OFF ->
+            "Your phone's location is switched off, so we can't tell which state you're in. Turn it on to see today's rates for your area."
+        LocationIssue.PERMISSION_DENIED ->
+            "Eva2z needs location access to show fuel rates for the state you're in. You can allow it from app settings."
+        LocationIssue.NO_FIX ->
+            "We couldn't get a location fix just now. Move to an open area and try again, or pick your state manually."
+    }
+    val confirmLabel = if (issue == LocationIssue.NO_FIX) "Try again" else "Open settings"
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Box(
+                modifier = Modifier
+                    .size(52.dp)
+                    .clip(CircleShape)
+                    .background(FuelColors.PetrolBg),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.LocationOn,
+                    contentDescription = null,
+                    tint = FuelColors.PetrolAccent,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
+        },
+        title = {
+            Text(
+                text = title,
+                fontWeight = FontWeight.Bold,
+                color = FuelColors.TextPrimary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        text = {
+            Text(
+                text = message,
+                color = FuelColors.TextSecondary,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = { if (issue == LocationIssue.NO_FIX) { onDismiss(); onRetry() } else onOpenSettings() },
+                shape = RoundedCornerShape(24.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = FuelColors.ActionGreen,
+                    contentColor = Color.White
+                )
+            ) {
+                Text(confirmLabel, fontWeight = FontWeight.SemiBold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Not now", color = FuelColors.TextSecondary)
+            }
+        },
+        containerColor = FuelColors.Background
+    )
+}
+
+@Composable
+private fun LocationPermissionGate(
+    onBack: () -> Unit,
+    onAllow: () -> Unit,
+    onPickManually: () -> Unit,
+    canPickManually: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Box(Modifier.fillMaxSize()) {
+        IconButton(
+            onClick = onBack,
+            modifier = Modifier.align(Alignment.TopStart).padding(start = 8.dp, top = 12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Back",
+                tint = FuelColors.TextPrimary
+            )
+        }
+
+        Column(
+            modifier = modifier
+                .verticalScroll(rememberScrollState())
+                .widthIn(max = 420.dp)
+                .padding(horizontal = 32.dp, vertical = 56.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(CircleShape)
+                    .background(FuelColors.PetrolBg),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.LocationOn,
+                    contentDescription = null,
+                    tint = FuelColors.PetrolAccent,
+                    modifier = Modifier.size(34.dp)
+                )
+            }
+            Spacer(Modifier.height(20.dp))
+            Text(
+                text = "Turn on location",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = FuelColors.TextPrimary,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "Allow location access so we can show today's petrol and diesel rates for the state you're in.",
+                fontSize = 14.sp,
+                color = FuelColors.TextSecondary,
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(24.dp))
+            Button(
+                onClick = onAllow,
+                shape = RoundedCornerShape(24.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = FuelColors.ActionGreen,
+                    contentColor = Color.White
+                )
+            ) {
+                Text("Allow location", fontWeight = FontWeight.SemiBold)
+            }
+            if (canPickManually) {
+                Spacer(Modifier.height(4.dp))
+                TextButton(onClick = onPickManually) {
+                    Text("Choose a state instead", color = FuelColors.TextSecondary)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UseMyLocationRow(dimens: FuelDimens, locating: Boolean, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .padding(top = 8.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .clickable(enabled = !locating, onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (locating) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(14.dp),
+                color = FuelColors.ActionGreen,
+                strokeWidth = 2.dp
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Default.LocationOn,
+                contentDescription = null,
+                tint = FuelColors.ActionGreen,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = if (locating) "Finding your location…" else "Use my current location",
+            fontSize = dimens.metaSize,
+            fontWeight = FontWeight.Medium,
+            color = FuelColors.ActionGreen
+        )
+    }
+}
+
+@Composable
+private fun LocationSelector(
+    dimens: FuelDimens,
+    location: String,
+    detected: Boolean,
+    onClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -367,7 +699,11 @@ private fun LocationSelector(dimens: FuelDimens, location: String, onClick: () -
         )
         Spacer(Modifier.width(10.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = "Location", fontSize = dimens.locLabelSize, color = FuelColors.TextSecondary)
+            Text(
+                text = if (detected) "Your location" else "Location",
+                fontSize = dimens.locLabelSize,
+                color = FuelColors.TextSecondary
+            )
             Text(
                 text = location,
                 fontSize = dimens.locValueSize,
@@ -464,7 +800,11 @@ private fun FuelPriceCard(
 }
 
 @Composable
-private fun NearbyStatesTable(dimens: FuelDimens, states: List<NearbyStatePrice>) {
+private fun NearbyStatesTable(
+    dimens: FuelDimens,
+    states: List<NearbyStatePrice>,
+    onStateClick: (String) -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -472,16 +812,16 @@ private fun NearbyStatesTable(dimens: FuelDimens, states: List<NearbyStatePrice>
             .background(FuelColors.Background)
     ) {
         Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-            Text(text = "", modifier = Modifier.weight(1.2f))
+            Text(text = "", modifier = Modifier.weight(1.4f))
             Text(
-                text = "P",
+                text = if (dimens.compactTableHeaders) "P" else "Petrol",
                 modifier = Modifier.weight(0.8f),
                 textAlign = TextAlign.End,
                 fontSize = dimens.tableHeaderSize,
                 color = FuelColors.TextSecondary
             )
             Text(
-                text = "D",
+                text = if (dimens.compactTableHeaders) "D" else "Diesel",
                 modifier = Modifier.weight(0.8f),
                 textAlign = TextAlign.End,
                 fontSize = dimens.tableHeaderSize,
@@ -491,12 +831,15 @@ private fun NearbyStatesTable(dimens: FuelDimens, states: List<NearbyStatePrice>
 
         states.forEachIndexed { index, row ->
             Row(
-                modifier = Modifier.fillMaxWidth().padding(vertical = dimens.tableRowPadV),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onStateClick(row.stateName) }
+                    .padding(vertical = dimens.tableRowPadV),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = row.stateName,
-                    modifier = Modifier.weight(1.2f),
+                    modifier = Modifier.weight(1.4f),
                     fontSize = dimens.tableRowSize,
                     color = FuelColors.TextPrimary,
                     maxLines = 1,

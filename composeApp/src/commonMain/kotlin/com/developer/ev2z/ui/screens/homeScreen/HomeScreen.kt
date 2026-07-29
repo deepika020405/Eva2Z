@@ -96,7 +96,11 @@ fun HomeScreen(
     parkingLocked: Boolean = false,
     gpsLocked: Boolean = false,
     onNavigateToShop: () -> Unit = {},
-    onFuelPrice: () -> Unit = {}
+    onFuelPrice: () -> Unit = {},
+    // Fuel rates for wherever the user currently is — null until a state is resolved.
+    fuelLocationLabel: String = "your area",
+    fuelPetrolPrice: Double? = null,
+    fuelDieselPrice: Double? = null
 ) {
     // Which locked section the user tapped — drives the popup content. null = no popup.
     var lockedDialogFor by remember { mutableStateOf<HomeSectionLock?>(null) }
@@ -116,11 +120,10 @@ fun HomeScreen(
             ) {
                 item { HomeHeader(userName, hPad, onOpenNotifications, unreadNotificationCount) }
                 item {
-                    // TODO: wire locationLabel/petrolPrice/dieselPrice to a real fuel-price source.
                     FuelPriceHomeWidget(
-                        locationLabel = "Noida, UP",
-                        petrolPrice   = 94.87,
-                        dieselPrice   = 87.66,
+                        locationLabel = fuelLocationLabel,
+                        petrolPrice   = fuelPetrolPrice,
+                        dieselPrice   = fuelDieselPrice,
                         onClick       = onFuelPrice,
                         modifier      = Modifier.padding(horizontal = hPad)
                     )
@@ -183,8 +186,8 @@ fun HomeScreen(
 @Composable
 fun FuelPriceHomeWidget(
     locationLabel: String,
-    petrolPrice: Double,
-    dieselPrice: Double,
+    petrolPrice: Double?,
+    dieselPrice: Double?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -224,7 +227,11 @@ fun FuelPriceHomeWidget(
                         color    = TextSecondary
                     )
                     Text(
-                        text       = "Petrol ₹${formatPrice(petrolPrice)}  ·  Diesel ₹${formatPrice(dieselPrice)}",
+                        text = if (petrolPrice != null && dieselPrice != null) {
+                            "Petrol ₹${formatPrice(petrolPrice)}  ·  Diesel ₹${formatPrice(dieselPrice)}"
+                        } else {
+                            "Tap to see today's rates"
+                        },
                         fontSize   = 14.sp,
                         fontWeight = FontWeight.Medium,
                         color      = TextPrimary

@@ -494,27 +494,50 @@ class ApiService {
     }
 
     // ---------------- FUEL PRICES ----------------
-    /**
-     * Public endpoint — no bearer token. Omit [state] for every state (also carries the
-     * per-state district breakdown); pass a state name to refresh just that state.
-     */
-    suspend fun getFuelPrices(state: String? = null): FuelPricesResponse {
-        println("🌐 API: Fetching fuel prices state=${state ?: "all"}")
+    /** Lenient so a rate sent as a number instead of "117.51" still decodes. */
+    private val fuelJson = Json { ignoreUnknownKeys = true; isLenient = true }
+
+    /** Public endpoint — no bearer token. Every state / union territory. */
+    suspend fun getFuelPrices(): FuelPricesResponse {
+        println("🌐 API: Fetching fuel prices (all states)")
 
         return try {
             val response = client.get("${baseUrl}fuel-prices") {
                 header(HttpHeaders.Accept, ContentType.Application.Json.toString())
-                if (!state.isNullOrBlank()) parameter("state", state)
             }
 
             val raw = response.bodyAsText()
             println("✔️ Fuel Prices Status: ${response.status}")
 
-            Json { ignoreUnknownKeys = true }
-                .decodeFromString(FuelPricesResponse.serializer(), raw)
+            fuelJson.decodeFromString(FuelPricesResponse.serializer(), raw)
 
         } catch (e: Exception) {
             println("❌ Fuel Prices Error: ${e.message}")
+            throw e
+        }
+    }
+
+    /**
+     * Public endpoint — refreshes a single state. The name is a path segment
+     * (`fuel-prices/Andhra Pradesh`), so it is appended through the URL builder to
+     * get encoded properly.
+     */
+    suspend fun getFuelPriceForState(state: String): FuelPriceStateResponse {
+        println("🌐 API: Fetching fuel price for state=$state")
+
+        return try {
+            val response = client.get("${baseUrl}fuel-prices") {
+                url { appendPathSegments(state) }
+                header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+            }
+
+            val raw = response.bodyAsText()
+            println("✔️ Fuel Price ($state) Status: ${response.status}")
+
+            fuelJson.decodeFromString(FuelPriceStateResponse.serializer(), raw)
+
+        } catch (e: Exception) {
+            println("❌ Fuel Price ($state) Error: ${e.message}")
             throw e
         }
     }

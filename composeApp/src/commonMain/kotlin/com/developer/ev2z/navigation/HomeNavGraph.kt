@@ -13,6 +13,8 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -27,6 +29,7 @@ import cafe.adriel.voyager.navigator.Navigator
 import kotlinx.coroutines.launch
 import cafe.adriel.voyager.navigator.tab.*
 import com.developer.ev2z.LocalPlatformActivity
+import com.developer.ev2z.requestLocationPermissionAtStartup
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.data.local.UserPrefs
 import com.developer.ev2z.cancelCallNotification
@@ -141,12 +144,20 @@ class HomeTab(
         var showLiveLocation by rememberSaveable { mutableStateOf(false) }
         var showFuelPrice by rememberSaveable { mutableStateOf(false) }
         val fuelPriceViewModel = remember { FuelPriceViewModel() }
+        // Shared by the home widget and the fuel screen so both show the same state.
+        val fuelUiState by fuelPriceViewModel.uiState.collectAsState()
+        // Picks the fuel state back up after the user returns from location settings.
+        LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+            fuelPriceViewModel.onAppResumed()
+        }
         val unreadNotifCount by NotificationBadgeManager.unreadCount.collectAsState()
 
         val uiState by viewModel.uiState.collectAsState()
 
         LaunchedEffect(Unit) {
             viewModel.loadDevices(token)
+            // Ask for location on app open so the home fuel card can show local rates.
+            requestLocationPermissionAtStartup()
         }
 
         val userName = remember(uiState) {
@@ -177,12 +188,14 @@ class HomeTab(
 
         } else if (showFuelPrice) {
 
-            val fuelUiState by fuelPriceViewModel.uiState.collectAsState()
             FuelPriceScreen(
                 uiState = fuelUiState,
                 onBack = { showFuelPrice = false },
                 onStateSelected = fuelPriceViewModel::onStateSelected,
-                onRetry = fuelPriceViewModel::retry
+                onRetry = fuelPriceViewModel::retry,
+                onRequestLocation = fuelPriceViewModel::requestLocation,
+                onOpenLocationSettings = fuelPriceViewModel::openSettingsForIssue,
+                onDismissLocationIssue = fuelPriceViewModel::dismissLocationIssue
             )
 
         } else {
@@ -227,7 +240,10 @@ class HomeTab(
                 parkingLocked = parkingLocked,
                 gpsLocked = gpsLocked,
                 onNavigateToShop = onNavigateToShop,
-                onFuelPrice = { showFuelPrice = true }
+                onFuelPrice = { showFuelPrice = true },
+                fuelLocationLabel = fuelUiState.homeLocationLabel,
+                fuelPetrolPrice = fuelUiState.current?.petrolPrice,
+                fuelDieselPrice = fuelUiState.current?.dieselPrice
             )
         }
     }
@@ -811,6 +827,11 @@ fun HomeNavGraph(
                     showNotificationsScreen = false
                     sosOpenedFromInbox = true
                     showSosQuickReply = true
+                },
+                onCommunityClick = {
+                    showNotificationsScreen = false
+                    sosTagViewModel.resetAll()
+                    showCommunity = true
                 },
                 apiService = apiService,
                 token = token,

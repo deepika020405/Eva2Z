@@ -28,6 +28,18 @@ actual suspend fun getAddressFromLatLng(
     }
 }
 
+actual suspend fun getStateFromLatLng(
+    lat: Double,
+    lng: Double
+): String = withContext(Dispatchers.IO) {
+    try {
+        val geocoder = Geocoder(appContext, Locale.US)
+        geocoder.getFromLocation(lat, lng, 1)?.firstOrNull()?.adminArea.orEmpty()
+    } catch (e: Exception) {
+        ""
+    }
+}
+
 actual suspend fun getCityFromLatLng(
     lat: Double,
     lng: Double
