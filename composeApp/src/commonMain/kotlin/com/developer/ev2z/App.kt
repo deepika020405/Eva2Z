@@ -38,6 +38,7 @@ import com.developer.ev2z.ui.screens.onboarding.OnboardingScreen
 import com.developer.ev2z.ui.screens.deviceStatus.DeviceStatusScreen
 import com.developer.ev2z.ui.screens.trackTrace.TrackTraceScreen
 import com.developer.ev2z.util.FcmRegistrar
+import com.developer.ev2z.util.SessionLogout
 
 
 @Composable
@@ -171,6 +172,10 @@ fun App() {
     LaunchedEffect(isLoggedIn, authToken) {
         if (isLoggedIn && authToken.isNotEmpty()) {
             FcmBridge.register { fcmToken ->
+                // Persist immediately, not just on a successful register. Logout needs this
+                // token to deregister, and previously a failed/pending register left it
+                // unsaved — so logout silently skipped the deregistration call.
+                userPrefs.saveLastFcmToken(fcmToken)
                 FcmRegistrar.registerFcmToServer(
                     authTokenNullable = "Bearer $authToken",
                     fcmToken          = fcmToken,
@@ -415,15 +420,16 @@ fun App() {
                     },
 
                     onLogout = {
-                        userPrefs.clear()
-                        storage.clear()
+                        // Also reached by session expiry (401) and account deletion — both
+                        // used to clear only local storage, leaving this device registered
+                        // for push forever. Route them through the same deregistration.
+                        SessionLogout.logoutAndClear(apiService, storage)
                         isLoggedIn = false
                         authToken = ""
                         username = ""
                         authViewModel.resetLoginSuccess()
                         authViewModel.clearError()
                         AppTokenProvider.getToken = { "" }
-                        FcmBridge.clear()
                     }
                 )
             }

@@ -232,6 +232,7 @@ fun FuelPriceScreen(
                     onAllow = onRequestLocation,
                     onPickManually = { showLocationPicker = true },
                     canPickManually = uiState.availableStates.isNotEmpty(),
+                    permissionMissing = uiState.locationPermissionMissing,
                     modifier = Modifier.align(Alignment.Center)
                 )
             }
@@ -570,6 +571,8 @@ private fun LocationPermissionGate(
     onAllow: () -> Unit,
     onPickManually: () -> Unit,
     canPickManually: Boolean,
+    // false = permission is granted but no fix arrived (GPS off, indoors, timed out).
+    permissionMissing: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     Box(Modifier.fillMaxSize()) {
@@ -607,7 +610,7 @@ private fun LocationPermissionGate(
             }
             Spacer(Modifier.height(20.dp))
             Text(
-                text = "Turn on location",
+                text = if (permissionMissing) "Turn on location" else "Couldn't find your location",
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 color = FuelColors.TextPrimary,
@@ -615,7 +618,11 @@ private fun LocationPermissionGate(
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "Allow location access so we can show today's petrol and diesel rates for the state you're in.",
+                text = if (permissionMissing) {
+                    "Allow location access so we can show today's petrol and diesel rates for the state you're in."
+                } else {
+                    "We need your location to show today's petrol and diesel rates for the state you're in. Check that location is switched on and try again."
+                },
                 fontSize = 14.sp,
                 color = FuelColors.TextSecondary,
                 textAlign = TextAlign.Center
@@ -629,7 +636,10 @@ private fun LocationPermissionGate(
                     contentColor = Color.White
                 )
             ) {
-                Text("Allow location", fontWeight = FontWeight.SemiBold)
+                Text(
+                    text = if (permissionMissing) "Allow location" else "Try again",
+                    fontWeight = FontWeight.SemiBold
+                )
             }
             if (canPickManually) {
                 Spacer(Modifier.height(4.dp))

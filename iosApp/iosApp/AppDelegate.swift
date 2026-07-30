@@ -148,6 +148,14 @@ class AppDelegate: NSObject,
         Messaging.messaging().appDidReceiveMessage(userInfo)
         print("📨 didReceiveRemoteNotification:", userInfo)
 
+        // No session on this device → ignore the push so we never post a local banner
+        // or wake the call UI for a logged-out user.
+        if (UserDefaults.standard.string(forKey: "token") ?? "").isEmpty {
+            print("⚠️ Push ignored — user logged out on this device")
+            completionHandler(.noData)
+            return
+        }
+
         let type   = userInfo["type"]    as? String ?? ""
         let roomId = userInfo["room_id"] as? String ?? ""
 
@@ -251,6 +259,15 @@ class AppDelegate: NSObject,
         let data = notification.request.content.userInfo
         let type = data["type"] as? String ?? ""
         print("📩 Foreground notification id=\(identifier) type=\(type)")
+
+        // No session on this device → suppress the banner and drop anything already
+        // delivered, so a stale server-side token can't surface notifications.
+        if (UserDefaults.standard.string(forKey: "token") ?? "").isEmpty {
+            print("⚠️ Foreground notification suppressed — user logged out on this device")
+            center.removeDeliveredNotifications(withIdentifiers: [identifier])
+            completionHandler([])
+            return
+        }
 
         // Suppress our background-fallback local notification when app is foreground
         // (IncomingCallScreen + RingtoneManager already handle the foreground call UI)

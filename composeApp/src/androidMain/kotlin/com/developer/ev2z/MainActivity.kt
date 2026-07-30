@@ -114,6 +114,20 @@ class MainActivity : ComponentActivity() {
         ActivityProvider.clearActivity()
     }
 
+    // Delivers the answer to the "Turn on location" dialog raised by
+    // promptEnableLocationServices(). resultCode is RESULT_OK when the user tapped OK,
+    // but the switch can still land off, so the live state is what gets reported.
+    @Deprecated("Play Services' startResolutionForResult only reports through this callback")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        @Suppress("DEPRECATION")
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == LOCATION_SETTINGS_REQUEST) {
+            val callback = pendingLocationSettingsCallback
+            pendingLocationSettingsCallback = null
+            callback?.invoke(isLocationEnabled())
+        }
+    }
+
     // Delivers the pending location result once the user responds to the runtime
     // location-permission prompt (e.g. when creating a community post the first time).
     override fun onRequestPermissionsResult(

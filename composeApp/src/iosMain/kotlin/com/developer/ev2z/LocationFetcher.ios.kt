@@ -55,6 +55,12 @@ actual fun hasLocationPermission(): Boolean = try {
 
 // CoreLocation shows its prompt as a side effect of asking for a fix. The delegate
 // reports the answer through LocationPermissionEvents, so callers just fire and forget.
+// iOS gives apps no way to switch Location Services on — only Settings can. Report the
+// current state so the caller falls back to its "Open Settings" prompt.
+actual fun promptEnableLocationServices(onResult: (Boolean) -> Unit) {
+    onResult(isLocationEnabled())
+}
+
 actual fun requestLocationPermissionAtStartup() {
     if (hasLocationPermission()) return
     fetchPhoneLocation { _, _ -> }

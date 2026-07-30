@@ -28,7 +28,8 @@ enum class FuelLocationStatus {
     LOCATING,
     // Rates belong to the state the device is actually in.
     DETECTED,
-    // Granted, but no usable fix — falls back to the last/default state.
+    // Granted, but no usable fix (GPS off, indoors, timed out). Falls back to the last
+    // state this user resolved, or to nothing at all on a first run.
     UNAVAILABLE,
     // User picked a state by hand; GPS no longer overrides it.
     MANUAL
@@ -57,8 +58,19 @@ data class FuelPriceUiState(
     val nearbyStates: List<NearbyStatePrice> = emptyList(),
     val error: String? = null
 ) {
+    // No rates to show and no location to base them on. There is no default state to
+    // fall back to, so the screen asks for location rather than showing someone else's
+    // prices. Covers both "never asked" and "asked but couldn't get a fix".
     val needsLocationPermission: Boolean
-        get() = locationStatus == FuelLocationStatus.PERMISSION_REQUIRED && current == null
+        get() = current == null && (
+            locationStatus == FuelLocationStatus.PERMISSION_REQUIRED ||
+            locationStatus == FuelLocationStatus.UNAVAILABLE
+        )
+
+    // True when the block is because location was refused, false when it was granted
+    // but no fix arrived — the two need different wording and different buttons.
+    val locationPermissionMissing: Boolean
+        get() = locationStatus == FuelLocationStatus.PERMISSION_REQUIRED
 
     val isLocating: Boolean
         get() = locationStatus == FuelLocationStatus.LOCATING
@@ -82,6 +94,7 @@ data class FuelPriceUiState(
             selectedState.isNotBlank() -> cityForLabel ?: selectedState
             locationStatus == FuelLocationStatus.LOCATING -> "locating…"
             locationStatus == FuelLocationStatus.PERMISSION_REQUIRED -> "tap to allow location"
+            locationStatus == FuelLocationStatus.UNAVAILABLE -> "tap to enable location"
             else -> "tap to choose a state"
         }
 }

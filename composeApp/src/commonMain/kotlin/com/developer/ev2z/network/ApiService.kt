@@ -2559,12 +2559,24 @@ class ApiService {
     }
 
     // ---------------- LOGOUT ----------------
-    suspend fun logout(authHeader: String, fcmToken: String) {
-        println("🚪 API: Calling logout... fcmToken=${fcmToken.take(20)}")
+    // Mirrors registerFcmToken()'s payload — the server needs device_uuid to delete the
+    // exact row it created at register time. Sending fcm_token alone left stale rows behind.
+    suspend fun logout(
+        authHeader: String,
+        fcmToken:   String,
+        deviceUuid: String = "",
+        platform:   String = ""
+    ) {
+        println("🚪 API: Calling logout... fcmToken=${fcmToken.take(20)} deviceUuid=$deviceUuid")
+        val body = buildMap {
+            put("fcm_token", fcmToken)
+            if (deviceUuid.isNotBlank()) put("device_uuid", deviceUuid)
+            if (platform.isNotBlank()) put("platform", platform)
+        }
         val response = client.post("${baseUrl}logout") {
             header(HttpHeaders.Authorization, authHeader)
             contentType(ContentType.Application.Json)
-            setBody(mapOf("fcm_token" to fcmToken))
+            setBody(body)
         }
         println("🚪 Logout status: ${response.status}")
         println("🚪 Logout body: ${response.bodyAsText()}")

@@ -8,6 +8,7 @@ import com.developer.ev2z.hasLocationPermission
 import com.developer.ev2z.isLocationEnabled
 import com.developer.ev2z.openAppSettings
 import com.developer.ev2z.openLocationSettings
+import com.developer.ev2z.promptEnableLocationServices
 import com.developer.ev2z.repository.FuelPriceRepository
 import com.developer.ev2z.response.FuelStateDto
 import com.developer.ev2z.util.getCityFromLatLng
@@ -48,6 +49,10 @@ class FuelPriceViewModel(
     // True once the user picks a state by hand — GPS stops overriding it after that.
     private var userPickedState = false
 
+    // The "Turn on location" system dialog is raised once per session, not on every
+    // resume — an explicit request from the user resets it.
+    private var servicesPromptShown = false
+
     init {
         start()
         // The startup permission prompt lives in MainActivity/AppDelegate, so pick up
@@ -80,6 +85,8 @@ class FuelPriceViewModel(
     fun requestLocation() {
         if (_uiState.value.isLocating) return
         userPickedState = false
+        // An explicit ask always gets a fresh prompt, even if one was already shown.
+        servicesPromptShown = false
         scope.launch {
             if (allStates.isEmpty() && !loadCatalogue()) return@launch
             detectState(userInitiated = true)
@@ -138,25 +145,19 @@ class FuelPriceViewModel(
         scope.launch {
             if (!loadCatalogue()) return@launch
 
-            if (hasLocationPermission()) {
-                detectState(userInitiated = false)
-                return@launch
-            }
-
-            // Not granted yet: show the last state the user saw (if any) and ask.
-            val remembered = rememberedState()
-            _uiState.update {
-                if (remembered != null) {
-                    it.showState(remembered, FuelLocationStatus.MANUAL, city = null)
-                } else {
-                    it.copy(
-                        isLoading = false,
-                        error = null,
-                        availableStates = stateNames(),
-                        locationStatus = FuelLocationStatus.PERMISSION_REQUIRED
-                    )
+            // Show the last state this user resolved while the fix is in flight, so the
+            // home card isn't blank on a warm start. It upgrades to the live location as
+            // soon as the fix lands. Nothing is shown on a first run — there is no default.
+            rememberedState()?.let { remembered ->
+                _uiState.update {
+                    it.showState(remembered, FuelLocationStatus.UNAVAILABLE, city = null)
                 }
             }
+
+            // Attempt a fix whether or not permission is granted yet: fetchPhoneLocation
+            // raises the system prompt on both platforms, so opening the app is what asks
+            // for location. The 30s timeout covers the dialog sitting on screen.
+            detectState(userInitiated = false)
         }
     }
 
@@ -184,11 +185,16 @@ class FuelPriceViewModel(
     // for their location, never as a surprise on app open.
     private suspend fun detectState(userInitiated: Boolean) {
         // The phone's location switch being off is the common cause, and no amount of
-        // permission gets around it — say so before spending 30s on a fix that can't land.
-        if (!isLocationEnabled()) {
+        // permission gets around it. Ask the system to switch it on first — on Android
+        // that is Play Services' own "Turn on location" dialog, so the user fixes it
+        // without leaving the app.
+        if (!isLocationEnabled() && !promptLocationServices()) {
             showFallback(
                 status = FuelLocationStatus.UNAVAILABLE,
-                issue = if (userInitiated) LocationIssue.SERVICE_OFF else null
+                // Shown on app open too, not just when the user asked. Suppressing it
+                // there left a phone with location off sitting on an empty screen with
+                // no explanation of why there were no rates.
+                issue = LocationIssue.SERVICE_OFF
             )
             return
         }
@@ -248,12 +254,14 @@ class FuelPriceViewModel(
         _uiState.update { it.showState(state, FuelLocationStatus.DETECTED, city) }
     }
 
-    // Shows the last-seen state (or the default) when GPS can't decide for us.
+    // Shows the last state this user actually resolved when GPS can't decide right now.
+    //
+    // There is deliberately no default state here. Falling back to the API's `is_default`
+    // row (or a hardcoded one) meant a user who never granted location saw rates from a
+    // state they may have never been in, presented as if they were local. When nothing
+    // has been resolved for this user yet we show no rates at all and ask for location.
     private fun showFallback(status: FuelLocationStatus, issue: LocationIssue?) {
         val state = rememberedState()
-            ?: allStates.firstOrNull { it.isDefault }
-            ?: allStates.firstOrNull { it.stateName.equals(DEFAULT_STATE, ignoreCase = true) }
-            ?: allStates.firstOrNull()
 
         _uiState.update {
             if (state == null) {
@@ -261,12 +269,36 @@ class FuelPriceViewModel(
                     isLoading = false,
                     locationStatus = status,
                     locationIssue = issue,
-                    error = it.error ?: "No fuel prices available"
+                    // Not an error — the prices loaded fine, we just don't know where
+                    // the user is. The screen asks for location instead.
+                    error = null
                 )
             } else {
                 it.showState(state, status, city = null).copy(locationIssue = issue)
             }
         }
+    }
+
+    /**
+     * Raises the system prompt to switch location services on and suspends for the answer.
+     *
+     * Asked at most once per session so returning to the screen doesn't nag; an explicit
+     * tap on "Allow location" / "Try again" clears the flag and asks again.
+     */
+    private suspend fun promptLocationServices(): Boolean {
+        if (servicesPromptShown) return isLocationEnabled()
+        servicesPromptShown = true
+        return withTimeoutOrNull(LOCATION_TIMEOUT_MS) {
+            suspendCancellableCoroutine<Boolean> { cont ->
+                var delivered = false
+                promptEnableLocationServices { enabled ->
+                    if (!delivered) {
+                        delivered = true
+                        cont.resume(enabled)
+                    }
+                }
+            }
+        } ?: isLocationEnabled()
     }
 
     // Suspends until the platform delivers a fix. (0,0) means denied/unavailable.
@@ -399,7 +431,6 @@ class FuelPriceViewModel(
     }
 
     private companion object {
-        const val DEFAULT_STATE = "Uttar Pradesh"
         const val KEY_LAST_STATE = "fuel_last_state"
         const val LOCATION_TIMEOUT_MS = 30_000L
 

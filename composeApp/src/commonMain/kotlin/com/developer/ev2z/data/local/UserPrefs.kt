@@ -49,7 +49,13 @@ class UserPrefs(private val storage: StorageManager) {  // ✅ Storage → Stora
         return token.substringBefore("|").toIntOrNull() ?: 0
     }
 
-    fun clear() = storage.clear()
+    // device_uuid identifies the phone, not the session — keep it across logout so the
+    // next login updates the same server-side device row instead of creating a new one.
+    fun clear() {
+        val deviceUuid = storage.getString("device_uuid", "")
+        storage.clear()
+        if (!deviceUuid.isNullOrBlank()) storage.saveString("device_uuid", deviceUuid)
+    }
 
 
     fun getString(key: String, default: String): String =

@@ -218,8 +218,11 @@ class AuthRepository(private val api: ApiService) {
     // ============================================
     // LOGOUT
     // ============================================
-    suspend fun logout(token: String, fcmToken: String) {
-        api.logout("Bearer $token", fcmToken)
+    // Prefer SessionLogout.logoutAndClear() — it also wipes local state and is the path
+    // every logout in the app goes through. device_uuid is required for the server to
+    // delete this device's push registration.
+    suspend fun logout(token: String, fcmToken: String, deviceUuid: String = "", platform: String = "") {
+        api.logout("Bearer $token", fcmToken, deviceUuid, platform)
     }
 
     // ============================================

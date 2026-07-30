@@ -27,6 +27,12 @@ import okhttp3.RequestBody.Companion.toRequestBody
 
 class MyFirebaseMessagingService : FirebaseMessagingService() {
 
+    private companion object {
+        // Intent action Firebase uses for delivered messages. Token refresh arrives as
+        // com.google.firebase.messaging.NEW_TOKEN, so gating on this alone is safe.
+        const val INTENT_ACTION_FCM_RECEIVE = "com.google.android.c2dm.intent.RECEIVE"
+    }
+
     // Fire-and-forget POST to mark message as delivered (arrived on device, not yet read).
     private fun callDeliveredApi(chatId: Int, token: String) {
         CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
@@ -60,6 +66,17 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         val prefs = applicationContext.getSharedPreferences("eva2z_prefs", MODE_PRIVATE)
         val authToken = prefs.getString("token", "") ?: ""
         val type = extras?.getString("type")
+
+        // No session on this device → drop the message entirely instead of letting
+        // Firebase display it. onMessageReceived() already guards data-only pushes, but
+        // notification-payload pushes in background/killed state never reach it — they
+        // are rendered by Firebase inside super.handleIntent(). Returning here is the
+        // only app-side way to stop those. Token-refresh intents use a different action
+        // and still pass through.
+        if (authToken.isBlank() && intent.action == INTENT_ACTION_FCM_RECEIVE) {
+            println("⚠️ FCM message dropped — user logged out on this device")
+            return
+        }
 
         when {
             // ── Visitor declined / caller cancelled — dismiss owner's CallScreen ──

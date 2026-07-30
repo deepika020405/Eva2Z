@@ -1,8 +1,8 @@
 package com.developer.ev2z.ui.screens.AccountActivity
 
-import com.developer.ev2z.FcmBridge
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.util.SessionLogout
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -88,18 +88,8 @@ class AccountActivityViewModel(
         viewModelScope.launch {
             try {
                 println("🚪 AccountActivityViewModel: Logging out...")
-                val token    = storageManager.getString("token", "")
-                // Use in-memory FCM token (reliable even if storage write hasn't completed)
-                val fcmToken = FcmBridge.currentToken() ?: storageManager.getString("last_fcm_token", "")
-                if (token.isNotBlank() && !fcmToken.isNullOrBlank()) {
-                    try {
-                        apiService.logout("Bearer $token", fcmToken)
-                        println("✅ Logout API called successfully")
-                    } catch (e: Exception) {
-                        println("⚠️ Logout API failed (continuing local logout): ${e.message}")
-                    }
-                }
-                storageManager.clear()
+                // Deregisters this device server-side, then clears local session.
+                SessionLogout.logoutAndClear(apiService, storageManager)
                 println("✅ Storage cleared")
                 _state.value = _state.value.copy(
                     isDeleting = false,
