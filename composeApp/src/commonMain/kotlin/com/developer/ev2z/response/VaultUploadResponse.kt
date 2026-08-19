@@ -13,8 +13,12 @@ import kotlinx.serialization.Serializable
  * ```
  * Success (minimal):
  * ```
- * { "success": true, "id": 38 }
+ * { "success": true, "id": "ed014dfd-b778-4191-b24f-82ec0b66022a" }
  * ```
+ * The id comes back as a JSON number on older builds and as a quoted UUID on
+ * the current server, so it is read through [IdAsStringSerializer] — a plain
+ * `Int` field made the whole response fail to parse, silently discarding the
+ * new document's id, type and expiry.
  * Rejection (document failed server-side validation):
  * ```
  * { "success": false, "error": "document_rejected",
@@ -25,7 +29,10 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class VaultUploadResponse(
     val success: Boolean = false,
-    val id: Int? = null,
+
+    @Serializable(with = IdAsStringSerializer::class)
+    val id: String? = null,
+
     val message: String? = null,
 
     @SerialName("document_type")

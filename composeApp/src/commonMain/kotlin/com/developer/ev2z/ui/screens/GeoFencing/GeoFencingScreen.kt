@@ -44,6 +44,7 @@ import com.developer.ev2z.response.Device
 import com.developer.ev2z.response.GeoFenceDto
 import com.developer.ev2z.util.formatToIST
 import com.developer.ev2z.util.getAddressFromLatLng
+import com.developer.ev2z.theme.AppPageBg
 
 // ── Theme tokens — light green + white ────────────────────────────
 private object G {
@@ -52,7 +53,7 @@ private object G {
     val PrimaryBg    = Color(0xFFF0F7EC)
     val PrimaryBorder= Color(0xFFD4E4CD)
     val Surface      = Color(0xFFFFFFFF)
-    val Background   = Color(0xFFF9FBF7)
+    val Background   = AppPageBg
     val TextPrimary  = Color(0xFF1C2418)
     val TextSecondary= Color(0xFF5D6858)
     val TextHint     = Color(0xFFA0A99B)

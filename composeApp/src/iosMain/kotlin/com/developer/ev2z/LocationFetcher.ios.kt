@@ -19,10 +19,21 @@ import platform.darwin.NSObject
 private var locationManager: CLLocationManager? = null
 private var locationDelegate: IosLocationDelegate? = null
 
+// Every caller waiting on the request currently in flight. These are globals, so a second
+// concurrent caller used to replace the first one's manager and delegate outright — the
+// first then never heard back. Screens that both ask at app open (fuel prices and weather)
+// now share one request and all get the same fix.
+private val pendingWaiters = mutableListOf<(Double, Double) -> Unit>()
+
 actual fun fetchPhoneLocation(onResult: (Double, Double) -> Unit) {
     try {
+        pendingWaiters += onResult
+        // A request is already in flight — its delegate will fan the result out to
+        // everyone queued, so don't start a competing one.
+        if (locationManager != null) return
+
         val manager = CLLocationManager()
-        val delegate = IosLocationDelegate(onResult)
+        val delegate = IosLocationDelegate()
 
         locationManager = manager
         locationDelegate = delegate
@@ -39,7 +50,12 @@ actual fun fetchPhoneLocation(onResult: (Double, Double) -> Unit) {
             else -> { /* wait for locationManagerDidChangeAuthorization */ }
         }
     } catch (_: Exception) {
-        onResult(0.0, 0.0)
+        // Answer everyone queued, including this caller, then reset for the next attempt.
+        val waiters = pendingWaiters.toList()
+        pendingWaiters.clear()
+        locationManager = null
+        locationDelegate = null
+        waiters.forEach { it(0.0, 0.0) }
     }
 }
 
@@ -83,19 +99,20 @@ actual fun openLocationSettings() {
 // iOS has no per-app location toggle outside the app's own settings page.
 actual fun openAppSettings() = openLocationSettings()
 
-private class IosLocationDelegate(
-    private val onResult: (Double, Double) -> Unit
-) : NSObject(), CLLocationManagerDelegateProtocol {
+private class IosLocationDelegate : NSObject(), CLLocationManagerDelegateProtocol {
 
     private var delivered = false
 
     private fun deliver(lat: Double, lng: Double) {
         if (delivered) return
         delivered = true
-        onResult(lat, lng)
-        // Release retained references.
+        val waiters = pendingWaiters.toList()
+        pendingWaiters.clear()
+        // Release retained references before calling back, so a waiter that immediately
+        // asks for another fix starts a fresh request instead of queueing behind this one.
         locationManager = null
         locationDelegate = null
+        waiters.forEach { it(lat, lng) }
     }
 
     // iOS 14+ authorization callback.

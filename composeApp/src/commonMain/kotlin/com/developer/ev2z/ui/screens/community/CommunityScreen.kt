@@ -89,11 +89,12 @@ import kotlinx.coroutines.delay
 import kotlinx.datetime.*
 import kotlin.text.firstOrNull
 import kotlin.time.ExperimentalTime
+import com.developer.ev2z.theme.AppPageBg
 
 // ─────────────────────────────────────────────────────────────────
 // Design tokens
 // ─────────────────────────────────────────────────────────────────
-private val CommScreenBg  = Color(0xFFF8FAFC)
+private val CommScreenBg  = AppPageBg
 private val CommCardBg    = Color(0xFFFFFFFF)
 private val CommTopBarBg  = Color(0xFFFFFFFF)
 private val CommGreen     = Color(0xFF00A844)

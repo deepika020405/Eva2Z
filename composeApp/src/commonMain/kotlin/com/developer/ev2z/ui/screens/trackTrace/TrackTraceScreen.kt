@@ -45,12 +45,13 @@ import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
 import org.jetbrains.compose.resources.painterResource
 import kotlin.text.ifEmpty
+import com.developer.ev2z.theme.AppPageBg
 
 // ── Theme Colors (Light Green — App Theme) ───────────────────────
 private val TT_Primary = Color(0xFF6A9F50)
 private val TT_PrimaryDark = Color(0xFF4A7D39)
 private val TT_PrimaryBg = Color(0xFFF0F7EC)
-private val TT_Background = Color(0xFFF8FAF0)
+private val TT_Background = AppPageBg
 private val TT_Surface = Color(0xFFFFFFFF)
 private val TT_SectionBg = Color(0xFFF3F6F0)
 private val TT_Border = Color(0xFFE2E8DD)

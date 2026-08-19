@@ -18,6 +18,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.navigation.PlatformBackHandler
+import com.developer.ev2z.theme.AppPageBg
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -51,7 +52,7 @@ fun AboutAppScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White
+                    containerColor = AppPageBg
                 )
             )
         },
@@ -79,7 +80,7 @@ fun AboutAppScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xFFF5F6F8))
+                    .background(AppPageBg)
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = horizontalPad, vertical = horizontalPad),
                 verticalArrangement = Arrangement.spacedBy(cardSpacing)

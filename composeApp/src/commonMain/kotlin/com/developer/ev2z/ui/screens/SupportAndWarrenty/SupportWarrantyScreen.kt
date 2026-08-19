@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.navigation.PlatformBackHandler
+import com.developer.ev2z.theme.AppPageBg
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,7 +54,7 @@ fun SupportWarrantyScreen(
                 }
             )
         },
-        containerColor = Color(0xFFF6F7FB)
+        containerColor = AppPageBg
     ) { padding ->
 
         Column(

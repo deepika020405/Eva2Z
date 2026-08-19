@@ -73,6 +73,83 @@ actual fun compressStoryImage(
     return output
 }
 
+actual fun prepareDocumentImage(
+    imageBytes: ByteArray,
+    maxSizeKB: Int,
+    maxDimension: Int
+): ByteArray {
+    val decoded = decodeDownscaled(imageBytes, maxDimension) ?: return imageBytes
+    val upright = applyExifOrientation(decoded, imageBytes)
+
+    var quality = 90
+    var output: ByteArray
+    do {
+        val stream = ByteArrayOutputStream()
+        upright.compress(Bitmap.CompressFormat.JPEG, quality, stream)
+        output = stream.toByteArray()
+        quality -= 5
+    } while (output.size / 1024 > maxSizeKB && quality > 60)
+
+    return output
+}
+
+/** Decodes the image with its long edge at or below [maxDimension]. */
+private fun decodeDownscaled(imageBytes: ByteArray, maxDimension: Int): Bitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, bounds)
+
+    val longEdge = maxOf(bounds.outWidth, bounds.outHeight)
+    if (longEdge <= 0) return BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
+
+    // inSampleSize only halves, so it lands within 2x of the target — the exact
+    // fit comes from the scale below, working on an already-small bitmap.
+    val options = BitmapFactory.Options().apply {
+        var sample = 1
+        while (longEdge / (sample * 2) >= maxDimension) sample *= 2
+        inSampleSize = sample
+    }
+    val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size, options) ?: return null
+
+    val decodedLongEdge = maxOf(bitmap.width, bitmap.height)
+    if (decodedLongEdge <= maxDimension) return bitmap
+
+    val scale = maxDimension.toFloat() / decodedLongEdge
+    return Bitmap.createScaledBitmap(
+        bitmap,
+        (bitmap.width * scale).toInt().coerceAtLeast(1),
+        (bitmap.height * scale).toInt().coerceAtLeast(1),
+        true
+    )
+}
+
+/** Rotates/flips [bitmap] so the EXIF orientation of [imageBytes] is baked into the pixels. */
+private fun applyExifOrientation(bitmap: Bitmap, imageBytes: ByteArray): Bitmap {
+    val orientation = try {
+        ExifInterface(imageBytes.inputStream())
+            .getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+    } catch (_: Exception) {
+        ExifInterface.ORIENTATION_NORMAL
+    }
+
+    val matrix = Matrix()
+    when (orientation) {
+        ExifInterface.ORIENTATION_ROTATE_90     -> matrix.postRotate(90f)
+        ExifInterface.ORIENTATION_ROTATE_180    -> matrix.postRotate(180f)
+        ExifInterface.ORIENTATION_ROTATE_270    -> matrix.postRotate(270f)
+        ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.postScale(-1f, 1f)
+        ExifInterface.ORIENTATION_FLIP_VERTICAL   -> matrix.postScale(1f, -1f)
+        ExifInterface.ORIENTATION_TRANSPOSE     -> { matrix.postRotate(90f); matrix.postScale(-1f, 1f) }
+        ExifInterface.ORIENTATION_TRANSVERSE    -> { matrix.postRotate(270f); matrix.postScale(-1f, 1f) }
+        else -> return bitmap
+    }
+
+    return try {
+        Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+    } catch (_: OutOfMemoryError) {
+        bitmap
+    }
+}
+
 private fun toJpegBytes(bytes: ByteArray, quality: Int = 95): ByteArray {
     return try {
         val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return bytes

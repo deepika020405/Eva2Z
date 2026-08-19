@@ -31,6 +31,11 @@ object NotificationUtil {
     const val GEOFENCE_NOTIFICATION_ID = 9001
     const val CALL_NOTIFICATION_ID     = 9002
 
+    // Vault expiry reminders get their own id/request-code range, offset far enough
+    // above the fixed ids above that a document id can never collide with them.
+    private const val VAULT_NOTIFICATION_ID_BASE = 20_000
+    private const val VAULT_REQUEST_CODE_BASE    = 20_000
+
     // ── Android 14+: request USE_FULL_SCREEN_INTENT if not granted ───
     fun requestFullScreenIntentPermissionIfNeeded(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -144,16 +149,28 @@ object NotificationUtil {
         body: String?,
         alertId: Int? = null,
         visitorName: String? = null,
-        visitorPhone: String? = null
+        visitorPhone: String? = null,
+        // Set for type=VAULT_EXPIRY pushes. Routes the tap to the document vault
+        // instead of the SOS chat screen that sos_alert_id would open.
+        vaultDocumentId: String? = null,
+        vaultDocumentType: String? = null
     ) {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
             alertId?.let { putExtra("sos_alert_id", it) }
             if (!visitorName.isNullOrBlank())  putExtra("sos_visitor_name", visitorName)
             if (!visitorPhone.isNullOrBlank()) putExtra("sos_visitor_phone", visitorPhone)
+            if (!vaultDocumentId.isNullOrBlank()) {
+                putExtra("vault_document_id", vaultDocumentId)
+                if (!vaultDocumentType.isNullOrBlank()) {
+                    putExtra("vault_document_type", vaultDocumentType)
+                }
+            }
         }
 
-        val requestCode = alertId ?: System.currentTimeMillis().toInt()
+        val requestCode = alertId
+            ?: vaultDocumentId?.toIntOrNull()?.let { VAULT_REQUEST_CODE_BASE + it }
+            ?: System.currentTimeMillis().toInt()
         val clickPendingIntent = PendingIntent.getActivity(
             context, requestCode, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -176,9 +193,14 @@ object NotificationUtil {
             .setAutoCancel(true)
             .setContentIntent(clickPendingIntent)
 
-        val notificationId =
-            if (isGeofenceAlert) GEOFENCE_NOTIFICATION_ID
-            else alertId ?: System.currentTimeMillis().toInt()
+        // Reuse one id per vault document so a repeated expiry reminder for the same
+        // document replaces the previous banner instead of stacking a new one.
+        val notificationId = when {
+            isGeofenceAlert -> GEOFENCE_NOTIFICATION_ID
+            vaultDocumentId?.toIntOrNull() != null ->
+                VAULT_NOTIFICATION_ID_BASE + vaultDocumentId.toInt()
+            else -> alertId ?: System.currentTimeMillis().toInt()
+        }
 
         NotificationManagerCompat.from(context).notify(notificationId, builder.build())
     }

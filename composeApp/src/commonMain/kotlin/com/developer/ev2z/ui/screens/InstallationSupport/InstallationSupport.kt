@@ -29,6 +29,7 @@ import com.developer.ev2z.ui.screens.social_media.openUrl
 import kotlinx.coroutines.delay
 import kotlinx.datetime.*
 import kotlin.time.ExperimentalTime
+import com.developer.ev2z.theme.AppPageBg
 
 private val BrandGreen = Color(0xFF34A853)
 private val TextPrimary = Color(0xFF1A1A1A)
@@ -174,10 +175,10 @@ fun InstallationSupportScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppPageBg)
             )
         },
-        containerColor = Color(0xFFF5F6FA)
+        containerColor = AppPageBg
     ) { padding ->
 
         Box(modifier = Modifier.fillMaxSize()) {
@@ -824,7 +825,7 @@ private fun SupportDropdown(
 @Composable
 private fun SupportSuccessScreen(onDone: () -> Unit) {
     Box(
-        modifier = Modifier.fillMaxSize().background(Color.White),
+        modifier = Modifier.fillMaxSize().background(AppPageBg),
         contentAlignment = Alignment.Center
     ) {
         Column(

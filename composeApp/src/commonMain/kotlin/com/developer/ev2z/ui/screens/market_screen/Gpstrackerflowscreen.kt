@@ -31,6 +31,7 @@ import cafe.adriel.voyager.navigator.LocalNavigator
 import coil3.compose.AsyncImage
 import com.developer.ev2z.util.Analytics
 import kotlinx.coroutines.delay
+import com.developer.ev2z.theme.AppPageBg
 
 private val P_Orange    = Color(0xFFEA8C00)    // app-aligned orange
 private val P_DarkGreen = Color(0xFF3A6330)    // medium-dark green for toast
@@ -111,7 +112,7 @@ fun GpsTrackerFlowContent(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color(0xFFF7F8FA))) {
+    Box(modifier = Modifier.fillMaxSize().background(AppPageBg)) {
 
         Column(
             modifier = Modifier

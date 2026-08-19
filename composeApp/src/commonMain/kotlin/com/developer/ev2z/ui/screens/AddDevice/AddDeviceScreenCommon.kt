@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.util.Analytics
 import kotlinx.coroutines.launch
+import com.developer.ev2z.theme.AppPageBg
 
 private val primaryContainerLight = Color(0xFF00C853)
 private val BottomSheetPeek = 72.dp
@@ -292,7 +293,7 @@ fun AddDeviceDetailsCommon(
     Column(
         Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(AppPageBg)
             .verticalScroll(rememberScrollState())
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(24.dp)
@@ -368,10 +369,10 @@ fun AddDeviceDetailsCommon(
                 modifier = Modifier.weight(1f),
                 singleLine = true,
                 shape = RoundedCornerShape(8.dp),
-                isError = simNumber.isNotEmpty() && simNumber.removeSuffix("U").length < 19,
+                isError = simNumber.isNotEmpty() && simNumber.removeSuffix("U").length < 21,
                 supportingText = {
-                    if (simNumber.isNotEmpty() && simNumber.removeSuffix("U").length < 19) {
-                        Text("SIM Number must be 19-20 digits", color = Color.Red, style = MaterialTheme.typography.bodySmall)
+                    if (simNumber.isNotEmpty() && simNumber.removeSuffix("U").length < 21) {
+                        Text("SIM Number must be 20-21 digits", color = Color.Red, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             )

@@ -27,10 +27,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.navigation.PlatformBackHandler
+import com.developer.ev2z.theme.AppPageBg
 
 // ─── Design System ────────────────────────────────────────────────────────────
 
-private val ColorBg            = Color(0xFFF4F4F8)
+private val ColorBg            = AppPageBg
 private val ColorCard          = Color(0xFFFFFFFF)
 private val ColorPrimary       = Color(0xFF4A7D39)
 private val ColorPrimaryDark   = Color(0xFF3A6029)

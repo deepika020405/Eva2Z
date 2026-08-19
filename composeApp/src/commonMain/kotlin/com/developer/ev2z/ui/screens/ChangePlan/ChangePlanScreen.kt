@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.*
 import com.developer.ev2z.navigation.PlatformBackHandler
+import com.developer.ev2z.theme.AppPageBg
 
 /* =========================================================
    RESPONSIVE HELPERS
@@ -73,7 +74,7 @@ fun ChangePlanScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White
+                    containerColor = AppPageBg
                 )
             )
         },
@@ -84,7 +85,7 @@ fun ChangePlanScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(Color(0xFFF5F6F8))
+                .background(AppPageBg)
         ) {
             val pad = responsivePadding(maxWidth)
             val contentWidth = responsiveContentWidth(maxWidth)

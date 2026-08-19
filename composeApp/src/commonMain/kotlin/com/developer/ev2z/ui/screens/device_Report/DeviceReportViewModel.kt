@@ -3,6 +3,7 @@ package com.developer.ev2z.ui.screens.device_Report
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
+import com.developer.ev2z.network.UnauthorizedException
 import com.developer.ev2z.repository.DeviceReportRepository
 import com.developer.ev2z.response.Device
 import com.developer.ev2z.response.DeviceAnalyticsData
@@ -82,6 +83,36 @@ class DeviceReportViewModel(
     // ────────────────────────────────────────────────────────────────
 
     /**
+     * Tears the session's state down. This ViewModel is remembered at App root, so it
+     * outlives a logout: without this, both polling jobs keep running against the old
+     * token and — worse — [_selectedDevice] still holds the previous account's vehicle,
+     * so the next user's session polls a device that isn't theirs.
+     */
+    fun reset() {
+        stopPolling()
+        _uiState.value = DeviceReportUiState.Loading
+        _myDevices.value = emptyList()
+        _selectedDevice.value = null
+        _liveLocation.value = null
+        _totalDevices.value = 0
+        _address.value = null
+        _totalMilages.value = null
+        _mobilizeMessage.value = null
+        _showConfirmationDialog.value = null
+        _deviceAnalytics.value = null
+        _analyticsError.value = null
+        _isAnalyticsLoading.value = false
+        _selectedAnalyticsRange.value = AnalyticsRange.TODAY
+    }
+
+    private fun stopPolling() {
+        devicesPollingJob?.cancel()
+        devicesPollingJob = null
+        liveLocationJob?.cancel()
+        liveLocationJob = null
+    }
+
+    /**
      * Entry point called from the screen on composition. Kicks off the
      * device-list poll (which auto-selects the first device on cold start
      * and begins live-location polling for it).
@@ -151,6 +182,11 @@ class DeviceReportViewModel(
             // wait for the first live-location tick like we used to.
             _uiState.value = DeviceReportUiState.Success
 
+        } catch (e: UnauthorizedException) {
+            // The session died under us (logout, expiry). Stop instead of looping forever
+            // against a dead token — App calls reset() too, this is the backstop.
+            println("🔒 [DeviceReport] 401 Unauthorized — stopping polling")
+            stopPolling()
         } catch (e: Exception) {
             if (_myDevices.value.isEmpty()) {
                 _uiState.value = DeviceReportUiState.Error(e.message ?: "Unknown error")
@@ -184,6 +220,9 @@ class DeviceReportViewModel(
                 // Note: we do NOT blank out _liveLocation on a failed tick —
                 // that would cause flicker. We keep the last-good location on
                 // screen until the next successful poll.
+            } catch (e: UnauthorizedException) {
+                println("🔒 [DeviceReport] 401 Unauthorized — stopping live-location polling")
+                stopPolling()
             } catch (_: Exception) {
                 // Silent — live-location failures should never tear down the UI.
             }

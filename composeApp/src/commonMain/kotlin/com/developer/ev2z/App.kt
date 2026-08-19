@@ -39,6 +39,7 @@ import com.developer.ev2z.ui.screens.deviceStatus.DeviceStatusScreen
 import com.developer.ev2z.ui.screens.trackTrace.TrackTraceScreen
 import com.developer.ev2z.util.FcmRegistrar
 import com.developer.ev2z.util.SessionLogout
+import com.developer.ev2z.util.SessionState
 
 
 @Composable
@@ -151,6 +152,9 @@ fun App() {
                 username = name
                 isLoggedIn = true
                 AppTokenProvider.getToken = { token }
+                // This token came straight from a 200 on /login, so the session is known-good.
+                // A token merely restored from storage is not — see SessionState.
+                SessionState.markVerified()
                 authViewModel.resetLoginSuccess()
 
                 // Onboarding is shown ONLY to brand-new registrations, and only once.
@@ -168,9 +172,16 @@ fun App() {
       2️⃣ POST-LOGIN SIDE EFFECT → FCM REGISTER
       Always send the token on every login so the server is guaranteed to have it.
       Token is saved only after successful API response to prevent silent cache bugs.
+
+      Gated on a *verified* session, not just a stored one. On a cold start the app restores
+      whatever token is in storage and flips isLoggedIn before anything has checked it; firing
+      registration there re-armed the phone for push using a token the server had already
+      revoked, because fcm/register answers 200 regardless. sessionVerified flips only after an
+      authenticated call comes back 2xx (fresh login, or Home loading devices).
    ---------------------------------------- */
-    LaunchedEffect(isLoggedIn, authToken) {
-        if (isLoggedIn && authToken.isNotEmpty()) {
+    val sessionVerified by SessionState.verified.collectAsState()
+    LaunchedEffect(isLoggedIn, authToken, sessionVerified) {
+        if (isLoggedIn && authToken.isNotEmpty() && sessionVerified) {
             FcmBridge.register { fcmToken ->
                 // Persist immediately, not just on a successful register. Logout needs this
                 // token to deregister, and previously a failed/pending register left it
@@ -424,6 +435,11 @@ fun App() {
                         // used to clear only local storage, leaving this device registered
                         // for push forever. Route them through the same deregistration.
                         SessionLogout.logoutAndClear(apiService, storage)
+                        // Remembered at App root, so it survives logout: its polling jobs
+                        // and selected device belong to the session being torn down. Left
+                        // alone, the next user's session keeps polling the previous
+                        // account's vehicle with the previous account's token.
+                        deviceReportViewModel.reset()
                         isLoggedIn = false
                         authToken = ""
                         username = ""

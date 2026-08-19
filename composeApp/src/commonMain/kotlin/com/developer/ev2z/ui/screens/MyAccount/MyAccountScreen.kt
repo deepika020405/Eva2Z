@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.ui.screens.Profile.ProfileMenuItemRow
 import kotlinx.coroutines.launch
+import com.developer.ev2z.theme.AppPageBg
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,7 +50,7 @@ fun MyAccountScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White
+                    containerColor = AppPageBg
                 )
             )
         }
@@ -59,7 +60,7 @@ fun MyAccountScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(Color(0xFFF5F5F5))
+                .background(AppPageBg)
         ) {
 
             // 🔹 Plan & Billing Section

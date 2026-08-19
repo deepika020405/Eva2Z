@@ -2,6 +2,7 @@ package com.developer.ev2z.ui.screens.DriverScore
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import com.developer.ev2z.theme.AppPageBg
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Eva2z Design System — Professional Minimal
@@ -23,7 +24,7 @@ object Eva2zColors {
     val GreenGradientEnd   = Color(0xFF1BAF6B)
 
     // ─── Backgrounds — pure white world ──────────────────────────────────────
-    val Background  = Color(0xFFF7F8F7)   // page bg — barely off-white
+    val Background  = AppPageBg   // page bg — barely off-white
     val Surface     = Color(0xFFFFFFFF)   // card bg — pure white
     val SurfaceAlt  = Color(0xFFFBFBFB)   // table alt row
 

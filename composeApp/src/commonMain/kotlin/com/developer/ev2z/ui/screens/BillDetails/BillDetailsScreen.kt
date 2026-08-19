@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.util.generateInvoicePdf
 import com.developer.ev2z.util.openPdfFile
+import com.developer.ev2z.theme.AppPageBg
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,11 +52,11 @@ fun BillDetailsScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White
+                    containerColor = AppPageBg
                 )
             )
         },
-        containerColor = Color(0xFFF5F6F8),
+        containerColor = AppPageBg,
         contentWindowInsets = WindowInsets(0)
     ) { padding ->
 

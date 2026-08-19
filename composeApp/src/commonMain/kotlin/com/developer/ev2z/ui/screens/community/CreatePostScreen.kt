@@ -30,6 +30,7 @@ import com.developer.ev2z.openLocationSettings
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.util.Analytics
 import com.developer.ev2z.util.rememberImagePicker
+import com.developer.ev2z.theme.AppPageBg
 
 private val postCategories = listOf("Tips", "Traffic", "Stolen", "Lost", "Found", "Police")
 
@@ -150,7 +151,7 @@ fun CreatePostScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White
+                    containerColor = AppPageBg
                 )
             )
         },
@@ -161,7 +162,7 @@ fun CreatePostScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(Color(0xFFF8FAFC))
+                .background(AppPageBg)
         ) {
             val screenHeight = maxHeight
             val screenWidth = maxWidth

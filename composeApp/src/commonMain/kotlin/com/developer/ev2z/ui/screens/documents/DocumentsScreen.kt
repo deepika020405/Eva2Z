@@ -52,21 +52,24 @@ import com.developer.ev2z.response.VaultDocumentDetail
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
 import com.developer.ev2z.util.PlatformDocumentViewer
-import com.developer.ev2z.util.compressStoryImage
+import com.developer.ev2z.util.prepareDocumentImage
 import com.developer.ev2z.util.rememberImagePicker
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.datetime.Instant
 import kotlin.time.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.time.ExperimentalTime
+import com.developer.ev2z.theme.AppPageBg
 
 // ════════════════════════════════════════════════════════════════════════════
 //  Design tokens
 // ════════════════════════════════════════════════════════════════════════════
 
 private object VaultColors {
-    val Background    = Color(0xFFF4F6F8)
+    val Background    = AppPageBg
     val Surface       = Color.White
 
     val TextPrimary   = Color(0xFF111827)
@@ -279,6 +282,10 @@ fun DocumentsScreen(
     onBack: () -> Unit,
     onOpenViewer: (ByteArray, String) -> Unit,
     onOpenUpload: () -> Unit,
+    // Set when the screen was opened from an expiry-reminder notification — the detail
+    // overlay for this document opens automatically once the list has loaded.
+    initialDocumentId: String? = null,
+    onInitialDocumentConsumed: () -> Unit = {},
 ) {
     val viewModel = remember {
         DocumentsViewModel(apiService = apiService, storageManager = storageManager)
@@ -308,6 +315,22 @@ fun DocumentsScreen(
     }
 
     LaunchedEffect(Unit) { viewModel.loadDocuments() }
+
+    // Expiry-reminder deep link: wait for the list, then open that document's detail.
+    // Consumed exactly once so backing out of the detail returns to the list rather
+    // than re-opening it.
+    LaunchedEffect(documents, initialDocumentId) {
+        if (initialDocumentId.isNullOrBlank() || documents.isEmpty()) return@LaunchedEffect
+        val doc = documents.firstOrNull { it.id == initialDocumentId }
+        if (doc != null) {
+            val slot = matchDocumentsToSlots(documents).entries
+                .firstOrNull { it.value?.id == doc.id }?.key
+            selectedDoc = doc to slot
+        }
+        // Also consumed when the document is gone (deleted after the reminder was
+        // queued) — the user simply lands on the vault list.
+        onInitialDocumentConsumed()
+    }
 
     Box(
         modifier = Modifier
@@ -385,6 +408,7 @@ fun DocumentsScreen(
             val (doc, slot) = selectedDoc!!
             var previewBytes by remember(doc.id) { mutableStateOf<ByteArray?>(null) }
             var detail by remember(doc.id) { mutableStateOf<VaultDocumentDetail?>(null) }
+            var detailLoading by remember(doc.id) { mutableStateOf(true) }
 
             LaunchedEffect(doc.id) {
                 viewModel.openDocument(
@@ -395,16 +419,24 @@ fun DocumentsScreen(
 
             // The new backend serves the image via `image_url` (a plain URL),
             // not the encrypted `vault/{id}` endpoint (which 404s), so fetch the
-            // detail to get that URL and fall back to loading it directly.
+            // detail to get that URL and fall back to loading it directly. The
+            // same payload carries the OCR fields read off the document.
             LaunchedEffect(doc.id) {
-                viewModel.loadDocumentDetail(doc.id) { detail = it }
+                viewModel.loadDocumentDetail(doc.id) {
+                    detail = it
+                    detailLoading = false
+                }
             }
 
             PlatformBackHandler(enabled = true) { selectedDoc = null }
 
             DocumentDetailScreen(
-                fileName     = slot?.title ?: doc.fileName,
-                uploadedDate = formatIsoDateToReadable(doc.createdAt),
+                fileName             = slot?.title ?: doc.fileName,
+                uploadedDate         = formatIsoDateToReadable(doc.createdAt),
+                detail               = detail,
+                detailLoading        = detailLoading,
+                fallbackDocumentType = doc.documentType,
+                fallbackExpiryDate   = doc.expiryDate,
                 onClose      = { selectedDoc = null },
                 onReupload   = { selectedDoc = null; editDocument = doc },
                 onDelete     = { selectedDoc = null; deleteDocId = doc.id },
@@ -1347,7 +1379,14 @@ fun UploadDocumentScreen(
 
     val imagePickerLauncher = rememberImagePicker { bytes ->
         if (bytes != null) {
-            imageBytes = compressStoryImage(imageBytes = bytes, maxSizeKB = 800)
+            // Compression is a multi-second bitmap decode/encode on large camera
+            // shots — keep it off the main thread or the picker return janks.
+            scope.launch {
+                val compressed = withContext(Dispatchers.Default) {
+                    prepareDocumentImage(imageBytes = bytes, maxSizeKB = 800)
+                }
+                imageBytes = compressed
+            }
         }
     }
 
@@ -1397,7 +1436,7 @@ fun UploadDocumentScreen(
                                         // expiry) and cache the picked image for preview.
                                         val uploadedId =
                                             if (isEditMode) editDocument!!.id
-                                            else result.id?.toString()
+                                            else result.id
                                         if (!uploadedId.isNullOrBlank()) {
                                             viewModel.addOrUpdateLocal(
                                                 VaultDocumentDto(

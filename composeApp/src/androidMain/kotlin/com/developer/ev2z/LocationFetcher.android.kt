@@ -18,7 +18,12 @@ import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 
 internal const val LOCATION_PERMISSION_REQUEST = 7001
-internal var pendingLocationCallback: ((Double, Double) -> Unit)? = null
+
+// Every caller waiting on the one permission prompt that is currently on screen. This is
+// a list, not a single slot: several screens ask for a fix at app open (fuel prices and
+// weather both do), and a single slot meant the last one in silently replaced the others,
+// leaving them waiting on a callback that never fired.
+internal val pendingLocationCallbacks = mutableListOf<(Double, Double) -> Unit>()
 
 internal const val LOCATION_SETTINGS_REQUEST = 7002
 internal var pendingLocationSettingsCallback: ((Boolean) -> Unit)? = null
@@ -40,15 +45,20 @@ actual fun fetchPhoneLocation(onResult: (Double, Double) -> Unit) {
         if (!hasLocationPermission()) {
             val activity = ActivityProvider.getActivity()
             if (activity != null) {
-                pendingLocationCallback = onResult
-                ActivityCompat.requestPermissions(
-                    activity,
-                    arrayOf(
-                        Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.ACCESS_COARSE_LOCATION
-                    ),
-                    LOCATION_PERMISSION_REQUEST
-                )
+                val alreadyAsking = pendingLocationCallbacks.isNotEmpty()
+                pendingLocationCallbacks += onResult
+                // A second request raised while one is still on screen is dropped by the
+                // OS, so later callers just queue behind the prompt already showing.
+                if (!alreadyAsking) {
+                    ActivityCompat.requestPermissions(
+                        activity,
+                        arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        ),
+                        LOCATION_PERMISSION_REQUEST
+                    )
+                }
             } else {
                 onResult(0.0, 0.0)
             }

@@ -16,6 +16,7 @@ import com.developer.ev2z.util.DeepLinkBus
 import com.developer.ev2z.util.MetaAnalytics
 import com.developer.ev2z.util.NotificationUtil
 import com.developer.ev2z.util.SosNotificationHandler
+import com.developer.ev2z.util.VaultExpiryBus
 import com.developer.ev2z.calling.VoiceCallManager
 import com.developer.ev2z.util.initGeocoder
 import com.developer.ev2z.util.initOpenUrl
@@ -40,6 +41,7 @@ class MainActivity : ComponentActivity() {
             initOpenUrl(applicationContext)
 
             FcmBridge.tokenFetcher = { FcmManager.fetchAndRegisterToken() }
+            FcmBridge.tokenDeleter = { FcmManager.deleteToken() }
             NotificationPermissionHelper(this) {
                 FcmManager.fetchAndRegisterToken()
             }.checkAndRequest()
@@ -86,6 +88,9 @@ class MainActivity : ComponentActivity() {
             // ✅ SOS / Incoming-call — setContent KE BAAD handle karo
             // SharedFlow replay=1 hai — HomeNavGraph ready hone par collect karega
             intent?.let { handleSosIntent(it) }
+
+            // ✅ Document-expiry reminder tap — same replay=1 reasoning as above
+            intent?.let { handleVaultExpiryIntent(it) }
 
         } catch (e: Exception) {
             Log.e("MainActivity", "❌ Initialization error", e)
@@ -138,17 +143,20 @@ class MainActivity : ComponentActivity() {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == LOCATION_PERMISSION_REQUEST) {
             LocationPermissionEvents.notifyChanged()
-            val callback = pendingLocationCallback
-            pendingLocationCallback = null
-            if (callback == null) return
+            // Everyone who queued behind this one prompt gets the same answer.
+            val callbacks = pendingLocationCallbacks.toList()
+            pendingLocationCallbacks.clear()
+            if (callbacks.isEmpty()) return
             val granted = grantResults.isNotEmpty() &&
                 grantResults.any { it == android.content.pm.PackageManager.PERMISSION_GRANTED }
-            if (granted) {
-                fetchPhoneLocation(callback)
-            } else {
-                // Always answer the caller — a dropped callback leaves callers (e.g. the
-                // fuel-price screen) stuck waiting on a fix that will never arrive.
-                callback(0.0, 0.0)
+            callbacks.forEach { callback ->
+                if (granted) {
+                    fetchPhoneLocation(callback)
+                } else {
+                    // Always answer the caller — a dropped callback leaves callers (e.g. the
+                    // fuel-price screen) stuck waiting on a fix that will never arrive.
+                    callback(0.0, 0.0)
+                }
             }
         }
     }
@@ -159,6 +167,29 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         intent.data?.let { uri -> handleDeepLink(uri.toString()) }
         handleSosIntent(intent)
+        handleVaultExpiryIntent(intent)
+    }
+
+    // Document-expiry reminder tap → open the vault and deep-link to that document.
+    // Handles both our own PendingIntent extra ("vault_document_id", used when the app was
+    // in the foreground and MyFirebaseMessagingService posted the banner) and the Firebase
+    // auto-notification extras ("type" / "document_id"), which is what arrives when the
+    // banner was rendered by Firebase in background/killed state.
+    private fun handleVaultExpiryIntent(intent: Intent) {
+        val documentId = intent.getStringExtra("vault_document_id")
+            ?: intent.getStringExtra("document_id")
+                ?.takeIf { intent.getStringExtra("type") == "VAULT_EXPIRY" }
+        if (documentId.isNullOrBlank()) return
+
+        val documentType = intent.getStringExtra("vault_document_type")
+            ?: intent.getStringExtra("document_type")
+        Log.d("VaultExpiry", "📄 Expiry notification tapped — id=$documentId type=$documentType")
+        VaultExpiryBus.onExpiryNotificationTapped(documentId, documentType)
+
+        // Strip the extras so a configuration change does not replay the navigation.
+        intent.removeExtra("vault_document_id"); intent.removeExtra("vault_document_type")
+        intent.removeExtra("document_id"); intent.removeExtra("document_type")
+        intent.removeExtra("expiry_date"); intent.removeExtra("type")
     }
 
     // Handles both our custom PendingIntent extras (sos_alert_id / sos_visitor_name) AND

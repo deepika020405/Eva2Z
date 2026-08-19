@@ -22,12 +22,13 @@ import com.developer.ev2z.data.local.createStorageManager
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.network.ApiService
 import kotlinx.coroutines.launch
+import com.developer.ev2z.theme.AppPageBg
 
 // ── Theme Colors ─────────────────────────────────────────────────
 internal val CV_Primary = Color(0xFF6A9F50)
 internal val CV_PrimaryDark = Color(0xFF4A7D39)
 internal val CV_PrimaryBg = Color(0xFFF0F7EC)
-internal val CV_Background = Color(0xFFF8FAF0)
+internal val CV_Background = AppPageBg
 internal val CV_Surface = Color(0xFFFFFFFF)
 internal val CV_SectionBg = Color(0xFFF3F6F0)
 internal val CV_Border = Color(0xFFE2E8DD)

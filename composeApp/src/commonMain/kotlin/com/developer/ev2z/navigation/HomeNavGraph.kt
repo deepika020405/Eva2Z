@@ -105,8 +105,11 @@ import com.developer.ev2z.util.IncomingCallData
 import com.developer.ev2z.ui.screens.InstallationSupport.InstallationSupportScreen
 import com.developer.ev2z.ui.screens.fuelPrice.FuelPriceScreen
 import com.developer.ev2z.ui.screens.fuelPrice.FuelPriceViewModel
+import com.developer.ev2z.ui.screens.weather.WeatherScreen
+import com.developer.ev2z.ui.screens.weather.WeatherViewModel
 import com.developer.ev2z.ui.screens.market_screen.ShopProduct
 import com.developer.ev2z.util.SosNotificationHandler
+import com.developer.ev2z.util.VaultExpiryBus
 
 
 // ------------------ TABS -------------------
@@ -143,12 +146,17 @@ class HomeTab(
 
         var showLiveLocation by rememberSaveable { mutableStateOf(false) }
         var showFuelPrice by rememberSaveable { mutableStateOf(false) }
+        var showWeather by rememberSaveable { mutableStateOf(false) }
         val fuelPriceViewModel = remember { FuelPriceViewModel() }
+        val weatherViewModel = remember { WeatherViewModel() }
         // Shared by the home widget and the fuel screen so both show the same state.
         val fuelUiState by fuelPriceViewModel.uiState.collectAsState()
+        // Same deal for weather: the home button and the weather screen read one state.
+        val weatherUiState by weatherViewModel.uiState.collectAsState()
         // Picks the fuel state back up after the user returns from location settings.
         LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
             fuelPriceViewModel.onAppResumed()
+            weatherViewModel.onAppResumed()
         }
         val unreadNotifCount by NotificationBadgeManager.unreadCount.collectAsState()
 
@@ -198,6 +206,18 @@ class HomeTab(
                 onDismissLocationIssue = fuelPriceViewModel::dismissLocationIssue
             )
 
+        } else if (showWeather) {
+
+            WeatherScreen(
+                uiState = weatherUiState,
+                onBack = { showWeather = false },
+                onRetry = weatherViewModel::retry,
+                onRefresh = weatherViewModel::refresh,
+                onRequestLocation = weatherViewModel::requestLocation,
+                onOpenLocationSettings = weatherViewModel::openSettingsForIssue,
+                onDismissLocationIssue = weatherViewModel::dismissLocationIssue
+            )
+
         } else {
 
             HomeScreen(
@@ -243,7 +263,9 @@ class HomeTab(
                 onFuelPrice = { showFuelPrice = true },
                 fuelLocationLabel = fuelUiState.homeLocationLabel,
                 fuelPetrolPrice = fuelUiState.current?.petrolPrice,
-                fuelDieselPrice = fuelUiState.current?.dieselPrice
+                fuelDieselPrice = fuelUiState.current?.dieselPrice,
+                onWeather = { showWeather = true },
+                weatherNow = weatherUiState.current
             )
         }
     }
@@ -705,6 +727,29 @@ fun HomeNavGraph(
     var documentsGateState by remember {
         mutableStateOf(DocumentsGateState.NONE)
     }
+    // Document id from a tapped expiry reminder — survives the vault password gate and
+    // is handed to DocumentsScreen once the user unlocks, then cleared.
+    var pendingVaultDocumentId by remember { mutableStateOf<String?>(null) }
+
+    // ── Document expiry reminder tapped → vault gate → that document ─
+    // Declared here rather than beside the other notification collectors above because
+    // it reads documentsGateState, which is only in scope from this point on.
+    LaunchedEffect(Unit) {
+        VaultExpiryBus.expiryFlow.collect { documentId ->
+            println("📄 Vault expiry redirect — documentId=$documentId")
+
+            pendingVaultDocumentId = documentId
+
+            if (documentsGateState == DocumentsGateState.UNLOCKED) {
+                // Vault already unlocked this session — skip the password prompt.
+                showDocuments = true
+            } else {
+                documentsGateState = DocumentsGateState.LOCKED
+                showVaultPasswordDialog = true
+            }
+            VaultExpiryBus.clear()
+        }
+    }
 
 
     // Edit device state
@@ -1014,7 +1059,9 @@ fun HomeNavGraph(
                 onOpenUpload = {
                     showDocuments = false
                     showUploadDocument = true
-                }
+                },
+                initialDocumentId = pendingVaultDocumentId,
+                onInitialDocumentConsumed = { pendingVaultDocumentId = null }
             )
 
         } else if (showManageDevice) {
@@ -1391,6 +1438,9 @@ fun HomeNavGraph(
             onDismiss = {
                 showVaultPasswordDialog = false
                 documentsGateState = DocumentsGateState.LOCKED
+                // User backed out of the gate — drop any expiry deep link so it does
+                // not fire the next time the vault is opened normally.
+                pendingVaultDocumentId = null
             }
         )
     }

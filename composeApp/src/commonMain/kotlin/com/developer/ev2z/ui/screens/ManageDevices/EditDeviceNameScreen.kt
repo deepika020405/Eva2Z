@@ -24,6 +24,7 @@ import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.data.local.UserPrefs
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.theme.AppPageBg
 
 private val primaryContainerLight = Color(0xFF00C853)
 
@@ -58,7 +59,7 @@ fun EditDeviceNameScreen(
     Column(
         Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(AppPageBg)
             .verticalScroll(rememberScrollState())
             .padding(24.dp)
             .statusBarsPadding(),

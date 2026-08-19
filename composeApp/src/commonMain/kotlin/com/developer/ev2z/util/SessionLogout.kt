@@ -32,6 +32,17 @@ object SessionLogout {
 
         // Capture everything the server needs BEFORE clearing local storage.
         val token = storage.getString("token", "")
+
+        // A blank token here means this session was already torn down. The profile screen
+        // logs out and then reports logoutSuccess, which fires App's onLogout — so every
+        // manual logout reaches this function twice. Repeating the work just doubles the
+        // network calls and logs a misleading "no auth token" for the second pass.
+        if (token.isBlank()) {
+            println("⚠️ Logout: session already cleared — skipping duplicate")
+            clearLocal(storage)
+            return
+        }
+
         // In-memory token is the freshest; fall back to the persisted copy when the app
         // was restarted and FCM hasn't handed us a token again this session.
         val fcmToken = FcmBridge.currentToken()?.takeIf { it.isNotBlank() }
@@ -39,26 +50,46 @@ object SessionLogout {
         val deviceUuid = userPrefs.getOrCreateDeviceUuid()
         val platform = platformName()
 
+        // Bump the session generation FIRST. An FCM registration already in flight checks this
+        // when it lands and undoes itself instead of putting this phone back on the push list —
+        // that race is what re-registered the device milliseconds after a 401 logout.
+        SessionState.invalidate()
+
         clearLocal(storage)
 
-        // Fire even when the FCM token is unknown — device_uuid alone is enough for the
-        // server to find and delete this device's row.
-        if (token.isNotBlank()) {
-            CoroutineScope(Dispatchers.IO).launch {
+        // Kill the token on the device itself. Everything below depends on the server doing the
+        // right thing; this step does not. Without it, any device row the server keeps — from a
+        // failed logout, an older install, or a session that expired offline — keeps delivering.
+        FcmBridge.deleteToken()
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                apiService.logout(
+                    authHeader = "Bearer $token",
+                    fcmToken   = fcmToken,
+                    deviceUuid = deviceUuid,
+                    platform   = platform
+                )
+                println("✅ Logout API called successfully (device deregistered)")
+            } catch (e: Exception) {
+                println("⚠️ Logout API failed (local logout already done): ${e.message}")
+            }
+
+            // Always deregister as well, whatever /logout did. On the session-expiry path the
+            // token above is already rejected, so /logout deletes nothing and this is the only
+            // call that can remove the row.
+            if (fcmToken.isNotBlank() || deviceUuid.isNotBlank()) {
                 try {
-                    apiService.logout(
-                        authHeader = "Bearer $token",
+                    apiService.deregisterFcmToken(
                         fcmToken   = fcmToken,
                         deviceUuid = deviceUuid,
-                        platform   = platform
+                        platform   = platform,
+                        authHeader = "Bearer $token"
                     )
-                    println("✅ Logout API called successfully (device deregistered)")
                 } catch (e: Exception) {
-                    println("⚠️ Logout API failed (local logout already done): ${e.message}")
+                    println("⚠️ FCM deregister failed: ${e.message}")
                 }
             }
-        } else {
-            println("⚠️ Logout: no auth token — server-side deregistration skipped")
         }
     }
 

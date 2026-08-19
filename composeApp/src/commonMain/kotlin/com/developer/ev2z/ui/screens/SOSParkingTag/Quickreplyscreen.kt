@@ -39,6 +39,7 @@ import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
+import com.developer.ev2z.theme.AppPageBg
 
 
 internal val BrandGreen      = Color(0xFF4A7D39)
@@ -46,7 +47,7 @@ internal val BrandGreenLight = Color(0xFFF1F4ED)
 internal val BrandGreenMid   = Color(0xFFCCD7C7)
 internal val AccentGreen     = Color(0xFF85B070)
 internal val SoftGreen       = Color(0xFF9DD680)
-internal val BackgroundColor = Color(0xFFF8FAF0)
+internal val BackgroundColor = AppPageBg
 internal val CardColor       = Color.White
 internal val TextPrimary     = Color(0xFF252A23)
 internal val TextSecondary   = Color(0xFF5D6858)
@@ -60,7 +61,7 @@ internal val SuccessLight    = Color(0xFFE8F5E0)
 // Chat Color Tokens — light green + white (app theme)
 // ─────────────────────────────────────────────────────────────────
 
-private val ChatBg            = Color(0xFFF8FAF0)
+private val ChatBg            = AppPageBg
 private val OwnerBubble       = Color(0xFFE8F5E0)
 private val VisitorBubble     = Color.White
 private val ChatTopBarColor   = Color(0xFF4A7D39)

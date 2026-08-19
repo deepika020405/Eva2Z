@@ -7,8 +7,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.Close
@@ -18,6 +20,7 @@ import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,13 +34,21 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import com.developer.ev2z.response.VaultDocumentDetail
+import com.developer.ev2z.theme.AppPageBg
+import kotlin.time.Instant
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 // ════════════════════════════════════════════════════════════════════════════
 //  Design tokens
 // ════════════════════════════════════════════════════════════════════════════
 
 private object DetailColors {
-    val Background    = Color(0xFFF4F6F8)
+    val Background    = AppPageBg
     val Surface       = Color.White
     val PreviewBg     = Color(0xFF1B1B1F)
     val PreviewMuted  = Color(0xFF9CA3AF)
@@ -70,6 +81,10 @@ fun DocumentDetailScreen(
     onClose: () -> Unit,
     onReupload: () -> Unit,
     onDelete: () -> Unit,
+    detail: VaultDocumentDetail? = null,
+    detailLoading: Boolean = false,
+    fallbackDocumentType: String? = null,
+    fallbackExpiryDate: String? = null,
     preview: @Composable BoxScope.() -> Unit = { PdfPreviewPlaceholder() },
 ) {
     Column(
@@ -91,10 +106,14 @@ fun DocumentDetailScreen(
         )
 
         DocumentInfoCard(
-            fileName     = fileName,
-            uploadedDate = uploadedDate,
-            onReupload   = onReupload,
-            onDelete     = onDelete,
+            fileName             = fileName,
+            uploadedDate         = uploadedDate,
+            detail               = detail,
+            detailLoading        = detailLoading,
+            fallbackDocumentType = fallbackDocumentType,
+            fallbackExpiryDate   = fallbackExpiryDate,
+            onReupload           = onReupload,
+            onDelete             = onDelete,
         )
     }
 }
@@ -233,9 +252,20 @@ fun PdfPreviewPlaceholder(message: String = "Loading document…") {
 private fun DocumentInfoCard(
     fileName: String,
     uploadedDate: String,
+    detail: VaultDocumentDetail?,
+    detailLoading: Boolean,
+    fallbackDocumentType: String?,
+    fallbackExpiryDate: String?,
     onReupload: () -> Unit,
     onDelete: () -> Unit,
 ) {
+    val fields = remember(detail, fallbackDocumentType, fallbackExpiryDate) {
+        extractedFields(detail, fallbackDocumentType, fallbackExpiryDate)
+    }
+    val badge = remember(detail, fallbackExpiryDate) {
+        expiryBadge(detail?.expiryDate ?: fallbackExpiryDate)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -244,19 +274,62 @@ private fun DocumentInfoCard(
             .padding(horizontal = 20.dp)
             .padding(top = 20.dp, bottom = 24.dp),
     ) {
-        Text(
-            text       = fileName,
-            fontSize   = 17.sp,
-            fontWeight = FontWeight.SemiBold,
-            color      = DetailColors.TextPrimary,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text       = fileName,
+                fontSize   = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                color      = DetailColors.TextPrimary,
+                maxLines   = 1,
+                modifier   = Modifier.weight(1f, fill = false),
+            )
+            if (badge != null) {
+                Spacer(Modifier.width(8.dp))
+                DetailStatusBadge(label = badge.second, status = badge.first)
+            }
+        }
 
         Spacer(Modifier.height(16.dp))
 
-        InfoColumn(
-            label = "Uploaded",
-            value = uploadedDate.ifBlank { "—" },
-        )
+        // Server-side OCR fields read off the document image itself.
+        Column(
+            modifier            = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 220.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            when {
+                fields.isNotEmpty() -> fields.forEach { (label, value) ->
+                    InfoColumn(label = label, value = value)
+                }
+
+                detailLoading -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(
+                        color       = DetailColors.Green,
+                        strokeWidth = 2.dp,
+                        modifier    = Modifier.size(16.dp),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        "Reading details from the document…",
+                        fontSize = 13.sp,
+                        color    = DetailColors.TextSecondary,
+                    )
+                }
+
+                else -> Text(
+                    text     = "No details could be read from this document yet.",
+                    fontSize = 13.sp,
+                    color    = DetailColors.TextSecondary,
+                )
+            }
+
+            InfoColumn(
+                label = "Uploaded",
+                value = uploadedDate.ifBlank { "—" },
+            )
+        }
 
         Spacer(Modifier.height(20.dp))
 
@@ -300,7 +373,7 @@ private fun InfoColumn(label: String, value: String, modifier: Modifier = Modifi
 }
 
 @Composable
-private fun DetailStatusBadge(label: String, detail: String, status: DocumentBadgeStatus) {
+private fun DetailStatusBadge(label: String, status: DocumentBadgeStatus, detail: String = "") {
     val (bg, fg) = when (status) {
         DocumentBadgeStatus.Valid    -> DetailColors.GreenLight to DetailColors.GreenDark
         DocumentBadgeStatus.Expiring -> DetailColors.AmberLight to DetailColors.AmberDark
@@ -315,6 +388,116 @@ private fun DetailStatusBadge(label: String, detail: String, status: DocumentBad
     ) {
         val text = if (detail.isNotEmpty()) "$label · $detail" else label
         Text(text, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = fg)
+    }
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+//  Extracted-detail helpers
+// ════════════════════════════════════════════════════════════════════════════
+
+private val monthNames = listOf(
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+)
+
+/** True for OCR values the backend sends as filler rather than real data. */
+private fun String?.isMeaningful(): Boolean {
+    val v = this?.trim().orEmpty()
+    return v.isNotEmpty() &&
+        !v.equals("null", ignoreCase = true) &&
+        !v.equals("n/a", ignoreCase = true) &&
+        !v.equals("na", ignoreCase = true) &&
+        !v.equals("-", ignoreCase = true)
+}
+
+/** Parses the date shapes the vault returns: ISO instant, `yyyy-MM-dd`, `dd-MM-yyyy`, `dd/MM/yyyy`. */
+private fun parseVaultDate(raw: String?): LocalDate? {
+    val trimmed = raw?.trim().orEmpty()
+    if (!trimmed.isMeaningful()) return null
+
+    runCatching { return LocalDate.parse(trimmed) }
+    @OptIn(ExperimentalTime::class)
+    runCatching {
+        return Instant.parse(trimmed).toLocalDateTime(TimeZone.currentSystemDefault()).date
+    }
+
+    val parts = trimmed.split('-', '/', '.')
+    if (parts.size == 3) {
+        val day   = parts[0].toIntOrNull()
+        val month = parts[1].toIntOrNull()
+        val year  = parts[2].toIntOrNull()
+        if (day != null && month != null && year != null && month in 1..12 && day in 1..31) {
+            return runCatching { LocalDate(year, month, day) }.getOrNull()
+        }
+    }
+    return null
+}
+
+/** Human-readable date; falls back to the raw string when the shape is unknown. */
+private fun formatVaultDate(raw: String?): String {
+    if (!raw.isMeaningful()) return ""
+    val date = parseVaultDate(raw) ?: return raw!!.trim()
+    return "${date.day}-${monthNames[date.month.ordinal]}-${date.year}"
+}
+
+private fun documentTypeLabel(raw: String?): String? {
+    if (!raw.isMeaningful()) return null
+    return when (raw!!.trim().lowercase()) {
+        "dl", "driving_licence", "driving_license" -> "Driving Licence"
+        "rc", "registration_certificate"           -> "Registration Certificate"
+        "puc", "pucc"                              -> "PUC Certificate"
+        "insurance"                                -> "Insurance"
+        "fitness"                                  -> "Fitness Certificate"
+        "permit"                                   -> "Permit"
+        "aadhaar", "aadhar"                        -> "Aadhaar"
+        "pan"                                      -> "PAN Card"
+        else -> raw.trim().replace('_', ' ')
+            .split(' ')
+            .joinToString(" ") { word -> word.replaceFirstChar { it.uppercaseChar() } }
+    }
+}
+
+
+private fun extractedFields(
+    detail: VaultDocumentDetail?,
+    fallbackDocumentType: String?,
+    fallbackExpiryDate: String?,
+): List<Pair<String, String>> {
+    val out = mutableListOf<Pair<String, String>>()
+    fun add(label: String, value: String?) {
+        if (value.isMeaningful()) out += label to value!!.trim()
+    }
+
+    val identifier = detail?.primaryIdentifier
+
+    add("Document type", documentTypeLabel(detail?.documentType ?: fallbackDocumentType))
+    add("Document number", identifier)
+    add("Name", detail?.holderName)
+    add("Father's name", detail?.fatherName)
+    add("Date of birth", formatVaultDate(detail?.dob))
+    // The vehicle number often *is* the identifier on an RC — don't repeat it.
+    if (!detail?.vehicleNumber.equals(identifier, ignoreCase = true)) {
+        add("Vehicle number", detail?.vehicleNumber)
+    }
+    add("Vehicle class", detail?.vehicleClass)
+    add("Issue date", formatVaultDate(detail?.issueDate))
+    add("Expiry date", formatVaultDate(detail?.expiryDate ?: fallbackExpiryDate))
+    add("Issuing authority", detail?.issuingAuthority)
+    add("Address", detail?.address)
+
+    return out
+}
+
+/** Validity badge derived from the extracted expiry date, or null when unknown. */
+@OptIn(ExperimentalTime::class)
+private fun expiryBadge(expiry: String?): Pair<DocumentBadgeStatus, String>? {
+    val expiryDate = parseVaultDate(expiry) ?: return null
+    val today      = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+    val daysLeft   = expiryDate.toEpochDays() - today.toEpochDays()
+    return when {
+        daysLeft < 0   -> DocumentBadgeStatus.Expired  to "EXPIRED"
+        daysLeft <= 30 -> DocumentBadgeStatus.Expiring to "$daysLeft days left"
+        else           -> DocumentBadgeStatus.Valid    to "VALID"
     }
 }
 

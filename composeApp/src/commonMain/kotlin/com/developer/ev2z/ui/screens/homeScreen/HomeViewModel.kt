@@ -7,6 +7,7 @@ import com.developer.ev2z.data.local.model.Device
 import com.developer.ev2z.data.local.model.DeviceResponse
 import com.developer.ev2z.network.UnauthorizedException
 import com.developer.ev2z.repository.HomeRepository
+import com.developer.ev2z.util.SessionState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,12 +46,16 @@ class HomeViewModel(
             repository.getDevicesLatestLocations(token).fold(
                 onSuccess = { response ->
                     _uiState.value = HomeUiState.Success(response)
+                    // First proof this run that the stored token is still good. FCM registration
+                    // waits on this so a revoked session can never re-register the device.
+                    SessionState.markVerified()
                     println("✅ Devices loaded: ${response.totalDevices}")
                     println("✅ Response Body: ${response.toString()}")
                 },
                 onFailure = { error ->
                     if (error is UnauthorizedException) {
                         println("🔒 [Home] 401 Unauthorized — redirecting to login")
+                        SessionState.invalidate()
                         _uiState.value = HomeUiState.Unauthorized
                     } else {
                         _uiState.value = HomeUiState.Error(error.message ?: "Unknown error")

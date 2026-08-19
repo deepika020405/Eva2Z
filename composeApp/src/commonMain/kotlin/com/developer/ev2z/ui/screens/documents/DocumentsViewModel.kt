@@ -18,15 +18,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/**
- * Process-level cache of documents uploaded during the current app session.
- *
- * The vault list (`vault/documents`) and file (`vault/{id}`) endpoints currently
- * don't return freshly uploaded documents, and the screen's ViewModel is
- * `remember{}`-scoped so it dies on navigation. Keeping uploads here means a
- * just-uploaded document (and its image) stays visible across screen changes
- * for the whole session, independent of any single ViewModel instance.
- */
+
 object VaultSessionCache {
     val docs = mutableListOf<VaultDocumentDto>()
     val images = mutableMapOf<String, ByteArray>()
@@ -74,11 +66,7 @@ class DocumentsViewModel(
         _documents.value = serverDocs + VaultSessionCache.docs.filter { it.id !in serverIds }
     }
 
-    /**
-     * Adds (or replaces) a document we just uploaded so it appears on the
-     * vault list right away, using the data the upload response returned.
-     * The picked [imageBytes] are cached so the preview shows immediately.
-     */
+
     fun addOrUpdateLocal(doc: VaultDocumentDto, imageBytes: ByteArray? = null) {
         VaultSessionCache.put(doc, imageBytes)
         publishMerged()
@@ -99,11 +87,7 @@ class DocumentsViewModel(
         }
     }
 
-    /**
-     * Re-syncs the list from the server *without* toggling [loading], so the
-     * current list stays on screen instead of being replaced by a full-screen
-     * spinner. Used after an optimistic delete to reconcile with the server.
-     */
+
     private fun refreshDocumentsSilently() {
         viewModelScope.launch {
             try {
@@ -114,7 +98,6 @@ class DocumentsViewModel(
         }
     }
 
-    /** Fetches the server list and publishes the merged result. */
     private suspend fun fetchDocuments() {
         val vaultToken = storageManager.getString(StorageKeys.VAULT_TOKEN, "")
         val authToken = storageManager.getString("token", "")
@@ -268,35 +251,16 @@ class DocumentsViewModel(
         val vaultToken = storageManager.getString(StorageKeys.VAULT_TOKEN, "")
         val authToken = storageManager.getString("token", "")
 
-        // A re-upload requires the new image bytes; fall back to update if absent.
-        if (imageBytes == null) {
-            val salt = randomHex(16)
-            val iv = randomHex(16)
-            val authTag = randomHex(16)
-            val checksum = sha256(fileName.toByteArray())
-            return withContext(Dispatchers.IO) {
-                apiService.updateVaultDocument(
-                    documentId = documentId,
-                    vaultToken = vaultToken,
-                    authToken = authToken,
-                    encryptedFile = null,
-                    fileName = fileName,
-                    fileType = "image/jpeg",
-                    salt = salt,
-                    iv = iv,
-                    authTag = authTag,
-                    checksum = checksum
-                )
-            }
-        }
-
+        // vault/update/{id} handles both cases — with new bytes it replaces the
+        // file, without them it renames. (The old vault reupload route is dead
+        // server-side: VaultController::reupload does not exist → 500.)
         val salt = randomHex(16)
         val iv = randomHex(16)
         val authTag = randomHex(16)
-        val checksum = sha256(imageBytes)
+        val checksum = sha256(imageBytes ?: fileName.toByteArray())
 
         return withContext(Dispatchers.IO) {
-            apiService.reuploadDocument(
+            apiService.updateVaultDocument(
                 documentId = documentId,
                 vaultToken = vaultToken,
                 authToken = authToken,

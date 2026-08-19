@@ -52,6 +52,7 @@ import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.painterResource
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+import com.developer.ev2z.theme.AppPageBg
 
 @Composable
 fun ProfileScreen(
@@ -210,7 +211,7 @@ fun ProfileScreenContent(
                     )
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White
+                    containerColor = AppPageBg
                 )
             )
         },
@@ -240,7 +241,7 @@ fun ProfileScreenContent(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color(0xFFF5F6F8)),
+                        .background(AppPageBg),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // Profile Header

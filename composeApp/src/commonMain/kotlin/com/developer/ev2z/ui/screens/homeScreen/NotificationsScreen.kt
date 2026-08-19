@@ -43,6 +43,7 @@ import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
+import com.developer.ev2z.theme.AppPageBg
 
 // ─── Badge manager (unchanged) ────────────────────────────────────────────────
 
@@ -87,7 +88,7 @@ internal sealed class NotifItem {
 // ─── Colors ───────────────────────────────────────────────────────────────────
 
 private object NC {
-    val ScreenBg    = Color(0xFFF2F3F7)
+    val ScreenBg    = AppPageBg
     val CardBg      = Color(0xFFFFFFFF)
     val ChipBg      = Color(0xFFE2E8F0)
     val ChipActive  = Color(0xFF00A844)

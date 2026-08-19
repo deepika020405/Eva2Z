@@ -45,6 +45,7 @@ import com.developer.ev2z.util.DeepLinkBus
 import eva2z_connect_multiplatform.composeapp.generated.resources.*
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.resources.painterResource
+import com.developer.ev2z.theme.AppPageBg
 
 // ── Design Tokens ────────────────────────────────────────────────
 internal val P_Green        = Color(0xFF5BA03B)   // lighter vibrant green — was #4A7D39
@@ -52,7 +53,7 @@ internal val P_GreenDark    = Color(0xFF467D28)   // pressed / active states
 internal val P_GreenLight   = Color(0xFF7FC25A)   // light accent
 internal val P_GreenSurface = Color(0xFFF0F7EC)   // crisp light-green surface
 internal val P_GreenBorder  = Color(0xFFC0D9B0)   // soft border
-internal val P_Bg           = Color(0xFFFAFBF8)   // near-white, no yellow tint
+internal val P_Bg           = AppPageBg   // near-white, no yellow tint
 internal val P_Card         = Color(0xFFFFFFFF)
 internal val P_Dark         = Color(0xFF1C2D1A)   // text primary
 internal val P_Mid          = Color(0xFF637263)   // text secondary

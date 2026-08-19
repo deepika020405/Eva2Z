@@ -18,6 +18,7 @@ import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.phonepe.PaymentState
 import com.developer.ev2z.phonepe.openPhonePeSdk
 import com.developer.ev2z.ui.screens.market_screen.PaymentResultScreen
+import com.developer.ev2z.theme.AppPageBg
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -55,7 +56,7 @@ fun ChangePlanScreenHost(
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = Color(0xFFF5F6F8)
+        color = AppPageBg
     ) {
         when (paymentState) {
 

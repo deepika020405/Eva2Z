@@ -26,6 +26,7 @@ import androidx.compose.ui.window.Dialog
 import com.developer.ev2z.getPlatformContext
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.theme.AppPageBg
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,7 +84,7 @@ fun ReferAndEarnScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White
+                    containerColor = AppPageBg
                 )
             )
         },
@@ -254,7 +255,7 @@ private fun ReferralContentScreen(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(bottom = 88.dp)
-                .background(Color.White)
+                .background(AppPageBg)
                 .padding(horizontal = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {

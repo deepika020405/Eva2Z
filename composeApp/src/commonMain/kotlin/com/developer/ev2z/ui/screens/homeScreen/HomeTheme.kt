@@ -7,6 +7,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import com.developer.ev2z.theme.AppPageBg
 
 // ─── Palette ─────────────────────────────────────────────────────────────────
 data class HomePalette(
@@ -23,7 +24,7 @@ data class HomePalette(
 )
 
 val LightPalette = HomePalette(
-    pageBg        = Color(0xFFF7F9FC),
+    pageBg        = AppPageBg,
     cardBg        = Color.White,
     textPrimary   = Color(0xFF0F172A),
     textSecondary = Color(0xFF64748B),

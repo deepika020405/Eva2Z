@@ -3,6 +3,7 @@ package com.developer.ev2z.util
 import kotlinx.cinterop.*
 import platform.CoreGraphics.CGFloat
 import platform.CoreGraphics.CGRectMake
+import platform.CoreGraphics.CGSizeMake
 import platform.Foundation.*
 import platform.Photos.*
 import platform.UIKit.*
@@ -52,6 +53,50 @@ actual fun compressStoryImage(
         (outputData?.length?.toInt() ?: 0) / 1024 > maxSizeKB &&
         compression > 0.45
     )
+
+    outputData?.toByteArraySafe() ?: imageBytes
+}
+
+// ================= DOCUMENT SCAN (orientation baked in, resolution capped) =================
+@OptIn(ExperimentalForeignApi::class)
+actual fun prepareDocumentImage(
+    imageBytes: ByteArray,
+    maxSizeKB: Int,
+    maxDimension: Int
+): ByteArray = autoreleasepool {
+
+    val image = imageBytes.toUIImage() ?: return@autoreleasepool imageBytes
+
+    val width  = image.size.useContents { width }
+    val height = image.size.useContents { height }
+    if (width <= 0.0 || height <= 0.0) return@autoreleasepool imageBytes
+
+    val longEdge = maxOf(width, height)
+    val scale    = if (longEdge > maxDimension.toDouble()) maxDimension.toDouble() / longEdge else 1.0
+    val targetW  = width * scale
+    val targetH  = height * scale
+
+    // Redrawing bakes the EXIF orientation into the pixels. UIImage keeps it as an
+    // imageOrientation flag, so a straight JPEG re-encode can hand the server a
+    // sideways document — which its OCR rejects.
+    UIGraphicsBeginImageContextWithOptions(CGSizeMake(targetW, targetH), false, 1.0)
+    image.drawInRect(CGRectMake(0.0, 0.0, targetW, targetH))
+    val upright = UIGraphicsGetImageFromCurrentImageContext()
+    UIGraphicsEndImageContext()
+
+    val source = upright ?: image
+
+    var compression: CGFloat = 0.9
+    var outputData: NSData? = UIImageJPEGRepresentation(source, compression)
+
+    while (
+        outputData != null &&
+        (outputData?.length?.toInt() ?: 0) / 1024 > maxSizeKB &&
+        compression > 0.6
+    ) {
+        compression -= 0.05
+        outputData = UIImageJPEGRepresentation(source, compression)
+    }
 
     outputData?.toByteArraySafe() ?: imageBytes
 }

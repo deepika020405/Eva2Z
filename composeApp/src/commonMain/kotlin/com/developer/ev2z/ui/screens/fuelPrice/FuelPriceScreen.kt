@@ -62,10 +62,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import com.developer.ev2z.navigation.PlatformBackHandler
+import com.developer.ev2z.theme.AppPageBg
 
 // ─── Light-palette design tokens (Guardian Drive prototype alignment) ──────────
 private object FuelColors {
-    val Background = Color(0xFFFFFFFF)
+    val Background = AppPageBg
     val PetrolBg = Color(0xFFEAF7EC)
     val PetrolAccent = Color(0xFF34A853)
     val DieselBg = Color(0xFFFDF3E4)
@@ -196,6 +198,9 @@ fun FuelPriceScreen(
 ) {
     var showLocationPicker by remember { mutableStateOf(false) }
     var showAllStates by remember { mutableStateOf(false) }
+
+    // Device back goes home instead of falling through to the app's exit prompt.
+    PlatformBackHandler(enabled = true) { onBack() }
 
     uiState.locationIssue?.let { issue ->
         LocationIssueDialog(

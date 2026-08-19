@@ -32,7 +32,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,6 +49,7 @@ import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.util.Analytics
 import com.developer.ev2z.util.compressStoryImage
 import com.developer.ev2z.util.rememberImagePicker
+import com.developer.ev2z.theme.AppPageBg
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,13 +66,21 @@ fun CreateStoryScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var uploadSuccess by remember { mutableStateOf(false) }
 
+    val scope = rememberCoroutineScope()
+
     val imagePickerLauncher = rememberImagePicker { imageBytes ->
         if (imageBytes != null) {
-            val fixed = compressStoryImage(
-                imageBytes = imageBytes,
-                maxSizeKB = 800
-            )
-            image = fixed
+            // Compression is a multi-second bitmap decode/encode on large camera
+            // shots — keep it off the main thread or the picker return janks.
+            scope.launch {
+                val fixed = withContext(Dispatchers.Default) {
+                    compressStoryImage(
+                        imageBytes = imageBytes,
+                        maxSizeKB = 800
+                    )
+                }
+                image = fixed
+            }
         }
     }
 
@@ -133,7 +146,7 @@ fun CreateStoryScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White
+                    containerColor = AppPageBg
                 )
             )
         },
@@ -144,7 +157,7 @@ fun CreateStoryScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(Color(0xFFF8FAFC))
+                .background(AppPageBg)
         ) {
             val screenHeight = maxHeight
             val screenWidth = maxWidth

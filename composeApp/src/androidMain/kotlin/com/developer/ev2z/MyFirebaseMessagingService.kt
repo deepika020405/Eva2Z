@@ -296,6 +296,12 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             else -> { /* handled after generic notification */ }
         }
 
+        // Document-expiry reminder (DL / RC / PUC …). Carrying the document id on the
+        // notification intent is what routes the tap into the vault — without it the
+        // tap would fall through to the SOS/chat branch in MainActivity.
+        val vaultDocumentId   = if (type == "VAULT_EXPIRY") data["document_id"] else null
+        val vaultDocumentType = if (type == "VAULT_EXPIRY") data["document_type"] else null
+
         // Always show system notification — foreground or background.
         // alertFlow handles in-app redirect; notification gives user a fallback tap target.
         NotificationUtil.show(
@@ -304,7 +310,9 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
             body = body,
             alertId = alertId,
             visitorName = visitorName,
-            visitorPhone = visitorPhone
+            visitorPhone = visitorPhone,
+            vaultDocumentId = vaultDocumentId,
+            vaultDocumentType = vaultDocumentType
         )
 
         when (type) {
@@ -345,6 +353,17 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
                     println("✅ Sending SMS for device: $deviceId")
                     SmsUtil.send(deviceId)
                 }
+            }
+
+            // 📄 Document about to expire (DL / RC / PUC / insurance …)
+            // The notification is already posted above; nothing else to do here.
+            // Navigation happens only when the user taps it — see MainActivity's
+            // handleVaultExpiryIntent().
+            "VAULT_EXPIRY" -> {
+                println(
+                    "📄 VAULT_EXPIRY — documentId=${data["document_id"]} " +
+                    "docType=${data["document_type"]} expiry=${data["expiry_date"]}"
+                )
             }
 
             // 🟢 GEOFENCE ENTER

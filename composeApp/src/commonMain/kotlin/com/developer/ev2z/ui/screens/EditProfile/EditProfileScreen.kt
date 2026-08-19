@@ -36,6 +36,7 @@ import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.ui.components.FloatingContactButton
 import com.developer.ev2z.util.rememberImagePicker
 import kotlinx.coroutines.delay
+import com.developer.ev2z.theme.AppPageBg
 private const val BASE_IMAGE_URL = "https://gps.eva2z.in/storage/"
 
 @Composable
@@ -177,7 +178,7 @@ fun EditProfileScreenContent(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White
+                    containerColor = AppPageBg
                 )
             )
         },
@@ -222,7 +223,7 @@ fun EditProfileScreenContent(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.White)
+                    .background(AppPageBg)
                     .verticalScroll(scrollState)
                     .padding(horizontal = horizontalPad, vertical = if (isCompact) 16.dp else 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally

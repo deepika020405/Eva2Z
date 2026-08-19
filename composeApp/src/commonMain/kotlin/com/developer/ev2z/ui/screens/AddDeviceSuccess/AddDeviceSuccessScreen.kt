@@ -19,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.developer.ev2z.theme.AppPageBg
 
 private val primaryContainerLight = Color(0xFF00C853)
 
@@ -47,7 +48,7 @@ fun AddDeviceSuccessScreen(
     Column(
         Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(AppPageBg)
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center

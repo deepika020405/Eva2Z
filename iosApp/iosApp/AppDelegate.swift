@@ -66,6 +66,19 @@ class AppDelegate: NSObject,
             }
         }
 
+        // tokenDeleter is invoked by SessionLogout. Deleting the token makes FCM itself reject
+        // pushes aimed at this device, so a server-side device row that outlives logout can no
+        // longer deliver. A fresh token is minted on the next token request.
+        FcmBridge.shared.tokenDeleter = {
+            Messaging.messaging().deleteToken { error in
+                if let error = error {
+                    print("❌ FCM token delete failed: \(error.localizedDescription)")
+                } else {
+                    print("🗑️ FCM token deleted — device no longer reachable by push")
+                }
+            }
+        }
+
         // Register WebRTC bridge
         WebRtcBridgeHolder.shared.delegate = WebRtcBridge.shared
         print("✅ WebRtcBridge registered")

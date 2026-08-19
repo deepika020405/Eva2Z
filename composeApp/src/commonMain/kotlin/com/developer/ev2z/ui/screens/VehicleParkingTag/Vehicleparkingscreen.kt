@@ -30,9 +30,11 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.ui.components.CountryData
+import com.developer.ev2z.ui.components.allCountries
 import com.developer.ev2z.ui.components.CountryPickerDialog
 import com.developer.ev2z.ui.components.defaultCountry
 import kotlinx.coroutines.launch
+import com.developer.ev2z.theme.AppPageBg
 
 // ─────────────────────────────────────────────────────────────────
 // Design tokens
@@ -41,7 +43,7 @@ import kotlinx.coroutines.launch
 private val BrandGreen      = Color(0xFF34A853)
 private val GreenLight      = Color(0xFFE8F8ED)
 private val GreenMid        = Color(0xFFC4EDD0)
-private val BackgroundColor = Color(0xFFF6F6F6)
+private val BackgroundColor = AppPageBg
 private val CardColor       = Color.White
 private val TextPrimary     = Color(0xFF1E1E1E)
 private val TextSecondary   = Color(0xFF777777)
@@ -263,7 +265,7 @@ fun ParkingScreen(
             }
 
             RecentParkingsCard(
-                history  = history,
+                history          = history,
                 onDelete = { id, name ->
                     deleteTargetId   = id
                     deleteTargetName = name
@@ -278,9 +280,9 @@ fun ParkingScreen(
     // ── Edit Vehicle Dialog ───────────────────────────────────────
     editTargetItem?.let { item ->
         EditVehicleDialog(
-            item      = item,
+            item                = item,
             onDismiss = { editTargetItem = null },
-            onSave    = { type, number, alt1, alt2 ->
+            onSave    = { type, number, alt1, alt2, country ->
                 val id = item.id ?: return@EditVehicleDialog
                 viewModel.updateVehicle(
                     vehicleId       = id,
@@ -289,6 +291,8 @@ fun ParkingScreen(
                     phone           = item.phone ?: "",
                     alternatePhone1 = alt1.ifEmpty { null },
                     alternatePhone2 = alt2.ifEmpty { null },
+                    countryName     = country.name,
+                    countryCode     = country.dialCode,
                     onSuccess = {
                         editTargetItem = null
                         scope.launch { snackbarHostState.showSnackbar("Vehicle updated successfully") }
@@ -545,6 +549,10 @@ private fun ParkingFormCard(
                 imeAction       = ImeAction.Next,
                 keyboardActions = KeyboardActions(onNext = { onImeNext() })
             )
+
+            // National emergency numbers are registered globally for the
+            // selected country and shown on the public scan page only —
+            // they are intentionally not previewed in the registration form.
 
             Divider(color = BorderColor)
 
@@ -1040,7 +1048,7 @@ private fun RecentParkingsCard(
                 history.take(5).forEachIndexed { i, item ->
                     if (i > 0) Divider(color = BorderColor, thickness = 0.5.dp)
                     ParkingHistoryRow(
-                        item     = item,
+                        item      = item,
                         onDelete = {
                             item.id?.let { id -> onDelete(id, item.vehicle_type ?: "Vehicle") }
                         },
@@ -1395,14 +1403,29 @@ private fun ParkingHistoryRow(
 private fun EditVehicleDialog(
     item: ParkingData,
     onDismiss: () -> Unit,
-    onSave: (vehicleType: String, vehicleNumber: String, alternatePhone1: String, alternatePhone2: String) -> Unit
+    onSave: (
+        vehicleType: String,
+        vehicleNumber: String,
+        alternatePhone1: String,
+        alternatePhone2: String,
+        country: CountryData
+    ) -> Unit
 ) {
     var vehicleType     by remember { mutableStateOf(item.vehicle_type ?: "") }
     var vehicleNumber   by remember { mutableStateOf(item.vehicle_number ?: "") }
     val focusManager    = LocalFocusManager.current
 
-    var phone1Country   by remember { mutableStateOf(defaultCountry()) }
-    var phone2Country   by remember { mutableStateOf(defaultCountry()) }
+    // Restore the country stored with the registration; fall back to the default
+    val savedCountry = remember(item.country_code) {
+        item.country_code
+            ?.filter { it.isDigit() }
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { code -> allCountries.firstOrNull { it.dialCode.filter { c -> c.isDigit() } == code } }
+            ?: defaultCountry()
+    }
+
+    var phone1Country   by remember { mutableStateOf(savedCountry) }
+    var phone2Country   by remember { mutableStateOf(savedCountry) }
 
     // Strip stored dial-code prefix so only the local digits are shown
     fun stripDialCode(full: String?, country: CountryData): String {
@@ -1412,8 +1435,8 @@ private fun EditVehicleDialog(
         return if (digits.startsWith(prefix)) digits.drop(prefix.length) else digits
     }
 
-    var alternatePhone1 by remember { mutableStateOf(stripDialCode(item.alternate_phone_1 ?: item.phone, defaultCountry())) }
-    var alternatePhone2 by remember { mutableStateOf(stripDialCode(item.alternate_phone_2 ?: item.alternate_phone, defaultCountry())) }
+    var alternatePhone1 by remember { mutableStateOf(stripDialCode(item.alternate_phone_1 ?: item.phone, savedCountry)) }
+    var alternatePhone2 by remember { mutableStateOf(stripDialCode(item.alternate_phone_2 ?: item.alternate_phone, savedCountry)) }
 
     var showPhone1Picker by remember { mutableStateOf(false) }
     var showPhone2Picker by remember { mutableStateOf(false) }
@@ -1528,7 +1551,7 @@ private fun EditVehicleDialog(
                                 if (isSaveEnabled) {
                                     val p1 = "${phone1Country.dialCode.filter { it.isDigit() }}$alternatePhone1"
                                     val p2 = if (alternatePhone2.isNotBlank()) "${phone2Country.dialCode.filter { it.isDigit() }}$alternatePhone2" else ""
-                                    onSave(vehicleType, vehicleNumber, p1, p2)
+                                    onSave(vehicleType, vehicleNumber, p1, p2, phone1Country)
                                 }
                             })
                         )
@@ -1554,7 +1577,7 @@ private fun EditVehicleDialog(
                                 focusManager.clearFocus()
                                 val p1 = "${phone1Country.dialCode.filter { it.isDigit() }}$alternatePhone1"
                                 val p2 = if (alternatePhone2.isNotBlank()) "${phone2Country.dialCode.filter { it.isDigit() }}$alternatePhone2" else ""
-                                onSave(vehicleType, vehicleNumber, p1, p2)
+                                onSave(vehicleType, vehicleNumber, p1, p2, phone1Country)
                             },
                             enabled  = isSaveEnabled,
                             modifier = Modifier.weight(1f).height(48.dp),

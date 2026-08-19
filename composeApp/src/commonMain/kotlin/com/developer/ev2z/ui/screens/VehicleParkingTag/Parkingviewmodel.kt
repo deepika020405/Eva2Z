@@ -231,6 +231,8 @@ class ParkingViewModel(
                 alternatePhone1 = "${_phoneCountry.value.dialCode.filter { it.isDigit() }}${_phone.value}",
                 alternatePhone2 = _alternatePhone.value.ifEmpty { null }
                     ?.let { "${_alternatePhoneCountry.value.dialCode.filter { it.isDigit() }}$it" },
+                countryName     = _phoneCountry.value.name,
+                countryCode     = _phoneCountry.value.dialCode,
                 referralCode    = promoCode.ifEmpty { null }
             )
 
@@ -340,6 +342,8 @@ class ParkingViewModel(
         phone: String,
         alternatePhone1: String?,
         alternatePhone2: String?,
+        countryName: String,
+        countryCode: String,
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
@@ -351,7 +355,9 @@ class ParkingViewModel(
                     vehicleNumber   = vehicleNumber,
                     phone           = phone,
                     alternatePhone1 = alternatePhone1,
-                    alternatePhone2 = alternatePhone2
+                    alternatePhone2 = alternatePhone2,
+                    countryName     = countryName,
+                    countryCode     = countryCode
                 )
                 if (response.status) {
                     response.data?.let { updated ->

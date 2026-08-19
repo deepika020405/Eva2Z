@@ -30,14 +30,18 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.times
+import com.developer.ev2z.ui.screens.weather.CurrentWeather
+import com.developer.ev2z.ui.screens.weather.WeatherKind
+import com.developer.ev2z.ui.screens.weather.formatTemperature
 import kotlin.math.roundToInt
+import com.developer.ev2z.theme.AppPageBg
 
 // ─────────────────────────── COLORS ────────────────────────────────
 
 private val BrandGreen      = Color(0xFF00A859)
 private val BrandGreenDark  = Color(0xFF007A40)
 private val BrandGreenLight = Color(0xFFE6F7EF)
-private val BackgroundColor = Color(0xFFF4F6F9)
+private val BackgroundColor = AppPageBg
 private val CardWhite       = Color.White
 private val TextPrimary     = Color(0xFF111827)
 private val TextSecondary   = Color(0xFF6B7280)
@@ -100,7 +104,10 @@ fun HomeScreen(
     // Fuel rates for wherever the user currently is — null until a state is resolved.
     fuelLocationLabel: String = "your area",
     fuelPetrolPrice: Double? = null,
-    fuelDieselPrice: Double? = null
+    fuelDieselPrice: Double? = null,
+    onWeather: () -> Unit = {},
+    // Today's conditions for the button above the fuel card. Null until a fix lands.
+    weatherNow: CurrentWeather? = null
 ) {
     // Which locked section the user tapped — drives the popup content. null = no popup.
     var lockedDialogFor by remember { mutableStateOf<HomeSectionLock?>(null) }
@@ -120,13 +127,22 @@ fun HomeScreen(
             ) {
                 item { HomeHeader(userName, hPad, onOpenNotifications, unreadNotificationCount) }
                 item {
-                    FuelPriceHomeWidget(
-                        locationLabel = fuelLocationLabel,
-                        petrolPrice   = fuelPetrolPrice,
-                        dieselPrice   = fuelDieselPrice,
-                        onClick       = onFuelPrice,
-                        modifier      = Modifier.padding(horizontal = hPad)
-                    )
+                    Column(modifier = Modifier.padding(horizontal = hPad)) {
+                        // Sits above the fuel card, pushed to the right edge.
+                        Row(
+                            modifier              = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            WeatherHomeButton(now = weatherNow, onClick = onWeather)
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        FuelPriceHomeWidget(
+                            locationLabel = fuelLocationLabel,
+                            petrolPrice   = fuelPetrolPrice,
+                            dieselPrice   = fuelDieselPrice,
+                            onClick       = onFuelPrice
+                        )
+                    }
                 }
                 item {
                     ParkingTagSection(
@@ -174,6 +190,84 @@ fun HomeScreen(
             )
         }
     }
+}
+
+// ─────────────────────── WEATHER BUTTON ────────────────────────────
+
+/**
+ * Compact "today's weather" pill above the fuel price card. Shows the live temperature
+ * and condition once a fix lands, and a plain "Weather" prompt until then. Tapping it
+ * invokes [onClick] to open the full weather screen.
+ */
+@Composable
+fun WeatherHomeButton(
+    now: CurrentWeather?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val kind = now?.condition?.kind ?: WeatherKind.UNKNOWN
+    val isDay = now?.isDay ?: true
+    val accent = weatherAccentColor(kind, isDay)
+
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(accent.copy(alpha = 0.10f))
+            .border(1.dp, accent.copy(alpha = 0.35f), RoundedCornerShape(20.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector        = weatherHomeIcon(kind, isDay),
+            contentDescription = null,
+            tint               = accent,
+            modifier           = Modifier.size(16.dp)
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = if (now != null) {
+                "${formatTemperature(now.temperature)} · ${now.condition.label}"
+            } else {
+                "Today's weather"
+            },
+            fontSize   = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color      = TextPrimary,
+            maxLines   = 1,
+            overflow   = TextOverflow.Ellipsis
+        )
+        Spacer(Modifier.width(2.dp))
+        Icon(
+            imageVector        = Icons.Default.ChevronRight,
+            contentDescription = "Open weather updates",
+            tint               = accent,
+            modifier           = Modifier.size(15.dp)
+        )
+    }
+}
+
+private fun weatherHomeIcon(kind: WeatherKind, isDay: Boolean): ImageVector = when (kind) {
+    WeatherKind.CLEAR         -> if (isDay) Icons.Default.WbSunny else Icons.Default.DarkMode
+    WeatherKind.PARTLY_CLOUDY -> if (isDay) Icons.Default.WbCloudy else Icons.Default.NightsStay
+    WeatherKind.CLOUDY        -> Icons.Default.Cloud
+    WeatherKind.FOG           -> Icons.Default.BlurOn
+    WeatherKind.DRIZZLE       -> Icons.Default.Grain
+    WeatherKind.RAIN          -> Icons.Default.Umbrella
+    WeatherKind.SNOW          -> Icons.Default.AcUnit
+    WeatherKind.THUNDERSTORM  -> Icons.Default.Bolt
+    WeatherKind.UNKNOWN       -> Icons.Default.WbSunny
+}
+
+private fun weatherAccentColor(kind: WeatherKind, isDay: Boolean): Color = when {
+    !isDay -> Color(0xFF3F51B5)
+    kind == WeatherKind.CLEAR -> Color(0xFFF5A623)
+    kind == WeatherKind.PARTLY_CLOUDY -> Color(0xFF4A90D9)
+    kind == WeatherKind.CLOUDY || kind == WeatherKind.FOG -> Color(0xFF78909C)
+    kind == WeatherKind.DRIZZLE || kind == WeatherKind.RAIN -> Color(0xFF2F80ED)
+    kind == WeatherKind.SNOW -> Color(0xFF4FC3F7)
+    kind == WeatherKind.THUNDERSTORM -> Color(0xFF6C63A6)
+    else -> BrandGreen
 }
 
 // ─────────────────────── FUEL PRICE WIDGET ─────────────────────────

@@ -21,9 +21,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.developer.ev2z.theme.AppPageBg
 
 private object AppColors {
-    val Background     = Color(0xFFF8FAFC)
+    val Background     = AppPageBg
     val Card           = Color.White
     val Green          = Color(0xFF00A844)
     val GreenSoft      = Color(0xFFE8F7EE)

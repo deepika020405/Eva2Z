@@ -56,6 +56,7 @@ import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
 import org.jetbrains.compose.resources.painterResource
 import kotlin.math.min
+import com.developer.ev2z.theme.AppPageBg
 
 
 data class DeviceItem(
@@ -68,7 +69,7 @@ data class DeviceItem(
 private val DR_Primary = Color(0xFF6A9F50)
 private val DR_PrimaryDark = Color(0xFF4A7D39)
 private val DR_PrimaryBg = Color(0xFFF0F7EC)
-private val DR_Background = Color(0xFFF8FAF0)
+private val DR_Background = AppPageBg
 private val DR_Surface = Color(0xFFFFFFFF)
 private val DR_SectionBg = Color(0xFFF3F6F0)
 private val DR_Border = Color(0xFFE2E8DD)

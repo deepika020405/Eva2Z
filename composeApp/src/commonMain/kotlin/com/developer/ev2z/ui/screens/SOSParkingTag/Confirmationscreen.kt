@@ -20,9 +20,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.navigation.PlatformBackHandler
+import com.developer.ev2z.theme.AppPageBg
 
 // ── Light Green Palette ───────────────────────────────────────────
-private val LGBackground     = Color(0xFFF2FAF4)   // page bg
+private val LGBackground     = AppPageBg   // page bg
 private val LGSurface        = Color(0xFFE8F5E9)   // card / chip bg
 private val LGPrimary        = Color(0xFF43A047)   // buttons, icons
 private val LGPrimaryLight   = Color(0xFFC8E6C9)   // icon circle bg

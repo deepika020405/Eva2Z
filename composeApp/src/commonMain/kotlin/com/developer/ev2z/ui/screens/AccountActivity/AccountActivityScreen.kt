@@ -26,6 +26,7 @@ import com.developer.ev2z.ui.components.FloatingContactButton
 import com.developer.ev2z.util.AlertPrefs    // SMS toggle still uses this
 //import com.developer.ev2z.util.saveAlertPrefs // SMS toggle still uses this
 import kotlinx.coroutines.delay
+import com.developer.ev2z.theme.AppPageBg
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,7 +84,7 @@ fun AccountActivityScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White
+                    containerColor = AppPageBg
                 )
             )
         },
@@ -94,12 +95,12 @@ fun AccountActivityScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .background(Color(0xFFF5F5F5))
+                .background(AppPageBg)
         ) {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color(0xFFF5F5F5))
+                    .background(AppPageBg)
             ) {
                 item {
 

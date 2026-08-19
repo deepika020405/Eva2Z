@@ -19,7 +19,10 @@ data class VaultDocumentDetailResponse(
 
 @Serializable
 data class VaultDocumentDetail(
-    val id: Int? = null,
+    // Vault ids are UUID strings on the current server and numbers on older
+    // builds — read either shape rather than failing the whole payload.
+    @Serializable(with = IdAsStringSerializer::class)
+    val id: String? = null,
 
     @SerialName("created_at")
     val createdAt: String? = null,
@@ -33,6 +36,8 @@ data class VaultDocumentDetail(
     @SerialName("expiry_date")
     val expiryDate: String? = null,
 
+    // Sent as either 0.97 or "0.97" depending on the extraction backend.
+    @Serializable(with = IdAsStringSerializer::class)
     @SerialName("extraction_confidence")
     val extractionConfidence: String? = null,
 

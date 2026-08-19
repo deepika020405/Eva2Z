@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.navigation.PlatformBackHandler
+import com.developer.ev2z.theme.AppPageBg
 
 // ✅ FIXED: Only 3 parameters now
 @Composable
@@ -92,11 +93,11 @@ private fun DeviceListScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White
+                    containerColor = AppPageBg
                 )
             )
         },
-        containerColor = Color(0xFFF6F6F6)
+        containerColor = AppPageBg
     ) { padding ->
         Box(
             modifier = Modifier
@@ -298,11 +299,11 @@ private fun DeviceDetailFullScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White
+                    containerColor = AppPageBg
                 )
             )
         },
-        containerColor = Color(0xFFF6F6F6)
+        containerColor = AppPageBg
     ) { padding ->
         LazyColumn(
             modifier = Modifier

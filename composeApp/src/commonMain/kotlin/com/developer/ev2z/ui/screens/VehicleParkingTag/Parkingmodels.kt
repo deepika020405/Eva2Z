@@ -14,6 +14,8 @@ data class ParkingRequest(
     @SerialName("phone")              val phone: String,
     @SerialName("alternate_phone_1")  val alternate_phone_1: String,
     @SerialName("alternate_phone_2")  val alternate_phone_2: String? = null,
+    @SerialName("country_name")       val country_name: String,
+    @SerialName("country_code")       val country_code: String,
     @SerialName("refral_code")        val refral_code: String? = null)
 
 // ─────────────────────────────────────────────────────────────────
@@ -43,6 +45,8 @@ data class ParkingData(
     @SerialName("vehicle_number")    val vehicle_number: String?      = null,
     @SerialName("alternate_phone_1") val alternate_phone_1: String?   = null,
     @SerialName("alternate_phone_2") val alternate_phone_2: String?   = null,
+    @SerialName("country_name")      val country_name: String?        = null,
+    @SerialName("country_code")      val country_code: String?        = null,
     @SerialName("refral_code")       val refral_code: String? = null,   // ADD THIS
     // Keep old field names for backward compatibility with existing API responses
     @SerialName("phone")             val phone: String?               = null,
@@ -60,6 +64,8 @@ data class ParkingFieldErrors(
     @SerialName("vehicle_number")    val vehicle_number: List<String>?    = null,
     @SerialName("alternate_phone_1") val alternate_phone_1: List<String>? = null,
     @SerialName("alternate_phone_2") val alternate_phone_2: List<String>? = null,
+    @SerialName("country_name")      val country_name: List<String>?      = null,
+    @SerialName("country_code")      val country_code: List<String>?      = null,
     // Keep old field names for backward compatibility
     @SerialName("phone")             val phone: List<String>?             = null,
     @SerialName("alternate_phone")   val alternate_phone: List<String>?   = null

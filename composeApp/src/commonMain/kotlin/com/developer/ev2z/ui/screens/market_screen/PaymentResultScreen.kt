@@ -26,6 +26,7 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.delay
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import com.developer.ev2z.theme.AppPageBg
 
 class PaymentResultScreen(
     private val isSuccess: Boolean,
@@ -336,7 +337,7 @@ private fun OrderDetailsCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color(0xFFF8F9FA)
+            containerColor = AppPageBg
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {

@@ -271,3 +271,20 @@ val CardBg = Color(0xFFFFFFFF)
 
 
 val waningRed = Color(0xFC5457)
+
+
+// ─────────────────────── APP-WIDE SURFACES ───────────────────────
+//
+// There is no MaterialTheme wrapper in this app (see the commented-out EVA2ZTheme),
+// so screens set their own backgrounds. These are the shared tokens every screen's
+// page background points at, so the whole app can be retinted from one place.
+
+/**
+ * The page background for every screen — a very light green wash tinted from the brand
+ * green. Cards, sheets and app bars sit on top of it in [AppSurface] white, so content
+ * lifts off the page instead of blending into it.
+ */
+val AppPageBg = Color(0xFFF1F8F4)
+
+/** Card / sheet / app-bar white that sits on top of [AppPageBg]. */
+val AppSurface = Color(0xFFFFFFFF)

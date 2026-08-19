@@ -32,6 +32,7 @@ import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
 import kotlinx.datetime.*
 import org.jetbrains.compose.resources.painterResource
 import kotlin.time.ExperimentalTime
+import com.developer.ev2z.theme.AppPageBg
 
 @OptIn(ExperimentalMaterial3Api::class, kotlin.time.ExperimentalTime::class)
 @Composable
@@ -90,7 +91,7 @@ fun HistoryPlaybackScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFF9F9F9))
+                .background(AppPageBg)
         ) {
             if (routePoints.isNotEmpty()) {
                 HistoryMapView(

@@ -17,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.developer.ev2z.theme.AppPageBg
 
 enum class PaymentUiState {
     Success,
@@ -59,7 +60,7 @@ fun PaymentPlanScreen(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF5F6F8))
+            .background(AppPageBg)
     ) {
         val screenHeight = maxHeight
         val screenWidth = maxWidth

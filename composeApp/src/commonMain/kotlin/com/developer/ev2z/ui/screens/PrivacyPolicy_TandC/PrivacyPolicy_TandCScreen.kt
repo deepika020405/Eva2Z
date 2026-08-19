@@ -12,6 +12,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.navigation.PlatformBackHandler
+import com.developer.ev2z.theme.AppPageBg
 
 enum class WebViewType {
     PRIVACY_POLICY,
@@ -77,10 +78,11 @@ fun PrivacyPolicy_TandCScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White
+                    containerColor = AppPageBg
                 )
             )
-        }
+        },
+        containerColor = AppPageBg
     ) { padding ->
         Box(
             modifier = Modifier

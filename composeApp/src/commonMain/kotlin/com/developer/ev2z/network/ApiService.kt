@@ -63,6 +63,9 @@ class ApiService {
     private val gpsBaseUrl = "${KtorClient.SOCKET_SERVER_URL}/api/"
 
     companion object {
+        /** Open-Meteo forecast endpoint — open source, keyless, no bearer token. */
+        const val WEATHER_BASE_URL = "https://api.open-meteo.com/v1/forecast"
+
         /**
          * Resolves a possibly-relative image URL (e.g. "/storage/vault/x.jpeg")
          * returned by the API into an absolute URL against the app host.
@@ -538,6 +541,56 @@ class ApiService {
 
         } catch (e: Exception) {
             println("❌ Fuel Price ($state) Error: ${e.message}")
+            throw e
+        }
+    }
+
+    // ---------------- WEATHER ----------------
+    private val weatherJson = Json { ignoreUnknownKeys = true; isLenient = true }
+
+    /**
+     * Current conditions plus an hourly and 7-day forecast for a coordinate, from
+     * Open-Meteo — an open-source, keyless service, so this call bypasses [baseUrl]
+     * and carries no bearer token.
+     *
+     * `timezone=auto` makes every timestamp local to the coordinate, which is what the
+     * screen renders directly; without it the hour labels would be UTC.
+     */
+    suspend fun getWeatherForecast(lat: Double, lng: Double): WeatherForecastResponse {
+        println("🌐 API: Fetching weather for lat=$lat lng=$lng")
+
+        return try {
+            val response = client.get(WEATHER_BASE_URL) {
+                url {
+                    parameters.append("latitude", lat.toString())
+                    parameters.append("longitude", lng.toString())
+                    parameters.append(
+                        "current",
+                        "temperature_2m,relative_humidity_2m,apparent_temperature,is_day," +
+                            "precipitation,weather_code,wind_speed_10m,pressure_msl"
+                    )
+                    parameters.append(
+                        "hourly",
+                        "temperature_2m,weather_code,precipitation_probability"
+                    )
+                    parameters.append(
+                        "daily",
+                        "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset," +
+                            "precipitation_probability_max,wind_speed_10m_max,uv_index_max"
+                    )
+                    parameters.append("timezone", "auto")
+                    parameters.append("forecast_days", "7")
+                }
+                header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+            }
+
+            val raw = response.bodyAsText()
+            println("✔️ Weather Status: ${response.status}")
+
+            weatherJson.decodeFromString(WeatherForecastResponse.serializer(), raw)
+
+        } catch (e: Exception) {
+            println("❌ Weather Error: ${e.message}")
             throw e
         }
     }
@@ -1271,6 +1324,8 @@ class ApiService {
         phone: String,
         alternatePhone1: String,
         alternatePhone2: String? = null,
+        countryName: String,
+        countryCode: String,
         referralCode: String? = null
     ): ParkingResponse {
 
@@ -1283,6 +1338,8 @@ class ApiService {
             phone = phone.trim(),
             alternate_phone_1 = alternatePhone1.trim(),
             alternate_phone_2 = alternatePhone2?.trim()?.ifEmpty { null },
+            country_name = countryName.trim(),
+            country_code = countryCode.trim(),
             refral_code = referralCode?.trim()?.ifEmpty { null }
         )
 
@@ -1431,7 +1488,9 @@ class ApiService {
         vehicleNumber: String,
         phone: String,
         alternatePhone1: String?,
-        alternatePhone2: String?
+        alternatePhone2: String?,
+        countryName: String,
+        countryCode: String
     ): ParkingResponse {
         val token = AppTokenProvider.getToken()
         val url   = "${baseUrl}vehicle-parking/update/$vehicleId"
@@ -1441,7 +1500,9 @@ class ApiService {
             vehicle_number    = vehicleNumber.trim(),
             phone             = phone.trim(),
             alternate_phone_1 = alternatePhone1?.trim() ?: "",
-            alternate_phone_2 = alternatePhone2?.trim()?.ifEmpty { null }
+            alternate_phone_2 = alternatePhone2?.trim()?.ifEmpty { null },
+            country_name      = countryName.trim(),
+            country_code      = countryCode.trim()
         )
 
         println("🌐 updateVehicle → POST $url")
@@ -1472,6 +1533,7 @@ class ApiService {
             ParkingResponse(status = false, message = "Network error: ${e.message ?: "Unknown"}")
         }
     }
+
 
 
     // ─────────────────────────────────────────────────────────────────
@@ -1809,10 +1871,10 @@ class ApiService {
     }
 
     // ---------------- ACCEPT INCOMING CALL ----------------
-    // POST gps/call/accept  { "room_id": "..." }
+    // POST call/accept  { "room_id": "..." }
     suspend fun acceptCall(roomId: String): SosReplyResponse {
         val token = AppTokenProvider.getToken()
-        val url   = "${gpsBaseUrl}call/accept"
+        val url   = "${baseUrl}call/accept"
         val body  = buildJsonObject { put("room_id", roomId) }
         println("🌐 acceptCall → POST $url  room_id=$roomId")
         return try {
@@ -1840,10 +1902,10 @@ class ApiService {
     }
 
     // ---------------- DECLINE INCOMING CALL ----------------
-    // POST gps/call/decline  { "room_id": "..." }
+    // POST call/decline  { "room_id": "..." }
     suspend fun declineCall(roomId: String): SosReplyResponse {
         val token = AppTokenProvider.getToken()
-        val url   = "${gpsBaseUrl}call/decline"
+        val url   = "${baseUrl}call/decline"
         val body  = buildJsonObject { put("room_id", roomId) }
         println("🌐 declineCall → POST $url  room_id=$roomId")
         return try {
@@ -1875,7 +1937,7 @@ class ApiService {
     // Backend sends FCM to visitor and returns the room_id for WebRTC signaling.
     suspend fun initiateCall(chatId: Int): InitiateCallResponse {
         val token = AppTokenProvider.getToken()
-        val url   = "${gpsBaseUrl}owner/call/initiate"
+        val url   = "${baseUrl}owner/call/initiate"
         val body  = buildJsonObject { put("chat_id", chatId) }
         println("🌐 initiateCall → POST $url  chat_id=$chatId")
         return try {
@@ -2558,6 +2620,36 @@ class ApiService {
         println("📡 FCM API BODY: ${response.bodyAsText()}")
     }
 
+    // Removes this device from the push list.
+    //
+    // Deliberately usable without a live session: the session-expiry logout path has nothing
+    // but an already-rejected token, so a deregistration that needs valid auth can never run
+    // on the exact path where the device most needs removing. device_uuid + fcm_token identify
+    // the row on their own — the server must accept this pair the same way fcm/register does.
+    suspend fun deregisterFcmToken(
+        fcmToken:   String,
+        deviceUuid: String,
+        platform:   String = "android",
+        authHeader: String? = null
+    ) {
+        val response = client.post("${baseUrl}fcm/deregister") {
+            headers {
+                authHeader?.let { append("Authorization", it) }
+                append("Content-Type", "application/json")
+            }
+            setBody(
+                mapOf(
+                    "fcm_token"   to fcmToken,
+                    "device_uuid" to deviceUuid,
+                    "platform"    to platform
+                )
+            )
+        }
+
+        println("📡 FCM DEREGISTER STATUS: ${response.status}")
+        println("📡 FCM DEREGISTER BODY: ${response.bodyAsText()}")
+    }
+
     // ---------------- LOGOUT ----------------
     // Mirrors registerFcmToken()'s payload — the server needs device_uuid to delete the
     // exact row it created at register time. Sending fcm_token alone left stale rows behind.
@@ -2713,60 +2805,33 @@ class ApiService {
         vaultToken: String,
         authToken: String
     ) {
-        // Delete lives at vault/document/{id} (the file fetch is vault/{id}).
-        val url = "${baseUrl}vault/document/$documentId"
+        // The server exposes two delete routes. vault/{id} is the sibling of the
+        // working file fetch and resolves ids the same way; vault/document/{id}
+        // uses route-model binding that 404s on these ids. Prefer the first and
+        // keep the legacy path as a fallback.
+        suspend fun attempt(url: String): HttpResponse =
+            client.delete(url) {
+                header("X-Vault-Token", vaultToken)
+                header(HttpHeaders.Authorization, "Bearer $authToken")
+            }
 
-        val response = client.delete(url) {
-            header("X-Vault-Token", vaultToken)
-            header(HttpHeaders.Authorization, "Bearer $authToken")
-        }
+        var response = attempt("${baseUrl}vault/$documentId")
         println("🗑️ vault delete $documentId → ${response.status}")
 
+        if (response.status == HttpStatusCode.NotFound ||
+            response.status == HttpStatusCode.MethodNotAllowed
+        ) {
+            response = attempt("${baseUrl}vault/document/$documentId")
+            println("🗑️ vault/document delete $documentId → ${response.status}")
+        }
+
         if (!response.status.isSuccess()) {
+            val errorBody = try { response.bodyAsText() } catch (e: Exception) { "<no body>" }
+            println("❌ vault delete failed → $errorBody")
             throw Exception("Failed to delete document")
         }
     }
 
-
-    suspend fun reuploadDocument(
-        documentId: String,
-        vaultToken: String,
-        authToken: String,
-        encryptedFile: ByteArray,
-        fileName: String,
-        fileType: String,
-        salt: String,
-        iv: String,
-        authTag: String,
-        checksum: String
-    ): VaultUploadResponse {
-        val response = client.submitFormWithBinaryData(
-            url = "${baseUrl}reupload",
-            formData = formData {
-                append("id", documentId)
-                append("encrypted_file", encryptedFile, Headers.build {
-                    append(HttpHeaders.ContentType, "image/jpeg")
-                    append(
-                        HttpHeaders.ContentDisposition,
-                        "filename=\"$fileName.jpg\""
-                    )
-                })
-                append("file_name", fileName)
-                append("file_type", fileType)
-                append("salt", salt)
-                append("iv", iv)
-                append("auth_tag", authTag)
-                append("checksum", checksum)
-            }
-        ) {
-            headers {
-                append("X-Vault-Token", vaultToken)
-                append("Authorization", "Bearer $authToken")
-            }
-        }
-
-        return parseVaultUploadResponse(response)
-    }
 
     suspend fun uploadVaultDocument(
         vaultToken: String,
@@ -2825,8 +2890,8 @@ class ApiService {
 
                 encryptedFile?.let {
                     append("encrypted_file", it, Headers.build {
-                        append(HttpHeaders.ContentType, "image/png")
-                        append(HttpHeaders.ContentDisposition, "filename=\"$fileName.png\"")
+                        append(HttpHeaders.ContentType, fileType)
+                        append(HttpHeaders.ContentDisposition, "filename=\"$fileName.jpg\"")
                     })
                 }
 
