@@ -38,10 +38,12 @@ fun ChangePlanScreenHost(
     var sdkLaunched by remember { mutableStateOf(false) }
 
     LaunchedEffect(phonePeToken) {
-        if (phonePeToken != null && !sdkLaunched) {
+        val orderId = renewViewModel.phonePeOrderId
+        if (phonePeToken != null && orderId != null && !sdkLaunched) {
             sdkLaunched = true
             openPhonePeSdk(
-                paymentUrl = phonePeToken!!,
+                orderToken = phonePeToken!!,
+                orderId = orderId,
                 onResult = { result ->
                     renewViewModel.onPaymentResult(
                         success = result.success,

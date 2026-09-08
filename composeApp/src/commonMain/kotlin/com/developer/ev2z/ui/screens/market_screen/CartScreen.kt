@@ -137,9 +137,12 @@ private fun PremiumCartHeader(count: Int) {
                     Text("$count item${if (count != 1) "s" else ""}",
                         fontSize = 12.sp, color = P_Light)
                 }
-                Text("Continue Shopping", fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium, color = P_Green,
-                    modifier = Modifier.clickable { navigator.pop() })
+                Box(modifier = Modifier.size(38.dp).clip(CircleShape)
+                    .background(P_Bg).clickable { navigator.push(OrderHistoryScreen()) },
+                    contentAlignment = Alignment.Center) {
+                    Icon(Icons.Outlined.ReceiptLong, "My Orders",
+                        tint = P_Dark, modifier = Modifier.size(18.dp))
+                }
             }
             HorizontalDivider(color = P_Border, thickness = 0.5.dp)
         }
@@ -149,6 +152,7 @@ private fun PremiumCartHeader(count: Int) {
 // ── Empty Cart ─────────────────────────────────────────────────────
 @Composable
 private fun PremiumEmptyCart() {
+    val navigator = LocalNavigator.currentOrThrow
     Column(modifier = Modifier.fillMaxWidth().padding(top = 100.dp),
         horizontalAlignment = Alignment.CenterHorizontally) {
         Box(modifier = Modifier.size(80.dp).clip(CircleShape)
@@ -162,6 +166,17 @@ private fun PremiumEmptyCart() {
         Spacer(Modifier.height(6.dp))
         Text("Browse our GPS trackers to get started",
             fontSize = 14.sp, color = P_Light)
+        Spacer(Modifier.height(18.dp))
+        OutlinedButton(
+            onClick = { navigator.push(OrderHistoryScreen()) },
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = P_Green),
+            border = BorderStroke(1.dp, P_GreenBorder)
+        ) {
+            Icon(Icons.Outlined.ReceiptLong, null, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("View My Orders", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        }
     }
 }
 

@@ -107,10 +107,16 @@ import com.developer.ev2z.ui.screens.fuelPrice.FuelPriceScreen
 import com.developer.ev2z.ui.screens.fuelPrice.FuelPriceViewModel
 import com.developer.ev2z.ui.screens.weather.WeatherScreen
 import com.developer.ev2z.ui.screens.weather.WeatherViewModel
+import com.developer.ev2z.ui.screens.fastag.FastagFlow
+import com.developer.ev2z.ui.screens.fastag.FastagVehicleBalance
 import com.developer.ev2z.ui.screens.market_screen.ShopProduct
 import com.developer.ev2z.util.SosNotificationHandler
 import com.developer.ev2z.util.VaultExpiryBus
+import com.developer.ev2z.ui.screens.social_media.openUrl
 
+
+/** Government e-Challan portal opened by the Home "Check Challan" button. */
+private const val ECHALLAN_PORTAL_URL = "https://echallan.parivahan.gov.in/"
 
 // ------------------ TABS -------------------
 
@@ -147,6 +153,10 @@ class HomeTab(
         var showLiveLocation by rememberSaveable { mutableStateOf(false) }
         var showFuelPrice by rememberSaveable { mutableStateOf(false) }
         var showWeather by rememberSaveable { mutableStateOf(false) }
+        // FASTag recharge. Holds the vehicle the user tapped so its plate can prefill
+        // the issuer's form; null plate = opened from the "Link a FASTag" empty card.
+        var fastagVehicleNumber by rememberSaveable { mutableStateOf<String?>(null) }
+        var showFastag by rememberSaveable { mutableStateOf(false) }
         val fuelPriceViewModel = remember { FuelPriceViewModel() }
         val weatherViewModel = remember { WeatherViewModel() }
         // Shared by the home widget and the fuel screen so both show the same state.
@@ -218,6 +228,13 @@ class HomeTab(
                 onDismissLocationIssue = weatherViewModel::dismissLocationIssue
             )
 
+        } else if (showFastag) {
+
+            FastagFlow(
+                onExit = { showFastag = false },
+                vehicleNumber = fastagVehicleNumber
+            )
+
         } else {
 
             HomeScreen(
@@ -265,7 +282,24 @@ class HomeTab(
                 fuelPetrolPrice = fuelUiState.current?.petrolPrice,
                 fuelDieselPrice = fuelUiState.current?.dieselPrice,
                 onWeather = { showWeather = true },
-                weatherNow = weatherUiState.current
+                weatherNow = weatherUiState.current,
+                onCheckChallan = { openUrl(ECHALLAN_PORTAL_URL) },
+                // Balances need the FASTag endpoints on gps.eva2z.in; until they exist
+                // the section renders its "link a tag" card, which routes to the same
+                // recharge flow.
+                fastagVehicles = emptyList<FastagVehicleBalance>(),
+                onFastagRecharge = { vehicle ->
+                    fastagVehicleNumber = vehicle.vehicleNumber
+                    showFastag = true
+                },
+                onFastagViewAll = {
+                    fastagVehicleNumber = null
+                    showFastag = true
+                },
+                onLinkFastag = {
+                    fastagVehicleNumber = null
+                    showFastag = true
+                }
             )
         }
     }
@@ -978,7 +1012,11 @@ fun HomeNavGraph(
 
             CriminalVerificationFlow(
                 apiService = apiService,
-                onBack = { showCriminalVerification = false }
+                onBack = { showCriminalVerification = false },
+                onGoToDashboard = {
+                    showCriminalVerification = false
+                    selectedTabIndex = 0
+                }
             )
 
         } else if (showEditProfile) {
@@ -1059,9 +1097,7 @@ fun HomeNavGraph(
                 onOpenUpload = {
                     showDocuments = false
                     showUploadDocument = true
-                },
-                initialDocumentId = pendingVaultDocumentId,
-                onInitialDocumentConsumed = { pendingVaultDocumentId = null }
+                }
             )
 
         } else if (showManageDevice) {

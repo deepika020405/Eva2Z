@@ -67,6 +67,8 @@ class AddDeviceViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val deviceIdSave = if (deviceId.startsWith("0")) deviceId else "0$deviceId"
+                // SIM is 19 or 20 digits plus a "U" suffix, so this is 20 or 21 characters.
+                // Requires sim_number max:21 server-side; max:20 rejects 20-digit SIMs with 422.
                 val simNumSave = if (simNumber.endsWith("U")) simNumber else "${simNumber}U"
 
                 val body = buildJsonObject {

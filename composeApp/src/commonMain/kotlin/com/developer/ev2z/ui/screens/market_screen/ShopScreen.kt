@@ -107,7 +107,8 @@ fun ShopScreen(
     onBackClick: () -> Unit = {},
     onPlaceOrder: (ShopProduct) -> Unit = {},
     onAddToCart: (ShopProduct, String) -> Unit = { _, _ -> },
-    onCartClick: () -> Unit = {}
+    onCartClick: () -> Unit = {},
+    onOrdersClick: () -> Unit = {}
 ) {
     var selectedCategory  by remember { mutableStateOf("all") }
     var showPlanDetails   by remember { mutableStateOf(false) }
@@ -206,7 +207,13 @@ fun ShopScreen(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = if (cartCount > 0) 168.dp else 100.dp)
         ) {
-            item { ShopTopBar(cartCount = cartCount, onCartClick = onCartClick) }
+            item {
+                ShopTopBar(
+                    cartCount = cartCount,
+                    onCartClick = onCartClick,
+                    onOrdersClick = onOrdersClick
+                )
+            }
 
             item {
                 Spacer(Modifier.height(4.dp))
@@ -670,7 +677,7 @@ private fun DeviceTypeSheet(
 
 // ── Top Bar ──────────────────────────────────────────────────────
 @Composable
-private fun ShopTopBar(cartCount: Int, onCartClick: () -> Unit) {
+private fun ShopTopBar(cartCount: Int, onCartClick: () -> Unit, onOrdersClick: () -> Unit) {
     Surface(color = P_Bg, shadowElevation = 0.dp) {
         Row(
             modifier = Modifier
@@ -692,10 +699,13 @@ private fun ShopTopBar(cartCount: Int, onCartClick: () -> Unit) {
             Box(
                 modifier = Modifier
                     .size(40.dp).clip(CircleShape).background(P_ChipBg)
-                    .clickable { /* TODO open search */ },
+                    .clickable { onOrdersClick() },
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Search, null, tint = P_Dark, modifier = Modifier.size(20.dp))
+                Icon(
+                    Icons.Outlined.ReceiptLong, "My Orders",
+                    tint = P_Dark, modifier = Modifier.size(20.dp)
+                )
             }
             Spacer(Modifier.width(10.dp))
             Box {
@@ -1289,6 +1299,7 @@ fun ShopScreenHost(category: String? = null) {
         hasGpsDevice  = state.hasGpsDevice,
         hasParkingTag = state.hasParkingTag,
         onCartClick   = { navigator?.push(CartScreen()) },
+        onOrdersClick = { navigator?.push(OrderHistoryScreen()) },
         onAddToCart = { product, deviceType ->
             viewModel.addToCart(
                 add         = "add",

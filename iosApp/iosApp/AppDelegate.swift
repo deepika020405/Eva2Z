@@ -656,7 +656,13 @@ class AppDelegate: NSObject,
                 print("❌ VoIP token registration error:", err)
             } else {
                 let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
-                print("✅ VoIP token registered (HTTP \(code))")
+                if (200...299).contains(code) {
+                    print("✅ VoIP token registered (HTTP \(code))")
+                } else {
+                    // Previously printed a checkmark for every response, so a 401 read as success
+                    // while this device was in fact never added to the push list.
+                    print("❌ VoIP token registration rejected (HTTP \(code))")
+                }
             }
         }.resume()
     }

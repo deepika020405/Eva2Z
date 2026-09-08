@@ -22,10 +22,13 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.developer.ev2z.navigation.PlatformBackHandler
+import com.developer.ev2z.ui.components.dismissKeyboardOnTap
+import com.developer.ev2z.ui.components.screenHeightDp
 import com.developer.ev2z.util.Analytics
 import kotlinx.coroutines.launch
 import com.developer.ev2z.theme.AppPageBg
@@ -254,6 +257,22 @@ fun AddDeviceCommon(
     }
 }
 
+// SIM numbers are 19 or 20 digits followed by a "U" suffix. Both lengths are valid.
+private const val SIM_MIN_DIGITS = 19
+private const val SIM_MAX_DIGITS = 20
+
+/** The digits without the trailing "U", so length checks are independent of the suffix. */
+private fun String.simDigits() = removeSuffix("U")
+
+private fun String.isValidSimNumber() = simDigits().let { digits ->
+    digits.length in SIM_MIN_DIGITS..SIM_MAX_DIGITS && digits.all { it.isDigit() }
+}
+
+/** Allows partially-typed values (digits, optional trailing "U") while blocking overlong input. */
+private fun String.isTypableSimNumber() =
+    simDigits().let { it.length <= SIM_MAX_DIGITS && it.all { c -> c.isDigit() } } &&
+            (!endsWith("U") || length > 1)
+
 // ✅ COMMON AddDeviceDetails
 @Composable
 fun AddDeviceDetailsCommon(
@@ -290,163 +309,168 @@ fun AddDeviceDetailsCommon(
         }
     }
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(AppPageBg)
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
-    ) {
-//        IconButton(
-//            onClick = { onNavigate("back") },
-//            modifier = Modifier
-//                .size(40.dp)
-//                .clip(CircleShape)
-//                .background(Color.White)
-//                .border(2.dp, Color.Gray, CircleShape)
-//        ) {
-//            Icon(Icons.AutoMirrored.Filled.KeyboardBackspace, "Close", tint = Color.Black)
-//        }
+    val focusManager = LocalFocusManager.current
+    // Measured on the window so the sizing is about the device, not this composable's slot.
+    val isCompact = screenHeightDp() < 700.dp
+    val verticalGap = if (isCompact) 14.dp else 24.dp
+    val logoSize = if (isCompact) 56.dp else 75.dp
 
-        Image(Icons.Filled.AccountCircle, "logo", contentScale = ContentScale.Fit, modifier = Modifier.size(75.dp))
+    BoxWithConstraints(Modifier.fillMaxSize().background(AppPageBg)) {
+        val horizontalPad = (maxWidth * 0.06f).coerceIn(16.dp, 32.dp)
 
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            Modifier
+                .fillMaxSize()
+                // systemBarsPadding keeps content clear of the iOS notch and home indicator,
+                // which Compose does not inset automatically there.
+                .systemBarsPadding()
+                // imePadding before the scroll so the keyboard shrinks the viewport — that
+                // is what lets the focused field scroll itself into view.
+                .imePadding()
+                .verticalScroll(rememberScrollState())
+                .dismissKeyboardOnTap(focusManager)
+                .padding(horizontal = horizontalPad, vertical = if (isCompact) 16.dp else 24.dp),
+            verticalArrangement = Arrangement.spacedBy(verticalGap)
         ) {
-            Column(Modifier.weight(0.6f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Add Device Details", style = MaterialTheme.typography.titleLarge, color = Color.Black)
-                Text("All fields required", style = MaterialTheme.typography.titleMedium, color = Color.Black)
+            Image(Icons.Filled.AccountCircle, "logo", contentScale = ContentScale.Fit, modifier = Modifier.size(logoSize))
+
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(0.6f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Add Device Details", style = MaterialTheme.typography.titleLarge, color = Color.Black)
+                    Text("All fields required", style = MaterialTheme.typography.titleMedium, color = Color.Black)
+                }
+
+    //            TextButton(onClick = { onNavigate("addDevice") }, modifier = Modifier.weight(0.4f)) {
+    //                Text("Scan", style = MaterialTheme.typography.titleMedium, color = primaryContainerLight)
+    //            }
             }
 
-//            TextButton(onClick = { onNavigate("addDevice") }, modifier = Modifier.weight(0.4f)) {
-//                Text("Scan", style = MaterialTheme.typography.titleMedium, color = primaryContainerLight)
-//            }
-        }
-
-        OutlinedTextField(
-            deviceName,
-            { deviceName = it },
-            label = { Text("Enter Vehicle Name") },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            shape = RoundedCornerShape(8.dp)
-        )
-
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
-                deviceId,
-                { if (it.all { c -> c.isDigit() } && it.length <= 16) deviceId = it },
-                label = { Text("Device ID") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.weight(1f),
+                deviceName,
+                { deviceName = it },
+                label = { Text("Enter Vehicle Name") },
+                modifier = Modifier.fillMaxWidth(),
                 singleLine = true,
-                shape = RoundedCornerShape(8.dp),
-                isError = deviceId.isNotEmpty() && deviceId.length < 15,
-                supportingText = {
-                    if (deviceId.isNotEmpty() && deviceId.length < 15) {
-                        Text("Device ID must be 15-16 digits", color = Color.Red, style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-            )
-            Icon(Icons.Outlined.Info, "Info", tint = Color.Black, modifier = Modifier.size(24.dp))
-        }
-
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                simNumber,
-                { newValue ->
-                    val withoutU = newValue.removeSuffix("U")
-                    if (withoutU.all { it.isDigit() } && withoutU.length <= 20) {
-                        if (newValue.matches(Regex("^[0-9]*U?$"))) {
-                            simNumber = newValue
-                        }
-                    }
-                },
-                label = { Text("Sim Number") },
-                modifier = Modifier.weight(1f),
-                singleLine = true,
-                shape = RoundedCornerShape(8.dp),
-                isError = simNumber.isNotEmpty() && simNumber.removeSuffix("U").length < 21,
-                supportingText = {
-                    if (simNumber.isNotEmpty() && simNumber.removeSuffix("U").length < 21) {
-                        Text("SIM Number must be 20-21 digits", color = Color.Red, style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-            )
-            Icon(Icons.Outlined.Info, "Info", tint = Color.Black, modifier = Modifier.size(24.dp))
-        }
-
-        ExposedDropdownMenuBox(expanded, { expanded = !expanded }, Modifier.fillMaxWidth()) {
-            OutlinedTextField(
-                deviceType,
-                {},
-                readOnly = true,
-                label = { Text("Device Type") },
-                placeholder = { Text("Select device type", color = Color.Gray) },
-                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = primaryContainerLight,
-                    unfocusedBorderColor = Color.Gray
-                ),
-                modifier = Modifier.menuAnchor().fillMaxWidth(),
                 shape = RoundedCornerShape(8.dp)
             )
 
-            ExposedDropdownMenu(expanded, { expanded = false }, Modifier.background(Color.White)) {
-                deviceTypes.forEach { type ->
-                    DropdownMenuItem(
-                        { Text(type, style = MaterialTheme.typography.bodyLarge) },
-                        { deviceType = type; expanded = false },
-                        Modifier.fillMaxWidth()
-                    )
-                    if (type != deviceTypes.last()) {
-                        HorizontalDivider(color = Color.LightGray, thickness = 0.5.dp)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    deviceId,
+                    { if (it.all { c -> c.isDigit() } && it.length <= 16) deviceId = it },
+                    label = { Text("Device ID") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    shape = RoundedCornerShape(8.dp),
+                    isError = deviceId.isNotEmpty() && deviceId.length < 15,
+                    supportingText = {
+                        if (deviceId.isNotEmpty() && deviceId.length < 15) {
+                            Text("Device ID must be 15-16 digits", color = Color.Red, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                )
+                Icon(Icons.Outlined.Info, "Info", tint = Color.Black, modifier = Modifier.size(24.dp))
+            }
+
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    simNumber,
+                    { newValue ->
+                        if (newValue.isTypableSimNumber()) {
+                            simNumber = newValue
+                        }
+                    },
+                    label = { Text("Sim Number") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    shape = RoundedCornerShape(8.dp),
+                    isError = simNumber.isNotEmpty() && !simNumber.isValidSimNumber(),
+                    supportingText = {
+                        if (simNumber.isNotEmpty() && !simNumber.isValidSimNumber()) {
+                            Text("SIM Number must be 19 or 20 digits", color = Color.Red, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                )
+                Icon(Icons.Outlined.Info, "Info", tint = Color.Black, modifier = Modifier.size(24.dp))
+            }
+
+            ExposedDropdownMenuBox(expanded, { expanded = !expanded }, Modifier.fillMaxWidth()) {
+                OutlinedTextField(
+                    deviceType,
+                    {},
+                    readOnly = true,
+                    label = { Text("Device Type") },
+                    placeholder = { Text("Select device type", color = Color.Gray) },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = primaryContainerLight,
+                        unfocusedBorderColor = Color.Gray
+                    ),
+                    modifier = Modifier.menuAnchor().fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp)
+                )
+
+                ExposedDropdownMenu(expanded, { expanded = false }, Modifier.background(Color.White)) {
+                    deviceTypes.forEach { type ->
+                        DropdownMenuItem(
+                            { Text(type, style = MaterialTheme.typography.bodyLarge) },
+                            { deviceType = type; expanded = false },
+                            Modifier.fillMaxWidth()
+                        )
+                        if (type != deviceTypes.last()) {
+                            HorizontalDivider(color = Color.LightGray, thickness = 0.5.dp)
+                        }
                     }
                 }
             }
-        }
 
-        Text(
-            "* Your Device will be activated within in 24 hours",
-            modifier = Modifier.alpha(0.7f).fillMaxWidth(),
-            style = MaterialTheme.typography.bodySmall,
-            textAlign = TextAlign.Center
-        )
+            Text(
+                "* Your Device will be activated within in 24 hours",
+                modifier = Modifier.alpha(0.7f).fillMaxWidth(),
+                style = MaterialTheme.typography.bodySmall,
+                textAlign = TextAlign.Center
+            )
 
-        errorMessage?.let {
-            Text(it, color = Color.Red, style = MaterialTheme.typography.bodySmall, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
-        }
-
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            TextButton(
-                { onNavigate("home") },
-                Modifier.weight(0.3f).border(1.dp, Color.Gray, RoundedCornerShape(100.dp))
-            ) {
-                Text("Cancel", color = Color.Black)
+            errorMessage?.let {
+                Text(it, color = Color.Red, style = MaterialTheme.typography.bodySmall, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
             }
 
-            Spacer(Modifier.width(16.dp))
-
-            Button(
-                {
-                    val isDeviceIdValid = deviceId.length in 15..16
-                    val isSimNumberValid = simNumber.removeSuffix("U").length in 19..20
-
-                    if (deviceName.isNotEmpty() && isDeviceIdValid && isSimNumberValid && deviceType.isNotEmpty()) {
-                        viewModel.addDevice(authToken, deviceName, deviceId, simNumber, deviceType.lowercase())
-                    }
-                },
-                enabled = !isLoading && deviceName.isNotEmpty() && deviceId.length in 15..16 &&
-                        simNumber.removeSuffix("U").length in 19..20 && deviceType.isNotEmpty(),
-                modifier = Modifier.weight(0.7f),
-                colors = ButtonDefaults.buttonColors(containerColor = primaryContainerLight),
-                shape = RoundedCornerShape(100.dp)
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(if (isLoading) "Adding..." else "Add Device", color = Color.White)
+                TextButton(
+                    { onNavigate("home") },
+                    Modifier.weight(0.35f).border(1.dp, Color.Gray, RoundedCornerShape(100.dp))
+                ) {
+                    Text("Cancel", color = Color.Black, maxLines = 1)
+                }
+
+                Button(
+                    {
+                        val isDeviceIdValid = deviceId.length in 15..16
+
+                        if (deviceName.isNotEmpty() && isDeviceIdValid && simNumber.isValidSimNumber() && deviceType.isNotEmpty()) {
+                            viewModel.addDevice(authToken, deviceName, deviceId, simNumber, deviceType.lowercase())
+                        }
+                    },
+                    enabled = !isLoading && deviceName.isNotEmpty() && deviceId.length in 15..16 &&
+                            simNumber.isValidSimNumber() && deviceType.isNotEmpty(),
+                    modifier = Modifier.weight(0.65f),
+                    colors = ButtonDefaults.buttonColors(containerColor = primaryContainerLight),
+                    shape = RoundedCornerShape(100.dp)
+                ) {
+                    Text(if (isLoading) "Adding..." else "Add Device", color = Color.White, maxLines = 1)
+                }
             }
+
+            // Keeps the action row clear of the keyboard once it is scrolled to the bottom.
+            Spacer(Modifier.height(if (isCompact) 8.dp else 16.dp))
         }
     }
 }

@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,9 +25,13 @@ import cafe.adriel.voyager.core.screen.Screen
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import coil3.compose.AsyncImage
-import kotlinx.coroutines.delay
-import org.jetbrains.compose.ui.tooling.preview.Preview
+import com.developer.ev2z.data.local.StoredOrderAddress
+import com.developer.ev2z.data.local.StoredOrderItem
+import com.developer.ev2z.repository.formatOrderDate
 import com.developer.ev2z.theme.AppPageBg
+
+/** Express shipping window quoted on the confirmation screen. */
+private const val EXPECTED_DELIVERY_MS = 5L * 24 * 60 * 60 * 1000
 
 class PaymentResultScreen(
     private val isSuccess: Boolean,
@@ -56,12 +61,13 @@ fun PaymentResultContent(
     val navigator = LocalNavigator.currentOrThrow
     val viewModel = ShopViewModelProvider.viewModel
     val state by viewModel.state.collectAsState()
+    // The cart is emptied the moment payment succeeds, so the ordered items come from the
+    // order the ViewModel built at payment time — that is what actually holds them.
+    val placedOrder by viewModel.lastPlacedOrder.collectAsState()
     val scrollState = rememberScrollState()
 
-    // ✅ Auto-navigate back after 5 seconds ONLY on success
-    LaunchedEffect(isSuccess) {
+    LaunchedEffect(isSuccess, placedOrder) {
         if (isSuccess) {
-
             Analytics.logEvent(
                 name = "purchase",
                 params = mapOf(
@@ -71,22 +77,18 @@ fun PaymentResultContent(
                         ?: state.finalAmount?.toDoubleOrNull()
                         ?: state.totalPrice?.toDoubleOrNull()
                         ?: 0.0),
-                    "items" to state.cart.mapIndexed { index, item ->
+                    "items" to (placedOrder?.items.orEmpty()).mapIndexed { index, item ->
                         mapOf(
-                            "item_id" to (item.product?.id?.toString() ?: ""),
-                            "item_name" to (item.product?.name ?: ""),
+                            "item_id" to item.productId.toString(),
+                            "item_name" to item.name,
                             "item_category" to "iot_devices",
-                            "price" to (item.product?.sale_price?.toDoubleOrNull() ?: 0.0),
+                            "price" to (item.price.toDoubleOrNull() ?: 0.0),
                             "quantity" to item.quantity,
                             "index" to index
                         )
                     }
                 )
             )
-
-            delay(5000)
-            viewModel.resetPaymentState()
-            navigator.popUntilRoot()
         }
     }
 
@@ -128,7 +130,9 @@ fun PaymentResultContent(
 
             // Description
             Text(
-                text = "Your order has been placed successfully.\nThank you for shopping with us!",
+                text = placedOrder?.let {
+                    "Order #${it.orderId} has been placed successfully.\nYou can track it any time from My Orders."
+                } ?: "Your order has been placed successfully.\nThank you for shopping with us!",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.Gray,
                 fontSize = 14.sp,
@@ -140,19 +144,24 @@ fun PaymentResultContent(
 
             // Order Details Card
             OrderDetailsCard(
-                cartItems = state.cart,
-                totalAmount = amount ?: state.finalAmount ?: state.totalPrice ?: "0",
+                items = placedOrder?.items.orEmpty(),
+                totalAmount = placedOrder?.totalAmount
+                    ?: amount ?: state.finalAmount ?: state.totalPrice ?: "0",
+                orderDate = formatOrderDate(placedOrder?.placedAt ?: 0L),
+                expectedDelivery = placedOrder?.placedAt
+                    ?.let { formatOrderDate(it + EXPECTED_DELIVERY_MS) },
                 transactionId = transactionId,
-                shippingAddress = state.selectedAddress
+                shippingAddress = placedOrder?.address
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(28.dp))
 
-            // Back to Home Button
+            // Track Order — opens the order in My Orders
             Button(
                 onClick = {
                     viewModel.resetPaymentState()
-                    navigator.popUntilRoot()
+                    // replace, not push — back should land on the shop, not on this screen again
+                    navigator.replace(OrderHistoryScreen(highlightOrderId = placedOrder?.orderId))
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -163,15 +172,44 @@ fun PaymentResultContent(
                 shape = RoundedCornerShape(28.dp)
             ) {
                 Icon(
-                    Icons.Default.Home,
-                    contentDescription = "Home",
+                    Icons.Outlined.ReceiptLong,
+                    contentDescription = null,
                     tint = Color.White,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Back to Home",
+                    text = "Track Order",
                     color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Back to Home Button
+            OutlinedButton(
+                onClick = {
+                    viewModel.resetPaymentState()
+                    navigator.popUntilRoot()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = Color(0xFF6A9F50)
+                ),
+                shape = RoundedCornerShape(28.dp)
+            ) {
+                Icon(
+                    Icons.Default.Home,
+                    contentDescription = "Home",
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Back to Home",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold
                 )
@@ -328,10 +366,12 @@ fun PaymentResultContent(
 
 @Composable
 private fun OrderDetailsCard(
-    cartItems: List<com.developer.ev2z.response.CartItemDto>,
+    items: List<StoredOrderItem>,
     totalAmount: String,
+    orderDate: String,
+    expectedDelivery: String?,
     transactionId: String?,
-    shippingAddress: BillingAddress?
+    shippingAddress: StoredOrderAddress?
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -358,7 +398,7 @@ private fun OrderDetailsCard(
             Spacer(modifier = Modifier.height(20.dp))
 
             // Order Items
-            cartItems.forEach { item ->
+            items.forEach { item ->
                 OrderItemRow(item = item)
                 Spacer(modifier = Modifier.height(16.dp))
             }
@@ -369,28 +409,29 @@ private fun OrderDetailsCard(
             Spacer(modifier = Modifier.height(16.dp))
 
             // Order Information
-            OrderInfoRow(label = "Total Amount", value = "₹$totalAmount", highlight = true)
+            OrderInfoRow(
+                label = "Total Amount",
+                value = "₹${totalAmount.toDoubleOrNull()?.toInt() ?: totalAmount}",
+                highlight = true
+            )
             Spacer(modifier = Modifier.height(12.dp))
 
             OrderInfoRow(label = "Delivery Method", value = "Express Shipping")
             Spacer(modifier = Modifier.height(12.dp))
 
-            OrderInfoRow(
-                label = "Order Date",
-                value = getCurrentDate()
-            )
-            Spacer(modifier = Modifier.height(12.dp))
+            OrderInfoRow(label = "Order Date", value = orderDate)
 
-            OrderInfoRow(
-                label = "Expected Delivery",
-                value = getExpectedDeliveryDate()
-            )
-            Spacer(modifier = Modifier.height(12.dp))
+            if (expectedDelivery != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                OrderInfoRow(label = "Expected Delivery", value = "by $expectedDelivery")
+            }
 
             if (transactionId != null) {
-                OrderInfoRow(label = "Transaction ID", value = transactionId)
                 Spacer(modifier = Modifier.height(12.dp))
+                OrderInfoRow(label = "Transaction ID", value = transactionId)
             }
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             OrderInfoRow(
                 label = "Shipping Address",
@@ -403,8 +444,8 @@ private fun OrderDetailsCard(
 }
 
 @Composable
-private fun OrderItemRow(item: com.developer.ev2z.response.CartItemDto) {
-    val salePrice = item.product?.sale_price?.toDoubleOrNull() ?: 0.0
+private fun OrderItemRow(item: StoredOrderItem) {
+    val salePrice = item.price.toDoubleOrNull() ?: 0.0
     val fakeOldPrice = (salePrice * 1.5).toInt()
 
     Row(
@@ -419,8 +460,8 @@ private fun OrderItemRow(item: com.developer.ev2z.response.CartItemDto) {
         ) {
             // Product Image
             AsyncImage(
-                model = item.product?.image.orEmpty(),
-                contentDescription = item.product?.name,
+                model = item.imageUrl,
+                contentDescription = item.name,
                 modifier = Modifier
                     .size(60.dp)
                     .clip(RoundedCornerShape(12.dp))
@@ -430,7 +471,7 @@ private fun OrderItemRow(item: com.developer.ev2z.response.CartItemDto) {
             // Product Name & Quantity
             Column {
                 Text(
-                    text = item.product?.name ?: "",
+                    text = item.name,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = Color.Black,
@@ -522,14 +563,4 @@ private fun DashedDivider() {
     }
 }
 
-// Helper functions
-private fun getCurrentDate(): String {
-    // In real app, use kotlinx-datetime
-    return "January 15, 2025"
-}
-
-private fun getExpectedDeliveryDate(): String {
-    // In real app, calculate 2-3 days from current date
-    return "January 17, 2025"
-}
 

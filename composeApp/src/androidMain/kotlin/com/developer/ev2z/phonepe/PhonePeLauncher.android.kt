@@ -6,7 +6,8 @@ import android.util.Log
 import com.developer.ev2z.ActivityProvider
 
 actual fun openPhonePeSdk(
-    paymentUrl: String, // orderToken
+    orderToken: String,
+    orderId: String,
     onResult: (PaymentResult) -> Unit
 ) {
     Log.d("PhonePe", "🚀 Android PhonePe launcher called")
@@ -18,9 +19,8 @@ actual fun openPhonePeSdk(
     }
 
     try {
-        val orderToken = paymentUrl
-        val orderId = "OMO${System.currentTimeMillis()}"
-
+        // Both come from the create-order response. The order id used to be minted here
+        // as "OMO${System.currentTimeMillis()}", which matches no order on PhonePe's side.
         Log.d("PhonePe", "🔑 Order Token: ${orderToken.take(50)}...")
         Log.d("PhonePe", "🆔 Order ID: $orderId")
 

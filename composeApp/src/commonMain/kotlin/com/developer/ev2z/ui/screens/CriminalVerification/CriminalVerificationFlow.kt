@@ -44,7 +44,8 @@ internal val CV_Info = Color(0xFF4A90D9)
 @Composable
 fun CriminalVerificationFlow(
     apiService: ApiService,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onGoToDashboard: () -> Unit = onBack
 ) {
     val userPrefs = remember { UserPrefs(createStorageManager()) }
     val vm = remember { CriminalVerificationViewModel(apiService, userPrefs) }
@@ -151,6 +152,7 @@ fun CriminalVerificationFlow(
                     vm.paymentToken?.let { token ->
                         CriminalPaymentScreen(
                             paymentToken = token,
+                            phonepeOrderId = vm.phonepeOrderId.orEmpty(),
                             amount = vm.amount,
                             onSuccess = { txnId ->
                                 scope.launch { vm.onPaymentSuccess(txnId ?: "") }
@@ -186,7 +188,7 @@ fun CriminalVerificationFlow(
                         reportUrl = vm.reportUrl,
                         candidateName = vm.searchedCandidateName,
                         courtResult = vm.courtCheckResult,
-                        onDone = { },
+                        onDone = onGoToDashboard,
                         onNewVerification = { vm.reset() }
                     )
                 }

@@ -19,12 +19,21 @@ import kotlinx.serialization.Serializable
  * the current server, so it is read through [IdAsStringSerializer] — a plain
  * `Int` field made the whole response fail to parse, silently discarding the
  * new document's id, type and expiry.
- * Rejection (document failed server-side validation):
+ * Rejection (document failed server-side validation). The server emits two
+ * different shapes for this — the older `document_rejected` form:
  * ```
  * { "success": false, "error": "document_rejected",
  *   "reason": "wrong_document_type:expected_dl_got_puc",
  *   "detected_type": "puc", "message": "Document validation failed." }
  * ```
+ * and the current `document_type_mismatch` form, which drops `reason` and names
+ * the expected type in its own field (types come back upper-case here):
+ * ```
+ * { "success": false, "error": "document_type_mismatch",
+ *   "message": "Please upload a valid RC document.",
+ *   "requested_type": "RC", "detected_type": "UNKNOWN" }
+ * ```
+ * Both are handled — see [isWrongDocumentType] and [expectedType].
  */
 @Serializable
 data class VaultUploadResponse(
@@ -54,14 +63,32 @@ data class VaultUploadResponse(
 
     @SerialName("detected_type")
     val detectedType: String? = null,
+
+    @SerialName("requested_type")
+    val requestedType: String? = null,
 ) {
-    /** The type the server expected, parsed from `reason` e.g. `wrong_document_type:expected_dl_got_puc`. */
+    /**
+     * The type the server expected: from `requested_type` on the current
+     * contract, else parsed out of `reason` (`wrong_document_type:expected_dl_got_puc`)
+     * on the older one.
+     */
     val expectedType: String?
-        get() = reason
-            ?.substringAfter("expected_", "")
-            ?.substringBefore("_got_", "")
-            ?.takeIf { it.isNotBlank() }
+        get() = requestedType?.takeIf { it.isNotBlank() }
+            ?: reason
+                ?.substringAfter("expected_", "")
+                ?.substringBefore("_got_", "")
+                ?.takeIf { it.isNotBlank() }
 
     val isWrongDocumentType: Boolean
-        get() = error == "document_rejected" && reason?.startsWith("wrong_document_type") == true
+        get() = error == "document_type_mismatch" ||
+                (error == "document_rejected" && reason?.startsWith("wrong_document_type") == true)
+
+    /**
+     * True when the server rejected the upload without recognising what the
+     * photo actually is — `detected_type: "UNKNOWN"`, or absent. Worth telling
+     * apart from a real mismatch: the user needs a clearer photo, not a
+     * different document.
+     */
+    val detectedTypeIsUnknown: Boolean
+        get() = detectedType.isNullOrBlank() || detectedType.equals("unknown", ignoreCase = true)
 }

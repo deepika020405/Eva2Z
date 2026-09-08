@@ -39,6 +39,7 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
@@ -2616,8 +2617,16 @@ class ApiService {
             )
         }
 
+        val body = response.bodyAsText()
         println("📡 FCM API STATUS: ${response.status}")
-        println("📡 FCM API BODY: ${response.bodyAsText()}")
+        println("📡 FCM API BODY: $body")
+
+        // The client is not configured with expectSuccess, so a rejected registration used to
+        // fall through and be logged as a success by the caller. Fail loudly instead: a
+        // non-2xx here means this device is not on the push list.
+        if (!response.status.isSuccess()) {
+            throw Exception("fcm/register rejected (${response.status}): ${body.take(200)}")
+        }
     }
 
     // Removes this device from the push list.
@@ -2729,12 +2738,22 @@ class ApiService {
                 throw Exception("Failed to fetch documents")
             }
 
-            // ✅ Deserialize list
-            kotlinx.serialization.json.Json {
-                ignoreUnknownKeys = true
-            }.decodeFromString(
+            // The server returns either a bare array (older builds) or a
+            // wrapper `{"success":true,"data":[...]}`. Decoding the wrapper as
+            // a list throws, and the catch below turns that into an empty
+            // list — i.e. a vault full of documents shows up as empty.
+            val json = Json { ignoreUnknownKeys = true }
+            val element = json.parseToJsonElement(raw)
+            val array = when (element) {
+                is JsonArray  -> element
+                is JsonObject -> element["data"] as? JsonArray
+                    ?: throw Exception("Vault list has no 'data' array: $raw")
+                else          -> throw Exception("Unexpected vault list payload: $raw")
+            }
+
+            json.decodeFromJsonElement(
                 ListSerializer(VaultDocumentDto.serializer()),
-                raw
+                array
             )
 
         } catch (e: Exception) {
@@ -2792,9 +2811,13 @@ class ApiService {
         }
 
         if (response.status != HttpStatusCode.OK) {
+            // Laravel answers this route with a full stack trace; log only the message so a
+            // routine 404 (the server no longer stores the encrypted blob — callers fall back
+            // to `image_url`) doesn't dump hundreds of lines into the console.
             val errorBody = try { response.bodyAsText() } catch (e: Exception) { "<no body>" }
-            println("❌ vault/$documentId ${response.status} → $errorBody")
-            throw Exception("Failed to fetch document (${response.status}): $errorBody")
+            val summary = errorBody.take(200)
+            println("❌ vault/$documentId ${response.status} → $summary")
+            throw Exception("Failed to fetch document (${response.status}): $summary")
         }
 
         return response.body()
@@ -2844,6 +2867,7 @@ class ApiService {
         authTag: String,
         checksum: String
     ): VaultUploadResponse {
+        logVaultPayload("upload", encryptedFile, fileName, fileType)
         val response = client.submitFormWithBinaryData(
             url = "${baseUrl}vault/upload",
             formData = formData {
@@ -2884,6 +2908,7 @@ class ApiService {
         authTag: String,
         checksum: String
     ): VaultUploadResponse {
+        logVaultPayload("update/$documentId", encryptedFile, fileName, fileType)
         val response = client.submitFormWithBinaryData(
             url = "${baseUrl}vault/update/$documentId",
             formData = formData {
@@ -2912,6 +2937,38 @@ class ApiService {
         return parseVaultUploadResponse(response)
     }
 
+
+    /**
+     * Logs what is actually being sent to the vault so a server-side
+     * `document_rejected` can be told apart from the app shipping a broken or
+     * mislabelled file (e.g. HEIC/PNG bytes declared as JPEG).
+     */
+    private fun logVaultPayload(
+        op: String,
+        bytes: ByteArray?,
+        fileName: String,
+        fileType: String
+    ) {
+        if (bytes == null) {
+            println("📎 vault $op payload: <no file> name='$fileName' type=$fileType")
+            return
+        }
+        val magic = bytes.take(12)
+            .joinToString(" ") { it.toInt().and(0xFF).toString(16).padStart(2, '0') }
+        val format = when {
+            bytes.size < 4                                      -> "EMPTY/TRUNCATED"
+            bytes[0] == 0xFF.toByte() && bytes[1] == 0xD8.toByte() -> "JPEG"
+            bytes[0] == 0x89.toByte() && bytes[1] == 0x50.toByte() -> "PNG"
+            bytes[0] == 0x25.toByte() && bytes[1] == 0x50.toByte() -> "PDF"
+            bytes.size > 11 && bytes.copyOfRange(4, 12)
+                .decodeToString().startsWith("ftyp")            -> "HEIC/MP4-container"
+            else                                                -> "UNKNOWN"
+        }
+        println(
+            "📎 vault $op payload: ${bytes.size} bytes · detected=$format · " +
+                "declared=$fileType · name='$fileName' · magic=$magic"
+        )
+    }
 
     private suspend fun parseVaultUploadResponse(response: HttpResponse): VaultUploadResponse {
         val raw = response.bodyAsText()

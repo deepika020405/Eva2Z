@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.LocalGasStation
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -64,6 +65,8 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.theme.AppPageBg
+import com.developer.ev2z.util.INSTALL_FOOTER
+import com.developer.ev2z.util.shareText
 
 // ─── Light-palette design tokens (Guardian Drive prototype alignment) ──────────
 private object FuelColors {
@@ -182,6 +185,34 @@ private fun formatChange(value: Double): String {
     val rupees = cents / 100
     val paise = cents % 100
     return "₹$rupees.${paise.toString().padStart(2, '0')}"
+}
+
+/**
+ * Plain-text rates for the share sheet, closed by the install footer so a recipient
+ * without the app can get it. Returns null when there is nothing worth sending —
+ * the share button is hidden in that case, so this is a guard rather than a path
+ * anyone should hit.
+ */
+internal fun buildFuelPriceShareMessage(uiState: FuelPriceUiState): String? {
+    val price = uiState.current ?: return null
+
+    return buildString {
+        appendLine("⛽ Fuel prices today — ${uiState.selectedLocationLabel}")
+        appendLine()
+        appendLine("Petrol: ${formatRupees(price.petrolPrice)}/L${changeSuffix(price.petrolDeltaToday)}")
+        appendLine("Diesel: ${formatRupees(price.dieselPrice)}/L${changeSuffix(price.dieselDeltaToday)}")
+        appendLine()
+        appendLine("Updated ${price.updatedAt} · ${price.source}")
+        appendLine()
+        append(INSTALL_FOOTER)
+    }
+}
+
+/** " (▲ ₹0.35 today)" — omitted entirely when there is no movement to report. */
+private fun changeSuffix(delta: Double?): String {
+    if (delta == null || delta == 0.0) return ""
+    val arrow = if (delta > 0) "▲" else "▼"
+    return " ($arrow ${formatChange(delta)} today)"
 }
 
 
@@ -312,7 +343,19 @@ fun FuelPriceScreen(
                             .padding(horizontal = d.hPad)
                     ) {
                         Spacer(Modifier.height(12.dp))
-                        FuelPriceHeader(dimens = d, onBackClick = onBack)
+                        FuelPriceHeader(
+                            dimens = d,
+                            onBackClick = onBack,
+                            canShare = uiState.current != null,
+                            onShareClick = {
+                                buildFuelPriceShareMessage(uiState)?.let { message ->
+                                    shareText(
+                                        text = message,
+                                        subject = "Fuel prices today — ${uiState.selectedLocationLabel}"
+                                    )
+                                }
+                            }
+                        )
 
                         Spacer(Modifier.height(20.dp))
                         LocationSelector(
@@ -465,15 +508,30 @@ private fun ShowAllStatesToggle(
 }
 
 @Composable
-private fun FuelPriceHeader(dimens: FuelDimens, onBackClick: () -> Unit) {
+private fun FuelPriceHeader(
+    dimens: FuelDimens,
+    onBackClick: () -> Unit,
+    onShareClick: () -> Unit,
+    canShare: Boolean
+) {
     Column {
-        IconButton(onClick = onBackClick, modifier = Modifier.size(dimens.backButton)) {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Back",
-                tint = FuelColors.TextPrimary,
-                modifier = Modifier.size(dimens.backIcon)
-            )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBackClick, modifier = Modifier.size(dimens.backButton)) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = FuelColors.TextPrimary,
+                    modifier = Modifier.size(dimens.backIcon)
+                )
+            }
+            // Hidden until there are rates to send — an empty share is worse than none.
+            if (canShare) {
+                ShareRatesButton(dimens = dimens, onClick = onShareClick)
+            }
         }
         Spacer(Modifier.height(4.dp))
         Text(
@@ -482,10 +540,33 @@ private fun FuelPriceHeader(dimens: FuelDimens, onBackClick: () -> Unit) {
             fontWeight = FontWeight.Bold,
             color = FuelColors.TextPrimary
         )
+
+    }
+}
+
+/** Labelled pill rather than a bare icon — "share what?" is otherwise a guess. */
+@Composable
+private fun ShareRatesButton(dimens: FuelDimens, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(FuelColors.PetrolBg)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Default.Share,
+            contentDescription = null,
+            tint = FuelColors.ActionGreen,
+            modifier = Modifier.size(15.dp)
+        )
+        Spacer(Modifier.width(6.dp))
         Text(
-            text = "Daily rates near you",
-            fontSize = dimens.subtitleSize,
-            color = FuelColors.TextSecondary
+            text = "Share",
+            fontSize = dimens.metaSize,
+            fontWeight = FontWeight.SemiBold,
+            color = FuelColors.ActionGreen
         )
     }
 }

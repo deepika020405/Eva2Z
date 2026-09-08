@@ -2,15 +2,15 @@
 package com.developer.ev2z.phonepe
 
 import platform.Foundation.NSNotificationCenter
-import platform.Foundation.NSString
-import platform.darwin.NSObject
 
 actual fun openPhonePeSdk(
-    paymentUrl: String,
+    orderToken: String,
+    orderId: String,
     onResult: (PaymentResult) -> Unit
 ) {
     println("🚀 iOS PhonePe launcher called")
-    println("🔗 Payment URL/Token: ${paymentUrl.take(50)}...")
+    println("🔑 Token: ${orderToken.take(50)}...")
+    println("🆔 Order ID: $orderId")
 
     // ✅ Register callback FIRST
     PaymentBus.register { success, txnId, reason ->
@@ -19,17 +19,19 @@ actual fun openPhonePeSdk(
     }
 
     try {
-        // ✅ Build PhonePe payment URL with token parameter
-        val phonePeWebUrl = "https://mercury.phonepe.com/transact/pg?token=$paymentUrl"
-
-        println("📲 Posting notification with URL")
-
-        // ✅ Cast to NSString then NSObject
+        // userInfo, not a URL. The token is base64 and used to be smuggled through a
+        // "…/pg?token=$token" query string that PaymentBridge parsed back out — a
+        // round-trip that silently truncates on any '#' or '&' the token happens to
+        // carry, and that had nowhere to put the order id.
+        println("📲 Posting payment request to PaymentBridge")
         NSNotificationCenter.defaultCenter.postNotificationName(
             aName = "OpenPaymentWebView",
-            `object` = phonePeWebUrl as NSString as NSObject
+            `object` = null,
+            userInfo = mapOf<Any?, Any?>(
+                "token" to orderToken,
+                "orderId" to orderId
+            )
         )
-
         println("✅ Payment notification posted successfully")
 
     } catch (e: Exception) {

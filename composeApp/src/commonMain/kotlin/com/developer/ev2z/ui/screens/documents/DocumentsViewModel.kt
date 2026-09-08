@@ -146,10 +146,14 @@ class DocumentsViewModel(
             return
         }
 
+        // Deliberately does not touch `_loading`/`_error`. Those drive the whole vault
+        // screen: flipping them here replaced the document list with a spinner while the
+        // fetch ran, and left it showing a red "Unable to open document" once it failed —
+        // even though the detail overlay had already rendered the image via `image_url`.
+        // Opening a document is a per-document action, so failure is reported through
+        // `onError` only.
         viewModelScope.launch {
             try {
-                _loading.value = true
-
                 val vaultToken = storageManager.getString(StorageKeys.VAULT_TOKEN, "")
                 val authToken = storageManager.getString("token", "")
 
@@ -171,11 +175,8 @@ class DocumentsViewModel(
                 onResult(fileBytes) // ✅ MAIN THREAD SAFE
 
             } catch (e: Exception) {
-                _error.value = "Unable to open document"
-                e.printStackTrace()
+                println("⚠️ Could not fetch encrypted file for $documentId — falling back to image_url")
                 onError()
-            } finally {
-                _loading.value = false
             }
         }
     }

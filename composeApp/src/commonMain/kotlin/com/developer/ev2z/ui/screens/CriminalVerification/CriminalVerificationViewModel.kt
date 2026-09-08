@@ -69,6 +69,7 @@ class CriminalVerificationViewModel(
     var bgvStatus          by mutableStateOf(BgvStatus.FORM_SUBMITTED)
     var merchantOrderId    by mutableStateOf<String?>(null)
     var paymentToken       by mutableStateOf<String?>(null)
+    var phonepeOrderId     by mutableStateOf<String?>(null)
     var errorMessage       by mutableStateOf("")
     var amount             by mutableStateOf(499)
     var reportUrl          by mutableStateOf<String?>(null)
@@ -187,10 +188,15 @@ class CriminalVerificationViewModel(
             val order = api.createCriminalOrder(amount)
             merchantOrderId = order["merchantOrderId"]?.jsonPrimitive?.content
             paymentToken    = order["token"]?.jsonPrimitive?.content
+            // PhonePe's own order id — the SDK needs it next to the token, and it is
+            // never generated on device.
+            phonepeOrderId  = order["phonepeOrderId"]?.jsonPrimitive?.content
+                ?: order["orderId"]?.jsonPrimitive?.content
 
             merchantOrderId?.let { prefs.saveString(KEY_MERCHANT_ORDER, it) }
 
             if (paymentToken.isNullOrEmpty()) throw Exception("Payment token missing")
+            if (phonepeOrderId.isNullOrEmpty()) throw Exception("phonepeOrderId missing")
             step = VerificationStep.PAYMENT
         } catch (e: Exception) {
             errorMessage = e.message ?: "Order creation failed"
@@ -316,6 +322,7 @@ class CriminalVerificationViewModel(
         step                  = VerificationStep.FORM
         merchantOrderId       = null
         paymentToken          = null
+        phonepeOrderId        = null
         errorMessage          = ""
         cachedForm            = null
         createdCandidateId    = null

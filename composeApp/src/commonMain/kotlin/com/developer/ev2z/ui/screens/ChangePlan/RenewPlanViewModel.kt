@@ -27,6 +27,12 @@ class RenewPlanViewModel(
     private var merchantOrderId: String? = null
     private var phonePeOrderIdFromServer: String? = null
 
+    /**
+     * PhonePe's own order id for the pending token. The SDK needs it alongside the
+     * token — checkout fails if the two don't belong to the same order.
+     */
+    val phonePeOrderId: String? get() = phonePeOrderIdFromServer
+
     private var currentAmount: Int = 0
 
     // ✅ ONLY FUNCTION DEFINITION HERE
@@ -138,6 +144,7 @@ class RenewPlanViewModel(
         _paymentState.value = PaymentState.Idle
         _phonePeToken.value = null
         merchantOrderId = null
+        phonePeOrderIdFromServer = null
         currentAmount = 0
     }
 }

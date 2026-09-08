@@ -31,6 +31,11 @@ data class BillingOrderDto(
     @SerialName("order_total")
     val orderTotal: Int,
 
+    // Fulfilment status — server does not send it yet; when it starts to,
+    // it drives the tracking timeline in Order History.
+    @SerialName("order_status")
+    val orderStatus: String? = null,
+
     val items: List<BillingItemDto> = emptyList()  // ✅ safe default
 )
 

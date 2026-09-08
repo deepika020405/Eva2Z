@@ -3,6 +3,7 @@ package com.developer.ev2z.repository
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.request.CreateOrderProduct
 import com.developer.ev2z.request.CreateOrderRequest
+import com.developer.ev2z.request.PhonePeCallbackRequest
 import com.developer.ev2z.response.CartItemDto
 import com.developer.ev2z.response.BillingDto
 import com.developer.ev2z.response.CartResponse
@@ -153,6 +154,23 @@ class ProductRepository(
 
         return api.createPhonePeOrder(token, body)
     }
+
+    // create-orders leaves the row at PENDING. The server only promotes it to SUCCESS when
+    // this callback lands, and my-billing filters on SUCCESS — so skipping this call loses
+    // the order entirely, however the payment actually went.
+    //
+    // merchantOrderId must be the ORD-… id: the server looks the row up by merchant_order_id.
+    suspend fun confirmPhonePePayment(
+        merchantOrderId: String,
+        phonepeOrderId: String,
+        success: Boolean
+    ): Boolean = api.sendPhonePeCallback(
+        PhonePeCallbackRequest(
+            merchantOrderId = merchantOrderId,
+            phonepeOrderId = phonepeOrderId,
+            status = if (success) "SUCCESS" else "FAILED"
+        )
+    )
 
 
     suspend fun getMyDevices(token: String): MyDevicesResponse {

@@ -21,6 +21,7 @@ import com.developer.ev2z.phonepe.openPhonePeSdk
 @Composable
 fun CriminalPaymentScreen(
     paymentToken: String,
+    phonepeOrderId: String,
     amount: Int,
     onSuccess: (String?) -> Unit,
     onFailure: (String?) -> Unit,
@@ -120,7 +121,7 @@ fun CriminalPaymentScreen(
         Column(modifier = Modifier.fillMaxWidth()) {
             Button(
                 onClick = {
-                    openPhonePeSdk(paymentToken) { result ->
+                    openPhonePeSdk(paymentToken, phonepeOrderId) { result ->
                         if (result.success) onSuccess(result.transactionId)
                         else onFailure(result.message)
                     }

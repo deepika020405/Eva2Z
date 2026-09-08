@@ -152,16 +152,7 @@ private val documentSlots = listOf(
         iconBg           = VaultColors.GreenLight,
         validityYears    = 1,
     ),
-    DocumentSlot(
-        matchKeys        = listOf("service", "maintenance"),
-        category         = "Ownership & Finance",
-        title            = "Service Record",
-        fallbackSubtitle = "Latest service history",
-        icon             = Icons.Outlined.Build,
-        iconTint         = VaultColors.GreenDark,
-        iconBg           = VaultColors.GreenLight,
-        validityYears    = 0,
-    ),
+
 )
 
 private data class VaultDocument(
@@ -1758,6 +1749,13 @@ private fun readableDocType(code: String?): String = when (code?.lowercase()) {
 private fun rejectionMessage(result: com.developer.ev2z.response.VaultUploadResponse): String {
     if (result.isWrongDocumentType) {
         val expected = readableDocType(result.expectedType)
+        // detected_type "UNKNOWN" means the server never recognised the photo,
+        // so naming it back at the user ("this looks like an UNKNOWN") is noise —
+        // the real problem is legibility, not the wrong document.
+        if (result.detectedTypeIsUnknown) {
+            return "We couldn't recognise this as a $expected. Make sure the whole " +
+                    "document is in frame, in focus and free of glare, then try again."
+        }
         val detected = readableDocType(result.detectedType)
         return "This looks like a $detected, but a $expected was expected. " +
                 "Please upload the correct document."
