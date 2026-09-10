@@ -1,6 +1,7 @@
 package com.developer.ev2z.ui.screens.CriminalVerification
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -8,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
@@ -15,6 +17,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -28,6 +32,9 @@ fun CriminalSuccessScreen(
     reportUrl: String?,
     candidateName: String?,
     courtResult: CourtCheckResult?,
+    paymentDone: Boolean = false,
+    amount: Int = 0,
+    merchantOrderId: String? = null,
     onDone: () -> Unit,
     onNewVerification: () -> Unit
 ) {
@@ -62,6 +69,17 @@ fun CriminalSuccessScreen(
             Spacer(Modifier.height(16.dp))
             StatusBadge(status)
             Spacer(Modifier.height(18.dp))
+
+            candidateId?.let {
+                CandidateIdCard(
+                    candidateId = it,
+                    paymentDone = paymentDone,
+                    amount = amount,
+                    merchantOrderId = merchantOrderId
+                )
+                Spacer(Modifier.height(14.dp))
+            }
+
             VerificationTimeline(status)
             Spacer(Modifier.height(18.dp))
 
@@ -143,6 +161,112 @@ fun CriminalSuccessScreen(
             }
 
             Spacer(Modifier.height(20.dp))
+        }
+    }
+}
+
+// ── Candidate ID + Payment Card ─────────────────────────────────
+@Composable
+fun CandidateIdCard(
+    candidateId: Int,
+    paymentDone: Boolean,
+    amount: Int,
+    merchantOrderId: String?
+) {
+    val clipboard = LocalClipboardManager.current
+
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = CV_Surface),
+        elevation = CardDefaults.cardElevation(2.dp)
+    ) {
+        Column(Modifier.padding(18.dp)) {
+            Text(
+                "Your Candidate ID",
+                fontSize = 12.sp,
+                color = CV_TextHint
+            )
+            Spacer(Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    candidateId.toString(),
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = CV_TextPrimary
+                )
+                Spacer(Modifier.width(12.dp))
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = CV_PrimaryBg,
+                    modifier = Modifier.clickable {
+                        clipboard.setText(AnnotatedString(candidateId.toString()))
+                    }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.ContentCopy,
+                            contentDescription = "Copy Candidate ID",
+                            tint = CV_Primary,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(Modifier.width(5.dp))
+                        Text(
+                            "Copy",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = CV_Primary
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(6.dp))
+            Text(
+                "Keep this ID — you can check the status anytime from the Check Status tab.",
+                fontSize = 12.sp,
+                color = CV_TextSec,
+                lineHeight = 17.sp
+            )
+
+            Spacer(Modifier.height(14.dp))
+            HorizontalDivider(color = CV_Border)
+            Spacer(Modifier.height(12.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    if (paymentDone) Icons.Default.CheckCircle else Icons.Default.HourglassTop,
+                    contentDescription = null,
+                    tint = if (paymentDone) CV_Success else CV_TextHint,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        if (paymentDone) "Payment Done" else "Payment status unavailable",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (paymentDone) CV_Success else CV_TextSec
+                    )
+                    if (!merchantOrderId.isNullOrBlank()) {
+                        Text(
+                            "Order: $merchantOrderId",
+                            fontSize = 11.sp,
+                            color = CV_TextHint
+                        )
+                    }
+                }
+                if (paymentDone && amount > 0) {
+                    Text(
+                        "₹$amount",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = CV_TextPrimary
+                    )
+                }
+            }
         }
     }
 }

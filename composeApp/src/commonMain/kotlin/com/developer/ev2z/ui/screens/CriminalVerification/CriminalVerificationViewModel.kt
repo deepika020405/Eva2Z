@@ -3,6 +3,7 @@ package com.developer.ev2z.ui.screens.CriminalVerification
 import androidx.compose.runtime.*
 import com.developer.ev2z.data.local.UserPrefs
 import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.network.findStringDeep
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -10,6 +11,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.time.Clock
 
 private const val KEY_CANDIDATE_ID   = "bgv_candidate_id"
 private const val KEY_BGV_STATUS     = "bgv_status"
@@ -71,7 +73,8 @@ class CriminalVerificationViewModel(
     var paymentToken       by mutableStateOf<String?>(null)
     var phonepeOrderId     by mutableStateOf<String?>(null)
     var errorMessage       by mutableStateOf("")
-    var amount             by mutableStateOf(499)
+    var amount             by mutableStateOf(1)
+    var paymentDone        by mutableStateOf(false)
     var reportUrl          by mutableStateOf<String?>(null)
     var searchedCandidateName by mutableStateOf<String?>(null)
     var courtCheckResult   by mutableStateOf<CourtCheckResult?>(null)
@@ -80,9 +83,17 @@ class CriminalVerificationViewModel(
     var cachedForm by mutableStateOf<CriminalForm?>(null)
         private set
 
+    var history by mutableStateOf<List<BgvHistoryEntry>>(emptyList())
+        private set
+
+    private val historyStore = BgvHistoryStore(prefs)
+
     // ─────────────────────────────────────────────
     // Helper — court array parse karo (reusable)
     // ─────────────────────────────────────────────
+    @OptIn(kotlin.time.ExperimentalTime::class)
+    private fun nowMs() = Clock.System.now().toEpochMilliseconds()
+
     private fun parseCourtResult(data: kotlinx.serialization.json.JsonObject?) {
         val courtArray = data
             ?.get("check_details")
@@ -116,14 +127,21 @@ class CriminalVerificationViewModel(
     // Load persisted state — screen open hone par
     // ─────────────────────────────────────────────
     fun loadPersistedState() {
+        history = historyStore.getAll()
+
         val savedId = prefs.getString(KEY_CANDIDATE_ID, "")
             .toIntOrNull() ?: return
 
+        // Restore the last candidate without opening the result screen — the entry
+        // screen lists the whole history now, so the user picks what to look at.
         createdCandidateId = savedId
         merchantOrderId    = prefs.getString(KEY_MERCHANT_ORDER, "").ifBlank { null }
         reportUrl          = prefs.getString(KEY_REPORT_URL, "").ifBlank { null }
         bgvStatus          = parseBgvStatus(prefs.getString(KEY_BGV_STATUS, ""))
-        step               = VerificationStep.SUCCESS
+    }
+
+    fun deleteHistoryEntry(candidateId: Int) {
+        history = historyStore.remove(candidateId)
     }
 
     // ─────────────────────────────────────────────
@@ -162,6 +180,22 @@ class CriminalVerificationViewModel(
             prefs.saveString(KEY_BGV_STATUS, bgvStatus.name)
             if (!url.isNullOrBlank()) prefs.saveString(KEY_REPORT_URL, url)
 
+            // Keep the searched id in history too, so the user does not have to
+            // remember/retype it next time.
+            val stored = history.firstOrNull { it.candidateId == id }
+            paymentDone     = stored?.paymentDone ?: false
+            merchantOrderId = stored?.merchantOrderId
+            history = historyStore.upsert(
+                BgvHistoryEntry(
+                    candidateId = id,
+                    name        = candidateName ?: name,
+                    amount      = stored?.amount ?: 0,
+                    paymentDone = stored?.paymentDone ?: false,
+                    status      = bgvStatus.name,
+                    createdAtMs = stored?.createdAtMs ?: nowMs()
+                )
+            )
+
             step = VerificationStep.SUCCESS
 
         } catch (e: Exception) {
@@ -186,17 +220,37 @@ class CriminalVerificationViewModel(
         step    = VerificationStep.CREATING_ORDER
         try {
             val order = api.createCriminalOrder(amount)
-            merchantOrderId = order["merchantOrderId"]?.jsonPrimitive?.content
-            paymentToken    = order["token"]?.jsonPrimitive?.content
+
+            // The backend is not consistent about nesting: our own ORD- id, PhonePe's
+            // OMO order id and the checkout token can each arrive top level, under
+            // `data`, or only inside `order.raw_response`. Search the whole tree.
+            merchantOrderId = order.findStringDeep("merchantOrderId", "merchant_order_id")
+            paymentToken    = order.findStringDeep("token", "orderToken", "order_token")
             // PhonePe's own order id — the SDK needs it next to the token, and it is
             // never generated on device.
-            phonepeOrderId  = order["phonepeOrderId"]?.jsonPrimitive?.content
-                ?: order["orderId"]?.jsonPrimitive?.content
+            // `orderId` is PhonePe's own key inside raw_response. A bare `order_id` is
+            // deliberately not searched — that is our numeric DB row, not an OMO… id.
+            phonepeOrderId  = order.findStringDeep("phonepeOrderId", "phonepe_order_id")
+                ?: order.findStringDeep("orderId")
+
+            println("💳 parsed → merchantOrderId=$merchantOrderId, phonepeOrderId=$phonepeOrderId, token=${paymentToken?.take(24)}…")
 
             merchantOrderId?.let { prefs.saveString(KEY_MERCHANT_ORDER, it) }
 
-            if (paymentToken.isNullOrEmpty()) throw Exception("Payment token missing")
-            if (phonepeOrderId.isNullOrEmpty()) throw Exception("phonepeOrderId missing")
+            // Name the keys the server did send — otherwise this failure is invisible
+            // without logcat.
+            if (paymentToken.isNullOrEmpty())
+                throw Exception("Payment token missing in order response (keys: ${order.keys.joinToString()})")
+
+            // crminal-create-order currently replies with merchantOrderId/token only, so
+            // PhonePe's own OMO… id is unavailable. Hand the SDK our merchant id rather
+            // than dead-ending the flow; PhonePe decides whether it accepts it.
+            if (phonepeOrderId.isNullOrEmpty()) {
+                println("⚠️ Server did not return phonepeOrderId — falling back to merchantOrderId")
+                phonepeOrderId = merchantOrderId
+            }
+            if (phonepeOrderId.isNullOrEmpty())
+                throw Exception("Order id missing in server response (keys: ${order.keys.joinToString()})")
             step = VerificationStep.PAYMENT
         } catch (e: Exception) {
             errorMessage = e.message ?: "Order creation failed"
@@ -207,9 +261,10 @@ class CriminalVerificationViewModel(
     }
 
     suspend fun onPaymentSuccess(phonepeOrderId: String) {
-        loading   = true
-        step      = VerificationStep.VERIFYING_PAYMENT
-        bgvStatus = BgvStatus.PAYMENT_DONE
+        loading     = true
+        step        = VerificationStep.VERIFYING_PAYMENT
+        bgvStatus   = BgvStatus.PAYMENT_DONE
+        paymentDone = true
         prefs.saveString(KEY_BGV_STATUS, BgvStatus.PAYMENT_DONE.name)
 
         try {
@@ -236,6 +291,7 @@ class CriminalVerificationViewModel(
                 val id = result.candidateId.toInt()
                 createdCandidateId = id
                 prefs.saveString(KEY_CANDIDATE_ID, id.toString())
+                addToHistory(id, BgvStatus.CANDIDATE_CREATED)
                 submitBGV(id)
             }
             result.isDuplicate -> {
@@ -245,6 +301,21 @@ class CriminalVerificationViewModel(
             }
             else -> throw Exception(result.error ?: "Candidate creation failed")
         }
+    }
+
+    private fun addToHistory(candidateId: Int, status: BgvStatus) {
+        history = historyStore.upsert(
+            BgvHistoryEntry(
+                candidateId     = candidateId,
+                name            = cachedForm?.name.orEmpty(),
+                phone           = cachedForm?.phone.orEmpty(),
+                amount          = amount,
+                merchantOrderId = merchantOrderId,
+                paymentDone     = paymentDone,
+                status          = status.name,
+                createdAtMs     = nowMs()
+            )
+        )
     }
 
     suspend fun checkVerificationStatus() {
@@ -277,6 +348,11 @@ class CriminalVerificationViewModel(
                 bgvStatus = newStatus
                 prefs.saveString(KEY_BGV_STATUS, newStatus.name)
             }
+            // Polling runs every 5s — only touch storage when the status actually moved.
+            val storedStatus = history.firstOrNull { it.candidateId == id }?.status
+            if (storedStatus != null && storedStatus != newStatus.name) {
+                history = historyStore.updateStatus(id, newStatus.name)
+            }
 
             // ✅ Court result parse karo
             parseCourtResult(data)
@@ -306,6 +382,7 @@ class CriminalVerificationViewModel(
         step      = VerificationStep.SUBMITTING_BGV
         bgvStatus = BgvStatus.VERIFICATION_STARTED
         prefs.saveString(KEY_BGV_STATUS, BgvStatus.VERIFICATION_STARTED.name)
+        history = historyStore.updateStatus(candidateId, BgvStatus.VERIFICATION_STARTED.name)
 
         try { api.submitBgvVerification(candidateId, cachedForm!!) }
         catch (e: Exception) { println("⚠️ BGV error (non-fatal): ${e.message}") }
@@ -331,6 +408,10 @@ class CriminalVerificationViewModel(
         searchedCandidateName = null
         courtCheckResult      = null   // ✅ reset
         amount                = 499
+        paymentDone           = false
+
+        // History survives a reset — that is the whole point of keeping it.
+        history = historyStore.getAll()
     }
 
     private fun parseBgvStatus(s: String) = when (s) {

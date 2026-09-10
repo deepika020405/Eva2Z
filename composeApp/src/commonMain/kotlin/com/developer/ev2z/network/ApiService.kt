@@ -795,11 +795,18 @@ class ApiService {
     suspend fun createCriminalOrder(amount: Int): JsonObject {
         val token = AppTokenProvider.getToken()
 
-        return client.post("${baseUrl}crminal-create-order") {
+        val response = client.post("${baseUrl}crminal-create-order") {
             header(HttpHeaders.Authorization, "Bearer $token")
             contentType(ContentType.Application.Json)
             setBody(mapOf("amount" to amount))
-        }.body()
+        }
+
+        val raw = response.bodyAsText()
+        println("💳 CRIMINAL CREATE-ORDER (${response.status}) → $raw")
+
+        return kotlinx.serialization.json.Json
+            .parseToJsonElement(raw)
+            .jsonObject
     }
 
 

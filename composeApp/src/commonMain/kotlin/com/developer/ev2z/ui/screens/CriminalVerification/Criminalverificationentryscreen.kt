@@ -26,8 +26,10 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun CriminalVerificationEntryScreen(
     isLoading: Boolean,
+    history: List<BgvHistoryEntry> = emptyList(),
     onSubmitNew: (CriminalForm) -> Unit,
-    onSearchStatus: (candidateId: String, name: String) -> Unit
+    onSearchStatus: (candidateId: String, name: String) -> Unit,
+    onDeleteHistory: (candidateId: Int) -> Unit = {}
 ) {
     var selectedTab by rememberSaveable { mutableStateOf(0) }
 
@@ -97,7 +99,8 @@ fun CriminalVerificationEntryScreen(
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            "Check Status",
+                            if (history.isEmpty()) "Check Status"
+                            else "Check Status (${history.size})",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Medium,
                             color = if (selectedTab == 1) Color.White else CV_TextSec
@@ -116,7 +119,9 @@ fun CriminalVerificationEntryScreen(
 
             1 -> CheckStatusTab(
                 isLoading = isLoading,
-                onSearch = onSearchStatus
+                history = history,
+                onSearch = onSearchStatus,
+                onDeleteHistory = onDeleteHistory
             )
         }
     }
@@ -125,7 +130,9 @@ fun CriminalVerificationEntryScreen(
 @Composable
 fun CheckStatusTab(
     isLoading: Boolean,
-    onSearch: (candidateId: String, name: String) -> Unit
+    history: List<BgvHistoryEntry> = emptyList(),
+    onSearch: (candidateId: String, name: String) -> Unit,
+    onDeleteHistory: (candidateId: Int) -> Unit = {}
 ) {
     var candidateId by rememberSaveable { mutableStateOf("") }
     val isValid = candidateId.isNotBlank()
@@ -169,7 +176,10 @@ fun CheckStatusTab(
                     }
                     Spacer(Modifier.width(12.dp))
                     Text(
-                        "Enter your Candidate ID to check verification status.",
+                        if (history.isEmpty())
+                            "Enter your Candidate ID to check verification status."
+                        else
+                            "Pick a verification below, or enter a Candidate ID to check its status.",
                         fontSize = 13.sp,
                         color = CV_TextSec,
                         lineHeight = 18.sp
@@ -228,6 +238,17 @@ fun CheckStatusTab(
                         fontWeight = FontWeight.SemiBold
                     )
                 }
+            }
+
+            if (history.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                BgvHistorySection(
+                    entries = history,
+                    isLoading = isLoading,
+                    onCheckStatus = { id -> onSearch(id.toString(), "") },
+                    onDelete = onDeleteHistory
+                )
+                Spacer(Modifier.height(8.dp))
             }
         }
     }

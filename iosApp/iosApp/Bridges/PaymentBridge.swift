@@ -10,6 +10,11 @@ import ComposeApp
     static let shared = PaymentBridge()
     private var ppPayment: PPPayment?
 
+    #if DEBUG
+    private static let consoleHandlerName = "ev2zCheckoutDebug"
+    private var didAttachConsoleBridge = false
+    #endif
+
     private override init() {
         super.init()
 
@@ -42,6 +47,11 @@ import ComposeApp
             // Before the PPPayment init — the SDK reads this when it builds its logger,
             // so setting it afterwards silenced the first (and most interesting) events.
             PPPayment.enableDebugLogs = true
+
+            #if DEBUG
+            // Each attempt gets a fresh web view, so the bridge has to be re-attached.
+            self.didAttachConsoleBridge = false
+            #endif
 
             self.ppPayment = PPPayment(
                 environment: .production,
@@ -106,6 +116,7 @@ import ComposeApp
                 } else {
                     print("🔎 Found checkout web view, but inspection needs iOS 16.4+")
                 }
+                self?.attachConsoleBridge(to: webView)
                 return
             }
 
@@ -120,6 +131,95 @@ import ComposeApp
         }
         return nil
     }
+
+    /// Mirrors the checkout page's console errors and network responses into the Xcode
+    /// console. Safari's Web Inspector shows the same thing, but it needs the device to be
+    /// paired and the page to still be on screen when you go looking — this survives both.
+    private func attachConsoleBridge(to webView: WKWebView) {
+        guard !didAttachConsoleBridge else { return }
+        didAttachConsoleBridge = true
+
+        let controller = webView.configuration.userContentController
+        // Adding a duplicate name is a hard crash, and the SDK may hand back a controller
+        // a previous attempt already touched.
+        controller.removeScriptMessageHandler(forName: Self.consoleHandlerName)
+        controller.add(self, name: Self.consoleHandlerName)
+
+        // The user script covers every navigation the checkout makes from here on…
+        controller.addUserScript(
+            WKUserScript(
+                source: Self.consoleBridgeSource,
+                injectionTime: .atDocumentStart,
+                forMainFrameOnly: false
+            )
+        )
+
+        // …and this covers the document already on screen, which the user script missed.
+        webView.evaluateJavaScript(Self.consoleBridgeSource) { _, error in
+            if let error = error {
+                print("🔎 Console bridge injection failed: \(error.localizedDescription)")
+            } else {
+                print("🔎 Console bridge attached — checkout errors will print here")
+            }
+        }
+    }
+
+    private static let consoleBridgeSource = """
+    (function () {
+      if (window.__ev2zDebugAttached) { return; }
+      window.__ev2zDebugAttached = true;
+
+      var post = function (payload) {
+        try { window.webkit.messageHandlers.\(consoleHandlerName).postMessage(payload); } catch (e) {}
+      };
+      var clip = function (value) { return String(value == null ? '' : value).slice(0, 2000); };
+
+      ['error', 'warn'].forEach(function (level) {
+        var original = console[level];
+        console[level] = function () {
+          post({ kind: 'console', level: level, text: Array.prototype.map.call(arguments, String).join(' ') });
+          original.apply(console, arguments);
+        };
+      });
+
+      window.addEventListener('error', function (e) {
+        post({ kind: 'jsError', text: e.message + ' @ ' + e.filename + ':' + e.lineno });
+      });
+      window.addEventListener('unhandledrejection', function (e) {
+        post({ kind: 'jsError', text: 'unhandled rejection: ' + String(e.reason) });
+      });
+
+      var originalFetch = window.fetch;
+      if (originalFetch) {
+        window.fetch = function (input) {
+          var url = String(input && input.url ? input.url : input);
+          return originalFetch.apply(this, arguments).then(function (res) {
+            res.clone().text().then(function (body) {
+              post({ kind: 'fetch', status: res.status, url: url, body: clip(body) });
+            }).catch(function () {});
+            return res;
+          }).catch(function (err) {
+            post({ kind: 'fetch', status: -1, url: url, body: clip(err) });
+            throw err;
+          });
+        };
+      }
+
+      var open = XMLHttpRequest.prototype.open;
+      var send = XMLHttpRequest.prototype.send;
+      XMLHttpRequest.prototype.open = function (method, url) {
+        this.__ev2zUrl = url;
+        return open.apply(this, arguments);
+      };
+      XMLHttpRequest.prototype.send = function () {
+        var xhr = this;
+        xhr.addEventListener('loadend', function () {
+          post({ kind: 'xhr', status: xhr.status, url: String(xhr.__ev2zUrl), body: clip(xhr.responseText) });
+        });
+        return send.apply(this, arguments);
+      };
+    })();
+    """
     #endif
 
     private func handlePaymentResult(request: DPSTransactionRequest?, resultState: PPResultState) {
@@ -168,3 +268,31 @@ import ComposeApp
         NotificationCenter.default.removeObserver(self)
     }
 }
+
+#if DEBUG
+extension PaymentBridge: WKScriptMessageHandler {
+
+    func userContentController(
+        _ userContentController: WKUserContentController,
+        didReceive message: WKScriptMessage
+    ) {
+        guard message.name == Self.consoleHandlerName,
+              let info = message.body as? [String: Any] else { return }
+
+        let kind = info["kind"] as? String ?? "?"
+
+        switch kind {
+        case "console", "jsError":
+            print("🌐 [checkout \(kind)] \(info["text"] as? String ?? "")")
+
+        default:
+            let status = info["status"] as? Int ?? 0
+            let url = info["url"] as? String ?? ""
+            print("🌐 [checkout \(kind) \(status)] \(url)")
+            if let body = info["body"] as? String, !body.isEmpty {
+                print("   ↳ \(body)")
+            }
+        }
+    }
+}
+#endif

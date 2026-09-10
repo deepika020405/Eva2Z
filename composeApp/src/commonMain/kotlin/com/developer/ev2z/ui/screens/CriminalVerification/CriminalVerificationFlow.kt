@@ -139,10 +139,12 @@ fun CriminalVerificationFlow(
                 VerificationStep.FORM ->
                     CriminalVerificationEntryScreen(
                         isLoading = vm.loading,
+                        history = vm.history,
                         onSubmitNew = { form -> scope.launch { vm.submitForm(form) } },
                         onSearchStatus = { candidateId, name ->
                             scope.launch { vm.searchByCandidate(candidateId, name) }
-                        }
+                        },
+                        onDeleteHistory = { id -> vm.deleteHistoryEntry(id) }
                     )
 
                 VerificationStep.CREATING_ORDER ->
@@ -188,6 +190,9 @@ fun CriminalVerificationFlow(
                         reportUrl = vm.reportUrl,
                         candidateName = vm.searchedCandidateName,
                         courtResult = vm.courtCheckResult,
+                        paymentDone = vm.paymentDone,
+                        amount = vm.amount,
+                        merchantOrderId = vm.merchantOrderId,
                         onDone = onGoToDashboard,
                         onNewVerification = { vm.reset() }
                     )

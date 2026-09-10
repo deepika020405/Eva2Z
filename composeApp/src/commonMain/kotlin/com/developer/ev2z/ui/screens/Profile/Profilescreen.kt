@@ -274,7 +274,7 @@ fun ProfileScreenContent(
                             items = listOf(
                                 ProfileMenuItem("Edit Profile", Icons.Rounded.Edit, onEditProfile),
                                 ProfileMenuItem("Account Activity", Icons.Rounded.ManageAccounts, onAccountActivity),
-                                ProfileMenuItem("Refer And Earn", Icons.Rounded.CardGiftcard, onReferAndEarn),
+//                                ProfileMenuItem("Refer And Earn", Icons.Rounded.CardGiftcard, onReferAndEarn),
                                 ProfileMenuItem("Change Password", Icons.Rounded.Password, onChangePassword),
                                 ProfileMenuItem(
                                     title = "My Account",
