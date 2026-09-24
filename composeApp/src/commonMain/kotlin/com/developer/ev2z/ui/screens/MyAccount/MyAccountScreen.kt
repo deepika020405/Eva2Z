@@ -29,7 +29,8 @@ fun MyAccountScreen(
     onBack: () -> Unit,
     onChangePlan: () -> Unit,
     onBillDetails: () -> Unit,
-    onWarranty: (String) -> Unit
+    onWarranty: (String) -> Unit,
+    onServiceComplaints: () -> Unit = {}
 ) {
     PlatformBackHandler(true) {
         onBack()
@@ -91,7 +92,10 @@ fun MyAccountScreen(
                                     )
                                 }
                             }
-                        }
+                        },
+                        // Service & Warranty complaint flow — raise a component
+                        // complaint and track it through warranty + allocation.
+                        "Service & Complaints" to onServiceComplaints
                     )
                 )
             }

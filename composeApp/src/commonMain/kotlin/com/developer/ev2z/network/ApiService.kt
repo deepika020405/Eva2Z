@@ -29,7 +29,9 @@ import com.developer.ev2z.ui.screens.VehicleParkingTag.ParkingData
 import com.developer.ev2z.ui.screens.VehicleParkingTag.ParkingRequest
 import com.developer.ev2z.ui.screens.VehicleParkingTag.ParkingResponse
 import com.developer.ev2z.ui.screens.VehicleParkingTag.UserParkingListResponse
+import com.developer.ev2z.ui.screens.serviceWarranty.*
 import com.developer.ev2z.util.AppTokenProvider
+import kotlinx.coroutines.delay
 import io.ktor.client.call.*
 import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.ResponseException
@@ -54,8 +56,23 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 class UnauthorizedException : Exception("Session expired. Please login again.")
+
+/**
+ * The server answered 404/405/501 — the route is not deployed yet.
+ *
+ * Thrown only by calls whose endpoint is still being built, so a caller can fall
+ * back to a live one instead of dead-ending the user. See [ApiService.createServiceOrder].
+ */
+class ServiceEndpointMissingException(val path: String) :
+    Exception("Endpoint $path is not available on the server yet.")
+
+/** 404/405/501 all mean "this route does not exist here", not "your request was bad". */
+private val MISSING_ENDPOINT_CODES = setOf(404, 405, 501)
 
 class ApiService {
 
@@ -458,11 +475,20 @@ class ApiService {
     }
 
     // ---------------- ADD DEVICE ----------------
+    /**
+     * Posted to the **GPS server**, not the app host.
+     *
+     * The two hosts run different versions of this route: app.eva2z.in validates
+     * `sim_number` as `max:20` and so rejects every 20-digit SIM once the label's
+     * "U" suffix is appended (21 chars, 422), while gps.eva2z.in accepts it —
+     * verified 2026-09-19 with `89788978901234567698U`. Same bearer token works
+     * on both, as `submit-bgv` already relies on.
+     */
     suspend fun addDevice(token: String, body: JsonObject): JsonObject {
-        println("🌐 API: Adding device")
+        println("🌐 API: Adding device → ${gpsBaseUrl}add-device")
 
         return try {
-            val response = client.post("${baseUrl}add-device") {
+            val response = client.post("${gpsBaseUrl}add-device") {
                 header(HttpHeaders.Authorization, "Bearer $token")
                 contentType(ContentType.Application.Json)
                 setBody(body)
@@ -476,6 +502,9 @@ class ApiService {
             throw e
         }
     }
+
+
+
 
     // ---------------- UPDATE DEVICE ----------------
     suspend fun updateDevice(token: String, body: JsonObject): JsonObject {
@@ -688,6 +717,26 @@ class ApiService {
 
             println("📥 RAW RESPONSE → $response")
 
+            // The gateway answers 200 even when it is reporting a failure — the real
+            // status lives in the body: {"status":"error","error":{"status":409,…}}.
+            // Without this the duplicate below (a ClientRequestException) never fires.
+            val errorObj = response["error"] as? JsonObject
+            if (errorObj != null ||
+                (response["status"] as? JsonPrimitive)?.contentOrNull == "error"
+            ) {
+                val code    = (errorObj?.get("status") as? JsonPrimitive)?.intOrNull
+                val message = (errorObj?.get("message") as? JsonPrimitive)?.contentOrNull
+                    ?: (response["message"] as? JsonPrimitive)?.contentOrNull
+
+                return if (code == 409) {
+                    println("⚠️ Duplicate Candidate (409 in body)")
+                    CandidateResult(isDuplicate = true, error = message)
+                } else {
+                    println("❌ API Error ($code): $message")
+                    CandidateResult(error = message ?: "Something went wrong")
+                }
+            }
+
             val candidateId =
                 response["data"]?.jsonObject
                     ?.get("data")?.jsonObject
@@ -695,7 +744,10 @@ class ApiService {
 
             println("✅ Parsed candidateId = $candidateId")
 
-            CandidateResult(candidateId = candidateId)
+            if (candidateId == null)
+                CandidateResult(error = "Server did not return a candidate id")
+            else
+                CandidateResult(candidateId = candidateId)
 
         } catch (e: ClientRequestException) {
             if (e.response.status.value == 409) {
@@ -2251,6 +2303,49 @@ class ApiService {
         return response.status.isSuccess()
     }
 
+    /**
+     * POST phonepe/webhook — the route PhonePe's own servers call, and the one
+     * that turns a paid SERVICE-… order into a ticket.
+     *
+     * It is not the same thing as `phonepe/callback`: that one is authenticated
+     * and settles the order (it answers "OK" for a service order and files
+     * nothing), while this one is public — no bearer token — and is where the
+     * complaint actually gets created. Confirmed by the backend team on
+     * 2026-09-22 after they replayed this body by hand and the ticket appeared.
+     *
+     * Calling it from the app stands in for a webhook that is not reaching the
+     * server on its own. Harmless to send twice: it is keyed by the order id, so
+     * PhonePe's real delivery and this one converge on the same result.
+     */
+    suspend fun sendPhonePeWebhook(
+        merchantOrderId: String,
+        phonepeOrderId: String?,
+        status: String,
+    ): Boolean {
+        println("📡 Sending PhonePe webhook → $merchantOrderId / $status")
+
+        val response = client.post("${baseUrl}phonepe/webhook") {
+            contentType(ContentType.Application.Json)
+            setBody(
+                buildMap {
+                    put("merchantOrderId", merchantOrderId)
+                    put("merchant_order_id", merchantOrderId)
+                    phonepeOrderId?.takeIf { it.isNotBlank() }?.let {
+                        put("phonepeOrderId", it)
+                        put("phonepe_order_id", it)
+                    }
+                    put("status", status)
+                    put("state", status)
+                }
+            )
+        }
+
+        val raw = runCatching { response.bodyAsText() }.getOrDefault("")
+        println("📡 Webhook status = ${response.status} → ${raw.take(300)}")
+
+        return response.status.isSuccess()
+    }
+
 
 
     // ---------------- COMMUNITY POSTS ----------------
@@ -2542,8 +2637,283 @@ class ApiService {
          }.body()
      }
 
+    // ===============================================
+    // SERVICE & WARRANTY APIs
+    // ===============================================
 
+    /**
+     * POST service/complaints — files a service complaint.
+     *
+     * The server, not the app, decides whether money is owed: it answers either
+     * `complaint_submitted: true` with the ticket, or `payment_required: true` with
+     * the ₹ amount for a customer_type of "new". After that payment clears, the same
+     * complaint is posted again with [merchantOrderId] filled in and the server
+     * completes it.
+     *
+     * Multipart, because the invoice and problem photos go up with it.
+     */
+    suspend fun createServiceComplaint(
+        customerType: String,
+        /** Null when the account has no registered device; the server allows it. */
+        deviceId: String?,
+        componentId: String,
+        issue: String,
+        errorCode: String?,
+        invoice: ByteArray?,
+        invoiceName: String?,
+        photos: List<Pair<String, ByteArray>>,
+        merchantOrderId: String? = null,
+        phonepeOrderId: String? = null,
+    ): JsonObject {
+        val token = AppTokenProvider.getToken()
 
+        println("🛠️ POST service/complaints → type=$customerType device=$deviceId component=$componentId payment=$merchantOrderId")
+
+        val response = client.submitFormWithBinaryData(
+            url = "${baseUrl}service/complaints",
+            formData = formData {
+                append("customer_type", customerType)
+                deviceId?.takeIf { it.isNotBlank() }?.let { append("device_id", it) }
+                append("component_id", componentId)
+                append("issue", issue)
+                errorCode?.takeIf { it.isNotBlank() }?.let { append("error_code", it) }
+
+                // Present only on the second post, after the ₹299 has been paid.
+                // Both spellings go up: every other PhonePe route in this app
+                // (phonepe/callback, crminal-callback) takes camelCase, so a
+                // snake_case-only body would be silently ignored if this endpoint
+                // follows the same convention as its siblings.
+                merchantOrderId?.let {
+                    append("merchant_order_id", it)
+                    append("merchantOrderId", it)
+                    append("payment_reference", it)
+                    append("payment_status", "SUCCESS")
+                    append("status", "SUCCESS")
+                }
+                phonepeOrderId?.let {
+                    append("phonepe_order_id", it)
+                    append("phonepeOrderId", it)
+                }
+
+                if (invoice != null) {
+                    append(
+                        key = "invoice",
+                        value = invoice,
+                        headers = Headers.build {
+                            append(HttpHeaders.ContentType, "image/jpeg")
+                            append(
+                                HttpHeaders.ContentDisposition,
+                                "filename=${invoiceName ?: "invoice.jpg"}"
+                            )
+                        }
+                    )
+                }
+
+                photos.forEachIndexed { index, (name, bytes) ->
+                    append(
+                        key = "photos[]",
+                        value = bytes,
+                        headers = Headers.build {
+                            append(HttpHeaders.ContentType, "image/jpeg")
+                            append(
+                                HttpHeaders.ContentDisposition,
+                                "filename=${name.ifBlank { "photo_$index.jpg" }}"
+                            )
+                        }
+                    )
+                }
+            }
+        ) {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+        }
+
+        if (response.status == HttpStatusCode.Unauthorized) throw UnauthorizedException()
+
+        val raw = response.bodyAsText()
+        println("🛠️ SERVICE COMPLAINT (${response.status}) → $raw")
+
+        if (response.status.value in MISSING_ENDPOINT_CODES) {
+            throw ServiceEndpointMissingException("service/complaints")
+        }
+        // 422 carries a JSON validation body worth surfacing, so only bail out on
+        // statuses that arrive as an HTML error page.
+        if (!response.status.isSuccess() && response.status.value >= 500) {
+            throw IllegalStateException("Complaint submission failed: HTTP ${response.status.value}")
+        }
+
+        return Json { ignoreUnknownKeys = true }.parseToJsonElement(raw).jsonObject
+    }
+
+    /**
+     * GET service/my-complaints — every complaint the signed-in user has raised.
+     *
+     * Each entry carries its component, invoice, photos[] and status_history, so
+     * the list and the dashboard counters are built entirely from this response.
+     */
+    suspend fun getMyComplaints(): JsonObject {
+        val token = AppTokenProvider.getToken()
+
+        val response = client.get("${baseUrl}service/my-complaints") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+        }
+
+        val raw = response.bodyAsText()
+        println("🛠️ MY-COMPLAINTS (${response.status}) → ${raw.take(400)}")
+
+        if (response.status == HttpStatusCode.Unauthorized) throw UnauthorizedException()
+        if (response.status.value in MISSING_ENDPOINT_CODES) {
+            throw ServiceEndpointMissingException("service/my-complaints")
+        }
+        if (!response.status.isSuccess()) {
+            throw IllegalStateException("Complaint list failed: HTTP ${response.status.value}")
+        }
+
+        return Json { ignoreUnknownKeys = true }.parseToJsonElement(raw).jsonObject
+    }
+
+    /**
+     * GET service/open-complaints — the complaints the server currently counts as
+     * open. This is the authority on that: the rows carry a `status` of their own
+     * ("pending"), but which bucket they belong to is what the endpoint itself
+     * says, so the app reads membership rather than re-deriving it.
+     *
+     * Laravel pagination, so the rows are at `data.data[]` and [page] walks them.
+     * The shape is lighter than my-complaints — a `component_id` but no component
+     * object, and no invoice, photos or status_history — which is why this is used
+     * to update statuses and never to build a ticket from scratch.
+     */
+    suspend fun getOpenComplaints(page: Int = 1): JsonObject {
+        val token = AppTokenProvider.getToken()
+
+        val response = client.get("${baseUrl}service/open-complaints") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+            parameter("page", page)
+        }
+
+        val raw = response.bodyAsText()
+        println("🛠️ OPEN-COMPLAINTS p$page (${response.status}) → ${raw.take(400)}")
+
+        if (response.status == HttpStatusCode.Unauthorized) throw UnauthorizedException()
+        if (response.status.value in MISSING_ENDPOINT_CODES) {
+            throw ServiceEndpointMissingException("service/open-complaints")
+        }
+        if (!response.status.isSuccess()) {
+            throw IllegalStateException("Open complaints failed: HTTP ${response.status.value}")
+        }
+
+        return Json { ignoreUnknownKeys = true }.parseToJsonElement(raw).jsonObject
+    }
+
+    /**
+     * GET service/my-complaints/{id} — one complaint in full.
+     *
+     * [id] is the numeric row id, not the SR-… ticket number. Beyond the list
+     * payload this adds `device`, `remarks[]` and `documents[]`, and names the
+     * photo array `media` rather than `photos`.
+     */
+    suspend fun getComplaintDetail(id: String): JsonObject {
+        val token = AppTokenProvider.getToken()
+
+        val response = client.get("${baseUrl}service/my-complaints/$id") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+        }
+
+        val raw = response.bodyAsText()
+        println("🛠️ COMPLAINT $id (${response.status}) → ${raw.take(400)}")
+
+        if (response.status == HttpStatusCode.Unauthorized) throw UnauthorizedException()
+        if (response.status.value in MISSING_ENDPOINT_CODES) {
+            throw ServiceEndpointMissingException("service/my-complaints/$id")
+        }
+        if (!response.status.isSuccess()) {
+            throw IllegalStateException("Complaint detail failed: HTTP ${response.status.value}")
+        }
+
+        return Json { ignoreUnknownKeys = true }.parseToJsonElement(raw).jsonObject
+    }
+
+    /**
+     * POST service/create-order — the one-time service charge a customer who is
+     * not on EVA2Z Connect pays before a complaint can be filed.
+     *
+     * The route is not deployed yet, so this throws [ServiceEndpointMissingException]
+     * on a 404 and [buildServicePaymentOrder] retries against the criminal-verification
+     * order endpoint, which is live. Once the real route ships the fallback stops
+     * being reached on its own — no app change needed.
+     */
+    suspend fun createServiceOrder(amount: Int): JsonObject {
+        val token = AppTokenProvider.getToken()
+
+        val response = client.post("${baseUrl}service/create-order") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(mapOf("amount" to amount))
+        }
+
+        val raw = response.bodyAsText()
+        println("💳 SERVICE CREATE-ORDER (${response.status}) → $raw")
+
+        if (response.status == HttpStatusCode.Unauthorized) throw UnauthorizedException()
+        if (response.status.value in MISSING_ENDPOINT_CODES) {
+            throw ServiceEndpointMissingException("service/create-order")
+        }
+        // A 5xx arrives as an HTML error page, so check before handing it to the parser.
+        if (!response.status.isSuccess()) {
+            throw IllegalStateException("Service order failed: HTTP ${response.status.value}")
+        }
+
+        return Json { ignoreUnknownKeys = true }.parseToJsonElement(raw).jsonObject
+    }
+
+    /**
+     * POST service/payment-callback — tells the server the service charge was paid.
+     *
+     * Like every other PhonePe flow in the app this is what actually moves the
+     * order out of PENDING; the SDK's own success result proves nothing.
+     *
+     * Both spellings of each id go up. The route answered 500 — not the 422 a
+     * missing field would produce — to a camelCase-only body on 2026-09-22, which
+     * is what a handler reading `merchant_order_id`, finding null and then
+     * dereferencing the order it failed to look up would do. Its sibling
+     * `phonepe/callback` takes camelCase, so neither convention can be assumed.
+     */
+    suspend fun sendServicePaymentCallback(
+        merchantOrderId: String,
+        phonepeOrderId: String,
+        status: String
+    ): Boolean {
+        val token = AppTokenProvider.getToken()
+
+        println("📡 Sending service payment callback → $merchantOrderId / $status")
+
+        val response = client.post("${baseUrl}service/payment-callback") {
+            header(HttpHeaders.Authorization, "Bearer $token")
+            contentType(ContentType.Application.Json)
+            setBody(
+                mapOf(
+                    "merchantOrderId" to merchantOrderId,
+                    "merchant_order_id" to merchantOrderId,
+                    "phonepeOrderId" to phonepeOrderId,
+                    "phonepe_order_id" to phonepeOrderId,
+                    "status" to status,
+                    "payment_status" to status,
+                )
+            )
+        }
+
+        val raw = runCatching { response.bodyAsText() }.getOrDefault("")
+        println("📡 Service callback status = ${response.status} → ${raw.take(300)}")
+
+        if (response.status.value in MISSING_ENDPOINT_CODES) {
+            throw ServiceEndpointMissingException("service/payment-callback")
+        }
+
+        return response.status.isSuccess()
+    }
 
     // ---------------- ADD STORY ----------------
     suspend fun addStory(
@@ -3020,6 +3390,855 @@ class ApiService {
             throw e
         }
     }
+
+    // ===============================================
+    // SERVICE & WARRANTY — responses turned into models
+    //
+    // The raw calls are above; these wrap them so the screens get domain objects
+    // instead of JsonObjects. Everything the flow needs lives here — there is no
+    // repository layer, and no URL outside [KtorClient.BASE_URL].
+    // ===============================================
+
+    /**
+     * The devices the complaint can be raised against. An empty list is normal —
+     * the complaint still files, just without a `device_id`.
+     */
+    suspend fun fetchServiceVehicles(): List<ServiceVehicle> {
+        val vehicles = getUserDevices().data.map { device ->
+            val name = device.device_name?.takeIf { it.isNotBlank() }
+            ServiceVehicle(
+                vehicleId = device.device_id.toString(),
+                registrationNumber = name ?: device.device_number,
+                // The device API carries no vehicle model; the IMEI-bearing tracker
+                // is what is actually under warranty, so label it as such.
+                model = "EVA2Z GPS Tracker",
+                vin = device.device_number,
+                purchaseDate = device.warranty_start,
+                warrantyExpiry = device.warranty_expiry,
+                warrantyActive = device.warranty_status == "active",
+            )
+        }
+        println("🛵 get-user-devices → ${vehicles.size} device(s)")
+        return vehicles
+    }
+
+    /**
+     * The signed-in user's complaints, newest first.
+     *
+     * `service/open-complaints` used to be read here to move tickets into the Open
+     * bucket; it was dropped on the backend team's instruction (2026-09-22), so the
+     * status `my-complaints` gives is now the only one. [fetchOpenComplaintKeys]
+     * still exists for whoever wants that bucket back, but nothing calls it.
+     *
+     * [vehicles] only names the device a ticket was raised against; pass an empty
+     * list when the caller does not have them and the ticket still reads fine.
+     */
+    suspend fun fetchServiceComplaints(
+        vehicles: List<ServiceVehicle> = emptyList(),
+    ): List<ServiceTicket> {
+        val payload = getMyComplaints()
+        val rows = payload["data"]?.let { runCatching { it.jsonArray }.getOrNull() }
+            ?: run {
+                println("⚠️ my-complaints returned no data array")
+                return emptyList()
+            }
+
+        val tickets = rows.mapNotNull { row ->
+            runCatching { row.jsonObject.toServiceTicket(vehicles) }
+                .onFailure { println("⚠️ Skipped an unreadable complaint row: ${it.message}") }
+                .getOrNull()
+        }
+        println("🛠️ my-complaints → ${tickets.size} ticket(s)")
+
+        return tickets.sortedByDescending { it.lastUpdatedMillis }
+    }
+
+    /**
+     * Every ticket number and row id `service/open-complaints` lists, following the
+     * Laravel paginator. Capped at [MAX_OPEN_PAGES] so a paginator that never
+     * reports a last page cannot spin; what was dropped is logged rather than
+     * passed off as the whole set.
+     */
+    suspend fun fetchOpenComplaintKeys(): Set<String> {
+        val keys = mutableSetOf<String>()
+        var page = 1
+
+        while (page <= MAX_OPEN_PAGES) {
+            val payload = getOpenComplaints(page)
+            val body = payload["data"]?.let { runCatching { it.jsonObject }.getOrNull() }
+
+            // Paginated ({data: {data: [...]}}) is the shape today; a bare array is
+            // accepted too so an unpaginated build of the route still works.
+            val rows = body?.get("data")?.let { runCatching { it.jsonArray }.getOrNull() }
+                ?: payload["data"]?.let { runCatching { it.jsonArray }.getOrNull() }
+                ?: break
+
+            rows.forEach { element ->
+                val row = runCatching { element.jsonObject }.getOrNull() ?: return@forEach
+                row.text("ticket_number", "ticket_no")?.let { keys += it }
+                row.text("id")?.let { keys += it }
+            }
+
+            val lastPage = body?.number("last_page") ?: page
+            if (page >= lastPage) {
+                println("🛠️ open-complaints → ${keys.size} key(s) across $page page(s)")
+                return keys
+            }
+            page++
+        }
+
+        println("⚠️ open-complaints stopped at the $MAX_OPEN_PAGES-page cap — later pages were not read.")
+        return keys
+    }
+
+    /**
+     * One complaint in full. `service/my-complaints/{id}` is keyed by the numeric
+     * row id, which only the list carries, so the list is read first unless the
+     * caller already knows the row ([known]).
+     */
+    suspend fun fetchServiceComplaint(
+        ticketId: String,
+        vehicles: List<ServiceVehicle> = emptyList(),
+        known: ServiceTicket? = null,
+    ): ServiceTicket? {
+        val listed = known
+            ?: runCatching { fetchServiceComplaints(vehicles) }
+                .getOrElse { e ->
+                    println("⚠️ Couldn't read the list for $ticketId: ${e.message}")
+                    emptyList()
+                }
+                .firstOrNull { it.ticketId == ticketId }
+
+        val rowId = listed?.serverId ?: ticketId.takeIf { id -> id.all { it.isDigit() } }
+        if (rowId == null) {
+            println("⚠️ No numeric id for $ticketId — showing the listed copy.")
+            return listed
+        }
+
+        val fetched = runCatching {
+            getComplaintDetail(rowId)["data"]
+                ?.let { it.jsonObject }
+                ?.toServiceTicket(vehicles)
+        }.getOrElse { e ->
+            println("❌ Complaint $rowId detail failed: ${e.message}")
+            null
+        } ?: return listed
+
+        // The detail response has no idea about the open bucket, so the status the
+        // list already resolved wins — the two screens must not disagree.
+        val merged = listed?.let { fetched.enrichedWith(it).copy(status = it.status) } ?: fetched
+        return merged
+    }
+
+    /** The serviceable components. There is no components endpoint; this is local. */
+    fun serviceComponents(): List<ServiceComponentItem> = ServiceComponentCatalog
+
+    /**
+     * Files the complaint. [payment] is non-null only on the second attempt, after
+     * the service charge the server asked for has been paid and confirmed.
+     */
+    @OptIn(ExperimentalTime::class)
+    suspend fun submitServiceComplaint(
+        draft: ComplaintDraft,
+        payment: ServicePaymentReceipt? = null,
+    ): ComplaintSubmission {
+        // No device on the account is not a blocker — the server files the complaint
+        // with a null device_id — so a stand-in stands in for display only.
+        val vehicle = draft.vehicle ?: UnlinkedVehicle
+        val component = draft.component ?: error("component missing")
+        val customerType = draft.customerType ?: ServiceCustomerType.EVA2Z_CUSTOMER
+
+        suspend fun post() = createServiceComplaint(
+            customerType = customerType.apiValue,
+            // The server keys complaints by the tracker's IMEI, which is what
+            // get-user-devices calls device_number and this app calls the VIN.
+            deviceId = vehicle.vin.ifBlank { vehicle.vehicleId }.takeIf { it.isNotBlank() },
+            componentId = component.apiId,
+            issue = draft.issueDescription.trim(),
+            errorCode = draft.errorCode.trim().takeIf { it.isNotBlank() },
+            invoice = draft.invoice?.bytes,
+            invoiceName = draft.invoice?.name,
+            photos = draft.media.mapNotNull { media -> media.bytes?.let { media.name to it } },
+            merchantOrderId = payment?.merchantOrderId,
+            // Both references go up: the server has been seen to ignore a lone
+            // merchant_order_id and answer with a fresh charge instead.
+            phonepeOrderId = payment?.phonepeOrderId,
+        )
+
+        // A dropped upload ("unexpected end of stream" — the server closing a
+        // pooled connection mid-multipart) produces no response at all, so whether
+        // the complaint was filed is genuinely unknown. Blindly re-posting risks a
+        // duplicate ticket, so the list endpoint is asked first and the retry only
+        // happens once nothing matching is found there.
+        val payload = try {
+            post()
+        } catch (first: Exception) {
+            println("⚠️ service/complaints failed (${first.message}) — checking whether it landed.")
+            alreadyFiled(draft, component)?.let { return ComplaintSubmission.Created(it) }
+
+            try {
+                post()
+            } catch (second: Exception) {
+                println("⚠️ Retry also failed (${second.message}) — checking once more.")
+                alreadyFiled(draft, component)?.let { return ComplaintSubmission.Created(it) }
+                throw second
+            }
+        }
+
+        val data = payload["data"]?.jsonObject
+        val succeeded = payload["success"]?.jsonPrimitive?.booleanOrNull
+            ?: payload["status"]?.jsonPrimitive?.booleanOrNull
+            ?: true
+
+        // The server owns this decision. Only `complaint_submitted: true` means a
+        // ticket exists — a `success: true` alongside `payment_required` does not.
+        val paymentRequired = data?.get("payment_required")?.jsonPrimitive?.booleanOrNull == true
+        val complaintSubmitted = data?.get("complaint_submitted")?.jsonPrimitive?.booleanOrNull == true
+
+        if (!succeeded && !paymentRequired) {
+            return ComplaintSubmission.Rejected(
+                payload.text("message") ?: "Your complaint could not be submitted."
+            )
+        }
+
+        if (paymentRequired && !complaintSubmitted) {
+            // Already paid, and the server is still answering payment_required. The
+            // ticket may exist anyway — `phonepe/webhook` is what files it, and it
+            // is called before this re-post. Ask the list before posting again:
+            // every re-post mints a fresh PENDING order on some builds of this
+            // route, so a blind retry leaves a trail of orphan charges behind.
+            if (payment != null) {
+                alreadyFiled(draft, component)?.let {
+                    println("✅ ${it.ticketId} exists — the webhook filed it; not re-posting.")
+                    return ComplaintSubmission.Created(it)
+                }
+            }
+
+            val charge = data?.number("service_charge", "amount") ?: customerType.expectedFeeRupees
+            return ComplaintSubmission.PaymentRequired(
+                amountRupees = charge,
+                buttonText = data?.text("button_text"),
+                // "payment_required with payment_status SUCCESS" is the server saying
+                // it has the money but has not filed the ticket yet — not a new charge.
+                settled = data?.text("payment_status")?.serviceSlug() == "success",
+                // The checkout may ride along with the amount; when it doesn't,
+                // the caller falls back to createServicePaymentOrder().
+                order = payload.readPaymentOrder(charge),
+            )
+        }
+
+        return ComplaintSubmission.Created(
+            (data ?: payload).toSubmittedTicket(
+                vehicle = vehicle,
+                component = component,
+                draft = draft,
+                customerType = customerType,
+                payment = payment,
+            )
+        )
+    }
+
+    /**
+     * Whether the complaint being submitted is already on the server — asked after
+     * a POST died without a response.
+     *
+     * Matched on component + issue text within [DUPLICATE_WINDOW_MS]; the window is
+     * what keeps a genuine repeat complaint about the same fault from being
+     * mistaken for the one that just failed.
+     */
+    @OptIn(ExperimentalTime::class)
+    private suspend fun alreadyFiled(
+        draft: ComplaintDraft,
+        component: ServiceComponentItem,
+    ): ServiceTicket? {
+        val issue = draft.issueDescription.trim()
+        if (issue.isEmpty()) return null
+
+        val now = Clock.System.now().toEpochMilliseconds()
+        val match = runCatching {
+            fetchServiceComplaints().firstOrNull { ticket ->
+                ticket.issueDescription.trim() == issue &&
+                    ticket.component.label.equals(component.label, ignoreCase = true) &&
+                    now - ticket.createdAtMillis <= DUPLICATE_WINDOW_MS
+            }
+        }.getOrElse { e ->
+            println("⚠️ Couldn't re-read my-complaints after the failure: ${e.message}")
+            null
+        }
+
+        if (match != null) println("✅ ${match.ticketId} was filed after all — not re-posting.")
+        return match
+    }
+
+    /** Opens a PhonePe checkout for the service charge the server asked for. */
+    suspend fun buildServicePaymentOrder(amountRupees: Int): ServicePaymentOrder {
+        val (payload, viaLegacy) = try {
+            createServiceOrder(amountRupees) to false
+        } catch (e: ServiceEndpointMissingException) {
+            // service/create-order is not deployed yet. crminal-create-order takes the
+            // same {amount} body and returns the same PhonePe order, so the ₹299
+            // checkout still completes — it is just booked against the wrong ledger
+            // until the real route lands.
+            println("⚠️ ${e.message} Falling back to criminal-create-order.")
+            createCriminalOrder(amountRupees) to true
+        }
+
+        val merchantOrderId = payload.findStringDeep("merchantOrderId", "merchant_order_id")
+            ?: throw IllegalStateException(
+                "Merchant order id missing in order response (keys: ${payload.keys.joinToString()})"
+            )
+        val token = payload.findStringDeep("token", "orderToken", "order_token")
+            ?: throw IllegalStateException(
+                "Payment token missing in order response (keys: ${payload.keys.joinToString()})"
+            )
+        // PhonePe resolves the token against its own OMO… id. A bare `order_id` is
+        // deliberately not searched — that is our numeric DB row.
+        val phonepeOrderId = payload.findStringDeep("phonepeOrderId", "phonepe_order_id")
+            ?: payload.findStringDeep("orderId")
+            ?: merchantOrderId
+
+        println("💳 Service fee order → merchant=$merchantOrderId, phonepe=$phonepeOrderId, legacy=$viaLegacy")
+
+        return ServicePaymentOrder(
+            merchantOrderId = merchantOrderId,
+            phonepeOrderId = phonepeOrderId,
+            token = token,
+            amountRupees = amountRupees,
+            viaLegacyEndpoint = viaLegacy,
+        )
+    }
+
+    /**
+     * Confirms a finished checkout. Returns false when the server would not confirm
+     * it — the payment must then be treated as unconfirmed, never as paid.
+     */
+    suspend fun confirmServicePayment(
+        order: ServicePaymentOrder,
+        phonepeOrderId: String?,
+    ): Boolean {
+        val txnId = phonepeOrderId?.takeIf { it.isNotBlank() } ?: order.phonepeOrderId
+
+        // The callback is confirmed against whichever endpoint created the order —
+        // the criminal ledger cannot look up an order it never issued. Retried
+        // because losing this call strands money the user has already spent.
+        repeat(3) { attempt ->
+            val confirmed = runCatching {
+                if (order.viaLegacyEndpoint) {
+                    sendCriminalPaymentCallback(order.merchantOrderId, txnId, "SUCCESS")
+                } else {
+                    sendServicePaymentCallback(order.merchantOrderId, txnId, "SUCCESS")
+                }
+            }.getOrElse { e ->
+                println("❌ Service payment callback attempt ${attempt + 1} failed: ${e.message}")
+                false
+            }
+
+            if (confirmed) {
+                println("✅ Service charge confirmed with server (${order.merchantOrderId})")
+                return true
+            }
+            delay(700L * (attempt + 1))
+        }
+        return false
+    }
+
+    /**
+     * Last-resort settle attempt down the app's shared `phonepe/callback` route —
+     * the one the Shop checkout uses and which is known to work there. Returns
+     * false when the route will not take a SERVICE-… order, which is not an error.
+     */
+    suspend fun confirmServicePaymentViaSharedCallback(receipt: ServicePaymentReceipt): Boolean =
+        runCatching {
+            sendPhonePeCallback(
+                PhonePeCallbackRequest(
+                    merchantOrderId = receipt.merchantOrderId,
+                    phonepeOrderId = receipt.phonepeOrderId ?: receipt.merchantOrderId,
+                    status = "SUCCESS",
+                )
+            )
+        }.getOrElse { e ->
+            println("⚠️ Shared phonepe/callback wouldn't take ${receipt.merchantOrderId}: ${e.message}")
+            false
+        }
+
+    /**
+     * Tells the server the service charge was paid, down every route that will
+     * take a SERVICE-… order.
+     *
+     * `phonepe/webhook` is the one that matters — it is what creates the ticket,
+     * and PhonePe's own delivery of it is evidently not arriving. The other two
+     * only settle the order: `service/payment-callback` (500s as of 2026-09-22)
+     * and the shared `phonepe/callback` the Shop checkout uses. All three are
+     * tried because a route refusing this order is not an error, and the webhook
+     * is sent last so the order is already settled when it lands.
+     */
+    suspend fun settleServicePayment(receipt: ServicePaymentReceipt): Boolean {
+        val txnId = receipt.phonepeOrderId?.takeIf { it.isNotBlank() } ?: receipt.merchantOrderId
+
+        val viaService = runCatching {
+            sendServicePaymentCallback(receipt.merchantOrderId, txnId, "SUCCESS")
+        }.getOrElse { e ->
+            println("⚠️ service/payment-callback wouldn't take ${receipt.merchantOrderId}: ${e.message}")
+            false
+        }
+
+        val viaShared = confirmServicePaymentViaSharedCallback(receipt)
+
+        val viaWebhook = runCatching {
+            sendPhonePeWebhook(receipt.merchantOrderId, receipt.phonepeOrderId, "SUCCESS")
+        }.getOrElse { e ->
+            println("⚠️ phonepe/webhook wouldn't take ${receipt.merchantOrderId}: ${e.message}")
+            false
+        }
+
+        println(
+            "💳 ${receipt.merchantOrderId} settle → service=$viaService " +
+                "shared=$viaShared webhook=$viaWebhook"
+        )
+        return viaService || viaShared || viaWebhook
+    }
+}
+
+/* ════════════════ SERVICE & WARRANTY — JSON → domain ══════════════════════ *
+ *
+ * Parsing for the service endpoints, kept beside the calls that produce it so
+ * the whole flow reads top to bottom in this one file.
+ */
+
+/** How recent a server-side ticket has to be to count as the one whose upload died. */
+private const val DUPLICATE_WINDOW_MS = 5 * 60 * 1000L
+
+/** How many pages of `service/open-complaints` are read before giving up. */
+private const val MAX_OPEN_PAGES = 5
+
+/**
+ * Attachment paths are host-relative, so they are resolved against the API host —
+ * [KtorClient.BASE_URL] minus its "/api/" suffix.
+ *
+ * Two shapes arrive: `file_url` already carries the "/storage" prefix Laravel
+ * serves the disk under, while the `file_path` on the complaint endpoints is the
+ * bare disk path ("service/invoices/x.pdf") and has to be given one.
+ */
+private val SERVICE_FILE_HOST = KtorClient.BASE_URL.removeSuffix("/").removeSuffix("/api")
+
+private fun String.asFileUrl(): String {
+    if (startsWith("http://") || startsWith("https://")) return this
+    val path = trimStart('/')
+    return if (path.startsWith("storage/")) "$SERVICE_FILE_HOST/$path"
+    else "$SERVICE_FILE_HOST/storage/$path"
+}
+
+/**
+ * Fills the gaps the server cannot fill from the copy the caller already holds:
+ * the attachment bytes the user picked and the PhonePe receipt, which appears
+ * nowhere in the complaint payload. Everything else stays as the server sent it.
+ */
+private fun ServiceTicket.enrichedWith(local: ServiceTicket): ServiceTicket {
+    val withBytes = attachments.map { remote ->
+        if (remote.bytes != null) return@map remote
+        val match = local.attachments.firstOrNull { it.kind == remote.kind && it.name == remote.name }
+            ?: local.attachments.filter { it.kind == remote.kind }
+                .getOrNull(attachments.filter { it.kind == remote.kind }.indexOf(remote))
+        match?.bytes?.let { remote.copy(bytes = it) } ?: remote
+    }
+
+    return copy(
+        attachments = withBytes.ifEmpty { local.attachments },
+        payment = payment ?: local.payment,
+        customerType = local.customerType,
+        allocation = allocation ?: local.allocation,
+    )
+}
+
+/**
+ * Moves a ticket to [TicketStatus.OPEN] when `service/open-complaints` named it.
+ *
+ * A ticket that has already reached In progress or Completed is left alone: the
+ * open list lags behind those, and demoting a finished complaint back to Open
+ * would read as the work being undone.
+ */
+private fun ServiceTicket.withOpenStatusApplied(openKeys: Set<String>): ServiceTicket {
+    if (openKeys.isEmpty() || status == TicketStatus.OPEN) return this
+    if (status == TicketStatus.IN_PROGRESS || status == TicketStatus.COMPLETED) return this
+
+    val named = ticketId in openKeys || serverId?.let { it in openKeys } == true
+    return if (named) copy(status = TicketStatus.OPEN) else this
+}
+
+/**
+ * One `invoice` / `photos[]` entry. [local] is the copy the user picked, matched
+ * positionally, and is only used for its bytes — every other field comes from the
+ * server, which is why a PDF invoice keeps its real name and mime type instead of
+ * the "invoice.jpg" we uploaded it as.
+ */
+private fun JsonObject.toStoredAttachment(
+    kind: AttachmentKind,
+    local: ServiceAttachment?,
+): ServiceAttachment? {
+    val url = text("file_url", "url", "file_path")?.asFileUrl() ?: return null
+
+    return ServiceAttachment(
+        id = text("id")?.let { "${kind.name.lowercase()}-$it" } ?: local?.id ?: url,
+        // The complaint endpoints send no filename, so the last path segment is
+        // the only honest label available — "invoice.pdf" beats "Attachment".
+        name = text("original_name", "name", "file_name")
+            ?: local?.name
+            ?: url.substringAfterLast('/').takeIf { it.isNotBlank() }
+            ?: "Attachment",
+        sizeBytes = number("size", "file_size")?.toLong() ?: local?.sizeBytes ?: 0L,
+        kind = kind,
+        bytes = local?.bytes,
+        url = url,
+        mimeType = text("mime_type", "mime") ?: text("file_type"),
+    )
+}
+
+/**
+ * One row of `GET service/my-complaints`, or the `data` object of
+ * `GET service/my-complaints/{id}`.
+ *
+ * The two shapes are the same bar three things, all handled here: the detail
+ * names its photo array `media` where the list calls it `photos`, the detail
+ * nests the full `device` the list reduces to a `device_id`, and the detail adds
+ * `remarks` / `documents`.
+ */
+@OptIn(ExperimentalTime::class)
+private fun JsonObject.toServiceTicket(vehicles: List<ServiceVehicle>): ServiceTicket {
+    val rowId = text("id")
+    val ticketId = text("ticket_number", "ticket_no")
+        ?: rowId?.let { "SR-$it" }
+        ?: error("complaint row carries neither ticket_number nor id")
+
+    val component = readComponent()
+    val created = timestamp("created_at", "raised_at") ?: 0L
+    val issue = text("issue", "issue_description").orEmpty()
+
+    return ServiceTicket(
+        ticketId = ticketId,
+        serverId = rowId,
+        vehicle = readVehicle(vehicles),
+        component = component,
+        issueTitle = issue.take(60),
+        issueDescription = issue,
+        errorCode = text("error_code"),
+        status = resolveServiceStatus(text("status", "complaint_status")),
+        attachments = readRemoteAttachments(),
+        // No technician fields exist on the payload yet; the detail screen already
+        // hides the allocation card when this is null.
+        allocation = null,
+        timeline = readTimeline(ticketId, component, created),
+        createdAtMillis = created,
+        lastUpdatedMillis = timestamp("updated_at") ?: created,
+    )
+}
+
+/**
+ * Builds the ticket from the submission response, keeping the attachment bytes
+ * the user just picked — `service/my-complaints` echoes paths, never bytes, so
+ * this is the only copy that can preview without a download.
+ */
+@OptIn(ExperimentalTime::class)
+private fun JsonObject.toSubmittedTicket(
+    vehicle: ServiceVehicle,
+    component: ServiceComponentItem,
+    draft: ComplaintDraft,
+    customerType: ServiceCustomerType,
+    payment: ServicePaymentReceipt?,
+): ServiceTicket {
+    val now = Clock.System.now().toEpochMilliseconds()
+    val ticketId = text("ticket_number", "ticket_no", "ticket_id", "id") ?: "EVSR-$now"
+    val created = timestamp("created_at", "raised_at") ?: now
+
+    return ServiceTicket(
+        ticketId = ticketId,
+        // Kept so the detail screen can read the ticket back straight away,
+        // before the list endpoint has been re-polled.
+        serverId = text("id"),
+        vehicle = vehicle,
+        component = component,
+        issueTitle = draft.issueDescription.trim().take(60),
+        issueDescription = text("issue", "issue_description") ?: draft.issueDescription.trim(),
+        errorCode = text("error_code") ?: draft.errorCode.trim().takeIf { it.isNotBlank() },
+        status = resolveServiceStatus(text("status", "complaint_status")),
+        attachments = readStoredAttachments(draft),
+        allocation = null,
+        customerType = text("customer_type")?.let { ServiceCustomerType.fromApi(it) } ?: customerType,
+        payment = payment ?: readServerPayment(created),
+        timeline = buildList {
+            payment?.let {
+                add(
+                    TimelineEntry(
+                        title = "Service charge paid",
+                        note = "₹${it.amountRupees} received · ${it.merchantOrderId}",
+                        timestampMillis = it.paidAtMillis,
+                    )
+                )
+            }
+            add(
+                TimelineEntry(
+                    title = "Complaint submitted",
+                    note = "Ticket $ticketId created for ${component.label}.",
+                    timestampMillis = created,
+                )
+            )
+        }.reversed(),
+        createdAtMillis = created,
+        lastUpdatedMillis = created,
+    )
+}
+
+/**
+ * The server's `component` object is authoritative for the id and the name. The
+ * local catalogue is consulted only for "does this need an invoice", matched by
+ * name — its own numeric ids were guessed before this endpoint existed and do
+ * not line up with the server's.
+ */
+private fun JsonObject.readComponent(): ServiceComponentItem {
+    val node = this["component"]?.let { runCatching { it.jsonObject }.getOrNull() }
+    val name = node?.text("name")
+    val id = node?.text("id") ?: text("component_id")
+
+    val catalogue = ServiceComponentCatalog.firstOrNull { it.label.equals(name, ignoreCase = true) }
+
+    return ServiceComponentItem(
+        id = catalogue?.id ?: name?.serviceSlug() ?: id ?: "other",
+        label = name ?: catalogue?.label ?: "Other",
+        requiresInvoice = catalogue?.requiresInvoice ?: true,
+        serverId = id ?: catalogue?.serverId,
+    )
+}
+
+/**
+ * `device_id` is null on most complaints — the server files them without one —
+ * and is matched against the device list when present. [UnlinkedVehicle] is the
+ * display stand-in, exactly as it is at submission time.
+ */
+private fun JsonObject.readVehicle(vehicles: List<ServiceVehicle>): ServiceVehicle {
+    val nested = this["device"]?.let { runCatching { it.jsonObject }.getOrNull() }
+    val id = nested?.text("device_id", "id") ?: text("device_id") ?: return UnlinkedVehicle
+
+    vehicles.firstOrNull { it.vehicleId == id || it.vin == id }?.let { return it }
+
+    val number = nested?.text("device_number", "device_name") ?: return UnlinkedVehicle
+    return ServiceVehicle(
+        vehicleId = id,
+        registrationNumber = number,
+        model = "EVA2Z GPS Tracker",
+        vin = number,
+    )
+}
+
+/** Invoice, problem photos and — on the detail response — any extra documents. */
+private fun JsonObject.readRemoteAttachments(): List<ServiceAttachment> {
+    fun array(key: String) = this[key]?.let { runCatching { it.jsonArray }.getOrNull() }
+
+    val invoice = this["invoice"]
+        ?.let { runCatching { it.jsonObject }.getOrNull() }
+        ?.toStoredAttachment(AttachmentKind.INVOICE, local = null)
+
+    val photos = (array("media") ?: array("photos"))
+        ?.mapNotNull { element ->
+            runCatching {
+                element.jsonObject.toStoredAttachment(AttachmentKind.PHOTO, local = null)
+            }.getOrNull()
+        }
+        .orEmpty()
+
+    val documents = array("documents")
+        ?.mapNotNull { element ->
+            runCatching {
+                element.jsonObject.toStoredAttachment(AttachmentKind.INVOICE, local = null)
+            }.getOrNull()
+        }
+        .orEmpty()
+
+    return listOfNotNull(invoice) + photos + documents
+}
+
+/**
+ * `status_history` is the timeline, newest first, with any free-text `remarks`
+ * folded in. Falls back to a single "submitted" entry so the detail screen is
+ * never blank for a ticket the server sent no history for.
+ */
+@OptIn(ExperimentalTime::class)
+private fun JsonObject.readTimeline(
+    ticketId: String,
+    component: ServiceComponentItem,
+    createdAtMillis: Long,
+): List<TimelineEntry> {
+    fun array(key: String) = this[key]?.let { runCatching { it.jsonArray }.getOrNull() }
+
+    val history = array("status_history")
+        ?.mapNotNull { element ->
+            val entry = runCatching { element.jsonObject }.getOrNull() ?: return@mapNotNull null
+            TimelineEntry(
+                title = resolveServiceStatus(entry.text("new_status")).label,
+                note = entry.text("remark", "note"),
+                timestampMillis = entry.timestamp("created_at") ?: createdAtMillis,
+            )
+        }
+        .orEmpty()
+
+    val remarks = array("remarks")
+        ?.mapNotNull { element ->
+            val entry = runCatching { element.jsonObject }.getOrNull() ?: return@mapNotNull null
+            val note = entry.text("remark", "message", "note", "body") ?: return@mapNotNull null
+            TimelineEntry(
+                title = entry.text("added_by_role", "role")?.let { "Update from $it" } ?: "Update",
+                note = note,
+                timestampMillis = entry.timestamp("created_at") ?: createdAtMillis,
+            )
+        }
+        .orEmpty()
+
+    return (history + remarks)
+        .sortedByDescending { it.timestampMillis }
+        .ifEmpty {
+            listOf(
+                TimelineEntry(
+                    title = "Complaint submitted",
+                    note = "Ticket $ticketId created for ${component.label}.",
+                    timestampMillis = createdAtMillis,
+                )
+            )
+        }
+}
+
+/**
+ * The stored invoice and photos, falling back to what the user picked when the
+ * server echoes nothing back — the detail screen should never look empty just
+ * because the response shape changed.
+ */
+private fun JsonObject.readStoredAttachments(draft: ComplaintDraft): List<ServiceAttachment> {
+    val invoice = this["invoice"]
+        ?.let { runCatching { it.jsonObject }.getOrNull() }
+        ?.toStoredAttachment(AttachmentKind.INVOICE, draft.invoice)
+        ?: draft.invoice
+
+    val photos = this["photos"]
+        ?.let { runCatching { it.jsonArray }.getOrNull() }
+        ?.mapIndexedNotNull { index, element ->
+            runCatching {
+                element.jsonObject.toStoredAttachment(
+                    kind = AttachmentKind.PHOTO,
+                    local = draft.media.getOrNull(index),
+                )
+            }.getOrNull()
+        }
+        ?.takeIf { it.isNotEmpty() }
+        ?: draft.media
+
+    return listOfNotNull(invoice) + photos
+}
+
+/**
+ * A receipt reconstructed from the response, for a complaint whose charge the
+ * server already considers settled but that this session did not pay for itself.
+ * `payment_status: "not_required"` and a null order id both mean there is none.
+ */
+private fun JsonObject.readServerPayment(createdAtMillis: Long): ServicePaymentReceipt? {
+    val merchantOrderId = text("merchant_order_id", "merchantOrderId") ?: return null
+    val charge = number("service_charge", "amount") ?: return null
+    if (charge <= 0) return null
+
+    val settled = text("payment_status")?.serviceSlug()
+    if (settled == "not_required" || settled == "pending" || settled == "failed") return null
+
+    return ServicePaymentReceipt(
+        merchantOrderId = merchantOrderId,
+        amountRupees = charge,
+        paidAtMillis = createdAtMillis,
+    )
+}
+
+/**
+ * Pulls a PhonePe checkout out of a `payment_required` response.
+ *
+ * `merchant_order_id` and `phonepe_order_id` are always present in the body but are
+ * JSON null on a free complaint, which [findStringDeep] already discards. The token
+ * is the part that decides: without it the SDK has nothing to resolve the order
+ * against, so this returns null and the caller creates the order separately.
+ */
+private fun JsonObject.readPaymentOrder(amountRupees: Int): ServicePaymentOrder? {
+    val merchantOrderId = findStringDeep("merchantOrderId", "merchant_order_id") ?: return null
+    val token = findStringDeep("order_token", "token", "orderToken")
+    if (token == null) {
+        println("⚠️ service/complaints returned $merchantOrderId with no payment token — creating the order separately.")
+        return null
+    }
+    val phonepeOrderId = findStringDeep("phonepe_order_id", "phonepeOrderId")
+        ?: findStringDeep("orderId")
+        ?: merchantOrderId
+
+    return ServicePaymentOrder(
+        merchantOrderId = merchantOrderId,
+        phonepeOrderId = phonepeOrderId,
+        token = token,
+        amountRupees = amountRupees,
+        // This order belongs to the complaint, so re-posting the complaint is how
+        // it gets confirmed — there is no callback endpoint to reach for.
+        confirmedByResubmit = true,
+    )
+}
+
+/**
+ * The backend reports four statuses — submitted, open, in progress, completed.
+ * The extra spellings are older wordings and synonyms still present on historic
+ * rows; each folds onto the nearest of the four rather than inventing a stage.
+ */
+private fun resolveServiceStatus(raw: String?): TicketStatus = when (raw?.serviceSlug()) {
+    "submitted", "new", "raised", "complaint_raised", "pending" -> TicketStatus.SUBMITTED
+    "open", "reopened", "assigned", "technician_assigned", "allocated", "approved", "verified" ->
+        TicketStatus.OPEN
+    "in_progress", "servicing", "work_in_progress", "processing" -> TicketStatus.IN_PROGRESS
+    "completed", "resolved", "done", "closed" -> TicketStatus.COMPLETED
+    else -> TicketStatus.SUBMITTED
+}
+
+/** "In Progress" / "in-progress" / "IN PROGRESS" all collapse to "in_progress". */
+private fun String.serviceSlug(): String = trim().lowercase()
+    .map { if (it.isLetterOrDigit()) it else '_' }
+    .joinToString("")
+    .trim('_')
+
+private fun JsonObject.text(vararg keys: String): String? {
+    for (key in keys) {
+        val primitive = this[key] as? JsonPrimitive ?: continue
+        val value = primitive.contentOrNull?.trim() ?: continue
+        if (value.isNotEmpty() && !value.equals("null", ignoreCase = true)) return value
+    }
+    return null
+}
+
+/**
+ * `service_charge` arrives as 1, "1" and "1.00" depending on the route, so a
+ * decimal string is read too — without it a ₹1 charge fell through to the app's
+ * own ₹299 expectation and the button quoted the wrong figure.
+ */
+private fun JsonObject.number(vararg keys: String): Int? {
+    for (key in keys) {
+        val primitive = this[key] as? JsonPrimitive ?: continue
+        primitive.intOrNull?.let { return it }
+        val raw = primitive.contentOrNull?.trim() ?: continue
+        raw.toIntOrNull()?.let { return it }
+        raw.toDoubleOrNull()?.let { return it.toInt() }
+    }
+    return null
+}
+
+/**
+ * Laravel hands back either "2026-09-16T10:12:33.000000Z" or "2026-09-16 10:12:33";
+ * the second form has no offset, so it is read as UTC — the same assumption the
+ * rest of the app makes for server timestamps.
+ */
+@OptIn(ExperimentalTime::class)
+private fun JsonObject.timestamp(vararg keys: String): Long? {
+    val raw = text(*keys) ?: return null
+    val candidates = listOf(raw, raw.replace(' ', 'T'), raw.replace(' ', 'T') + "Z")
+    for (candidate in candidates) {
+        runCatching { Instant.parse(candidate).toEpochMilliseconds() }.getOrNull()?.let { return it }
+    }
+    return null
 }
 
 

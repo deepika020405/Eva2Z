@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
@@ -35,6 +36,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import cafe.adriel.voyager.navigator.LocalNavigator
@@ -679,61 +682,118 @@ private fun DeviceTypeSheet(
 @Composable
 private fun ShopTopBar(cartCount: Int, onCartClick: () -> Unit, onOrdersClick: () -> Unit) {
     Surface(color = P_Bg, shadowElevation = 0.dp) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "Shop", fontSize = 26.sp,
-                    fontWeight = FontWeight.Black, color = P_Dark
-                )
-                Text(
-                    "Protect every vehicle you own",
-                    fontSize = 12.sp, color = P_Mid
-                )
-            }
-            Box(
+        BoxWithConstraints {
+
+            // Same breakpoints the rest of the app uses (see HomeScreen).
+            val isTablet = maxWidth >= 600.dp
+            val isCompact = maxWidth < 360.dp
+            val hPad = when { isTablet -> 28.dp; isCompact -> 12.dp; else -> 20.dp }
+            val gap = if (isCompact) 8.dp else 10.dp
+
+            val pillHeight = if (isCompact) 36.dp else 40.dp
+            val pillIcon = if (isCompact) 16.dp else 18.dp
+            val pillText = if (isCompact) 11.sp else 12.sp
+            val pillPad = if (isCompact) 10.dp else 12.dp
+
+            Row(
                 modifier = Modifier
-                    .size(40.dp).clip(CircleShape).background(P_ChipBg)
-                    .clickable { onOrdersClick() },
-                contentAlignment = Alignment.Center
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = hPad, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    Icons.Outlined.ReceiptLong, "My Orders",
-                    tint = P_Dark, modifier = Modifier.size(20.dp)
-                )
-            }
-            Spacer(Modifier.width(10.dp))
-            Box {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp).clip(CircleShape).background(P_ChipBg)
-                        .clickable { onCartClick() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        Icons.Outlined.ShoppingCart, null,
-                        tint = P_Dark, modifier = Modifier.size(20.dp)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Shop", fontSize = if (isCompact) 22.sp else 26.sp,
+                        fontWeight = FontWeight.Black, color = P_Dark,
+                        maxLines = 1
                     )
-                }
-                if (cartCount > 0) {
-                    Box(
-                        modifier = Modifier
-                            .size(17.dp).clip(CircleShape).background(P_Red)
-                            .border(1.5.dp, P_Bg, CircleShape)
-                            .align(Alignment.TopEnd).offset(x = 3.dp, y = (-3).dp),
-                        contentAlignment = Alignment.Center
-                    ) {
+                    // Dropped entirely on a small phone: it's decorative, and the two
+                    // labelled buttons need that width more than it does. Elsewhere it
+                    // ellipsises rather than wrapping, which would change the bar height.
+                    if (!isCompact) {
                         Text(
-                            cartCount.toString(), fontSize = 9.sp,
-                            fontWeight = FontWeight.Black, color = Color.White
+                            "Protect every vehicle you own",
+                            fontSize = 12.sp, color = P_Mid,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
+                Spacer(Modifier.width(gap))
+                TopBarPill(
+                    icon = Icons.AutoMirrored.Outlined.ReceiptLong,
+                    label = "My Orders",
+                    height = pillHeight,
+                    iconSize = pillIcon,
+                    textSize = pillText,
+                    hPadding = pillPad,
+                    onClick = onOrdersClick
+                )
+                Spacer(Modifier.width(gap))
+                TopBarPill(
+                    icon = Icons.Outlined.ShoppingCart,
+                    label = "Cart",
+                    height = pillHeight,
+                    iconSize = pillIcon,
+                    textSize = pillText,
+                    hPadding = pillPad,
+                    badgeCount = cartCount,
+                    onClick = onCartClick
+                )
+            }
+        }
+    }
+}
+
+/**
+ * A labelled top-bar action. Both shop actions use this so they read as the same
+ * kind of control — a bare glyph leaves the user guessing what it opens.
+ */
+@Composable
+private fun TopBarPill(
+    icon: ImageVector,
+    label: String,
+    height: Dp,
+    iconSize: Dp,
+    textSize: TextUnit,
+    hPadding: Dp,
+    badgeCount: Int = 0,
+    onClick: () -> Unit
+) {
+    Box {
+        Row(
+            modifier = Modifier
+                .height(height)
+                .clip(RoundedCornerShape(height / 2))
+                .background(P_ChipBg)
+                .clickable { onClick() }
+                .padding(horizontal = hPadding),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // The visible label carries the meaning, so the icon stays out of the
+            // accessibility tree rather than being announced twice.
+            Icon(icon, null, tint = P_Dark, modifier = Modifier.size(iconSize))
+            Spacer(Modifier.width(6.dp))
+            Text(
+                label, fontSize = textSize,
+                fontWeight = FontWeight.SemiBold, color = P_Dark,
+                maxLines = 1
+            )
+        }
+        if (badgeCount > 0) {
+            Box(
+                modifier = Modifier
+                    .size(17.dp).clip(CircleShape).background(P_Red)
+                    .border(1.5.dp, P_Bg, CircleShape)
+                    .align(Alignment.TopEnd).offset(x = 3.dp, y = (-3).dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    if (badgeCount > 99) "99+" else badgeCount.toString(),
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Black, color = Color.White,
+                    maxLines = 1
+                )
             }
         }
     }

@@ -48,6 +48,7 @@ fun SignupScreen(
     var selectedCountry by remember { mutableStateOf(defaultCountry()) }
     var showPicker     by remember { mutableStateOf(false) }
     var phoneAlreadyRegisteredError by remember { mutableStateOf<String?>(null) }
+    var emailAlreadyRegisteredError by remember { mutableStateOf<String?>(null) }
     var submitAttempted by remember { mutableStateOf(false) }
 
     val isLoading  by viewModel.loading.collectAsState()
@@ -80,11 +81,20 @@ fun SignupScreen(
     }
 
     LaunchedEffect(error) {
-        if (error?.contains("already registered", ignoreCase = true) == true) {
+        val message = error ?: return@LaunchedEffect
+        if (!message.contains("already registered", ignoreCase = true)) return@LaunchedEffect
+
+        // The server uses the same "already registered" wording for both fields, so
+        // check which one it named. Blaming the phone for an email clash both points
+        // at the wrong field and bounces the user to Login with a phone that may have
+        // no account — and they never get the chance to correct the email.
+        if (message.contains("email", ignoreCase = true)) {
+            emailAlreadyRegisteredError = "This email is already registered!"
+        } else {
             phoneAlreadyRegisteredError = "This phone number is already registered!"
             navigateToLogin = true
-            viewModel.clearError()
         }
+        viewModel.clearError()
     }
 
     if (showPicker) {
@@ -220,7 +230,10 @@ fun SignupScreen(
             )
             OutlinedTextField(
                 value = email,
-                onValueChange = { email = it },
+                onValueChange = {
+                    email = it
+                    emailAlreadyRegisteredError = null
+                },
                 placeholder = {
                     Text(
                         if (isCompact) "Email address" else "Enter Your Valid E-mail",
@@ -244,11 +257,20 @@ fun SignupScreen(
                 ),
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                 singleLine = true,
-                isError = email.isNotEmpty() && !EmailValidator.isValidEmail(email)
+                isError = (email.isNotEmpty() && !EmailValidator.isValidEmail(email)) ||
+                        emailAlreadyRegisteredError != null
             )
             if (email.isNotEmpty() && !EmailValidator.isValidEmail(email)) {
                 Text(
                     text = "Please enter a valid email",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(start = 8.dp, top = 4.dp)
+                )
+            }
+            if (emailAlreadyRegisteredError != null) {
+                Text(
+                    text = emailAlreadyRegisteredError!!,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(start = 8.dp, top = 4.dp)
@@ -264,6 +286,7 @@ fun SignupScreen(
                     focusManager.clearFocus()
                     submitAttempted = true
                     phoneAlreadyRegisteredError = null
+                    emailAlreadyRegisteredError = null
                     if (!phoneValid) return@Button
 
                     val fullPhone = "${selectedCountry.dialCode}$phoneNumber"

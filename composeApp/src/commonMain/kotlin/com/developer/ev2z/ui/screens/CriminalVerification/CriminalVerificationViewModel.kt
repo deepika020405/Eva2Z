@@ -221,9 +221,7 @@ class CriminalVerificationViewModel(
         try {
             val order = api.createCriminalOrder(amount)
 
-            // The backend is not consistent about nesting: our own ORD- id, PhonePe's
-            // OMO order id and the checkout token can each arrive top level, under
-            // `data`, or only inside `order.raw_response`. Search the whole tree.
+          
             merchantOrderId = order.findStringDeep("merchantOrderId", "merchant_order_id")
             paymentToken    = order.findStringDeep("token", "orderToken", "order_token")
             // PhonePe's own order id — the SDK needs it next to the token, and it is
@@ -296,8 +294,12 @@ class CriminalVerificationViewModel(
             }
             result.isDuplicate -> {
                 println("ℹ️ Candidate already exists")
-                errorMessage = "Candidate already exists. Verification already initiated."
-                step = VerificationStep.SUCCESS
+                errorMessage = result.error
+                    ?: "Candidate already exists. Verification already initiated."
+                // Only the result screen makes sense when we still have an id to show;
+                // otherwise it renders an empty card and swallows the reason.
+                step = if (createdCandidateId != null) VerificationStep.SUCCESS
+                       else VerificationStep.ERROR
             }
             else -> throw Exception(result.error ?: "Candidate creation failed")
         }
@@ -407,7 +409,7 @@ class CriminalVerificationViewModel(
         reportUrl             = null
         searchedCandidateName = null
         courtCheckResult      = null   // ✅ reset
-        amount                = 499
+        amount                = 1
         paymentDone           = false
 
         // History survives a reset — that is the whole point of keeping it.

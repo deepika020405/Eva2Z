@@ -67,9 +67,16 @@ class AddDeviceViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val deviceIdSave = if (deviceId.startsWith("0")) deviceId else "0$deviceId"
-                // SIM is 19 or 20 digits plus a "U" suffix, so this is 20 or 21 characters.
-                // Requires sim_number max:21 server-side; max:20 rejects 20-digit SIMs with 422.
-                val simNumSave = if (simNumber.endsWith("U")) simNumber else "${simNumber}U"
+
+                // The SIM label prints 19 or 20 digits with a trailing "U", and the
+                // "U" is always sent — 20 or 21 characters on the wire.
+                //
+                // This REQUIRES `sim_number` to be validated max:21 server-side. While
+                // the rule is max:20, a 20-digit SIM is rejected with
+                // "The sim number field must not be greater than 20 characters"; that
+                // 422 is a backend limit, not a scanning or input bug.
+                val simDigits = simNumber.trim().removeSuffix("U")
+                val simNumSave = "${simDigits}U"
 
                 val body = buildJsonObject {
                     put("device_id", deviceIdSave)

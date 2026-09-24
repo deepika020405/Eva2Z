@@ -40,7 +40,7 @@ interface FastagDataSource {
     ): Result<FastagTransaction>
 
     /** The vehicles shown in the Home FASTag section, newest balance first. */
-    suspend fun linkedVehicles(): Result<List<FastagVehicleBalance>>
+//    suspend fun linkedVehicles(): Result<List<FastagVehicleBalance>>
 }
 
 /**
@@ -111,8 +111,8 @@ class LocalFastagDataSource : FastagDataSource {
         )
     }
 
-    override suspend fun linkedVehicles(): Result<List<FastagVehicleBalance>> =
-        Result.success(emptyList())
+//    override suspend fun linkedVehicles(): Result<List<FastagVehicleBalance>> =
+//        Result.success(emptyList())
 }
 
 /**

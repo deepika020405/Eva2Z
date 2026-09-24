@@ -137,12 +137,6 @@ private fun PremiumCartHeader(count: Int) {
                     Text("$count item${if (count != 1) "s" else ""}",
                         fontSize = 12.sp, color = P_Light)
                 }
-                Box(modifier = Modifier.size(38.dp).clip(CircleShape)
-                    .background(P_Bg).clickable { navigator.push(OrderHistoryScreen()) },
-                    contentAlignment = Alignment.Center) {
-                    Icon(Icons.Outlined.ReceiptLong, "My Orders",
-                        tint = P_Dark, modifier = Modifier.size(18.dp))
-                }
             }
             HorizontalDivider(color = P_Border, thickness = 0.5.dp)
         }

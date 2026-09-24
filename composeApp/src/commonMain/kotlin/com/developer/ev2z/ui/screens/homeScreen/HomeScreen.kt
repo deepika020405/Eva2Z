@@ -35,8 +35,8 @@ import com.developer.ev2z.ui.screens.weather.WeatherKind
 import com.developer.ev2z.ui.screens.weather.formatTemperature
 import kotlin.math.roundToInt
 import com.developer.ev2z.theme.AppPageBg
-import com.developer.ev2z.ui.screens.fastag.FastagHomeSection
-import com.developer.ev2z.ui.screens.fastag.FastagVehicleBalance
+//import com.developer.ev2z.ui.screens.fastag.FastagHomeSection
+//import com.developer.ev2z.ui.screens.fastag.FastagVehicleBalance
 
 // ─────────────────────────── COLORS ────────────────────────────────
 
@@ -92,6 +92,7 @@ fun HomeScreen(
     onRefer: () -> Unit,
     onOpenAddDevice: () -> Unit,
     onCriminalVerification: () -> Unit,
+    onServiceWarranty: () -> Unit = {},
     onDriverScore: () -> Unit,
     onParking: () -> Unit,
     onSosTag: () -> Unit,
@@ -115,8 +116,8 @@ fun HomeScreen(
     onCheckChallan: () -> Unit = {},
     // FASTag balances across the user's vehicles. Empty renders the "link a tag" card,
     // which is the correct state for anyone who hasn't linked one yet.
-    fastagVehicles: List<FastagVehicleBalance> = emptyList(),
-    onFastagRecharge: (FastagVehicleBalance) -> Unit = {},
+//    fastagVehicles: List<FastagVehicleBalance> = emptyList(),
+//    onFastagRecharge: (FastagVehicleBalance) -> Unit = {},
     onFastagViewAll: () -> Unit = {},
     onLinkFastag: () -> Unit = {}
 ) {
@@ -162,15 +163,15 @@ fun HomeScreen(
                 }
                 // Sits where the e-Challan card used to be — money and compliance, and
                 // the low-balance strip wants to be high on the page.
-                item {
-                    FastagHomeSection(
-                        vehicles     = fastagVehicles,
-                        onRecharge   = onFastagRecharge,
-                        onViewAll    = onFastagViewAll,
-                        onLinkFastag = onLinkFastag,
-                        hPad         = hPad
-                    )
-                }
+//                item {
+//                    FastagHomeSection(
+//                        vehicles     = fastagVehicles,
+//                        onRecharge   = onFastagRecharge,
+//                        onViewAll    = onFastagViewAll,
+//                        onLinkFastag = onLinkFastag,
+//                        hPad         = hPad
+//                    )
+//                }
                 item {
                     ParkingTagSection(
                         onVehicleTagRegistration = onParking,
@@ -200,6 +201,7 @@ fun HomeScreen(
                         onDocumentVault        = onOpenDocuments,
                         onCommunity            = onOpenCommunity,
                         onCriminalVerification = onCriminalVerification,
+                        onServiceWarranty      = onServiceWarranty,
                         hPad                   = hPad
                     )
                 }
@@ -386,131 +388,131 @@ private fun formatPrice(value: Double): String {
  * border — with a CTA pill so it reads as an action rather than a list row.
  * It leaves the app, so the open-in-new glyph marks it as an external link.
  */
-@Composable
-fun CheckChallanButton(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        onClick   = onClick,
-        modifier  = modifier
-            .fillMaxWidth()
-            .shadow(
-                elevation    = 6.dp,
-                shape        = RoundedCornerShape(16.dp),
-                ambientColor = ShadowColor,
-                spotColor    = ShadowColor
-            ),
-        shape     = RoundedCornerShape(16.dp),
-        colors    = CardDefaults.cardColors(containerColor = CardWhite),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        border    = BorderStroke(1.dp, ChallanAmber.copy(alpha = 0.28f))
-    ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
-            // Warm tint blob top-right, same idiom as the parking / general cards.
-            Box(
-                modifier = Modifier
-                    .size(130.dp)
-                    .align(Alignment.TopEnd)
-                    .offset(x = 34.dp, y = (-44).dp)
-                    .background(
-                        Brush.radialGradient(listOf(ChallanAmber.copy(0.16f), Color.Transparent)),
-                        CircleShape
-                    )
-            )
-            Row(
-                modifier          = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier         = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(
-                            Brush.linearGradient(
-                                listOf(ChallanAmber.copy(0.20f), ChallanAmber.copy(0.08f))
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector        = Icons.Default.ReceiptLong,
-                        contentDescription = null,
-                        tint               = ChallanAmber,
-                        modifier           = Modifier.size(24.dp)
-                    )
-                }
-
-                Spacer(Modifier.width(12.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "Check e-Challan",
-                        fontSize   = 15.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color      = TextPrimary,
-                        maxLines   = 1,
-                        overflow   = TextOverflow.Ellipsis
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        "Pending traffic fines & violations",
-                        fontSize = 11.sp,
-                        color    = TextSecondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Spacer(Modifier.height(6.dp))
-                    // Trust line — tells the user where the data actually comes from.
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector        = Icons.Default.VerifiedUser,
-                            contentDescription = null,
-                            tint               = ChallanAmber,
-                            modifier           = Modifier.size(11.dp)
-                        )
-                        Spacer(Modifier.width(4.dp))
-                        Text(
-                            "Govt. of India · parivahan.gov.in",
-                            fontSize   = 10.sp,
-                            fontWeight = FontWeight.Medium,
-                            color      = TextHint,
-                            maxLines   = 1,
-                            overflow   = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                Spacer(Modifier.width(10.dp))
-
-                // CTA pill — the whole card is the tap target, this just signals the action.
-                Row(
-                    modifier          = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(ChallanAmber)
-                        .padding(horizontal = 13.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        "Check",
-                        fontSize   = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color      = Color.White
-                    )
-                    Spacer(Modifier.width(4.dp))
-                    Icon(
-                        imageVector        = Icons.Default.OpenInNew,
-                        contentDescription = "Opens the e-Challan website",
-                        tint               = Color.White,
-                        modifier           = Modifier.size(13.dp)
-                    )
-                }
-            }
-        }
-    }
-}
+//@Composable
+//fun CheckChallanButton(
+//    onClick: () -> Unit,
+//    modifier: Modifier = Modifier
+//) {
+//    Card(
+//        onClick   = onClick,
+//        modifier  = modifier
+//            .fillMaxWidth()
+//            .shadow(
+//                elevation    = 6.dp,
+//                shape        = RoundedCornerShape(16.dp),
+//                ambientColor = ShadowColor,
+//                spotColor    = ShadowColor
+//            ),
+//        shape     = RoundedCornerShape(16.dp),
+//        colors    = CardDefaults.cardColors(containerColor = CardWhite),
+//        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+//        border    = BorderStroke(1.dp, ChallanAmber.copy(alpha = 0.28f))
+//    ) {
+//        Box(modifier = Modifier.fillMaxWidth()) {
+//            // Warm tint blob top-right, same idiom as the parking / general cards.
+//            Box(
+//                modifier = Modifier
+//                    .size(130.dp)
+//                    .align(Alignment.TopEnd)
+//                    .offset(x = 34.dp, y = (-44).dp)
+//                    .background(
+//                        Brush.radialGradient(listOf(ChallanAmber.copy(0.16f), Color.Transparent)),
+//                        CircleShape
+//                    )
+//            )
+//            Row(
+//                modifier          = Modifier
+//                    .fillMaxWidth()
+//                    .padding(horizontal = 14.dp, vertical = 14.dp),
+//                verticalAlignment = Alignment.CenterVertically
+//            ) {
+//                Box(
+//                    modifier         = Modifier
+//                        .size(48.dp)
+//                        .clip(RoundedCornerShape(14.dp))
+//                        .background(
+//                            Brush.linearGradient(
+//                                listOf(ChallanAmber.copy(0.20f), ChallanAmber.copy(0.08f))
+//                            )
+//                        ),
+//                    contentAlignment = Alignment.Center
+//                ) {
+//                    Icon(
+//                        imageVector        = Icons.Default.ReceiptLong,
+//                        contentDescription = null,
+//                        tint               = ChallanAmber,
+//                        modifier           = Modifier.size(24.dp)
+//                    )
+//                }
+//
+//                Spacer(Modifier.width(12.dp))
+//
+//                Column(modifier = Modifier.weight(1f)) {
+//                    Text(
+//                        "Check e-Challan",
+//                        fontSize   = 15.sp,
+//                        fontWeight = FontWeight.ExtraBold,
+//                        color      = TextPrimary,
+//                        maxLines   = 1,
+//                        overflow   = TextOverflow.Ellipsis
+//                    )
+//                    Spacer(Modifier.height(2.dp))
+//                    Text(
+//                        "Pending traffic fines & violations",
+//                        fontSize = 11.sp,
+//                        color    = TextSecondary,
+//                        maxLines = 1,
+//                        overflow = TextOverflow.Ellipsis
+//                    )
+//                    Spacer(Modifier.height(6.dp))
+//                    // Trust line — tells the user where the data actually comes from.
+//                    Row(verticalAlignment = Alignment.CenterVertically) {
+//                        Icon(
+//                            imageVector        = Icons.Default.VerifiedUser,
+//                            contentDescription = null,
+//                            tint               = ChallanAmber,
+//                            modifier           = Modifier.size(11.dp)
+//                        )
+//                        Spacer(Modifier.width(4.dp))
+//                        Text(
+//                            "Govt. of India · parivahan.gov.in",
+//                            fontSize   = 10.sp,
+//                            fontWeight = FontWeight.Medium,
+//                            color      = TextHint,
+//                            maxLines   = 1,
+//                            overflow   = TextOverflow.Ellipsis
+//                        )
+//                    }
+//                }
+//
+//                Spacer(Modifier.width(10.dp))
+//
+//                // CTA pill — the whole card is the tap target, this just signals the action.
+//                Row(
+//                    modifier          = Modifier
+//                        .clip(RoundedCornerShape(20.dp))
+//                        .background(ChallanAmber)
+//                        .padding(horizontal = 13.dp, vertical = 8.dp),
+//                    verticalAlignment = Alignment.CenterVertically
+//                ) {
+//                    Text(
+//                        "Check",
+//                        fontSize   = 12.sp,
+//                        fontWeight = FontWeight.Bold,
+//                        color      = Color.White
+//                    )
+//                    Spacer(Modifier.width(4.dp))
+//                    Icon(
+//                        imageVector        = Icons.Default.OpenInNew,
+//                        contentDescription = "Opens the e-Challan website",
+//                        tint               = Color.White,
+//                        modifier           = Modifier.size(13.dp)
+//                    )
+//                }
+//            }
+//        }
+//    }
+//}
 
 // ─────────────────────── LOCKED FEATURE DIALOG ─────────────────────
 
@@ -962,7 +964,7 @@ private fun InstallationSupportCard(onClick: () -> Unit, locked: Boolean = false
 }
 
 @Composable
-private fun CriminalVerificationCard(onClick: () -> Unit) {
+private fun GeneralRowCard(title: String, icon: ImageVector, onClick: () -> Unit) {
     Card(
         onClick   = onClick,
         modifier  = Modifier.fillMaxWidth(),
@@ -983,10 +985,10 @@ private fun CriminalVerificationCard(onClick: () -> Unit) {
                     .background(BrandGreenLight),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.VerifiedUser, null, tint = BrandGreen, modifier = Modifier.size(24.dp))
+                Icon(icon, null, tint = BrandGreen, modifier = Modifier.size(24.dp))
             }
             Spacer(Modifier.width(14.dp))
-            Text("Criminal Verification", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary, modifier = Modifier.weight(1f))
+            Text(title, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary, modifier = Modifier.weight(1f))
             Icon(Icons.Default.ChevronRight, null, tint = TextHint, modifier = Modifier.size(22.dp))
         }
     }
@@ -1001,6 +1003,7 @@ private fun GeneralSection(
     onDocumentVault: () -> Unit,
     onCommunity: () -> Unit,
     onCriminalVerification: () -> Unit,
+    onServiceWarranty: () -> Unit,
     hPad: Dp
 ) {
     val gridItems = listOf(
@@ -1024,7 +1027,19 @@ private fun GeneralSection(
 
         Spacer(Modifier.height(12.dp))
 
-        CriminalVerificationCard(onClick = onCriminalVerification)
+        GeneralRowCard(
+            title   = "Criminal Verification",
+            icon    = Icons.Default.VerifiedUser,
+            onClick = onCriminalVerification
+        )
+
+        Spacer(Modifier.height(12.dp))
+
+        GeneralRowCard(
+            title   = "Service & Warranty",
+            icon    = Icons.Default.Build,
+            onClick = onServiceWarranty
+        )
     }
 }
 

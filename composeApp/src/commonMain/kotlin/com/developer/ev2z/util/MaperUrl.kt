@@ -6,6 +6,13 @@ fun mapToUserError(e: Exception): String {
 
     return when {
 
+        // ✅ EMAIL ALREADY REGISTERED — must be checked before the phone case below,
+        // which would otherwise swallow it and name the wrong field.
+        msg.contains("email is already registered") ||
+                (msg.contains("email") && msg.contains("already registered")) -> {
+            "This email is already registered."
+        }
+
         // ✅ PHONE ALREADY REGISTERED (🔥 VERY IMPORTANT)
         msg.contains("phone is already registered") ||
                 msg.contains("already registered") -> {

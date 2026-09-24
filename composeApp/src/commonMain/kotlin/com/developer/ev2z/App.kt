@@ -34,7 +34,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import com.developer.ev2z.data.local.DeepLinkManager
 import com.developer.ev2z.ui.screens.SplashScreen
-import com.developer.ev2z.ui.screens.onboarding.OnboardingScreen
 import com.developer.ev2z.ui.screens.deviceStatus.DeviceStatusScreen
 import com.developer.ev2z.ui.screens.trackTrace.TrackTraceScreen
 import com.developer.ev2z.util.FcmRegistrar
@@ -384,26 +383,26 @@ fun App() {
 
 
 
-            showOnboarding -> {
-                // Shown once, right after the user's first successful login.
-                // Any plan selection simply proceeds into the app.
-                OnboardingScreen(
-                    onBack = {
-                        userPrefs.saveString("onboarding_done", "true")
-                        userPrefs.saveString("is_new_user", "")
-                        showOnboarding = false
-                    },
-                    onContinue = { planId ->
-                        userPrefs.saveString("onboarding_done", "true")
-                        userPrefs.saveString("is_new_user", "")
-                        // Persist the chosen plan so Home can lock the other section:
-                        //   "qr" locks GPS Tracking, "gps" locks QR Parking Tag,
-                        //   "other" locks both (only General usable).
-                        userPrefs.saveString("user_plan", planId)
-                        showOnboarding = false
-                    }
-                )
-            }
+//            showOnboarding -> {
+//                // Shown once, right after the user's first successful login.
+//                // Any plan selection simply proceeds into the app.
+////                OnboardingScreen(
+////                    onBack = {
+////                        userPrefs.saveString("onboarding_done", "true")
+////                        userPrefs.saveString("is_new_user", "")
+////                        showOnboarding = false
+////                    },
+////                    onContinue = { planId ->
+////                        userPrefs.saveString("onboarding_done", "true")
+////                        userPrefs.saveString("is_new_user", "")
+////                        // Persist the chosen plan so Home can lock the other section:
+////                        //   "qr" locks GPS Tracking, "gps" locks QR Parking Tag,
+////                        //   "other" locks both (only General usable).
+////                        userPrefs.saveString("user_plan", planId)
+////                        showOnboarding = false
+////                    }
+////                )
+//            }
 
             isLoggedIn && authToken.isNotEmpty() -> {
                 HomeNavGraph(

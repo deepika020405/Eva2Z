@@ -74,6 +74,7 @@ import com.developer.ev2z.ui.screens.Profile.ProfileViewModel
 import com.developer.ev2z.ui.screens.Profile.VaultPasswordDialog
 import com.developer.ev2z.ui.screens.ReferAndEarn.ReferAndEarnScreen
 import com.developer.ev2z.ui.screens.SupportAndWarrenty.WarrantyRoute
+import com.developer.ev2z.ui.screens.serviceWarranty.ServiceWarrantyFlow
 import com.developer.ev2z.ui.screens.VehicleParkingTag.ParkingScreen
 import com.developer.ev2z.ui.screens.VehicleParkingTag.ParkingViewModel
 import com.developer.ev2z.ui.screens.community.CommunityScreenRoot
@@ -108,7 +109,7 @@ import com.developer.ev2z.ui.screens.fuelPrice.FuelPriceViewModel
 import com.developer.ev2z.ui.screens.weather.WeatherScreen
 import com.developer.ev2z.ui.screens.weather.WeatherViewModel
 import com.developer.ev2z.ui.screens.fastag.FastagFlow
-import com.developer.ev2z.ui.screens.fastag.FastagVehicleBalance
+//import com.developer.ev2z.ui.screens.fastag.FastagVehicleBalance
 import com.developer.ev2z.ui.screens.market_screen.ShopProduct
 import com.developer.ev2z.util.SosNotificationHandler
 import com.developer.ev2z.util.VaultExpiryBus
@@ -134,6 +135,7 @@ class HomeTab(
     private val onNavigateToDeviceReport: () -> Unit,
     private val onOpenTrackTrace: () -> Unit,
     private val onNavigateToCriminalVerification: () -> Unit,
+    private val onNavigateToServiceWarranty: () -> Unit,
     private val onDocumentsTabSelected: () -> Unit,
     private val onNavigateToDriverScore: () -> Unit,
     private val onNavigateToParking: () -> Unit,
@@ -271,6 +273,7 @@ class HomeTab(
                 onOpenCommunity = onOpenCommunity,
 
                 onCriminalVerification = onNavigateToCriminalVerification,
+                onServiceWarranty = onNavigateToServiceWarranty,
                 onInstallationSupport = onNavigateToInstallationSupport,
                 onOpenNotifications = { onSosTagManual() },
                 unreadNotificationCount = unreadNotifCount,
@@ -287,19 +290,19 @@ class HomeTab(
                 // Balances need the FASTag endpoints on gps.eva2z.in; until they exist
                 // the section renders its "link a tag" card, which routes to the same
                 // recharge flow.
-                fastagVehicles = emptyList<FastagVehicleBalance>(),
-                onFastagRecharge = { vehicle ->
-                    fastagVehicleNumber = vehicle.vehicleNumber
-                    showFastag = true
-                },
-                onFastagViewAll = {
-                    fastagVehicleNumber = null
-                    showFastag = true
-                },
-                onLinkFastag = {
-                    fastagVehicleNumber = null
-                    showFastag = true
-                }
+//                fastagVehicles = emptyList<FastagVehicleBalance>(),
+//                onFastagRecharge = { vehicle ->
+//                    fastagVehicleNumber = vehicle.vehicleNumber
+//                    showFastag = true
+//                },
+//                onFastagViewAll = {
+//                    fastagVehicleNumber = null
+//                    showFastag = true
+//                },
+//                onLinkFastag = {
+//                    fastagVehicleNumber = null
+//                    showFastag = true
+//                }
             )
         }
     }
@@ -756,6 +759,11 @@ fun HomeNavGraph(
     var showTransactions by remember { mutableStateOf(false) }
     var showAutoPay by remember { mutableStateOf(false) }
     var showWarranty by remember { mutableStateOf(false) }
+    var showServiceWarranty by remember { mutableStateOf(false) }
+    // The flow is reachable from both Home and My Account, so remember where it was
+    // opened from — otherwise backing out of it always lands on My Account.
+    var serviceWarrantyFromAccount by remember { mutableStateOf(false) }
+    // Session-scoped so complaints raised in one visit are still there on the next.
     var showPaymentMethods by remember { mutableStateOf(false) }
     var showNotifications by remember { mutableStateOf(false) }
     var documentsGateState by remember {
@@ -1196,6 +1204,20 @@ fun HomeNavGraph(
                 }
             )
 
+        } else if (showServiceWarranty) {
+
+            // Multi-screen flow — it owns its own back stack and back handlers,
+            // so no PlatformBackHandler is registered for it below (one here would
+            // be composed last, win LIFO, and close the feature instead of
+            // stepping back a screen).
+            ServiceWarrantyFlow(
+                apiService = apiService,
+                onExit = {
+                    showServiceWarranty = false
+                    if (serviceWarrantyFromAccount) showMyAccount = true
+                }
+            )
+
         } else if (showBillDetails) {
 
             val vm = remember { BillDetailsViewModel(apiService, storageManager) }
@@ -1234,6 +1256,11 @@ fun HomeNavGraph(
                     selectedWarrantyDeviceId = deviceId
                     showMyAccount = false
                     showWarranty = true
+                },
+                onServiceComplaints = {
+                    showMyAccount = false
+                    serviceWarrantyFromAccount = true
+                    showServiceWarranty = true
                 }
             )
 
@@ -1345,6 +1372,10 @@ fun HomeNavGraph(
                 onNavigateToReferAndEarn = { showReferAndEarn = true },
                 onNavigateToAboutApp = { showAboutApp = true },
                 onNavigateToCriminalVerification = { showCriminalVerification = true },
+                onNavigateToServiceWarranty = {
+                    serviceWarrantyFromAccount = false
+                    showServiceWarranty = true
+                },
                 onNavigateToInstallationSupport = { showInstallationSupport = true },
                 onNavigateToMyAccount = { showMyAccount = true },
                 onNavigateToDocuments = { showCommunity = true },
@@ -1429,7 +1460,8 @@ fun HomeNavGraph(
             showSosConfirmation || showSosQuickReply ||
             showCreatePost || showCreateStory || showStoryViewer || showCommunity ||
             showDocumentViewer || showUploadDocument || showDocuments ||
-            showWarranty || showBillDetails || showChangePlan || showMyAccount ||
+            showWarranty || showServiceWarranty ||
+            showBillDetails || showChangePlan || showMyAccount ||
             showEditDeviceName || showManageDevice || showAddDevice || showGPSData ||
             showGeoFencing || showHistoryPlayback || showGeneralSettings ||
             showAccountActivity || showReferAndEarn || showChangePassword ||
@@ -1695,6 +1727,7 @@ fun HomeNavGraphContent(
     onRequestDocumentsWithPassword: () -> Unit,
     onDocumentsTabSelected: () -> Unit,   // ✅ ADD
     onNavigateToCriminalVerification: () -> Unit,   // ✅ ADD HERE
+    onNavigateToServiceWarranty: () -> Unit,
     onNavigateToInstallationSupport: () -> Unit,
     onOpenCommunity: () -> Unit,
     onNavigateToDriverScore: () -> Unit,  // ✅ ADD THIS LINE
@@ -1808,6 +1841,7 @@ fun HomeNavGraphContent(
             onOpenTrackTrace = onOpenTrackTrace,
             onDocumentsTabSelected = onDocumentsTabSelected,
             onNavigateToCriminalVerification = onNavigateToCriminalVerification,
+            onNavigateToServiceWarranty = onNavigateToServiceWarranty,
             onNavigateToDriverScore = onNavigateToDriverScore,
             onNavigateToParking = onNavigateToParking,
             onNavigateToSosTag = { alertId -> latestOnSosTag(alertId) },
