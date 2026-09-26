@@ -88,6 +88,7 @@ import com.developer.ev2z.ui.screens.homeScreen.HomeUiState
 import com.developer.ev2z.ui.screens.homeScreen.LiveLocationScreen
 import com.developer.ev2z.util.BottomBarController
 import com.developer.ev2z.util.DeepLinkBus
+import com.developer.ev2z.util.displayNameFrom
 import com.developer.ev2z.util.platformDownloadFile
 
 
@@ -181,15 +182,9 @@ class HomeTab(
         }
 
         val userName = remember(uiState) {
-            val rawName = (uiState as? HomeUiState.Success)
-                ?.deviceResponse
-                ?.name
-
-            rawName
-                ?.substringBefore("@")
-                ?.replaceFirstChar { it.uppercase() }
-                ?.takeIf { it.isNotBlank() }
-                ?: "User"
+            displayNameFrom(
+                (uiState as? HomeUiState.Success)?.deviceResponse?.name
+            )
         }
 
         if (showLiveLocation) {

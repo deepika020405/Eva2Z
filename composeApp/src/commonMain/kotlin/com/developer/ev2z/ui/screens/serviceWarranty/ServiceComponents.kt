@@ -407,7 +407,7 @@ fun TicketCard(
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                ticket.component.label,
+                ticket.problemLabel,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 color = ServiceColors.TextPrimary,

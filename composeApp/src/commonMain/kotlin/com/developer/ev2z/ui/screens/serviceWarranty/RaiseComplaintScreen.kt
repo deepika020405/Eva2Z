@@ -1,14 +1,14 @@
 package com.developer.ev2z.ui.screens.serviceWarranty
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,29 +25,27 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.AddPhotoAlternate
-import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.TwoWheeler
-import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Snackbar
@@ -76,26 +74,28 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.phonepe.openPhonePeSdk
-import com.developer.ev2z.util.rememberImagePicker
 import kotlinx.coroutines.launch
-import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
 /**
  * SCREEN 2 — Raise Complaint (FRD §3 / §4).
- * Vehicle → component → description → invoice → optional media → submit.
+ * Vehicle type → problem → description → terms → pay ₹[SERVICE_FEE_RUPEES] → submit.
  *
- * Attachments reuse the app's existing [rememberImagePicker] (camera or gallery)
- * rather than introducing a new expect/actual picker, so no new platform code is
- * added. That limits invoices to image formats — PDF upload needs a document
- * picker and is the one FRD item not covered here.
+ * The form no longer asks who is asking or which component is affected: every
+ * complaint carries the same service charge, and the problem is typed rather than
+ * picked off a list. Nothing is uploaded from here either — the invoice and photo
+ * sections are gone, so the whole form is four short cards.
  */
 @OptIn(ExperimentalTime::class)
 @Composable
 fun RaiseComplaintScreen(
     viewModel: RaiseComplaintViewModel,
     onBack: () -> Unit,
-    onComplaintCreated: (ticketId: String) -> Unit,
+    /**
+     * [payment] is the receipt for the charge, when one was collected — handed on so
+     * the ticket's own screen can show what was paid before the server reports it.
+     */
+    onComplaintCreated: (ticketId: String, payment: ServicePaymentReceipt?) -> Unit,
     /** Paid, but the server would not file the ticket — hand over to the list. */
     onPaidWithoutTicket: () -> Unit = onBack,
 ) {
@@ -106,38 +106,9 @@ fun RaiseComplaintScreen(
 
     PlatformBackHandler(true) { onBack() }
 
-    val invoicePicker = rememberImagePicker { bytes ->
-        if (bytes != null) {
-            viewModel.attachInvoice(
-                ServiceAttachment(
-                    id = "inv-${Clock.System.now().toEpochMilliseconds()}",
-                    name = "invoice.jpg",
-                    sizeBytes = bytes.size.toLong(),
-                    kind = AttachmentKind.INVOICE,
-                    bytes = bytes,
-                )
-            )
-        }
-    }
-
-    val mediaPicker = rememberImagePicker { bytes ->
-        if (bytes != null) {
-            val index = state.draft.media.size + 1
-            viewModel.attachMedia(
-                ServiceAttachment(
-                    id = "media-${Clock.System.now().toEpochMilliseconds()}",
-                    name = "photo_$index.jpg",
-                    sizeBytes = bytes.size.toLong(),
-                    kind = AttachmentKind.PHOTO,
-                    bytes = bytes,
-                )
-            )
-        }
-    }
-
-    // A non-EVA2Z customer pays the service charge before the complaint is filed.
-    // The order is consumed immediately so a recomposition can't open a second
-    // checkout for money that is already being collected.
+    // The service charge is collected before the complaint is filed. The order is
+    // consumed immediately so a recomposition can't open a second checkout for
+    // money that is already being collected.
     LaunchedEffect(state.pendingPayment) {
         val order = state.pendingPayment ?: return@LaunchedEffect
         viewModel.paymentLaunched()
@@ -185,7 +156,7 @@ fun RaiseComplaintScreen(
                 Box(
                     Modifier.fillMaxWidth().weight(1f),
                     contentAlignment = Alignment.Center,
-                ) { LoadingState(label = "Loading vehicles and components…") }
+                ) { LoadingState(label = "Loading your vehicles…") }
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxWidth().weight(1f),
@@ -197,17 +168,47 @@ fun RaiseComplaintScreen(
                     ),
                     verticalArrangement = Arrangement.spacedBy(cardGap),
                 ) {
-                    /* ──────────────────── 1. customer type ─────────────────── */
-                    item(key = "customer-type") {
-                        ServiceCard(title = "1. Are you an EVA2Z Connect customer?") {
-                            CustomerTypeDropdown(
-                                selected = state.draft.customerType,
-                                isError = state.showValidation && state.draft.customerType == null,
-                                // Switching after paying would misrepresent the charge, so the
-                                // choice is frozen once money has changed hands.
-                                enabled = state.paidReceipt == null && !state.isBusy,
-                                onSelect = viewModel::selectCustomerType,
+                    /* ─────────────────────── 1. vehicle ──────────────────────── */
+                    item(key = "vehicle") {
+                        ServiceCard(title = "1. Vehicle") {
+                            // Nothing is preselected, so the question has to be asked
+                            // out loud — a filled-in answer got walked past.
+                            val missingType = state.showValidation && state.draft.vehicleType == null
+                            Text(
+                                "Which vehicle is this complaint for?",
+                                fontSize = 12.sp,
+                                color = if (missingType) ServiceColors.Danger
+                                else ServiceColors.TextSecondary,
                             )
+                            Spacer(Modifier.height(10.dp))
+                            // Asked rather than read off the device list: the tracker
+                            // knows nothing about what it is fitted to, and a petrol
+                            // two-wheeler may have no device on the account at all.
+                            ServiceVehicleType.entries.forEachIndexed { index, type ->
+                                if (index > 0) Spacer(Modifier.height(8.dp))
+                                VehicleTypeOption(
+                                    type = type,
+                                    selected = state.draft.vehicleType == type,
+                                    isError = missingType,
+                                    // Switching after paying would misrepresent what
+                                    // the charge was raised for.
+                                    enabled = state.paidReceipt == null && !state.isBusy,
+                                    onSelect = { viewModel.selectVehicleType(type) },
+                                )
+                            }
+
+                            // Only surfaced when the account holds more than one
+                            // device, and then only to choose which one the ticket is
+                            // filed against — a single device is picked silently.
+                            if (state.vehicles.size > 1) {
+                                Spacer(Modifier.height(10.dp))
+                                VehiclePickerRow(
+                                    vehicle = state.draft.vehicle,
+                                    vehicles = state.vehicles,
+                                    onSelect = viewModel::selectVehicle,
+                                )
+                            }
+
                             // Nothing is said about money until the server has
                             // actually charged for it — a paid receipt is the one
                             // fact the app knows for certain.
@@ -227,57 +228,47 @@ fun RaiseComplaintScreen(
                         }
                     }
 
-                    /* ────────────────────── 2. vehicle ────────────────────── */
-                    item(key = "vehicle") {
-                        // "EV Scooty" is always the answer, so the field shows it filled in
-                        // whatever the device list did — empty, failed, or several entries.
-                        // Only the registration behind it is ever up for choosing.
-                        val multipleVehicles = state.vehicles.size > 1
-                        ServiceCard(title = "2. Vehicle") {
-                            PreselectedVehicleRow(
-                                vehicle = state.draft.vehicle,
-                                expandable = multipleVehicles,
-                                vehicles = state.vehicles,
-                                onSelect = viewModel::selectVehicle,
-                            )
-                            AnimatedVisibility(state.draft.vehicle != null) {
-                                Column {
-                                    Spacer(Modifier.height(12.dp))
-                                    Box(
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(Color(0xFFF8FAFC))
-                                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                                    ) {
-                                        Column {
-                                            state.draft.vehicle?.let { v ->
-                                                LabelValueRow("Vehicle type", SERVICE_VEHICLE_TYPE)
-                                                LabelValueRow("Registration No.", v.registrationNumber)
-                                                LabelValueRow("Model", v.model)
-                                                LabelValueRow("VIN / Chassis", v.vin)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    /* ───────────────────── 2. component ───────────────────── */
-                    item(key = "component") {
-                        ServiceCard(title = "3. Affected component") {
-                            ComponentChipGrid(
-                                components = state.components,
-                                selected = state.draft.component,
-                                onSelect = viewModel::selectComponent,
+                    /* ─────────────────────── 2. problem ──────────────────────── */
+                    item(key = "problem") {
+                        ServiceCard(title = "2. Problem") {
+                            val missing = state.showValidation && state.draft.problem.isBlank()
+                            OutlinedTextField(
+                                value = state.draft.problem,
+                                onValueChange = viewModel::updateProblem,
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = {
+                                    Text(
+                                        "e.g. Battery not charging",
+                                        fontSize = 13.sp,
+                                        color = ServiceColors.TextMuted,
+                                    )
+                                },
+                                supportingText = {
+                                    Text(
+                                        "${state.draft.problem.length} / ${ComplaintDraft.MAX_PROBLEM}",
+                                        fontSize = 11.sp,
+                                        color = ServiceColors.TextMuted,
+                                    )
+                                },
+                                isError = missing,
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
+                                textStyle = androidx.compose.ui.text.TextStyle(
+                                    fontSize = 14.sp,
+                                    color = ServiceColors.TextPrimary,
+                                ),
+                                colors = serviceFieldColors(),
+                                keyboardOptions = KeyboardOptions(
+                                    capitalization = KeyboardCapitalization.Sentences,
+                                    imeAction = ImeAction.Next,
+                                ),
                             )
                         }
                     }
 
                     /* ──────────────────── 3. description ──────────────────── */
                     item(key = "issue") {
-                        ServiceCard(title = "4. Describe the issue") {
+                        ServiceCard(title = "3. Describe the issue") {
                             val missing = state.showValidation && state.draft.issueDescription.isBlank()
                             OutlinedTextField(
                                 value = state.draft.issueDescription,
@@ -335,75 +326,40 @@ fun RaiseComplaintScreen(
                         }
                     }
 
-                    /* ─────────────────────── 4. invoice ───────────────────── */
-                    item(key = "invoice") {
-                        ServiceCard(
-                            title = if (state.draft.invoiceRequired) "5. Upload invoice (recommended)"
-                            else "5. Upload invoice (optional)",
-                        ) {
-                            if (state.draft.invoiceRequired) {
-                                InlineBanner(
-                                    text = "Attach the invoice to get warranty validated for " +
-                                        "${state.draft.component?.label ?: "this component"} — " +
-                                        "you can still submit without it.",
-                                    tone = BannerTone.INFO,
-                                    icon = Icons.Filled.ErrorOutline,
-                                )
-                                Spacer(Modifier.height(12.dp))
-                            }
-
-                            val invoice = state.draft.invoice
-                            if (invoice == null) {
-                                DashedDropZone(
-                                    label = "Upload purchase invoice",
-                                    hint = "Photo or gallery image · up to 15 MB",
-                                    icon = Icons.Filled.UploadFile,
-                                    // Recommended, not required — warranty review may stall
-                                    // without it, but that is the server's call to make.
-                                    isError = false,
-                                    onClick = { invoicePicker.launch() },
-                                )
-                            } else {
-                                AttachmentRow(attachment = invoice, onRemove = viewModel::removeInvoice)
-                            }
-                        }
-                    }
-
-                    /* ──────────────────────── 5. media ────────────────────── */
-                    item(key = "media") {
-                        ServiceCard(title = "6. Photos of the problem (optional)") {
-                            Text(
-                                "A clear photo helps our technician diagnose it faster.",
-                                fontSize = 12.sp,
-                                color = ServiceColors.TextSecondary,
-                                lineHeight = 17.sp,
+                    /* ──────────────── 4. service charge & terms ──────────────── */
+                    item(key = "charge") {
+                        ServiceCard(title = "4. Service charge") {
+                            // The figure is the server's `service_charge` once it has
+                            // stated one; the published fee stands in until then,
+                            // because no endpoint quotes it ahead of the submission.
+                            val charge = state.chargeRupees.takeIf { it > 0 }
+                                ?: SERVICE_FEE_RUPEES
+                            ChargeRow(
+                                amountRupees = charge,
+                                quoted = state.chargeIsFromServer,
+                                paid = state.paidReceipt != null,
                             )
-                            Spacer(Modifier.height(12.dp))
-                            state.draft.media.forEach { media ->
-                                AttachmentRow(
-                                    attachment = media,
-                                    onRemove = { viewModel.removeMedia(media.id) },
-                                    modifier = Modifier.padding(bottom = 8.dp),
+                            // The complaint is on record before the money is: the
+                            // server files it and asks for the charge in one answer, so
+                            // say so — otherwise a cancelled payment looks like nothing
+                            // happened and the user submits the same fault twice.
+                            state.unpaidTicket?.let { ticket ->
+                                Spacer(Modifier.height(10.dp))
+                                InlineBanner(
+                                    text = "Complaint ${ticket.ticketId} is already filed. " +
+                                        "Only the ₹$charge charge is outstanding — pay it to " +
+                                        "complete the request; don't submit this form again.",
+                                    tone = BannerTone.WARNING,
                                 )
                             }
-                            if (state.draft.media.size < ComplaintDraft.MAX_MEDIA) {
-                                OutlinedButton(
-                                    onClick = { mediaPicker.launch() },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = ButtonDefaults.outlinedButtonColors(
-                                        contentColor = ServiceColors.Brand,
-                                    ),
-                                ) {
-                                    Icon(
-                                        Icons.Filled.AddPhotoAlternate,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(18.dp),
-                                    )
-                                    Spacer(Modifier.width(8.dp))
-                                    Text("Add photo", fontSize = 14.sp)
-                                }
-                            }
+                            Spacer(Modifier.height(12.dp))
+                            TermsCheckRow(
+                                amountRupees = charge,
+                                checked = state.draft.termsAccepted,
+                                isError = state.showValidation && !state.draft.termsAccepted,
+                                enabled = !state.isBusy,
+                                onCheckedChange = viewModel::setTermsAccepted,
+                            )
                         }
                     }
                 }
@@ -497,7 +453,7 @@ fun RaiseComplaintScreen(
                     }
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        "We'll notify you once the invoice is verified and a technician is assigned.",
+                        "We'll notify you once a technician is assigned.",
                         fontSize = 12.sp,
                         color = ServiceColors.TextMuted,
                         lineHeight = 17.sp,
@@ -507,9 +463,10 @@ fun RaiseComplaintScreen(
             confirmButton = {
                 Button(
                     onClick = {
+                        val receipt = state.paidReceipt
                         showSuccessFor = null
                         viewModel.consumeSubmission()
-                        onComplaintCreated(ticketId)
+                        onComplaintCreated(ticketId, receipt)
                     },
                     shape = RoundedCornerShape(10.dp),
                     colors = ButtonDefaults.buttonColors(
@@ -691,9 +648,8 @@ private fun SubmitBar(
                 Spacer(Modifier.height(8.dp))
             }
 
-            // The only charge ever stated here is one the server has already
-            // collected — what a complaint costs is its decision, made when the
-            // form is submitted, and it arrives in the button's own label.
+            // Only ever a charge the server has already collected — what is still
+            // owed is stated in the form's own charge card and in the button label.
             paidReceipt?.let { receipt ->
                 Row(
                     Modifier.fillMaxWidth().padding(bottom = 10.dp),
@@ -753,58 +709,129 @@ private fun serviceFieldColors() = OutlinedTextFieldDefaults.colors(
 )
 
 /**
- * Decides the price of the whole flow, so it sits above everything else and is the
- * first thing [ComplaintDraft.validationError] complains about.
+ * One of the two kinds of vehicle this flow services — an EV or a petrol
+ * two-wheeler. A radio row rather than a dropdown: with exactly two answers, both
+ * are worth showing at once.
+ *
+ * Both start white with an empty ring. Green is the answer to "I chose this", never
+ * a default: a preselected option is read as a question already answered, and the
+ * user then does not realise they had a choice.
  */
 @Composable
-private fun CustomerTypeDropdown(
-    selected: ServiceCustomerType?,
+private fun VehicleTypeOption(
+    type: ServiceVehicleType,
+    selected: Boolean,
     isError: Boolean,
     enabled: Boolean,
-    onSelect: (ServiceCustomerType) -> Unit,
+    onSelect: () -> Unit,
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled, onClick = onSelect),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) ServiceColors.BrandSoft else Color.White,
+        ),
+        elevation = CardDefaults.cardElevation(0.dp),
+        border = BorderStroke(
+            1.dp,
+            when {
+                selected -> ServiceColors.Brand.copy(alpha = 0.55f)
+                isError -> ServiceColors.Danger
+                else -> ServiceColors.BorderSoft
+            },
+        ),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                Icons.Filled.TwoWheeler,
+                contentDescription = null,
+                tint = if (selected) ServiceColors.Brand else ServiceColors.TextSecondary,
+                modifier = Modifier.size(19.dp),
+            )
+            Spacer(Modifier.width(10.dp))
+            Text(
+                type.label,
+                fontSize = 14.sp,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (selected) ServiceColors.TextPrimary else ServiceColors.TextSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            if (selected) {
+                Icon(
+                    Icons.Filled.CheckCircle,
+                    contentDescription = "Selected",
+                    tint = ServiceColors.Brand,
+                    modifier = Modifier.size(18.dp),
+                )
+            } else {
+                // An empty ring, drawn rather than iconised so it lines up with the
+                // filled check that replaces it. Painted in the mid grey rather than
+                // the card's own border tint — at BorderSoft it was too faint to read
+                // as something waiting to be tapped.
+                Box(
+                    Modifier
+                        .size(18.dp)
+                        .border(
+                            1.5.dp,
+                            if (isError) ServiceColors.Danger else ServiceColors.TextMuted,
+                            CircleShape,
+                        ),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Which device the ticket is filed against, shown only when the account holds
+ * more than one — `service/complaints` keys a complaint by the tracker's IMEI, so
+ * with several devices the choice is the user's to make.
+ */
+@Composable
+private fun VehiclePickerRow(
+    vehicle: ServiceVehicle?,
+    vehicles: List<ServiceVehicle>,
+    onSelect: (ServiceVehicle) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
 
     Box {
-        Card(
-            modifier = Modifier
+        Row(
+            Modifier
                 .fillMaxWidth()
-                .clickable(enabled = enabled) { expanded = true },
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-            elevation = CardDefaults.cardElevation(0.dp),
-            border = androidx.compose.foundation.BorderStroke(
-                1.dp,
-                if (isError) ServiceColors.Danger else ServiceColors.BorderSoft,
-            ),
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color(0xFFF8FAFC))
+                .clickable { expanded = true }
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    Icons.Filled.Badge,
-                    contentDescription = null,
-                    tint = if (selected != null) ServiceColors.Brand else ServiceColors.TextSecondary,
-                    modifier = Modifier.size(19.dp),
-                )
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    selected?.label ?: "Select an option",
-                    fontSize = 14.sp,
-                    color = if (selected != null) ServiceColors.TextPrimary else ServiceColors.TextMuted,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-                if (enabled) {
-                    Icon(
-                        Icons.Filled.KeyboardArrowDown,
-                        contentDescription = null,
-                        tint = ServiceColors.TextSecondary,
-                    )
-                }
-            }
+            Text(
+                "Filing against",
+                fontSize = 12.sp,
+                color = ServiceColors.TextSecondary,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                vehicle?.registrationNumber ?: "Select a device",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = ServiceColors.TextPrimary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Icon(
+                Icons.Filled.KeyboardArrowDown,
+                contentDescription = null,
+                tint = ServiceColors.TextSecondary,
+                modifier = Modifier.size(18.dp),
+            )
         }
 
         DropdownMenu(
@@ -812,18 +839,18 @@ private fun CustomerTypeDropdown(
             onDismissRequest = { expanded = false },
             modifier = Modifier.background(Color.White),
         ) {
-            ServiceCustomerType.entries.forEach { type ->
+            vehicles.forEach { option ->
                 DropdownMenuItem(
                     text = {
                         Text(
-                            type.label,
+                            option.registrationNumber,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = ServiceColors.TextPrimary,
                         )
                     },
                     onClick = {
-                        onSelect(type)
+                        onSelect(option)
                         expanded = false
                     },
                 )
@@ -833,143 +860,85 @@ private fun CustomerTypeDropdown(
 }
 
 /**
- * The vehicle field, always pre-filled with [SERVICE_VEHICLE_TYPE].
+ * The charge this complaint carries. Stated before the checkout opens, so the
+ * amount is never a surprise sprung by PhonePe.
  *
- * The type is a constant of this flow, so it is printed unconditionally — an empty
- * device list or a failed `get-user-devices` only costs the registration line, never
- * the "EV Scooty" itself. [expandable] is true only when the account holds more than
- * one device, and then this doubles as the picker for which registration to file
- * against; the type line does not change either way.
+ * [quoted] is true once the figure is the server's own `service_charge` rather than
+ * the app's published ₹[SERVICE_FEE_RUPEES] placeholder — the line underneath says
+ * which it is, because the two have not always agreed.
  */
 @Composable
-private fun PreselectedVehicleRow(
-    vehicle: ServiceVehicle?,
-    expandable: Boolean = false,
-    vehicles: List<ServiceVehicle> = emptyList(),
-    onSelect: (ServiceVehicle) -> Unit = {},
-) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Box {
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(enabled = expandable) { expanded = true },
-            shape = RoundedCornerShape(12.dp),
-            colors = CardDefaults.cardColors(containerColor = ServiceColors.BrandSoft),
-            elevation = CardDefaults.cardElevation(0.dp),
-            border = androidx.compose.foundation.BorderStroke(
-                1.dp,
-                ServiceColors.Brand.copy(alpha = 0.35f),
-            ),
-        ) {
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    Icons.Filled.TwoWheeler,
-                    contentDescription = null,
-                    tint = ServiceColors.Brand,
-                    modifier = Modifier.size(19.dp),
-                )
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        SERVICE_VEHICLE_TYPE,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = ServiceColors.TextPrimary,
-                    )
-                    Text(
-                        when {
-                            // Said here rather than at submit: no device is not a
-                            // blocker, but the user should not find out afterwards.
-                            vehicle == null -> "No device linked · you can still raise this"
-                            expandable -> "${vehicle.registrationNumber} · Tap to change"
-                            else -> "${vehicle.registrationNumber} · Selected automatically"
-                        },
-                        fontSize = 11.sp,
-                        color = if (vehicle == null) ServiceColors.TextSecondary else ServiceColors.Brand,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                Icon(
-                    if (expandable) Icons.Filled.KeyboardArrowDown else Icons.Filled.CheckCircle,
-                    contentDescription = null,
-                    tint = ServiceColors.Brand,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
+private fun ChargeRow(amountRupees: Int, quoted: Boolean, paid: Boolean) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(ServiceColors.BrandSoft)
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                "Complaint service charge",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = ServiceColors.TextPrimary,
+            )
+            Text(
+                when {
+                    paid -> "Paid — your complaint is being filed"
+                    quoted -> "Confirmed by EVA2Z for this complaint"
+                    else -> "Payable once; confirmed when you submit"
+                },
+                fontSize = 11.sp,
+                color = ServiceColors.TextSecondary,
+                lineHeight = 15.sp,
+            )
         }
-
-        if (expandable) {
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false },
-                modifier = Modifier.background(Color.White),
-            ) {
-                vehicles.forEach { option ->
-                    DropdownMenuItem(
-                        text = {
-                            Column {
-                                Text(
-                                    option.registrationNumber,
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = ServiceColors.TextPrimary,
-                                )
-                                Text(
-                                    "$SERVICE_VEHICLE_TYPE · VIN ${option.vin.takeLast(6)}",
-                                    fontSize = 11.sp,
-                                    color = ServiceColors.TextSecondary,
-                                )
-                            }
-                        },
-                        onClick = {
-                            onSelect(option)
-                            expanded = false
-                        },
-                    )
-                }
-            }
-        }
+        Spacer(Modifier.width(10.dp))
+        Text(
+            if (paid) "₹$amountRupees paid" else "₹$amountRupees",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = ServiceColors.Brand,
+        )
     }
 }
 
-
-@OptIn(ExperimentalLayoutApi::class)
+/** The last thing [ComplaintDraft.validationError] asks for before the charge. */
 @Composable
-private fun ComponentChipGrid(
-    components: List<ServiceComponentItem>,
-    selected: ServiceComponentItem?,
-    onSelect: (ServiceComponentItem) -> Unit,
+private fun TermsCheckRow(
+    amountRupees: Int,
+    checked: Boolean,
+    isError: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
 ) {
-    // FlowRow keeps the 12 components readable without a nested scrollable grid.
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.fillMaxWidth(),
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .clickable(enabled = enabled) { onCheckedChange(!checked) },
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        components.forEach { component ->
-            val isSelected = component.id == selected?.id
-            Box(
-                Modifier
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(if (isSelected) ServiceColors.Brand else Color(0xFFF1F5F9))
-                    .clickable { onSelect(component) }
-                    .padding(horizontal = 12.dp, vertical = 9.dp),
-            ) {
-                Text(
-                    component.label,
-                    fontSize = 12.sp,
-                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (isSelected) Color.White else ServiceColors.TextSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
+        Checkbox(
+            checked = checked,
+            onCheckedChange = { if (enabled) onCheckedChange(it) },
+            enabled = enabled,
+            colors = CheckboxDefaults.colors(
+                checkedColor = ServiceColors.Brand,
+                uncheckedColor = if (isError) ServiceColors.Danger else ServiceColors.TextMuted,
+                checkmarkColor = Color.White,
+            ),
+        )
+        Spacer(Modifier.width(4.dp))
+        Text(
+            "I agree to the service terms & conditions and to the " +
+                "₹$amountRupees service charge for this complaint.",
+            fontSize = 12.sp,
+            color = if (isError) ServiceColors.Danger else ServiceColors.TextSecondary,
+            lineHeight = 17.sp,
+            modifier = Modifier.weight(1f).padding(end = 4.dp),
+        )
     }
 }

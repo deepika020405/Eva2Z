@@ -23,6 +23,7 @@ import com.developer.ev2z.ui.screens.device_Report.DeviceReportScreen
 import com.developer.ev2z.ui.screens.device_Report.DeviceReportViewModel
 import com.developer.ev2z.ui.screens.device_Report.PlatformAddressProvider
 import com.developer.ev2z.util.AppTokenProvider
+import com.developer.ev2z.util.displayNameFrom
 import com.developer.ev2z.ui.screens.AuthFlows.ForgetPasswordFlow
 import com.developer.ev2z.ui.screens.AuthFlows.RegistrationFlow
 import com.developer.ev2z.util.UpdateAvailableDialog
@@ -144,7 +145,9 @@ fun App() {
             delay(100)
 
             val token = userPrefs.getToken() ?: ""
-            val name = userPrefs.getName() ?: "User"
+            // A name that is really an e-mail address is not printed as one — see
+            // displayNameFrom; accounts exist whose stored name is the address itself.
+            val name = displayNameFrom(userPrefs.getName())
 
             if (token.isNotEmpty()) {
                 authToken = token
@@ -226,7 +229,7 @@ fun App() {
                         // ✅ Token bhi load karo
                         val token = userPrefs.getToken() ?: ""
                         authToken = token
-                        username = userPrefs.getName() ?: "User"
+                        username = displayNameFrom(userPrefs.getName())
                         AppTokenProvider.getToken = { token }
                         isLoggedIn = true
                         isLoading = false
@@ -239,7 +242,7 @@ fun App() {
                     onNavigateToShop = {
                         val token = userPrefs.getToken() ?: ""
                         authToken = token
-                        username = userPrefs.getName() ?: "User"
+                        username = displayNameFrom(userPrefs.getName())
                         AppTokenProvider.getToken = { token }
                         isLoggedIn = true
                         isLoading = false
@@ -247,7 +250,7 @@ fun App() {
                     onNavigateToProduct = { productId ->
                         val token = userPrefs.getToken() ?: ""
                         authToken = token
-                        username = userPrefs.getName() ?: "User"
+                        username = displayNameFrom(userPrefs.getName())
                         AppTokenProvider.getToken = { token }
                         isLoggedIn = true
                         isLoading = false

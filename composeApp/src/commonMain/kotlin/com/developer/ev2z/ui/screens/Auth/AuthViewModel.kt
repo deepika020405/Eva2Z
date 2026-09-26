@@ -4,6 +4,7 @@ import com.developer.ev2z.data.local.UserPrefs
 import com.developer.ev2z.request.LoginRequest
 import com.developer.ev2z.repository.AuthRepository
 import com.developer.ev2z.data.local.StorageManager
+import com.developer.ev2z.util.mapServerMessage
 import com.developer.ev2z.util.mapToUserError
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -181,7 +182,7 @@ class AuthViewModel(
                     _signupSuccess.value = true
                 } else {
                     println("❌ SignUp failed: ${result.message}")
-                    _error.value = result.message
+                    _error.value = mapServerMessage(result.message, fallback = "SignUp failed. Please try again.")
                 }
 
             } catch (e: Exception) {
@@ -247,7 +248,12 @@ class AuthViewModel(
                     }
                 } else {
                     println("❌ Password save failed: ${saveResult.message}")
-                    _error.value = saveResult.message
+                    // `save-password` answers a taken e-mail with the raw MySQL
+                    // duplicate-key error, INSERT statement and all — never show that.
+                    _error.value = mapServerMessage(
+                        saveResult.message,
+                        fallback = "We couldn't finish creating your account. Please try again.",
+                    )
                 }
 
             } catch (e: Exception) {
@@ -292,9 +298,10 @@ class AuthViewModel(
                     println("❌ OTP verification failed: ${result.message}")
 
                     // 🔥 MOST IMPORTANT FIX
-                    _error.value = result.message
-                        ?.takeIf { it.isNotBlank() }
-                        ?: "Invalid OTP. Please try again."
+                    _error.value = mapServerMessage(
+                        result.message,
+                        fallback = "Invalid OTP. Please try again.",
+                    )
                 }
 
             } catch (e: Exception) {
@@ -328,9 +335,10 @@ class AuthViewModel(
                     println("🔥 Email OTP verified successfully!")
                     _emailOtpVerified.value = true
                 } else {
-                    _error.value = result.message
-                        ?.takeIf { it.isNotBlank() }
-                        ?: "Invalid OTP. Please try again."
+                    _error.value = mapServerMessage(
+                        result.message,
+                        fallback = "Invalid OTP. Please try again.",
+                    )
                 }
 
             } catch (e: Exception) {
@@ -359,7 +367,7 @@ class AuthViewModel(
                     println("🔥 OTP resent successfully!")
                 } else {
                     println("❌ Resend OTP failed: ${result.message}")
-                    _error.value = result.message
+                    _error.value = mapServerMessage(result.message, fallback = "Couldn't resend the OTP. Please try again.")
                 }
 
             } catch (e: Exception) {
@@ -401,7 +409,7 @@ class AuthViewModel(
                     }
                     else -> {
                         println("❌ Forgot password failed: ${result.message}")
-                        _error.value = result.message
+                        _error.value = mapServerMessage(result.message)
                     }
                 }
 
@@ -446,7 +454,7 @@ class AuthViewModel(
                     _otpVerified.value = true
                 } else {
                     println("❌ Forgot password OTP verification failed: ${result.message}")
-                    _error.value = result.message
+                    _error.value = mapServerMessage(result.message, fallback = "Invalid OTP. Please try again.")
                 }
 
             } catch (e: Exception) {

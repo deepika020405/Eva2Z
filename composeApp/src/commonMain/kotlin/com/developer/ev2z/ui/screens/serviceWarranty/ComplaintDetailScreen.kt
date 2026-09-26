@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
@@ -108,7 +109,8 @@ fun ComplaintDetailScreen(
                             lineHeight = 19.sp,
                         )
                         Spacer(Modifier.height(12.dp))
-                        LabelValueRow("Component", ticket.component.label)
+                        LabelValueRow("Problem", ticket.problemLabel)
+                        ticket.vehicleType?.let { LabelValueRow("Vehicle", it.label) }
                         ticket.errorCode?.let { LabelValueRow("Error code", it) }
                         // Only the device the complaint was filed against — the rest
                         // of the vehicle's details belong on the dashboard.
@@ -116,9 +118,54 @@ fun ComplaintDetailScreen(
                             LabelValueRow("Device", ticket.vehicle.registrationNumber)
                         }
                         LabelValueRow("Raised on", ticket.createdAtMillis.asServiceDateTime())
-                        ticket.payment?.let {
-                            LabelValueRow("Service charge", "₹${it.amountRupees} paid")
+
+                        // The charge, right under the date it was raised. Paid is the
+                        // common case now — the complaint cannot be completed without
+                        // it — so the reference and the time are shown too: they are
+                        // what support asks for.
+                        val charge = ticket.chargeRupees
+                        when {
+                            ticket.chargePaid && charge != null -> {
+                                LabelValueRow("Service charge", "₹$charge paid")
+                                ticket.payment?.paidAtMillis?.takeIf { it > 0 }?.let {
+                                    LabelValueRow("Paid on", it.asServiceDateTime())
+                                }
+                                ticket.payment?.merchantOrderId
+                                    ?.takeIf { it.isNotBlank() }
+                                    ?.let { LabelValueRow("Payment ref", it) }
+                            }
+                            ticket.chargePaid -> LabelValueRow("Service charge", "Paid")
+                            ticket.chargePending && charge != null ->
+                                LabelValueRow("Service charge", "₹$charge · payment pending")
                         }
+                    }
+                }
+
+                /* ───────────────────────── paid banner ────────────────────── */
+                // Stated once in full, because it is the receipt: the app no longer
+                // keeps a payment record of its own, so this screen is where a user
+                // comes back to check what they were charged.
+                if (ticket.chargePaid) {
+                    item(key = "charge") {
+                        InlineBanner(
+                            text = ticket.chargeRupees
+                                ?.let { "Service charge of ₹$it has been paid for this request." }
+                                ?: "The service charge for this request has been paid.",
+                            tone = BannerTone.SUCCESS,
+                            icon = Icons.Filled.Verified,
+                        )
+                    }
+                } else if (ticket.chargePending) {
+                    item(key = "charge") {
+                        InlineBanner(
+                            text = ticket.chargeRupees
+                                ?.let {
+                                    "₹$it service charge is still outstanding on this request. " +
+                                        "It will be marked paid once the payment is confirmed."
+                                }
+                                ?: "The service charge on this request is not confirmed yet.",
+                            tone = BannerTone.WARNING,
+                        )
                     }
                 }
 
@@ -172,7 +219,7 @@ private fun TicketHeader(ticket: ServiceTicket) {
         ) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    ticket.component.label,
+                    ticket.problemLabel,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = ServiceColors.TextPrimary,

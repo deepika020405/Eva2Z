@@ -73,7 +73,7 @@ class CriminalVerificationViewModel(
     var paymentToken       by mutableStateOf<String?>(null)
     var phonepeOrderId     by mutableStateOf<String?>(null)
     var errorMessage       by mutableStateOf("")
-    var amount             by mutableStateOf(1)
+    var amount             by mutableStateOf(499)
     var paymentDone        by mutableStateOf(false)
     var reportUrl          by mutableStateOf<String?>(null)
     var searchedCandidateName by mutableStateOf<String?>(null)

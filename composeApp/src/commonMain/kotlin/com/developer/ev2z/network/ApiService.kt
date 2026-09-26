@@ -74,6 +74,42 @@ class ServiceEndpointMissingException(val path: String) :
 /** 404/405/501 all mean "this route does not exist here", not "your request was bad". */
 private val MISSING_ENDPOINT_CODES = setOf(404, 405, 501)
 
+/**
+ * What `POST service/complaints` answered, status included.
+ *
+ * The status has to travel with the body: a 422 validation body carries neither
+ * `success` nor `payment_required`, and reading it as a plain payload made the app
+ * announce a ticket for a complaint the server had refused (seen 2026-09-26, a
+ * `vehicle_type` 422 shown to the user as "Complaint submitted").
+ */
+data class ServiceComplaintPost(val statusCode: Int, val body: JsonObject) {
+    val isSuccess: Boolean get() = statusCode in 200..299
+
+    /**
+     * The validation complaint, as one line: Laravel's `errors` map first (it names
+     * the field that was refused), then the top-level `message`.
+     */
+    val validationMessage: String?
+        get() {
+            val fromErrors = body["errors"]
+                ?.let { runCatching { it.jsonObject }.getOrNull() }
+                ?.values
+                ?.firstNotNullOfOrNull { entry ->
+                    runCatching { entry.jsonArray.firstOrNull()?.jsonPrimitive?.content }.getOrNull()
+                        ?: runCatching { entry.jsonPrimitive.content }.getOrNull()
+                }
+            return fromErrors ?: body["message"]?.let {
+                runCatching { it.jsonPrimitive.content }.getOrNull()
+            }
+        }
+
+    /** True when the server refused the `vehicle_type` value specifically. */
+    val vehicleTypeRefused: Boolean
+        get() = body["errors"]
+            ?.let { runCatching { it.jsonObject }.getOrNull() }
+            ?.containsKey("vehicle_type") == true
+}
+
 class ApiService {
 
     private val client = KtorClient.client
@@ -2657,6 +2693,10 @@ class ApiService {
         /** Null when the account has no registered device; the server allows it. */
         deviceId: String?,
         componentId: String,
+        /** `vehicle_type` — "EV Vehicle (2 wheeler)" or "Petrol (2 wheeler)". */
+        vehicleType: String?,
+        /** `problem` — the one-line fault the user typed on the form. */
+        problem: String?,
         issue: String,
         errorCode: String?,
         invoice: ByteArray?,
@@ -2664,10 +2704,13 @@ class ApiService {
         photos: List<Pair<String, ByteArray>>,
         merchantOrderId: String? = null,
         phonepeOrderId: String? = null,
-    ): JsonObject {
+    ): ServiceComplaintPost {
         val token = AppTokenProvider.getToken()
 
-        println("🛠️ POST service/complaints → type=$customerType device=$deviceId component=$componentId payment=$merchantOrderId")
+        println(
+            "🛠️ POST service/complaints → type=$customerType device=$deviceId " +
+                "component=$componentId vehicle=$vehicleType problem=$problem payment=$merchantOrderId"
+        )
 
         val response = client.submitFormWithBinaryData(
             url = "${baseUrl}service/complaints",
@@ -2675,6 +2718,10 @@ class ApiService {
                 append("customer_type", customerType)
                 deviceId?.takeIf { it.isNotBlank() }?.let { append("device_id", it) }
                 append("component_id", componentId)
+                // Fields of their own since the form stopped asking which component
+                // is affected — the server keeps and echoes both.
+                vehicleType?.takeIf { it.isNotBlank() }?.let { append("vehicle_type", it) }
+                problem?.takeIf { it.isNotBlank() }?.let { append("problem", it) }
                 append("issue", issue)
                 errorCode?.takeIf { it.isNotBlank() }?.let { append("error_code", it) }
 
@@ -2742,7 +2789,10 @@ class ApiService {
             throw IllegalStateException("Complaint submission failed: HTTP ${response.status.value}")
         }
 
-        return Json { ignoreUnknownKeys = true }.parseToJsonElement(raw).jsonObject
+        return ServiceComplaintPost(
+            statusCode = response.status.value,
+            body = Json { ignoreUnknownKeys = true }.parseToJsonElement(raw).jsonObject,
+        )
     }
 
     /**
@@ -3545,16 +3595,20 @@ class ApiService {
         // No device on the account is not a blocker — the server files the complaint
         // with a null device_id — so a stand-in stands in for display only.
         val vehicle = draft.vehicle ?: UnlinkedVehicle
-        val component = draft.component ?: error("component missing")
+        val component = draft.component ?: ServiceProblemComponent
         val customerType = draft.customerType ?: ServiceCustomerType.EVA2Z_CUSTOMER
 
-        suspend fun post() = createServiceComplaint(
+        suspend fun postAs(vehicleType: String) = createServiceComplaint(
             customerType = customerType.apiValue,
             // The server keys complaints by the tracker's IMEI, which is what
             // get-user-devices calls device_number and this app calls the VIN.
             deviceId = vehicle.vin.ifBlank { vehicle.vehicleId }.takeIf { it.isNotBlank() },
             componentId = component.apiId,
-            issue = draft.issueDescription.trim(),
+            vehicleType = vehicleType,
+            problem = draft.problem.trim(),
+            // The description on its own — the problem and the vehicle type have
+            // their own fields now. See ComplaintDraft.issueText.
+            issue = draft.issueText,
             errorCode = draft.errorCode.trim().takeIf { it.isNotBlank() },
             invoice = draft.invoice?.bytes,
             invoiceName = draft.invoice?.name,
@@ -3565,12 +3619,41 @@ class ApiService {
             phonepeOrderId = payment?.phonepeOrderId,
         )
 
+        // The server's `vehicle_type` vocabulary is not settled (see
+        // ServiceVehicleType.apiValues): the spelling it accepted at 12:53 on
+        // 2026-09-26 was refused by an `in:` rule at 13:09. A refusal of that field
+        // alone costs nothing — the complaint is not created and no money is involved
+        // — so the remaining spellings are tried before giving up on the user.
+        suspend fun post(): ServiceComplaintPost {
+            // The form cannot be submitted without a vehicle type — ComplaintDraft
+            // asks for it first — so this stands in only for the type system.
+            val vehicleType = draft.vehicleType ?: ServiceVehicleType.EV_TWO_WHEELER
+            var refused: ServiceComplaintPost? = null
+            for (value in vehicleType.apiValues) {
+                val attempt = postAs(value)
+                if (!attempt.vehicleTypeRefused) {
+                    if (refused != null) {
+                        println("✅ service/complaints accepted vehicle_type=\"$value\" — pin this one.")
+                    }
+                    return attempt
+                }
+                println("⚠️ service/complaints refused vehicle_type=\"$value\": ${attempt.validationMessage}")
+                refused = attempt
+            }
+            println(
+                "❌ Every vehicle_type spelling this app knows was refused " +
+                    "(${vehicleType.apiValues.joinToString()}). The backend's `in:` " +
+                    "list is something else — ask for it."
+            )
+            return refused ?: postAs(vehicleType.apiValue)
+        }
+
         // A dropped upload ("unexpected end of stream" — the server closing a
         // pooled connection mid-multipart) produces no response at all, so whether
         // the complaint was filed is genuinely unknown. Blindly re-posting risks a
         // duplicate ticket, so the list endpoint is asked first and the retry only
         // happens once nothing matching is found there.
-        val payload = try {
+        val response = try {
             post()
         } catch (first: Exception) {
             println("⚠️ service/complaints failed (${first.message}) — checking whether it landed.")
@@ -3583,6 +3666,20 @@ class ApiService {
                 alreadyFiled(draft, component)?.let { return ComplaintSubmission.Created(it) }
                 throw second
             }
+        }
+
+        val payload = response.body
+
+        // A refused request is a refusal, whatever the body looks like. Checked before
+        // anything is read out of it: a 422 carries no `success` and no
+        // `payment_required`, so reading it as a payload announced a ticket for a
+        // complaint that was never filed.
+        if (!response.isSuccess) {
+            val complaint = response.validationMessage
+            println("❌ service/complaints refused the complaint (HTTP ${response.statusCode}): $complaint")
+            return ComplaintSubmission.Rejected(
+                complaint ?: "Your complaint could not be submitted. Please try again."
+            )
         }
 
         val data = payload["data"]?.jsonObject
@@ -3612,12 +3709,46 @@ class ApiService {
                     println("✅ ${it.ticketId} exists — the webhook filed it; not re-posting.")
                     return ComplaintSubmission.Created(it)
                 }
+
+                // Said plainly because it is the one fact that settles whose bug this
+                // is: a different order id back means the server did not look at the
+                // reference it was sent, and minted another PENDING order instead.
+                val echoed = data?.text("merchant_order_id", "merchantOrderId")
+                if (echoed != null && echoed != payment.merchantOrderId) {
+                    println(
+                        "❌ Sent merchant_order_id=${payment.merchantOrderId} " +
+                            "(paid, settled via phonepe/webhook) but service/complaints " +
+                            "answered with a NEW order $echoed — the payment reference was ignored."
+                    )
+                }
             }
 
             val charge = data?.number("service_charge", "amount") ?: customerType.expectedFeeRupees
+
+            // The complaint itself, when this answer carries one. Since 2026-09-26 the
+            // first post files the ticket and asks for the charge in the same breath
+            // ("Complaint created. Please complete ₹299 payment." with
+            // ticket_number SR-2026-000042), so posting again would file a duplicate.
+            val filedTicket = data
+                ?.takeIf { it.text("ticket_number", "ticket_no") != null }
+                ?.toSubmittedTicket(
+                    vehicle = vehicle,
+                    component = component,
+                    draft = draft,
+                    customerType = customerType,
+                    payment = payment,
+                )
+            if (filedTicket != null) {
+                println(
+                    "🧾 ${filedTicket.ticketId} was filed with the charge — " +
+                        "₹$charge outstanding, do not re-post this complaint."
+                )
+            }
+
             return ComplaintSubmission.PaymentRequired(
                 amountRupees = charge,
                 buttonText = data?.text("button_text"),
+                ticket = filedTicket,
                 // "payment_required with payment_status SUCCESS" is the server saying
                 // it has the money but has not filed the ticket yet — not a new charge.
                 settled = data?.text("payment_status")?.serviceSlug() == "success",
@@ -3642,24 +3773,35 @@ class ApiService {
      * Whether the complaint being submitted is already on the server — asked after
      * a POST died without a response.
      *
-     * Matched on component + issue text within [DUPLICATE_WINDOW_MS]; the window is
+     * Matched on problem + issue text within [DUPLICATE_WINDOW_MS]; the window is
      * what keeps a genuine repeat complaint about the same fault from being
      * mistaken for the one that just failed.
+     *
+     * The component is no longer part of the match: every complaint is filed against
+     * the server's "Other", so it cannot tell two tickets apart. The typed problem —
+     * `problem` on the row, [ServiceTicket.problemLabel] here — is what can.
      */
     @OptIn(ExperimentalTime::class)
     private suspend fun alreadyFiled(
         draft: ComplaintDraft,
         component: ServiceComponentItem,
     ): ServiceTicket? {
-        val issue = draft.issueDescription.trim()
+        val issue = draft.issueText
         if (issue.isEmpty()) return null
+        val problem = draft.problem.trim().ifEmpty { component.label }
 
         val now = Clock.System.now().toEpochMilliseconds()
         val match = runCatching {
             fetchServiceComplaints().firstOrNull { ticket ->
-                ticket.issueDescription.trim() == issue &&
-                    ticket.component.label.equals(component.label, ignoreCase = true) &&
-                    now - ticket.createdAtMillis <= DUPLICATE_WINDOW_MS
+                ticket.issueDescription.trim().equals(issue, ignoreCase = true) &&
+                    now - ticket.createdAtMillis <= DUPLICATE_WINDOW_MS &&
+                    // The problem only narrows the match when the row actually carries
+                    // one: rows the server files for itself come back with
+                    // `problem: null` (seen on SR-2026-000030), and insisting on it
+                    // there would miss the very ticket being looked for and tell a
+                    // paid user nothing was filed.
+                    (ticket.problem.isNullOrBlank() ||
+                        ticket.problemLabel.equals(problem, ignoreCase = true))
             }
         }.getOrElse { e ->
             println("⚠️ Couldn't re-read my-complaints after the failure: ${e.message}")
@@ -3913,11 +4055,20 @@ private fun JsonObject.toServiceTicket(vehicles: List<ServiceVehicle>): ServiceT
     val created = timestamp("created_at", "raised_at") ?: 0L
     val issue = text("issue", "issue_description").orEmpty()
 
+    // `problem` and `vehicle_type` are the form's own two fields; a row filed
+    // before they existed carries neither, and problemLabel falls back to the
+    // component for those.
+    val problem = text("problem")
+
     return ServiceTicket(
         ticketId = ticketId,
         serverId = rowId,
         vehicle = readVehicle(vehicles),
         component = component,
+        problem = problem,
+        vehicleType = ServiceVehicleType.fromApi(text("vehicle_type")),
+        // The problem is the ticket's headline now, so the title is the opening of
+        // the description — the detail header shows one above the other.
         issueTitle = issue.take(60),
         issueDescription = issue,
         errorCode = text("error_code"),
@@ -3926,6 +4077,14 @@ private fun JsonObject.toServiceTicket(vehicles: List<ServiceVehicle>): ServiceT
         // No technician fields exist on the payload yet; the detail screen already
         // hides the allocation card when this is null.
         allocation = null,
+        customerType = ServiceCustomerType.fromApi(text("customer_type")),
+        // The row's own account of the charge, and the only one there is now that the
+        // device-local payment record is gone. The receipt is usually null — rows come
+        // back with a null `merchant_order_id` even when paid — so the status and the
+        // amount are read alongside it: they are what the detail screen can still say.
+        payment = readServerPayment(created),
+        paymentStatus = text("payment_status"),
+        paymentAmountRupees = number("payment_amount", "service_charge", "amount"),
         timeline = readTimeline(ticketId, component, created),
         createdAtMillis = created,
         lastUpdatedMillis = timestamp("updated_at") ?: created,
@@ -3956,14 +4115,21 @@ private fun JsonObject.toSubmittedTicket(
         serverId = text("id"),
         vehicle = vehicle,
         component = component,
+        problem = text("problem")?.takeIf { it.isNotBlank() } ?: draft.problem.trim(),
+        vehicleType = ServiceVehicleType.fromApi(text("vehicle_type")) ?: draft.vehicleType,
         issueTitle = draft.issueDescription.trim().take(60),
-        issueDescription = text("issue", "issue_description") ?: draft.issueDescription.trim(),
+        issueDescription = text("issue", "issue_description") ?: draft.issueText,
         errorCode = text("error_code") ?: draft.errorCode.trim().takeIf { it.isNotBlank() },
         status = resolveServiceStatus(text("status", "complaint_status")),
         attachments = readStoredAttachments(draft),
         allocation = null,
         customerType = text("customer_type")?.let { ServiceCustomerType.fromApi(it) } ?: customerType,
         payment = payment ?: readServerPayment(created),
+        // A receipt in hand means paid, whatever the response still says — it is
+        // written the moment PhonePe settles, and this body was composed before that.
+        paymentStatus = if (payment != null) "SUCCESS" else text("payment_status"),
+        paymentAmountRupees = payment?.amountRupees
+            ?: number("service_charge", "payment_amount", "amount"),
         timeline = buildList {
             payment?.let {
                 add(
@@ -4138,7 +4304,9 @@ private fun JsonObject.readStoredAttachments(draft: ComplaintDraft): List<Servic
  */
 private fun JsonObject.readServerPayment(createdAtMillis: Long): ServicePaymentReceipt? {
     val merchantOrderId = text("merchant_order_id", "merchantOrderId") ?: return null
-    val charge = number("service_charge", "amount") ?: return null
+    // "payment_amount" is what a complaint row calls it; "service_charge" is the
+    // submission response's name for the same figure.
+    val charge = number("service_charge", "payment_amount", "amount") ?: return null
     if (charge <= 0) return null
 
     val settled = text("payment_status")?.serviceSlug()
@@ -4146,8 +4314,9 @@ private fun JsonObject.readServerPayment(createdAtMillis: Long): ServicePaymentR
 
     return ServicePaymentReceipt(
         merchantOrderId = merchantOrderId,
+        phonepeOrderId = text("phonepe_order_id", "phonepeOrderId"),
         amountRupees = charge,
-        paidAtMillis = createdAtMillis,
+        paidAtMillis = timestamp("paid_at", "payment_completed_at") ?: createdAtMillis,
     )
 }
 

@@ -134,10 +134,10 @@ fun ServiceDashboardScreen(
                             Icons.Filled.VerifiedUser,
                         ) { onOpenComplaints(ComplaintFilter.IN_PROGRESS) },
                     )
-                    // All four across on a tablet, 2×2 on a phone.
+                    // All three across on a tablet, 2+1 on a phone.
                     EqualTileGrid(
                         items = actions,
-                        perRow = if (isTablet) 4 else 2,
+                        perRow = if (isTablet) 3 else 2,
                         gap = gap,
                     ) { spec, tileModifier ->
                         ActionTile(
@@ -149,8 +149,6 @@ fun ServiceDashboardScreen(
                         )
                     }
                 }
-
-
 
                 /* ──────────────────────── recent tickets ────────────────────── */
                 item(key = "recent-header") {

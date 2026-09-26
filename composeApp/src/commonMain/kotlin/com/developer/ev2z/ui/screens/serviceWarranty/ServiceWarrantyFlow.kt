@@ -11,7 +11,14 @@ sealed interface ServiceStep {
     data object Dashboard : ServiceStep
     data class Raise(val vehicleId: String?) : ServiceStep
     data class Complaints(val filter: ComplaintFilter) : ServiceStep
-    data class Detail(val ticketId: String) : ServiceStep
+    /**
+     * [payment] is the charge this session just paid for the ticket, handed over so
+     * the detail screen can show it while the server still reports it as pending.
+     */
+    data class Detail(
+        val ticketId: String,
+        val payment: ServicePaymentReceipt? = null,
+    ) : ServiceStep
 }
 
 /**
@@ -62,11 +69,11 @@ fun ServiceWarrantyFlow(
             RaiseComplaintScreen(
                 viewModel = vm,
                 onBack = { pop() },
-                onComplaintCreated = { ticketId ->
+                onComplaintCreated = { ticketId, payment ->
                     // Replace the compose screen with the new ticket so backing out
                     // of the detail lands on the dashboard, not the filled-in form.
                     backStack.removeAt(backStack.lastIndex)
-                    push(ServiceStep.Detail(ticketId))
+                    push(ServiceStep.Detail(ticketId, payment))
                 },
                 onPaidWithoutTicket = {
                     // Paid, but no ticket number to open — the list is where it will
@@ -91,7 +98,7 @@ fun ServiceWarrantyFlow(
 
         is ServiceStep.Detail -> {
             val vm = rememberServiceViewModel("detail-${step.ticketId}") {
-                ComplaintDetailViewModel(apiService, step.ticketId)
+                ComplaintDetailViewModel(apiService, step.ticketId, step.payment)
             }
             ComplaintDetailScreen(
                 viewModel = vm,

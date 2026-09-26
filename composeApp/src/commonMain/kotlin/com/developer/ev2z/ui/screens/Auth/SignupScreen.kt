@@ -118,6 +118,10 @@ fun SignupScreen(
         val emailFieldHeight = if (isCompact) 56.dp  else 64.dp
         val buttonHeight     = if (isCompact) 46.dp  else 52.dp
         val buttonTextSize = if (isCompact) 15.sp  else 16.sp
+
+        // The one field the server stores verbatim and every screen greets the user
+        // by, so what goes in it has to actually be a name.
+        val nameError = nameErrorFor(fullName, submitAttempted)
         val verticalGap    = if (isCompact) 12.dp  else 18.dp
         val horizontalPad  = (screenWidth * 0.04f).coerceIn(12.dp, 24.dp)
 
@@ -143,9 +147,14 @@ fun SignupScreen(
             )
             OutlinedTextField(
                 value = fullName,
+                // Kept as typed, bar collapsing runs of spaces. It used to strip
+                // everything that was not a letter, which turned an e-mail address
+                // pasted in here into a name — "mukeshk86382@gmail.com" was saved as
+                // "Mukeshkgmailcom" (seen 2026-09-24) with nothing said about it.
+                // Anything the field cannot accept is now reported below instead.
                 onValueChange = { input ->
-                    val formatted = formatFullName(input)
-                    if (formatted.length <= 50) fullName = formatted
+                    val cleaned = input.replace("\\s+".toRegex(), " ").trimStart()
+                    if (cleaned.length <= 50) fullName = cleaned
                 },
                 placeholder = {
                     Text("Enter Your Full Name", color = Color(0xFFAAAAAA), fontSize = labelSize)
@@ -165,11 +174,11 @@ fun SignupScreen(
                 ),
                 keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                 singleLine = true,
-                isError = submitAttempted && fullName.isBlank()
+                isError = nameError != null
             )
-            if (submitAttempted && fullName.isBlank()) {
+            nameError?.let { message ->
                 Text(
-                    text = "Please enter your full name",
+                    text = message,
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.padding(start = 8.dp, top = 4.dp)
@@ -288,6 +297,9 @@ fun SignupScreen(
                     phoneAlreadyRegisteredError = null
                     emailAlreadyRegisteredError = null
                     if (!phoneValid) return@Button
+                    // Recomputed here: submitAttempted was false a line ago, so the
+                    // blank-name case is only an error from this point on.
+                    if (nameErrorFor(fullName, submitAttempted = true) != null) return@Button
 
                     val fullPhone = "${selectedCountry.dialCode}$phoneNumber"
 
@@ -309,7 +321,8 @@ fun SignupScreen(
                         )
                     )
 
-                    onSendOTPClick(fullName, fullPhone, email)
+                    // Normalised only now, once it is known to be a name.
+                    onSendOTPClick(formatFullName(fullName), fullPhone, email)
                 },
                 modifier = Modifier.fillMaxWidth().height(buttonHeight),
                 shape = RoundedCornerShape(16.dp),
@@ -324,7 +337,8 @@ fun SignupScreen(
                     pressedElevation  = 4.dp
                 ),
                 enabled = !isLoading &&
-                        fullName.isNotEmpty() &&
+                        fullName.isNotBlank() &&
+                        nameErrorFor(fullName, submitAttempted = true) == null &&
                         phoneValid &&
                         email.isNotEmpty() &&
                         EmailValidator.isValidEmail(email)
@@ -384,14 +398,53 @@ fun SignupScreen(
     }
 }
 
-private fun formatFullName(input: String): String =
-    input
-        .filter { it.isLetter() || it == ' ' }
+/**
+ * What is wrong with the name as typed, or null when it can be submitted.
+ *
+ * The blank case only speaks up once Send OTP has been pressed; the rest report as
+ * soon as they are true, because each one is something the user has to retype.
+ */
+internal fun nameErrorFor(input: String, submitAttempted: Boolean): String? {
+    val name = input.trim()
+
+    return when {
+        name.isEmpty() -> if (submitAttempted) "Please enter your full name" else null
+
+        // The whole point of this check: an e-mail address is not a name. It was
+        // accepted here before, stripped down to letters, and saved as the account
+        // name — which is what the app then greets the user by.
+        name.contains('@') || name.contains(".com", ignoreCase = true) ->
+            "Please enter your name, not your email address"
+
+        name.any { it.isDigit() } -> "Your name can't contain numbers"
+
+        name.none { it.isLetter() } -> "Please enter a valid name"
+
+        name.length < 2 -> "Please enter your full name"
+
+        else -> null
+    }
+}
+
+/**
+ * Tidies a name that has already passed [nameErrorFor] — collapses spaces and
+ * capitalises the start of each part. Apostrophes, hyphens and dots are kept:
+ * O'Brien, Jean-Luc and Dr. are names, not stray punctuation.
+ *
+ * Only a lowercase opening letter is changed; the rest is left exactly as typed, so
+ * McDonald stays McDonald instead of being flattened to Mcdonald.
+ */
+internal fun formatFullName(input: String): String {
+    val cleaned = input
+        .filter { it.isLetter() || it == ' ' || it == '\'' || it == '-' || it == '.' }
         .replace("\\s+".toRegex(), " ")
-        .trimStart()
-        .split(" ")
-        .joinToString(" ") { word ->
-            word.lowercase().replaceFirstChar {
-                if (it.isLowerCase()) it.titlecase() else it.toString()
-            }
+        .trim()
+
+    val separators = setOf(' ', '\'', '-', '.')
+    return buildString(cleaned.length) {
+        cleaned.forEachIndexed { index, char ->
+            val startsPart = index == 0 || cleaned[index - 1] in separators
+            append(if (startsPart && char.isLowerCase()) char.uppercaseChar() else char)
         }
+    }
+}

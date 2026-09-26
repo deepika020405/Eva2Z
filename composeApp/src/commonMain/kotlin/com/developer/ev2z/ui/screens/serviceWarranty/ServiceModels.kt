@@ -86,16 +86,73 @@ val ServiceComponentCatalog: List<ServiceComponentItem> = listOf(
     ServiceComponentItem("other", "Other", requiresInvoice = false, serverId = "12"),
 )
 
-/** One-time service charge for a complaint raised by a non-EVA2Z customer. */
+/**
+ * One-time service charge. Every complaint raised through this flow is paid for
+ * before it is filed — the fee is no longer conditional on who is asking.
+ */
 const val SERVICE_FEE_RUPEES = 299
 
 /**
- * Every vehicle serviced through this flow is an EV scooty — there is no second
- * type to choose from, so the vehicle field states it outright instead of asking.
- * It is deliberately independent of `get-user-devices`: the type is known even when
- * the device list is empty or the call failed.
+ * The type shown for a device the complaint is filed against when nothing has been
+ * chosen yet — [ServiceVehicleType] is what the form actually asks for.
  */
-const val SERVICE_VEHICLE_TYPE = "EV Scooty"
+const val SERVICE_VEHICLE_TYPE = "EV Vehicle (2 wheeler)"
+
+/**
+ * The kinds of vehicle this flow services. Asked on the form rather than read off
+ * `get-user-devices`: the tracker knows nothing about what it is fitted to, and a
+ * petrol two-wheeler may have no device on the account at all.
+ *
+ * [apiValues] is what travels in `vehicle_type`, and it is a list because the
+ * server's accepted vocabulary keeps moving: the full label was accepted and echoed
+ * at 12:53 on 2026-09-26 and refused by an `in:` rule at 13:09 ("The selected
+ * vehicle type is invalid."). The first entry is sent; the rest are tried, in order,
+ * only when the server refuses the field, and the one that lands is logged. Confirm
+ * the real list with the backend team and this can collapse to a single string.
+ */
+enum class ServiceVehicleType(val label: String, val apiValues: List<String>) {
+    EV_TWO_WHEELER(
+        label = "EV Vehicle (2 wheeler)",
+        apiValues = listOf("ev", "EV", "EV Vehicle (2 wheeler)", "electric", "ev_2w"),
+    ),
+    PETROL_TWO_WHEELER(
+        label = "Petrol Vehicle (2 wheeler)",
+        apiValues = listOf(
+            "petrol",
+            "Petrol",
+            "Petrol Vehicle (2 wheeler)",
+            "Petrol (2 wheeler)",
+            "petrol_2w",
+        ),
+    );
+
+    /** What goes on the wire first. */
+    val apiValue: String get() = apiValues.first()
+
+    companion object {
+        /** Reads `vehicle_type` back off a complaint; null when it says nothing. */
+        fun fromApi(raw: String?): ServiceVehicleType? {
+            val text = raw?.trim()?.lowercase()?.takeIf { it.isNotEmpty() } ?: return null
+            return when {
+                text.startsWith("petrol") -> PETROL_TWO_WHEELER
+                text.startsWith("ev") || text.contains("electric") -> EV_TWO_WHEELER
+                else -> null
+            }
+        }
+    }
+}
+
+/**
+ * What `component_id` carries now that the form no longer asks which component is
+ * affected — the user types the problem instead, and it travels in `issue`.
+ * "Other" is the catalogue's own unclassified entry, so it needs no invoice.
+ */
+val ServiceProblemComponent = ServiceComponentItem(
+    id = "other",
+    label = "Other",
+    requiresInvoice = false,
+    serverId = "12",
+)
 
 /**
  * Whether the person raising the complaint is on EVA2Z Connect.
@@ -189,6 +246,17 @@ sealed interface ComplaintSubmission {
         val amountRupees: Int,
         /** The server's own wording for the submit button, e.g. "Pay ₹299 & Submit". */
         val buttonText: String?,
+        /**
+         * The ticket the server filed alongside the charge, when it filed one.
+         *
+         * Non-null since 2026-09-26: `service/complaints` now answers the first post
+         * with `ticket_number` **and** `payment_required`, i.e. "the complaint exists,
+         * now pay for it". Posting again would file a second ticket, so when this is
+         * set the payment is all that is outstanding and the complaint must never be
+         * re-posted. Null on the older behaviour, where nothing was created until the
+         * paid re-post.
+         */
+        val ticket: ServiceTicket? = null,
         /**
          * The response's own `payment_status: "SUCCESS"` — the money is in and only
          * the ticket is missing. `service/complaints` owns the whole payment
@@ -290,6 +358,14 @@ data class ServiceTicket(
     val serverId: String? = null,
     val vehicle: ServiceVehicle,
     val component: ServiceComponentItem,
+    /**
+     * The server's `problem` — what the user typed on the form. Null only for a
+     * historic row filed before the field existed, which is what [problemLabel]
+     * covers.
+     */
+    val problem: String? = null,
+    /** The server's `vehicle_type`; null when the row carries none. */
+    val vehicleType: ServiceVehicleType? = null,
     val issueTitle: String,
     val issueDescription: String,
     val errorCode: String? = null,
@@ -300,9 +376,45 @@ data class ServiceTicket(
     val customerType: ServiceCustomerType = ServiceCustomerType.EVA2Z_CUSTOMER,
     /** Non-null only when a service charge was collected for this ticket. */
     val payment: ServicePaymentReceipt? = null,
+    /**
+     * The row's own `payment_status` — "SUCCESS", "PENDING", "not_required" — kept raw
+     * because it is the only word on the charge when [payment] is null, which is most
+     * of the time: the list omits `merchant_order_id` even for tickets that were paid.
+     */
+    val paymentStatus: String? = null,
+    /** The row's `payment_amount` / `service_charge`, whether or not it is paid yet. */
+    val paymentAmountRupees: Int? = null,
     val createdAtMillis: Long,
     val lastUpdatedMillis: Long,
-)
+) {
+    /**
+     * What the ticket is headlined by. The typed [problem] when the row has one,
+     * otherwise the component — which is all a complaint filed before the form
+     * asked for a problem ever had.
+     */
+    val problemLabel: String
+        get() = problem?.trim()?.takeIf { it.isNotEmpty() } ?: component.label
+
+    private val statusSlug: String? get() = paymentStatus?.trim()?.lowercase()
+
+    /**
+     * Whether the service charge for this ticket has been collected. A receipt in hand
+     * settles it; failing that the row's own status does.
+     */
+    val chargePaid: Boolean
+        get() = payment != null || statusSlug in setOf("success", "paid", "completed", "settled")
+
+    /** Charged but not yet collected — the ticket exists and the money is still due. */
+    val chargePending: Boolean
+        get() = !chargePaid &&
+            (paymentAmountRupees ?: 0) > 0 &&
+            statusSlug in setOf("pending", "initiated", "processing", "created")
+
+    /** What the charge is, from the receipt when there is one and the row otherwise. */
+    val chargeRupees: Int?
+        get() = payment?.amountRupees?.takeIf { it > 0 }
+            ?: paymentAmountRupees?.takeIf { it > 0 }
+}
 
 /** Filter tabs on the My Complaints screen — one per [TicketStatus], plus "All". */
 enum class ComplaintFilter(val label: String) {
@@ -335,6 +447,7 @@ fun List<ServiceTicket>.search(query: String): List<ServiceTicket> {
     if (q.isEmpty()) return this
     return filter { t ->
         t.ticketId.lowercase().contains(q) ||
+            t.problemLabel.lowercase().contains(q) ||
             t.component.label.lowercase().contains(q) ||
             t.issueDescription.lowercase().contains(q) ||
             t.vehicle.registrationNumber.lowercase().contains(q) ||
@@ -362,15 +475,46 @@ data class ServiceSummary(
 
 /** In-flight complaint being composed on the Raise Complaint screen. */
 data class ComplaintDraft(
-    val customerType: ServiceCustomerType? = null,
+    /**
+     * Every complaint is chargeable now, so the form no longer asks — it always
+     * declares the paying kind of customer and the ₹$SERVICE_FEE_RUPEES is
+     * collected before the complaint is posted.
+     */
+    val customerType: ServiceCustomerType? = ServiceCustomerType.NON_CUSTOMER,
+    /**
+     * Null until the user picks one. Not defaulted to EV: a pre-filled green option
+     * reads as "already answered", and people walked past the question without
+     * noticing there was a choice to make.
+     */
+    val vehicleType: ServiceVehicleType? = null,
     val vehicle: ServiceVehicle? = null,
-    val component: ServiceComponentItem? = null,
+    /** Fixed: the problem is typed, not picked off a component list. */
+    val component: ServiceComponentItem? = ServiceProblemComponent,
+    /** What the user says is wrong — the first line of the issue sent up. */
+    val problem: String = "",
     val issueDescription: String = "",
     val errorCode: String = "",
+    /**
+     * The terms have to be accepted before the charge can be raised — it is the
+     * last thing [validationError] asks for, and until it is ticked the submit
+     * button stays disabled.
+     */
+    val termsAccepted: Boolean = false,
     val invoice: ServiceAttachment? = null,
     val media: List<ServiceAttachment> = emptyList(),
 ) {
     val invoiceRequired: Boolean get() = component?.requiresInvoice == true
+
+    /**
+     * What goes up as `issue` — the description on its own.
+     *
+     * `service/complaints` now takes `vehicle_type` and `problem` as fields of their
+     * own and echoes all three back separately, so nothing is packed in here any
+     * more. Every place that has to recognise this complaint again (the duplicate
+     * check, the payment-history link) compares this same text against the server's
+     * `issue`, so the two sides stay identical.
+     */
+    val issueText: String get() = issueDescription.trim()
 
     /** True once every field the server needs has been filled in. */
     val isComplete: Boolean get() = validationError == null
@@ -384,13 +528,15 @@ data class ComplaintDraft(
      */
     val validationError: String?
         get() = when {
-            customerType == null -> "Tell us whether you are an EVA2Z Connect customer."
-            component == null -> "Select the component that has the issue."
+            vehicleType == null -> "Select your vehicle type."
+            problem.isBlank() -> "Tell us what the problem is."
             issueDescription.isBlank() -> "Describe the issue before submitting."
+            !termsAccepted -> "Accept the terms & conditions to continue."
             else -> null
         }
 
     companion object {
+        const val MAX_PROBLEM = 120
         const val MAX_DESCRIPTION = 600
         const val MAX_MEDIA = 5
         const val MAX_ATTACHMENT_BYTES = 15L * 1024 * 1024
