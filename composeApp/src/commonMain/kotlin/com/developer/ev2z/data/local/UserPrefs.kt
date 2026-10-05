@@ -10,13 +10,15 @@ class UserPrefs(private val storage: StorageManager) {  // ✅ Storage → Stora
         name: String,
         phone: String,
         email: String?,
-        photo: String?
+        photo: String?,
+        userId: Int = 0
     ) {
         storage.saveString("token", token)
         storage.saveString("name", name)
         storage.saveString("phone", phone)
         email?.let { storage.saveString("email", it) }
         photo?.let { storage.saveString("photo", it) }
+        if (userId > 0) storage.saveString("user_id", userId.toString())
     }
 
     fun getToken() = storage.getString("token", "")
@@ -43,8 +45,21 @@ class UserPrefs(private val storage: StorageManager) {  // ✅ Storage → Stora
 
     fun isLoggedIn() = getToken()?.isNotEmpty()
 
-    // Sanctum tokens are "{userId}|{secret}"; parse the numeric prefix as ownerId.
+    /**
+     * The signed-in user's real id, saved from the login response. 0 when the
+     * session was created before this was stored — callers that need certainty
+     * (ownership checks) must treat 0 as "unknown", not as a user.
+     */
+    fun getAuthUserId(): Int =
+        storage.getString("user_id", "")?.toIntOrNull() ?: 0
+
+    /**
+     * Legacy id accessor. Prefers the stored user id and falls back to the token
+     * prefix — note that "6639|abc…" is the *token* id, NOT the user id, so this
+     * fallback is a guess. Use [getAuthUserId] for anything the server authorizes.
+     */
     fun getUserId(): Int {
+        getAuthUserId().takeIf { it > 0 }?.let { return it }
         val token = getToken() ?: return 0
         return token.substringBefore("|").toIntOrNull() ?: 0
     }

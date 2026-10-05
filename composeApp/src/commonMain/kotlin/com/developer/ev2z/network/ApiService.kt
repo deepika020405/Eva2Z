@@ -75,6 +75,33 @@ class ServiceEndpointMissingException(val path: String) :
 private val MISSING_ENDPOINT_CODES = setOf(404, 405, 501)
 
 /**
+ * Type + message + cause, for logging a failure that has to be told apart from
+ * the others without a debugger.
+ *
+ * `e.message` alone is not enough on iOS: a Darwin/NSURLSession failure often
+ * carries a null message, so the only thing that reaches the console is
+ * "failed (null)" — which is why a transport error and an expired session read
+ * identically there.
+ */
+internal fun Throwable.describe(): String = buildString {
+    append(this@describe::class.simpleName ?: "Exception")
+    message?.let { append(": ").append(it) }
+    cause?.let { append(" ← ").append(it::class.simpleName).append(": ").append(it.message) }
+}
+
+/**
+ * Enough of a bearer token to tell three cases apart in a log without printing the
+ * secret: never sent at all, sent but belonging to a different session, or sent and
+ * simply rejected.
+ *
+ * The part before "|" is the Sanctum *personal access token* id, not the user id
+ * (see AppUserProvider) — but it is what identifies which session was used, so a
+ * 401 can be matched against the session the other platform is signed in with.
+ */
+private fun String.tokenFingerprint(): String =
+    if (isBlank()) "MISSING (empty token)" else "id=${substringBefore("|")} len=$length"
+
+/**
  * What `POST service/complaints` answered, status included.
  *
  * The status has to travel with the body: a 422 validation body carries neither
@@ -2457,6 +2484,129 @@ class ApiService {
     }
 
 
+    // ---------------- EDIT / DELETE POST ----------------
+    // 🔧 ENDPOINTS: these follow the Laravel REST siblings of `POST posts`.
+    // When the backend confirms the real routes, change only these two strings.
+    private fun updatePostPath(postId: Int) = "posts/$postId"
+    private fun deletePostPath(postId: Int) = "posts/$postId"
+
+    // 🔧 FIELD NAMES for the media part of an edit. Rename here if the backend
+    // expects something else (e.g. "images[]" / "keep_media[]" / "delete_media[]").
+    private val newMediaField     = "media[]"
+    private val keptMediaField    = "existing_media[]"
+    private val removedMediaField = "removed_media[]"
+
+    /**
+     * Edit an existing community post — text, category and images.
+     *
+     * Sent as multipart (same shape as the create call) because new photos travel as
+     * files. Laravel can't read multipart from a real PUT, so it goes out as POST with
+     * `_method=PUT` (method spoofing); if the route turns out to be a plain POST and
+     * answers 404/405, it is retried once without `_method`.
+     *
+     * @param newImages       freshly picked photos to upload
+     * @param keptMediaUrls   existing media_urls the user kept — pass null to leave
+     *                        the post's existing media untouched
+     * @param removedMediaUrls existing media_urls the user deleted
+     */
+    suspend fun updateCommunityPost(
+        postId: Int,
+        title: String?,
+        body: String,
+        category: String?,
+        newImages: List<ByteArray> = emptyList(),
+        keptMediaUrls: List<String>? = null,
+        removedMediaUrls: List<String> = emptyList(),
+    ): ApiActionResult {
+        val token = AppTokenProvider.getToken()
+        val url = "${baseUrl}${updatePostPath(postId)}"
+
+        println("🌐 API: Update post $postId → $url")
+        println("   ➡️ new images=${newImages.size}, kept=${keptMediaUrls?.size ?: "untouched"}, removed=${removedMediaUrls.size}")
+
+        // Built twice (with and without method spoofing), so it lives in a lambda.
+        fun parts(spoofPut: Boolean) = formData {
+            if (spoofPut) append("_method", "PUT")
+
+            title?.takeIf { it.isNotBlank() }?.let { append("title", it) }
+            append("body", body)
+            category?.takeIf { it.isNotBlank() }?.let { append("category", it) }
+
+            keptMediaUrls?.forEach { append(keptMediaField, it) }
+            removedMediaUrls.forEach { append(removedMediaField, it) }
+
+            newImages.forEachIndexed { index, bytes ->
+                append(
+                    key = newMediaField,
+                    value = bytes,
+                    headers = Headers.build {
+                        append(HttpHeaders.ContentType, "image/jpeg")
+                        append(HttpHeaders.ContentDisposition, "filename=image_$index.jpg")
+                    }
+                )
+            }
+        }
+
+        return try {
+            var response = client.submitFormWithBinaryData(url, parts(spoofPut = true)) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+            }
+
+            if (response.status == HttpStatusCode.NotFound ||
+                response.status == HttpStatusCode.MethodNotAllowed
+            ) {
+                println("↩️ _method=PUT not routed (${response.status}) — retrying as plain POST")
+                response = client.submitFormWithBinaryData(url, parts(spoofPut = false)) {
+                    header(HttpHeaders.Authorization, "Bearer $token")
+                    header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+                }
+            }
+
+            val raw = runCatching { response.bodyAsText() }.getOrDefault("")
+            println("📥 UPDATE POST ${response.status} → ${raw.take(300)}")
+
+
+            ApiActionResult(
+                success = response.status.isSuccess(),
+                statusCode = response.status.value,
+                message = ApiActionResult.reasonFrom(raw),
+            )
+
+        } catch (e: Exception) {
+            println("❌ Update Post Error: ${e.message}")
+            ApiActionResult(success = false, message = e.message)
+        }
+    }
+
+    /** Delete a community post the signed-in user owns. */
+    suspend fun deleteCommunityPost(postId: Int): ApiActionResult {
+        val token = AppTokenProvider.getToken()
+        val url = "${baseUrl}${deletePostPath(postId)}"
+
+        println("🌐 API: Delete post $postId → $url")
+
+        return try {
+            val response = client.delete(url) {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+            }
+
+            val raw = runCatching { response.bodyAsText() }.getOrDefault("")
+            println("📥 DELETE POST ${response.status} → ${raw.take(300)}")
+
+            ApiActionResult(
+                success = response.status.isSuccess(),
+                statusCode = response.status.value,
+                message = ApiActionResult.reasonFrom(raw),
+            )
+
+        } catch (e: Exception) {
+            println("❌ Delete Post Error: ${e.message}")
+            ApiActionResult(success = false, message = e.message)
+        }
+    }
+
     // ---------------- POST LIKE ----------------
     suspend fun togglePostLike(postId: Int): Boolean {
 
@@ -2709,7 +2859,8 @@ class ApiService {
 
         println(
             "🛠️ POST service/complaints → type=$customerType device=$deviceId " +
-                "component=$componentId vehicle=$vehicleType problem=$problem payment=$merchantOrderId"
+                "component=$componentId vehicle=$vehicleType problem=$problem payment=$merchantOrderId " +
+                "auth=${token.tokenFingerprint()}"
         )
 
         val response = client.submitFormWithBinaryData(
@@ -2775,10 +2926,13 @@ class ApiService {
             header(HttpHeaders.Accept, ContentType.Application.Json.toString())
         }
 
-        if (response.status == HttpStatusCode.Unauthorized) throw UnauthorizedException()
-
+        // Read before the 401 bails out: the body is the only thing that separates
+        // "no token reached the server" from "this token is not accepted", and
+        // throwing first left the console with nothing to tell them apart.
         val raw = response.bodyAsText()
         println("🛠️ SERVICE COMPLAINT (${response.status}) → $raw")
+
+        if (response.status == HttpStatusCode.Unauthorized) throw UnauthorizedException()
 
         if (response.status.value in MISSING_ENDPOINT_CODES) {
             throw ServiceEndpointMissingException("service/complaints")
@@ -3656,13 +3810,13 @@ class ApiService {
         val response = try {
             post()
         } catch (first: Exception) {
-            println("⚠️ service/complaints failed (${first.message}) — checking whether it landed.")
+            println("⚠️ service/complaints failed (${first.describe()}) — checking whether it landed.")
             alreadyFiled(draft, component)?.let { return ComplaintSubmission.Created(it) }
 
             try {
                 post()
             } catch (second: Exception) {
-                println("⚠️ Retry also failed (${second.message}) — checking once more.")
+                println("⚠️ Retry also failed (${second.describe()}) — checking once more.")
                 alreadyFiled(draft, component)?.let { return ComplaintSubmission.Created(it) }
                 throw second
             }
@@ -3723,7 +3877,16 @@ class ApiService {
                 }
             }
 
-            val charge = data?.number("service_charge", "amount") ?: customerType.expectedFeeRupees
+            // What the server quoted, and what is actually charged. They differ on
+            // the live route, which still answers `service_charge: 1` — a test
+            // figure, not a price. Opening PhonePe for it takes ₹1 off the user and
+            // leaves the real fee uncollected, so the published ₹299 is the floor:
+            // the server can quote more and that stands, it just cannot quote less.
+            val quoted = data?.number("service_charge", "amount")
+            val charge = quoted?.coerceAtLeast(SERVICE_FEE_RUPEES) ?: SERVICE_FEE_RUPEES
+            if (quoted != null && quoted != charge) {
+                println("⚠️ service/complaints quoted ₹$quoted — charging the published ₹$charge instead.")
+            }
 
             // The complaint itself, when this answer carries one. Since 2026-09-26 the
             // first post files the ticket and asks for the charge in the same breath
@@ -3754,7 +3917,13 @@ class ApiService {
                 settled = data?.text("payment_status")?.serviceSlug() == "success",
                 // The checkout may ride along with the amount; when it doesn't,
                 // the caller falls back to createServicePaymentOrder().
-                order = payload.readPaymentOrder(charge),
+                //
+                // It is only usable when it was minted for the figure being charged:
+                // the token resolves to the server's own order, so a ₹1 order opens
+                // PhonePe at ₹1 no matter what this response is labelled. When the
+                // quote was overridden above, the order is dropped and the caller
+                // creates a ₹$charge one.
+                order = payload.readPaymentOrder(charge)?.takeIf { quoted == charge },
             )
         }
 
@@ -3987,6 +4156,8 @@ private fun ServiceTicket.enrichedWith(local: ServiceTicket): ServiceTicket {
     return copy(
         attachments = withBytes.ifEmpty { local.attachments },
         payment = payment ?: local.payment,
+        paymentPaidAtMillis = paymentPaidAtMillis ?: local.paymentPaidAtMillis,
+        paymentReference = paymentReference ?: local.paymentReference,
         customerType = local.customerType,
         allocation = allocation ?: local.allocation,
     )
@@ -4085,6 +4256,11 @@ private fun JsonObject.toServiceTicket(vehicles: List<ServiceVehicle>): ServiceT
         payment = readServerPayment(created),
         paymentStatus = text("payment_status"),
         paymentAmountRupees = number("payment_amount", "service_charge", "amount"),
+        // Read straight off the row as well, because readServerPayment gives up when
+        // `merchant_order_id` is missing — which is exactly the common paid row. The
+        // detail screen's "Paid on" and "Payment ref" come from these.
+        paymentPaidAtMillis = readChargePaidAt(),
+        paymentReference = readChargeReference(),
         timeline = readTimeline(ticketId, component, created),
         createdAtMillis = created,
         lastUpdatedMillis = timestamp("updated_at") ?: created,
@@ -4130,6 +4306,8 @@ private fun JsonObject.toSubmittedTicket(
         paymentStatus = if (payment != null) "SUCCESS" else text("payment_status"),
         paymentAmountRupees = payment?.amountRupees
             ?: number("service_charge", "payment_amount", "amount"),
+        paymentPaidAtMillis = payment?.paidAtMillis ?: readChargePaidAt(),
+        paymentReference = payment?.merchantOrderId ?: readChargeReference(),
         timeline = buildList {
             payment?.let {
                 add(
@@ -4319,6 +4497,37 @@ private fun JsonObject.readServerPayment(createdAtMillis: Long): ServicePaymentR
         paidAtMillis = timestamp("paid_at", "payment_completed_at") ?: createdAtMillis,
     )
 }
+
+/**
+ * When the charge was paid, read off the complaint row on its own terms.
+ *
+ * [readServerPayment] returns null the moment `merchant_order_id` is absent, and
+ * rows come back that way even when paid — so the timestamp has to be read
+ * separately or the detail screen has nothing to put against "Paid on".
+ */
+@OptIn(ExperimentalTime::class)
+private fun JsonObject.readChargePaidAt(): Long? = timestamp(
+    "paid_at",
+    "payment_completed_at",
+    "payment_date",
+    "paid_on",
+    "transaction_date",
+)
+
+/**
+ * The reference for the charge, in the order support can act on: our own
+ * `merchant_order_id` first, then PhonePe's order id, then whatever transaction
+ * id the row carries.
+ */
+private fun JsonObject.readChargeReference(): String? = text(
+    "merchant_order_id",
+    "merchantOrderId",
+    "phonepe_order_id",
+    "phonepeOrderId",
+    "transaction_id",
+    "payment_id",
+    "order_id",
+)
 
 /**
  * Pulls a PhonePe checkout out of a `payment_required` response.

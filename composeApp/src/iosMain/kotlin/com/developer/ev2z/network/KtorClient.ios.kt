@@ -21,7 +21,11 @@ actual fun createHttpClient(): HttpClient {
 
         install(Logging) {
             logger = Logger.DEFAULT
-            level = LogLevel.NONE
+            // HEADERS, not NONE: a Darwin transport failure (NSURLSession refusing the
+            // request, a dropped multipart body) leaves no response for the call site
+            // to print, so without this the Xcode console shows only "failed (null)".
+            // Bodies stay out — the Authorization header is enough of a leak already.
+            level = LogLevel.HEADERS
         }
 
         install(HttpTimeout) {

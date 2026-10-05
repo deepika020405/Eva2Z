@@ -69,7 +69,10 @@ actual fun PlatformMapView(
     val mapView        = remember { MapView(context) }
     val markerHolder   = remember { arrayOfNulls<com.google.android.gms.maps.model.Marker>(1) }
     val routePolyline  = remember { arrayOfNulls<Polyline>(1) }
+    // Last point the marker's heading was computed from, and that heading. Both are
+    // only updated once the vehicle has actually travelled BEARING_MIN_MOVE_METERS.
     val lastLocation   = remember { doubleArrayOf(latitude, longitude) }
+    val lastBearing    = remember { floatArrayOf(0f) }
     val mapHolder      = remember { arrayOfNulls<com.google.android.gms.maps.GoogleMap>(1) }
     val fusedClient    = remember { LocationServices.getFusedLocationProviderClient(context) }
     // Mutable refs readable by the LocationCallback (main thread)
@@ -80,7 +83,14 @@ actual fun PlatformMapView(
     // Draw / refresh the blue route line on the map
     fun refreshRoute(map: com.google.android.gms.maps.GoogleMap, userLatLng: LatLng) {
         val deviceLatLng = LatLng(deviceLatLngRef[0], deviceLatLngRef[1])
-        routePolyline[0]?.remove()
+        val existing = routePolyline[0]
+        if (existing != null) {
+            // Move the existing line rather than replacing it: this runs on every
+            // marker frame, and remove + addPolyline allocated a new overlay ~60
+            // times a second, which stuttered the whole map.
+            existing.points = listOf(userLatLng, deviceLatLng)
+            return
+        }
         routePolyline[0] = map.addPolyline(
             PolylineOptions()
                 .add(userLatLng, deviceLatLng)
@@ -154,24 +164,41 @@ actual fun PlatformMapView(
                     }
                 }
             },
+            // The latitude/longitude arriving here are interpolated frames between two
+            // real fixes (see rememberAnimatedLatLng), so this block runs ~60 times a
+            // second. Everything in it has to be cheap and must not start an animation
+            // of its own.
             update = { _ ->
                 val newLatLng = LatLng(latitude, longitude)
                 deviceLatLngRef[0] = latitude
                 deviceLatLngRef[1] = longitude
                 routeActiveRef[0]  = routeActive
 
-                mapView.getMapAsync { map ->
+                val applyFrame = { map: com.google.android.gms.maps.GoogleMap ->
                     mapHolder[0] = map
 
                     // ── Vehicle marker bearing + position ────────────
-                    val bearing = calculateBearing(lastLocation[0], lastLocation[1], latitude, longitude)
-                    markerHolder[0]?.let { it.position = newLatLng; it.rotation = bearing }
-                    lastLocation[0] = latitude
-                    lastLocation[1] = longitude
+                    // Heading is only recomputed once the vehicle has really moved: a
+                    // sub-metre interpolation step yields an essentially random angle,
+                    // which made the arrow spin on the spot.
+                    val moved = distanceMeters(
+                        lastLocation[0], lastLocation[1], latitude, longitude
+                    )
+                    if (moved >= BEARING_MIN_MOVE_METERS) {
+                        lastBearing[0] = calculateBearing(
+                            lastLocation[0], lastLocation[1], latitude, longitude
+                        )
+                        lastLocation[0] = latitude
+                        lastLocation[1] = longitude
+                    }
+                    markerHolder[0]?.let { it.position = newLatLng; it.rotation = lastBearing[0] }
 
-                    // Camera follows device only when route is NOT active
+                    // Camera follows device only when route is NOT active.
+                    // moveCamera, not animateCamera: an animation started on every frame
+                    // was cancelled 16 ms later by the next one, so the camera never
+                    // reached its target and visibly dragged behind the marker.
                     if (!routeActive) {
-                        map.animateCamera(CameraUpdateFactory.newLatLng(newLatLng))
+                        map.moveCamera(CameraUpdateFactory.newLatLng(newLatLng))
                     }
 
                     // Device moved → refresh route if active
@@ -180,6 +207,11 @@ actual fun PlatformMapView(
                         if (userLatLng != null) refreshRoute(map, userLatLng)
                     }
                 }
+
+                // Use the map we already hold; getMapAsync would queue a callback per frame.
+                val readyMap = mapHolder[0]
+                if (readyMap != null) applyFrame(readyMap)
+                else mapView.getMapAsync { map -> applyFrame(map) }
             },
             modifier = Modifier.fillMaxSize()
         )
@@ -254,6 +286,20 @@ actual fun PlatformMapView(
             }
         }
     }
+}
+
+/**
+ * Travel below this is interpolation noise rather than a direction the vehicle is
+ * heading in, so the marker keeps the bearing it already has.
+ */
+private const val BEARING_MIN_MOVE_METERS = 3.0
+
+/** Flat-earth distance — accurate enough for a few-metre threshold and far cheaper than haversine. */
+private fun distanceMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+    val meanLat = Math.toRadians((lat1 + lat2) / 2)
+    val dLat = (lat2 - lat1) * 111_320.0
+    val dLng = (lon2 - lon1) * 111_320.0 * Math.cos(meanLat)
+    return Math.hypot(dLat, dLng)
 }
 
 private fun getNavigationIcon(context: Context, width: Int = 120, height: Int = 120): BitmapDescriptor {

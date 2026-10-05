@@ -30,11 +30,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.AlertDialog
@@ -84,6 +88,7 @@ import com.developer.ev2z.response.Users
 import com.developer.ev2z.ui.screens.Profile.ProfileImageZoomDialog
 import com.developer.ev2z.ui.screens.homeScreen.LocalHomeTheme
 import com.developer.ev2z.ui.screens.social_media.openUrl
+import com.developer.ev2z.util.rememberImagePicker
 import io.ktor.util.date.getTimeMillis
 import kotlinx.coroutines.delay
 import kotlinx.datetime.*
@@ -106,6 +111,7 @@ private val CommSubtle    = Color(0xFF94A3B8)
 private val CommDivider   = Color(0xFFE2E8F0)
 private val CommChipBg    = Color(0xFFF8FAFC)
 private val CommStar      = Color(0xFFD97706)
+private val CommDanger    = Color(0xFFDC2626)
 
 // ─────────────────────────────────────────────────────────────────
 // Category helper
@@ -146,6 +152,21 @@ private val avatarColors = listOf(
 )
 private fun postAvatarColor(userId: Int) = avatarColors[kotlin.math.abs(userId) % avatarColors.size]
 
+/**
+ * Whose post is this? Only the owner gets Edit/Delete — the API enforces the same
+ * rule and answers 403 {"error":"Not authorized"} for anybody else.
+ *
+ * [authUserId] is the real user id from the login response. It is 0 on sessions
+ * created before the app stored it; those fall back to the saved profile name,
+ * because the Sanctum token prefix is a token id and must not be read as a user id.
+ */
+private fun isOwnPost(post: Post, authUserId: Int, authUserName: String): Boolean {
+    val author = post.user ?: return false
+    if (authUserId > 0) return author.id == authUserId
+    return authUserName.isNotBlank() &&
+            author.name.trim().equals(authUserName.trim(), ignoreCase = true)
+}
+
 private data class CommTab(val id: String, val label: String, val emoji: String)
 
 
@@ -163,10 +184,13 @@ private val communityTabs = listOf(
 fun CommunityScreen(
     posts: List<Post>,
     authUserId: Int,
+    authUserName: String = "",
     onCreatePostClick: () -> Unit,
     onLikeClick: (Int) -> Unit,
     viewModel: CommunityViewModel,
     onCommentClick: (Int) -> Unit,
+    onEditPost: (Post) -> Unit = {},
+    onDeletePost: (Post) -> Unit = {},
 ) {
     val _ht           = LocalHomeTheme.current
     val CommScreenBg  = if (_ht.isDark) _ht.palette.pageBg        else CommScreenBg
@@ -217,6 +241,10 @@ fun CommunityScreen(
                         BASE_IMAGE_URL = BASE_IMAGE_URL,
                         onLikeClick    = onLikeClick,
                         onCommentClick = onCommentClick,
+                        // Edit / Delete only on the signed-in user's own posts
+                        canManage      = isOwnPost(post, authUserId, authUserName),
+                        onEditClick    = { onEditPost(post) },
+                        onDeleteClick  = { onDeletePost(post) },
                     )
                 }
 
@@ -350,6 +378,9 @@ fun PostItem(
     BASE_IMAGE_URL: String,
     onLikeClick: (Int) -> Unit,
     onCommentClick: (Int) -> Unit,
+    canManage: Boolean = false,
+    onEditClick: () -> Unit = {},
+    onDeleteClick: () -> Unit = {},
 ) {
     val _ht           = LocalHomeTheme.current
     val CommCardBg    = if (_ht.isDark) _ht.palette.cardBg        else CommCardBg
@@ -366,7 +397,14 @@ fun PostItem(
             .padding(14.dp),
     ) {
         // ── Header ────────────────────────────────────────────────
-        PostHeader(post.user, post.created_at, BASE_IMAGE_URL)
+        PostHeader(
+            user           = post.user,
+            createdAt      = post.created_at,
+            BASE_IMAGE_URL = BASE_IMAGE_URL,
+            showActions    = canManage,
+            onEdit         = onEditClick,
+            onDelete       = onDeleteClick,
+        )
 
         Spacer(Modifier.height(10.dp))
 
@@ -638,6 +676,9 @@ fun PostHeader(
     user: Users?,
     createdAt: String,
     BASE_IMAGE_URL: String,
+    showActions: Boolean = true,
+    onEdit: () -> Unit = {},
+    onDelete: () -> Unit = {},
 ) {
     val _ht           = LocalHomeTheme.current
     val CommTitleDark = if (_ht.isDark) _ht.palette.textPrimary else CommTitleDark
@@ -657,17 +698,17 @@ fun PostHeader(
         ) {
             if (!user?.photo.isNullOrEmpty()) {
                 AsyncImage(
-                    model              = "$BASE_IMAGE_URL/storage/${user!!.photo}",
+                    model = "$BASE_IMAGE_URL/storage/${user!!.photo}",
                     contentDescription = "Profile Picture",
-                    modifier           = Modifier.fillMaxSize().clip(CircleShape),
-                    contentScale       = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().clip(CircleShape),
+                    contentScale = ContentScale.Crop,
                 )
             } else {
                 Text(
-                    text       = user?.name?.firstOrNull()?.uppercase() ?: "U",
+                    text = user?.name?.firstOrNull()?.uppercase() ?: "U",
                     fontWeight = FontWeight.Bold,
-                    color      = Color.White,
-                    fontSize   = 14.sp,
+                    color = Color.White,
+                    fontSize = 14.sp,
                 )
             }
         }
@@ -678,12 +719,12 @@ fun PostHeader(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     user?.name ?: "—",
-                    fontSize   = 13.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color      = CommTitleDark,
-                    maxLines   = 1,
-                    overflow   = TextOverflow.Ellipsis,
-                    modifier   = Modifier.weight(1f, fill = false)
+                    color = CommTitleDark,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
                 )
                 Spacer(Modifier.width(6.dp))
                 Text("⭐", fontSize = 10.sp)
@@ -694,9 +735,36 @@ fun PostHeader(
             Text(
                 formatPostDateCmp(createdAt),
                 fontSize = 11.sp,
-                color    = CommSubtle,
+                color = CommSubtle,
             )
         }
+
+        // Edit / Delete actions — right side of the card, own posts only
+        Spacer(Modifier.width(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = Icons.Default.Edit,
+                contentDescription = "Edit post",
+                tint = CommTitleDark,
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .clickable(onClick = onEdit)
+                    .padding(5.dp),
+            )
+            Spacer(Modifier.width(4.dp))
+            Icon(
+                imageVector = Icons.Default.Delete,
+                contentDescription = "Delete post",
+                tint = CommDanger,
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .clickable(onClick = onDelete)
+                    .padding(5.dp),
+            )
+        }
+
     }
 }
 
@@ -1228,6 +1296,11 @@ fun CommunityScreenRoot(
 
     var openCommentsPostId by remember { mutableStateOf<Int?>(null) }
 
+    // ── Edit / Delete of the user's own posts ─────────────────────
+    var editingPost  by remember { mutableStateOf<Post?>(null) }
+    var deletingPost by remember { mutableStateOf<Post?>(null) }
+    var actionError  by remember { mutableStateOf<String?>(null) }
+
     // ── Current location for the "Nearby" pill ────────────────────
     var locationLabel by remember { mutableStateOf("Nearby") }
     var locating by remember { mutableStateOf(false) }
@@ -1328,10 +1401,13 @@ fun CommunityScreenRoot(
                     CommunityScreen(
                         posts            = state.posts,
                         authUserId       = state.authUserId,
+                        authUserName     = state.authUserName,
                         viewModel        = viewModel,
                         onCreatePostClick = onOpenCreatePost,
                         onLikeClick      = viewModel::toggleLike,
                         onCommentClick   = { openCommentsPostId = it },
+                        onEditPost       = { viewModel.clearError(); editingPost = it },
+                        onDeletePost     = { deletingPost = it },
                     )
                 }
             }
@@ -1346,6 +1422,72 @@ fun CommunityScreenRoot(
         )
     }
 
+    // ── Edit post ─────────────────────────────────────────────────
+    editingPost?.let { post ->
+        EditPostDialog(
+            post      = post,
+            saving    = state.postUpdating,
+            errorText = state.error,
+            onDismiss = { viewModel.clearError(); editingPost = null },
+            onSave    = { title, body, category, newImages, keptUrls, removedUrls ->
+                viewModel.editPost(
+                    postId           = post.id,
+                    title            = title,
+                    body             = body,
+                    category         = category,
+                    newImages        = newImages,
+                    keptMediaUrls    = keptUrls,
+                    removedMediaUrls = removedUrls,
+                ) { ok -> if (ok) editingPost = null }
+            },
+        )
+    }
+
+    // ── Delete post ───────────────────────────────────────────────
+    deletingPost?.let { post ->
+        AlertDialog(
+            onDismissRequest = { deletingPost = null },
+            title = { Text("Delete post?", fontWeight = FontWeight.Bold, color = CommTitleDark) },
+            text = {
+                Text(
+                    "This post will be removed from the community. This can't be undone.",
+                    fontSize = 13.sp,
+                    color    = CommBodyGray,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    deletingPost = null
+                    viewModel.deletePost(post.id) { ok ->
+                        if (!ok) actionError = viewModel.state.error
+                    }
+                }) {
+                    Text("Delete", color = CommDanger, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deletingPost = null }) {
+                    Text("Cancel", color = CommSubtle)
+                }
+            },
+            containerColor = CommCardBg,
+        )
+    }
+
+    actionError?.let { message ->
+        AlertDialog(
+            onDismissRequest = { actionError = null; viewModel.clearError() },
+            title = { Text("Couldn't delete", fontWeight = FontWeight.Bold, color = CommTitleDark) },
+            text  = { Text(message, fontSize = 13.sp, color = CommBodyGray) },
+            confirmButton = {
+                TextButton(onClick = { actionError = null; viewModel.clearError() }) {
+                    Text("OK", color = CommGreen, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            containerColor = CommCardBg,
+        )
+    }
+
     if (showEnableLocation) {
         EnableLocationDialog(
             onDismiss = { showEnableLocation = false },
@@ -1355,6 +1497,294 @@ fun CommunityScreenRoot(
             },
         )
     }
+}
+
+/** One 72.dp photo tile in the edit sheet, with a remove badge on top. */
+@Composable
+private fun EditPostThumb(
+    enabled: Boolean,
+    onRemove: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .size(72.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(CommChipBg),
+    ) {
+        content()
+
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(4.dp)
+                .size(20.dp)
+                .clip(CircleShape)
+                .background(Color.Black.copy(alpha = 0.55f))
+                .clickable(enabled = enabled, onClick = onRemove),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "Remove photo",
+                tint = Color.White,
+                modifier = Modifier.size(12.dp),
+            )
+        }
+    }
+}
+
+/**
+ * Edit dialog for a post the user owns — title, body, category and photos.
+ * Existing photos can be removed and new ones attached (max 5 in total).
+ */
+@Composable
+private fun EditPostDialog(
+    post: Post,
+    saving: Boolean,
+    errorText: String?,
+    onDismiss: () -> Unit,
+    onSave: (
+        title: String,
+        body: String,
+        category: String,
+        newImages: List<ByteArray>,
+        keptMediaUrls: List<String>?,
+        removedMediaUrls: List<String>,
+    ) -> Unit,
+) {
+    val categories = listOf("Tips", "Traffic", "Stolen", "Lost", "Found", "Police")
+
+    var title by remember(post.id) { mutableStateOf(post.title.orEmpty()) }
+    var body  by remember(post.id) { mutableStateOf(post.body.orEmpty()) }
+    var category by remember(post.id) {
+        mutableStateOf(
+            categories.firstOrNull { it.equals(post.category, ignoreCase = true) }
+                ?: post.category?.takeIf { it.isNotBlank() }
+                ?: categories.first()
+        )
+    }
+
+    // Photos: what stays, what the user dropped, what they attached now.
+    var keptUrls    by remember(post.id) { mutableStateOf(post.media_urls) }
+    var removedUrls by remember(post.id) { mutableStateOf(emptyList<String>()) }
+    var newImages   by remember(post.id) { mutableStateOf(emptyList<ByteArray>()) }
+
+    val totalImages = keptUrls.size + newImages.size
+
+    val imagePicker = rememberImagePicker { bytes ->
+        if (bytes != null) {
+            // One photo at a time while editing: the picked image replaces everything
+            // the post had. The old media goes into removedUrls so the API drops it,
+            // and an earlier pick in this same sheet is thrown away too.
+            if (keptUrls.isNotEmpty()) {
+                removedUrls = removedUrls + keptUrls
+                keptUrls = emptyList()
+            }
+            newImages = listOf(bytes)
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = { if (!saving) onDismiss() },
+        title = { Text("Edit post", fontWeight = FontWeight.Bold, color = CommTitleDark) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                // Why the last save failed (e.g. 403 on somebody else's post)
+                if (!errorText.isNullOrBlank() && !saving) {
+                    Text(
+                        errorText,
+                        fontSize = 12.sp,
+                        color = CommDanger,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                }
+
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Title", fontSize = 12.sp) },
+                    singleLine = true,
+                    enabled = !saving,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor   = CommGreen,
+                        unfocusedBorderColor = CommDivider,
+                        focusedTextColor     = CommTitleDark,
+                        unfocusedTextColor   = CommTitleDark,
+                        cursorColor          = CommGreen,
+                        focusedLabelColor    = CommGreen,
+                        unfocusedLabelColor  = CommSubtle,
+                    ),
+                )
+
+                Spacer(Modifier.height(10.dp))
+
+                OutlinedTextField(
+                    value = body,
+                    onValueChange = { body = it },
+                    label = { Text("What's happening?", fontSize = 12.sp) },
+                    minLines = 3,
+                    maxLines = 6,
+                    enabled = !saving,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor   = CommGreen,
+                        unfocusedBorderColor = CommDivider,
+                        focusedTextColor     = CommTitleDark,
+                        unfocusedTextColor   = CommTitleDark,
+                        cursorColor          = CommGreen,
+                        focusedLabelColor    = CommGreen,
+                        unfocusedLabelColor  = CommSubtle,
+                    ),
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                Text("Category", fontSize = 12.sp, color = CommSubtle)
+                Spacer(Modifier.height(6.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    categories.forEach { option ->
+                        val selected = option.equals(category, ignoreCase = true)
+                        Text(
+                            option,
+                            fontSize   = 12.sp,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                            color      = if (selected) CommGreenText else CommBodyGray,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(if (selected) CommGreenSoft else CommChipBg)
+                                .border(
+                                    BorderStroke(1.dp, if (selected) CommGreen else CommDivider),
+                                    RoundedCornerShape(16.dp),
+                                )
+                                .clickable(enabled = !saving) { category = option }
+                                .padding(horizontal = 12.dp, vertical = 7.dp),
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(14.dp))
+
+                Text(
+                    if (totalImages == 0) "Photo" else "Photo — a new one replaces this",
+                    fontSize = 12.sp,
+                    color = CommSubtle,
+                )
+                Spacer(Modifier.height(6.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    // Photos already on the post
+                    keptUrls.forEach { url ->
+                        EditPostThumb(
+                            enabled = !saving,
+                            onRemove = {
+                                keptUrls = keptUrls - url
+                                removedUrls = removedUrls + url
+                            },
+                        ) {
+                            AsyncImage(
+                                model = url,
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop,
+                            )
+                        }
+                    }
+
+                    // The photo picked in this sheet (not uploaded yet)
+                    newImages.forEach { bytes ->
+                        EditPostThumb(
+                            enabled = !saving,
+                            onRemove = { newImages = emptyList() },
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(CommGreenSoft),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(
+                                    "New",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = CommGreenText,
+                                )
+                            }
+                        }
+                    }
+
+                    // Pick tile — always available, since picking replaces the photo
+                    run {
+                        Box(
+                            modifier = Modifier
+                                .size(72.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(CommChipBg)
+                                .border(BorderStroke(1.dp, CommDivider), RoundedCornerShape(12.dp))
+                                .clickable(enabled = !saving) { imagePicker.launch() },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription =
+                                        if (totalImages > 0) "Replace photo" else "Add photo",
+                                    tint = CommGreen,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                                Text(
+                                    if (totalImages > 0) "Replace" else "Add",
+                                    fontSize = 10.sp,
+                                    color = CommGreen,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = body.isNotBlank() && !saving,
+                onClick = {
+                    onSave(
+                        title.trim(),
+                        body.trim(),
+                        category,
+                        newImages,
+                        // Only sent when photos were dropped — otherwise the backend
+                        // keeps the post's existing media as-is.
+                        keptUrls.takeIf { removedUrls.isNotEmpty() },
+                        removedUrls,
+                    )
+                },
+            ) {
+                Text(
+                    if (saving) "Saving…" else "Save",
+                    color = if (body.isNotBlank() && !saving) CommGreen else CommSubtle,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(enabled = !saving, onClick = onDismiss) {
+                Text("Cancel", color = CommSubtle)
+            }
+        },
+        containerColor = CommCardBg,
+    )
 }
 
 @Composable

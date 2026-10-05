@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.interop.UIKitView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.developer.ev2z.network.SnappedRoute
 import com.developer.ev2z.response.RoutePoint
 import kotlinx.cinterop.*
 import platform.CoreLocation.CLLocationCoordinate2D
@@ -29,6 +30,7 @@ import platform.darwin.NSObject
 @Composable
 actual fun HistoryMapView(
     routePoints: List<RoutePoint>,
+    snappedRoute: SnappedRoute,
     currentIndex: Int,
     modifier: Modifier
 ) {
@@ -36,9 +38,17 @@ actual fun HistoryMapView(
 
     var isHybrid by remember { mutableStateOf(false) }
 
-    // Track which routePoints list we've drawn the polyline for
+    // Updated every animation frame; read inside `update` below, which re-runs with it.
+    val smoothPosition = rememberSmoothPlaybackPosition(routePoints, currentIndex, snappedRoute)
+
+    // The one pin, kept across frames so it can be moved instead of rebuilt.
+    val markerAnnotation = remember { arrayOfNulls<MKPointAnnotation>(1) }
+
+    // Track which route we've drawn the polyline for. Keyed on the snapped route too,
+    // so the straight line drawn while snapping was in flight is replaced by the road
+    // geometry when it lands.
     var drawnRouteId by remember { mutableStateOf(0) }
-    val currentRouteId = remember(routePoints) { drawnRouteId + 1 }
+    val currentRouteId = remember(routePoints, snappedRoute) { drawnRouteId + 1 }
 
     // Create delegate inline and hold strong reference
     val mapDelegate = remember {
@@ -82,12 +92,21 @@ actual fun HistoryMapView(
                     // Remove old overlays
                     mapView.removeOverlays(mapView.overlays)
 
-                    val coordinates = routePoints.mapNotNull { point ->
-                        val lat = point.getLatDouble()
-                        val lng = point.getLngDouble()
-                        if (lat != null && lng != null) {
-                            CLLocationCoordinate2DMake(lat, lng)
-                        } else null
+                    // The road-snapped path when it is ready, the recorded fixes until
+                    // then — the snapped one bends with the street instead of cutting
+                    // between fixes.
+                    val coordinates = if (snappedRoute.path.size >= 2) {
+                        snappedRoute.path.map {
+                            CLLocationCoordinate2DMake(it.latitude, it.longitude)
+                        }
+                    } else {
+                        routePoints.mapNotNull { point ->
+                            val lat = point.getLatDouble()
+                            val lng = point.getLngDouble()
+                            if (lat != null && lng != null) {
+                                CLLocationCoordinate2DMake(lat, lng)
+                            } else null
+                        }
                     }
 
                     if (coordinates.isNotEmpty()) {
@@ -114,26 +133,32 @@ actual fun HistoryMapView(
                     }
                 }
 
-                // Update marker position
-                if (currentIndex in routePoints.indices) {
-                    val point = routePoints[currentIndex]
-                    val lat = point.getLatDouble() ?: return@UIKitView
-                    val lng = point.getLngDouble() ?: return@UIKitView
-
-                    mapView.removeAnnotations(mapView.annotations)
-
-                    val annotation = MKPointAnnotation().apply {
-                        setCoordinate(CLLocationCoordinate2DMake(lat, lng))
-                        setTitle("Point ${currentIndex + 1}")
-                        setSubtitle(point.createdAt)
-                    }
-                    mapView.addAnnotation(annotation)
-
-                    val region = MKCoordinateRegionMake(
-                        annotation.coordinate,
-                        MKCoordinateSpanMake(0.01, 0.01)
+                // Move the marker along the glide. The pin is kept and repositioned
+                // rather than removed and re-added: rebuilding it 60 times a second
+                // flickers, and the old code's remove/add was also what made the
+                // annotation blink on every playback step.
+                val position = smoothPosition.value
+                if (position != null) {
+                    val coordinate = CLLocationCoordinate2DMake(
+                        position.latitude,
+                        position.longitude,
                     )
-                    mapView.setRegion(region, animated = true)
+
+                    val marker = markerAnnotation[0]
+                        ?: MKPointAnnotation().also {
+                            markerAnnotation[0] = it
+                            mapView.addAnnotation(it)
+                        }
+
+                    marker.setCoordinate(coordinate)
+                    marker.setTitle("Point ${currentIndex + 1}")
+                    marker.setSubtitle(routePoints.getOrNull(currentIndex)?.createdAt ?: "")
+
+                    // Centre only — setRegion with a fixed 0.01 span re-imposed its own
+                    // zoom on every step, so the map could not be zoomed out while
+                    // playing. animated = false because the glide is already the
+                    // animation; animating on top of it would lag behind the marker.
+                    mapView.setCenterCoordinate(coordinate, animated = false)
                 }
             }
         )

@@ -77,7 +77,8 @@ class AuthViewModel(
                     name = result.user.name,
                     phone = result.user.phone,
                     email = result.user.email ?: "",
-                    photo = result.user.photo ?: ""
+                    photo = result.user.photo ?: "",
+                    userId = result.user.id
                 )
 
                 println("🔥 Token saved to storage")
@@ -233,7 +234,8 @@ class AuthViewModel(
                             name = loginResult.user.name,
                             phone = loginResult.user.phone,
                             email = loginResult.user.email ?: "",
-                            photo = loginResult.user.photo ?: ""
+                            photo = loginResult.user.photo ?: "",
+                            userId = loginResult.user.id
                         )
 
                         // This login is the completion of a brand-new registration →
@@ -499,7 +501,8 @@ class AuthViewModel(
                             name = loginResult.user.name,
                             phone = loginResult.user.phone,
                             email = loginResult.user.email ?: "",
-                            photo = loginResult.user.photo ?: ""
+                            photo = loginResult.user.photo ?: "",
+                            userId = loginResult.user.id
                         )
 
                         _loginSuccess.value = true

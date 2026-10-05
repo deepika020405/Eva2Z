@@ -1,6 +1,7 @@
 // CommunityRepository.kt
 package com.developer.ev2z.repository
 
+import com.developer.ev2z.network.ApiActionResult
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.response.Post
 import com.developer.ev2z.response.StoryResponse
@@ -26,6 +27,32 @@ class CommunityRepository(
         category: String?
     ): JsonObject {
         return apiService.createCommunityPost(title, body, images, lat, long, city, category)
+    }
+
+
+    suspend fun updatePost(
+        postId: Int,
+        title: String?,
+        body: String,
+        category: String?,
+        newImages: List<ByteArray> = emptyList(),
+        keptMediaUrls: List<String>? = null,
+        removedMediaUrls: List<String> = emptyList()
+    ): ApiActionResult {
+        return apiService.updateCommunityPost(
+            postId = postId,
+            title = title,
+            body = body,
+            category = category,
+            newImages = newImages,
+            keptMediaUrls = keptMediaUrls,
+            removedMediaUrls = removedMediaUrls
+        )
+    }
+
+
+    suspend fun deletePost(postId: Int): ApiActionResult {
+        return apiService.deleteCommunityPost(postId)
     }
 
 

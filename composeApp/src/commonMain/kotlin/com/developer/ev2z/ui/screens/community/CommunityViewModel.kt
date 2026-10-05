@@ -3,8 +3,10 @@ package com.developer.ev2z.ui.screens.community
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.developer.ev2z.network.ApiActionResult
 import com.developer.ev2z.repository.CommunityRepository
 import com.developer.ev2z.response.*
+import com.developer.ev2z.util.AppUserProvider
 import com.developer.ev2z.util.getCityFromLatLng
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
@@ -15,6 +17,7 @@ data class CommunityUiState(
     val posts: List<Post> = emptyList(),
     val stories: List<Story> = emptyList(),
     val authUserId: Int = 0,               // 🔥 KEEP (UI SAFE)
+    val authUserName: String = "",         // fallback identity when the id is unknown
     val error: String? = null,
 
     val postUpdating: Boolean = false,
@@ -35,8 +38,23 @@ class CommunityViewModel(
     private val loadMutex = Mutex()
     private var loadPostsJob: Job? = null
 
-    private var _state by mutableStateOf(CommunityUiState())
+    private var _state by mutableStateOf(
+        CommunityUiState(authUserId = currentUserId(), authUserName = currentUserName())
+    )
     val state: CommunityUiState get() = _state
+
+    /**
+     * The signed-in user's real id, saved from the login response — this is what
+     * decides whose posts show Edit/Delete.
+     *
+     * It is NOT read off the Sanctum token: "6639|abc…" carries the personal access
+     * token id, not the user id, and using it put Edit/Delete on strangers' posts,
+     * which the API rejected with 403 {"error":"Not authorized"}.
+     */
+    private fun currentUserId(): Int = AppUserProvider.getUserId()
+
+    /** Stored display name — used to spot own posts on sessions older than the id. */
+    private fun currentUserName(): String = AppUserProvider.getUserName()
 
     /** ---------------- STORIES CORE ---------------- */
 
@@ -120,6 +138,123 @@ class CommunityViewModel(
         }
     }
 
+    /** ---------------- EDIT / DELETE POST ---------------- */
+
+    /**
+     * Edit one of the user's own posts — text, category and photos.
+     *
+     * Text is patched into the feed locally so the card updates instantly. When the
+     * photos changed, the feed is refetched afterwards because only the server knows
+     * the URLs of the newly uploaded media.
+     *
+     * @param newImages        photos picked in the edit sheet
+     * @param keptMediaUrls    existing media_urls the user kept (null = untouched)
+     * @param removedMediaUrls existing media_urls the user removed
+     */
+    fun editPost(
+        postId: Int,
+        title: String?,
+        body: String,
+        category: String?,
+        newImages: List<ByteArray> = emptyList(),
+        keptMediaUrls: List<String>? = null,
+        removedMediaUrls: List<String> = emptyList(),
+        onResult: (Boolean) -> Unit = {}
+    ) {
+        scope.launch {
+            _state = _state.copy(postUpdating = true, error = null)
+
+            val result = try {
+                repository.updatePost(
+                    postId = postId,
+                    title = title,
+                    body = body,
+                    category = category,
+                    newImages = newImages,
+                    keptMediaUrls = keptMediaUrls,
+                    removedMediaUrls = removedMediaUrls
+                )
+            } catch (e: Exception) {
+                println("❌ editPost error: ${e.message}")
+                ApiActionResult(success = false, message = e.message)
+            }
+            val ok = result.success
+
+            _state = _state.copy(
+                postUpdating = false,
+                error = if (ok) null else failureText(result, "update"),
+                posts = if (!ok) _state.posts else _state.posts.map {
+                    if (it.id == postId)
+                        it.copy(
+                            title = title?.takeIf { t -> t.isNotBlank() } ?: it.title,
+                            body = body,
+                            category = category?.takeIf { c -> c.isNotBlank() } ?: it.category,
+                            // Removals are safe to show right away; uploads need the server URLs.
+                            media_urls = keptMediaUrls ?: it.media_urls
+                        )
+                    else it
+                }
+            )
+
+            onResult(ok)
+
+            val mediaChanged = newImages.isNotEmpty() || removedMediaUrls.isNotEmpty()
+            if (ok && mediaChanged) {
+                try {
+                    _state = _state.copy(posts = repository.fetchPosts())
+                } catch (e: Exception) {
+                    println("❌ editPost refresh error: ${e.message}")
+                }
+            }
+        }
+    }
+
+    /**
+     * Delete one of the user's own posts. Removed from the feed right away and put
+     * back if the API call fails.
+     */
+    fun deletePost(postId: Int, onResult: (Boolean) -> Unit = {}) {
+        val snapshot = _state.posts
+        val removed = snapshot.find { it.id == postId } ?: return
+
+        // Optimistic removal
+        _state = _state.copy(posts = snapshot.filterNot { it.id == postId }, error = null)
+
+        scope.launch {
+            val result = try {
+                repository.deletePost(postId)
+            } catch (e: Exception) {
+                println("❌ deletePost error: ${e.message}")
+                ApiActionResult(success = false, message = e.message)
+            }
+
+            if (!result.success) {
+                // Rollback in the original order
+                _state = _state.copy(
+                    posts = snapshot.map { if (it.id == removed.id) removed else it },
+                    error = failureText(result, "delete")
+                )
+            }
+
+            onResult(result.success)
+        }
+    }
+
+    /**
+     * Turns a failed write into something the user can act on. A 403 here means the
+     * post belongs to somebody else — the API answers {"error":"Not authorized"}.
+     */
+    private fun failureText(result: ApiActionResult, action: String): String = when {
+        result.statusCode == 401 -> "Session expired — please sign in again"
+        result.statusCode == 403 -> "You can only $action your own posts"
+        !result.message.isNullOrBlank() -> result.message
+        else -> "Could not $action the post"
+    }
+
+    fun clearError() {
+        _state = _state.copy(error = null)
+    }
+
     /** Reverse-geocode coordinates to a city name; result delivered on the main scope. */
     fun resolveCity(lat: Double, lng: Double, onResult: (String) -> Unit) {
         scope.launch {
@@ -152,7 +287,8 @@ class CommunityViewModel(
                         loading = false,
                         posts = posts,
                         stories = storyGroups.flatMap { it.stories },
-                        authUserId = _state.authUserId
+                        authUserId = currentUserId(),
+                        authUserName = currentUserName()
                     )
 
                 } catch (e: Exception) {

@@ -310,7 +310,9 @@ fun ShopScreen(
             items(filtered) { product ->
                 ListProductCard(
                     product = product,
-                    onClick = { onPlaceOrder(product) },
+                    onClick = {
+                        onPlaceOrder(product)
+                              },
                     onAdd   = {
                         if (product.deviceType != "none") {
                             deviceTypeProduct = product
@@ -1184,7 +1186,9 @@ private fun ListProductCard(product: ShopProduct, onClick: () -> Unit, onAdd: ()
         modifier = Modifier
             .fillMaxWidth().padding(horizontal = 20.dp)
             .shadow(3.dp, RoundedCornerShape(16.dp), ambientColor = Color(0x10000000))
-            .clickable { onClick() },
+            .clickable {
+                onClick()
+                       },
         shape     = RoundedCornerShape(16.dp),
         colors    = CardDefaults.cardColors(containerColor = P_Card),
         elevation = CardDefaults.cardElevation(0.dp)
@@ -1242,7 +1246,9 @@ private fun ListProductCard(product: ShopProduct, onClick: () -> Unit, onAdd: ()
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(22.dp)).background(P_Green)
-                    .clickable { onAdd() }
+                    .clickable {
+                        onAdd()
+                    }
                     .padding(horizontal = 14.dp, vertical = 9.dp)
             ) {
                 Text("Add", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)

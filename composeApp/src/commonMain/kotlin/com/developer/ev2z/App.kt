@@ -23,6 +23,7 @@ import com.developer.ev2z.ui.screens.device_Report.DeviceReportScreen
 import com.developer.ev2z.ui.screens.device_Report.DeviceReportViewModel
 import com.developer.ev2z.ui.screens.device_Report.PlatformAddressProvider
 import com.developer.ev2z.util.AppTokenProvider
+import com.developer.ev2z.util.AppUserProvider
 import com.developer.ev2z.util.displayNameFrom
 import com.developer.ev2z.ui.screens.AuthFlows.ForgetPasswordFlow
 import com.developer.ev2z.ui.screens.AuthFlows.RegistrationFlow
@@ -50,6 +51,11 @@ fun App() {
     val deviceReportRepository = remember { DeviceReportRepository(apiService) }
     val storage = remember { createStorageManager() }
     val userPrefs = remember { UserPrefs(storage) }
+    // Who the signed-in user is, for common code without UserPrefs (community ownership).
+    remember {
+        AppUserProvider.getUserId = { userPrefs.getAuthUserId() }
+        AppUserProvider.getUserName = { userPrefs.getName() ?: "" }
+    }
     // ✅ DeepLinkManager init karo
     remember { DeepLinkManager.init(storage) }
     val authViewModel = remember { AuthViewModel(authRepository, storage) }
@@ -546,7 +552,7 @@ fun App() {
 //        initialValue = 0.7f,
 //        targetValue = 1f,
 //        animationSpec = infiniteRepeatable(
-//            animation = tween(durationMillis = 1500, easing = FastOutSlowInEasing),
+//            animation = tween(durationMillis = 1500, easing = hell
 //            repeatMode = RepeatMode.Reverse
 //        )
 //    )

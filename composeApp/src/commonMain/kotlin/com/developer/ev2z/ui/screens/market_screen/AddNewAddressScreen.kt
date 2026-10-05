@@ -28,16 +28,23 @@ import cafe.adriel.voyager.navigator.currentOrThrow
 import com.developer.ev2z.BackPressHandler
 import com.developer.ev2z.util.Analytics
 
-class AddNewAddressScreen : Screen {
+/**
+ * Add a delivery address, or edit one when [existing] is passed — the cart's address
+ * list opens this screen with the address to change.
+ */
+class AddNewAddressScreen(
+    private val existing: BillingAddress? = null
+) : Screen {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     override fun Content() {
         val viewModel = ShopViewModelProvider.viewModel
         val navigator = LocalNavigator.currentOrThrow
+        val isEdit = existing != null
 
         LaunchedEffect(Unit) {
             Analytics.logEvent("screen_view", mapOf(
-                "screen_name" to "add_shipping_address"))
+                "screen_name" to if (isEdit) "edit_shipping_address" else "add_shipping_address"))
         }
         BackPressHandler { navigator.pop() }
 
@@ -45,7 +52,7 @@ class AddNewAddressScreen : Screen {
             containerColor = P_Bg,
             topBar = {
                 TopAppBar(
-                    title = { Text("Add Address",
+                    title = { Text(if (isEdit) "Edit Address" else "Add Address",
                         fontWeight = FontWeight.SemiBold, fontSize = 17.sp) },
                     navigationIcon = {
                         IconButton(onClick = { navigator.pop() }) {
@@ -65,12 +72,23 @@ class AddNewAddressScreen : Screen {
         ) { padding ->
             Box(modifier = Modifier.fillMaxSize().padding(padding).background(P_Bg)) {
                 AddAddressUI(
+                    existing = existing,
                     onSave = { fname, phone, email, address, city, state, pincode ->
-                        viewModel.addNewAddress(fname, phone, email, address, city, state, pincode) {
+                        val onDone: () -> Unit = {
                             Analytics.logEvent("add_shipping_info", mapOf(
                                 "shipping_city" to city, "shipping_state" to state,
                                 "shipping_pincode" to pincode, "country" to "IN"))
                             navigator.pop()
+                        }
+                        if (existing != null) {
+                            viewModel.updateAddress(
+                                existing.id, fname, phone, email,
+                                address, city, state, pincode, onDone
+                            )
+                        } else {
+                            viewModel.addNewAddress(
+                                fname, phone, email, address, city, state, pincode, onDone
+                            )
                         }
                     },
                     onCancel = { navigator.pop() }
@@ -83,15 +101,17 @@ class AddNewAddressScreen : Screen {
 @Composable
 fun AddAddressUI(
     onSave: (String, String, String, String, String, String, String) -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
+    existing: BillingAddress? = null
 ) {
-    var fname by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
-    var email by remember { mutableStateOf("") }
-    var address by remember { mutableStateOf("") }
-    var city by remember { mutableStateOf("") }
-    var state by remember { mutableStateOf("") }
-    var pincode by remember { mutableStateOf("") }
+    // Prefilled when editing, blank when adding
+    var fname by remember { mutableStateOf(existing?.fullName ?: "") }
+    var phone by remember { mutableStateOf(existing?.phone ?: "") }
+    var email by remember { mutableStateOf(existing?.email ?: "") }
+    var address by remember { mutableStateOf(existing?.address ?: "") }
+    var city by remember { mutableStateOf(existing?.city ?: "") }
+    var state by remember { mutableStateOf(existing?.state ?: "") }
+    var pincode by remember { mutableStateOf(existing?.pincode ?: "") }
 
     var fnameErr by remember { mutableStateOf<String?>(null) }
     var phoneErr by remember { mutableStateOf<String?>(null) }
@@ -142,7 +162,10 @@ fun AddAddressUI(
             colors = ButtonDefaults.buttonColors(containerColor = P_Green),
             elevation = ButtonDefaults.buttonElevation(0.dp)
         ) {
-            Text("Save Address", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+            Text(
+                if (existing != null) "Update Address" else "Save Address",
+                fontSize = 15.sp, fontWeight = FontWeight.SemiBold
+            )
         }
 
         Spacer(Modifier.height(10.dp))

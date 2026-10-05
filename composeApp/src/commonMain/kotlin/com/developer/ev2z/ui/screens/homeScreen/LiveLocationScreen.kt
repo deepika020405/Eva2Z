@@ -80,6 +80,15 @@ fun LiveLocationScreen(
         viewModel.loadDevices(token)
     }
 
+    // 🔥 Keep the coordinates coming while the map is on screen.
+    // loadDevices above is a single shot, so without this the marker stays wherever
+    // it first appeared no matter how far the vehicle actually moves. Stopped on the
+    // way out so it doesn't keep polling behind other screens.
+    DisposableEffect(token) {
+        viewModel.startDevicesPolling(token)
+        onDispose { viewModel.stopDevicesPolling() }
+    }
+
     // 🔥 Hide bottom navigation when this screen opens
     LaunchedEffect(Unit) {
         BottomBarController.visible = false
@@ -357,6 +366,7 @@ fun TopDeviceCard(
                             contentDescription = null,
                             tint = Color.Gray,
                             modifier = Modifier.size(20.dp)
+
                         )
                     }
                 }
@@ -444,6 +454,7 @@ fun DeviceDropdownSheet(
 @Composable
 fun DeviceListItem(device: Device, onClick: () -> Unit) {
     val statusColor = Color(device.getStatusColor())
+    val address = rememberDeviceAddress(device)
 
     Row(
         modifier = Modifier
@@ -464,12 +475,18 @@ fun DeviceListItem(device: Device, onClick: () -> Unit) {
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium
             )
+            // Same reasoning as DeviceOverviewItem: the picker is where you choose
+            // between vehicles, and "which one is at the office" is the question it
+            // has to answer — the device id never helped with that.
             Text(
-                text = "Device ID: ${device.deviceId}",
+                text = address ?: "Locating…",
                 fontSize = 11.sp,
-                color = Color.Gray
+                color = Color.Gray,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
         }
+        Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = device.getStatusDisplay(),
             fontSize = 12.sp,
@@ -600,6 +617,10 @@ fun DeviceOverviewItem(
 ) {
     val statusColor = Color(device.getStatusColor())
 
+    // Where the vehicle is sitting, once the geocoder answers. Null while it is being
+    // looked up, and for a vehicle that is moving — see rememberDeviceAddress.
+    val address = rememberDeviceAddress(device)
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -619,12 +640,19 @@ fun DeviceOverviewItem(
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium
             )
+            // The address replaces the device id here: an owner looking at this sheet
+            // wants to know where the vehicle is, and the id told them nothing. It
+            // tracks the coordinates of the current poll, so it follows the vehicle
+            // while live tracking is running.
             Text(
-                text = "Device ID: ${device.deviceId}",
+                text = address ?: "Locating…",
                 fontSize = 11.sp,
-                color = Color.Gray
+                color = Color.Gray,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
         }
+        Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = device.getStatusDisplay(),
             fontSize = 12.sp,

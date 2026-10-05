@@ -4,7 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -38,17 +38,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.developer.ev2z.navigation.PlatformBackHandler
+import com.developer.ev2z.network.LIVE_LOCATION_POLL_INTERVAL_MS
 import com.developer.ev2z.response.Device
 import com.developer.ev2z.ui.components.FloatingContactButton
 import com.developer.ev2z.ui.screens.device_Report.PlatformMapView
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
 import org.jetbrains.compose.resources.painterResource
+import kotlin.math.abs
 import kotlin.text.ifEmpty
 import com.developer.ev2z.theme.AppPageBg
 
 // ── Theme Colors (Light Green — App Theme) ───────────────────────
-private val TT_Primary = Color(0xFF6A9F50)
+internal val TT_Primary = Color(0xFF6A9F50)
 private val TT_PrimaryDark = Color(0xFF4A7D39)
 private val TT_PrimaryBg = Color(0xFFF0F7EC)
 private val TT_Background = AppPageBg
@@ -90,10 +92,6 @@ fun TrackTraceScreen(
 ) {
     val viewModel = TrackTraceViewModelProvider.viewModel
 
-    val devices by viewModel.devices.collectAsState()
-    val selectedDevice by viewModel.selectedDevice.collectAsState()
-    val username by viewModel.username.collectAsState()
-
     PlatformBackHandler(true) { onBack() }
 
     DisposableEffect(Unit) {
@@ -101,13 +99,39 @@ fun TrackTraceScreen(
         onDispose { viewModel.stop() }
     }
 
+    TrackTraceContent(
+        onBack = onBack,
+        map = { StableTrackMapSection(viewModel = viewModel) },
+        deviceCard = { LiveDeviceCard(viewModel = viewModel) },
+        bottomChip = { modifier -> BottomInfoChip(viewModel = viewModel, modifier = modifier) }
+    )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  TrackTraceContent
+//  The layout alone — insets, overlay order, contact FAB — with every data read
+//  pushed out into a slot. TrackTraceScreen fills the slots from the ViewModel;
+//  TrackTracePreviewScreen fills them with static sample data so the screen can
+//  be rendered at design time. Reading state inside the slots is also what keeps
+//  location polling from recomposing this Box.
+// ─────────────────────────────────────────────────────────────────────────────
+@Composable
+fun TrackTraceContent(
+    onBack: () -> Unit,
+    map: @Composable () -> Unit,
+    deviceCard: @Composable () -> Unit,
+    bottomChip: @Composable (Modifier) -> Unit,
+    contactButton: @Composable (Modifier) -> Unit = { modifier ->
+        FloatingContactButton(phoneNumber = "919755273822", modifier = modifier)
+    }
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(TT_Background)
     ) {
         // ── Map (isolated recomposition scope) ──────────────────────
-        StableTrackMapSection(viewModel = viewModel)
+        map()
 
         // ── Top overlay: Back + Title + Device card ─────────────────
         Column(
@@ -179,22 +203,14 @@ fun TrackTraceScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            // Device selector card — pass VM so it can read live-location status
-            // as the real-time source of truth for the LIVE/OFFLINE badge.
-            DeviceDropdownCardSimple(
-                userName = username.ifEmpty { "User" },
-                devices = devices,
-                selectedDevice = selectedDevice,
-                selectedLiveStatus = viewModel.liveLocation
-                    .collectAsState().value?.data?.latestLocation?.status,
-                onDeviceSelect = viewModel::selectDevice
-            )
+            // Device selector card — reads live-location status inside its own
+            // slot, so that poll never recomposes the screen around it.
+            deviceCard()
         }
 
         // ── Bottom info chip (speed + status) ───────────────────────
-        BottomInfoChip(
-            viewModel = viewModel,
-            modifier = Modifier
+        bottomChip(
+            Modifier
                 .align(Alignment.BottomCenter)
                 .padding(
                     start = 14.dp,
@@ -206,9 +222,8 @@ fun TrackTraceScreen(
         )
 
         // ── Floating contact ────────────────────────────────────────
-        FloatingContactButton(
-            phoneNumber = "919755273822",
-            modifier = Modifier
+        contactButton(
+            Modifier
                 .align(Alignment.BottomStart)
                 .padding(
                     start = 14.dp,
@@ -218,6 +233,26 @@ fun TrackTraceScreen(
                 )
         )
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  LiveDeviceCard — the device selector bound to the ViewModel
+// ─────────────────────────────────────────────────────────────────────────────
+@Composable
+private fun LiveDeviceCard(viewModel: TrackTraceViewModel) {
+    val devices by viewModel.devices.collectAsState()
+    val selectedDevice by viewModel.selectedDevice.collectAsState()
+    val username by viewModel.username.collectAsState()
+    val liveLocation by viewModel.liveLocation.collectAsState()
+
+    DeviceDropdownCardSimple(
+        userName = username.ifEmpty { "User" },
+        devices = devices,
+        selectedDevice = selectedDevice,
+        // Real-time source of truth for the LIVE/OFFLINE badge.
+        selectedLiveStatus = liveLocation?.data?.latestLocation?.status,
+        onDeviceSelect = viewModel::selectDevice
+    )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -258,10 +293,28 @@ private fun BottomInfoChip(
     val trailPoints by viewModel.trailPoints.collectAsState()
 
     val latest = liveLocation?.data?.latestLocation
-    val speed = latest?.speed?.toString() ?: "0"
-    val status = latest?.status ?: "offline"
+
+    TrackTraceInfoChip(
+        deviceName = selectedDevice?.device_name ?: "—",
+        status = latest?.status ?: "offline",
+        speed = latest?.speed?.toString() ?: "0",
+        trailPointCount = trailPoints.size,
+        modifier = modifier
+    )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  TrackTraceInfoChip — the chip itself, with no ViewModel attached
+// ─────────────────────────────────────────────────────────────────────────────
+@Composable
+fun TrackTraceInfoChip(
+    deviceName: String,
+    status: String,
+    speed: String,
+    trailPointCount: Int,
+    modifier: Modifier = Modifier
+) {
     val statusClr = ttStatusColor(status)
-    val deviceName = selectedDevice?.device_name ?: "—"
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -318,7 +371,7 @@ private fun BottomInfoChip(
 
                     // Trail points count
                     Text(
-                        "${trailPoints.size} points",
+                        "$trailPointCount points",
                         fontSize = 11.sp,
                         color = TT_TextHint
                     )
@@ -549,23 +602,56 @@ fun DeviceDropdownCardSimple(
 // ─────────────────────────────────────────────────────────────────────────────
 //  rememberAnimatedLatLng — smooth lat/lng animation helper
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** A jump larger than this is a signal recovery, not travel — snap instead of gliding. */
+private const val SNAP_DEGREES = 0.02   // ≈ 2 km
+
+/**
+ * Interpolates between two live fixes so the marker moves continuously.
+ *
+ * [durationMillis] is paced to the live-location poll interval. It used to be a flat
+ * 1000 ms while fixes arrive every 10 s, so the marker covered a whole interval of
+ * travel in one second and then stood still for nine — a lurch-and-freeze that read
+ * as the marker crawling far slower than the speed shown on the chip.
+ *
+ * A progress fraction is animated rather than the coordinates themselves: a Float
+ * longitude quantises to roughly a metre, which stair-steps at high zoom. A fix that
+ * lands mid-glide resumes from the current interpolated point, so the marker never
+ * snaps backwards; only an implausibly large jump skips straight to the new position.
+ */
 @Composable
 fun rememberAnimatedLatLng(
     latitude: Double,
-    longitude: Double
+    longitude: Double,
+    durationMillis: Int = LIVE_LOCATION_POLL_INTERVAL_MS.toInt()
 ): Pair<Double, Double> {
 
-    val animatedLat by animateFloatAsState(
-        targetValue = latitude.toFloat(),
-        animationSpec = tween(durationMillis = 1000, easing = LinearEasing),
-        label = "latAnimation"
-    )
+    val progress = remember { Animatable(1f) }
+    var from by remember { mutableStateOf(latitude to longitude) }
+    var to by remember { mutableStateOf(latitude to longitude) }
 
-    val animatedLng by animateFloatAsState(
-        targetValue = longitude.toFloat(),
-        animationSpec = tween(durationMillis = 1000, easing = LinearEasing),
-        label = "lngAnimation"
-    )
+    LaunchedEffect(latitude, longitude) {
+        if (latitude == to.first && longitude == to.second) return@LaunchedEffect
 
-    return animatedLat.toDouble() to animatedLng.toDouble()
+        val farJump = abs(latitude - to.first) > SNAP_DEGREES ||
+                abs(longitude - to.second) > SNAP_DEGREES
+
+        // Resume from wherever the previous glide had reached.
+        val reached = progress.value.toDouble()
+        from = (from.first + (to.first - from.first) * reached) to
+                (from.second + (to.second - from.second) * reached)
+        to = latitude to longitude
+
+        if (farJump) {
+            from = to
+            progress.snapTo(1f)
+        } else {
+            progress.snapTo(0f)
+            progress.animateTo(1f, tween(durationMillis, easing = LinearEasing))
+        }
+    }
+
+    val fraction = progress.value.toDouble()
+    return (from.first + (to.first - from.first) * fraction) to
+            (from.second + (to.second - from.second) * fraction)
 }

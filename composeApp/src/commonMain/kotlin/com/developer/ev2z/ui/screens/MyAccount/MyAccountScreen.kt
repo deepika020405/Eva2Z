@@ -70,7 +70,7 @@ fun MyAccountScreen(
                     "Plan & Billing",
                     listOf(
                         "Plans & Subscriptions" to onChangePlan,
-                        "Bill Details" to onBillDetails
+                        /*"Bill Details" to onBillDetails*/
                     )
                 )
             }

@@ -381,7 +381,8 @@ private fun PremiumAddressSection(
         AddressDialog(
             list = addresses,
             onSelect = { onSelect(it); showDialog = false },
-            onDelete = { viewModel.deleteBillingAddress(it.id) },
+            // The pencil opens the address for editing — deleting is not what it means.
+            onEdit = { showDialog = false; navigator.push(AddNewAddressScreen(it)) },
             onAddNew = { showDialog = false; navigator.push(AddNewAddressScreen()) },
             onDismiss = { showDialog = false })
     }
@@ -391,7 +392,7 @@ private fun PremiumAddressSection(
 @Composable
 fun AddressDialog(
     list: List<BillingAddress>, onSelect: (BillingAddress) -> Unit,
-    onDelete: (BillingAddress) -> Unit, onAddNew: () -> Unit, onDismiss: () -> Unit
+    onEdit: (BillingAddress) -> Unit, onAddNew: () -> Unit, onDismiss: () -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
         Card(shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth(),
@@ -422,10 +423,10 @@ fun AddressDialog(
                                     Text("${addr.state} − ${addr.pincode}",
                                         fontSize = 12.sp, color = P_Light)
                                 }
-                                IconButton(onClick = { onDelete(addr) },
+                                IconButton(onClick = { onEdit(addr) },
                                     modifier = Modifier.size(32.dp)) {
-                                    Icon(Icons.Default.DeleteOutline, null,
-                                        tint = P_Red, modifier = Modifier.size(17.dp))
+                                    Icon(Icons.Default.EditNote, "Edit address",
+                                        tint = P_Green, modifier = Modifier.size(24.dp))
                                 }
                             }
                         }

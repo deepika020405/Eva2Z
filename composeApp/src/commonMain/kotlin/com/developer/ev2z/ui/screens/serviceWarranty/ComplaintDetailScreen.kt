@@ -46,7 +46,8 @@ fun ComplaintDetailScreen(
     val state by viewModel.state.collectAsState()
     val ticket = state.ticket
 
-    PlatformBackHandler(true) { onBack() }
+    PlatformBackHandler(true) { onBack()
+    }
 
     ServiceScaffold(
         title = ticket?.ticketId ?: "Complaint",
@@ -123,20 +124,43 @@ fun ComplaintDetailScreen(
                         // common case now — the complaint cannot be completed without
                         // it — so the reference and the time are shown too: they are
                         // what support asks for.
+                        //
+                        // These read the ticket's derived accessors rather than its
+                        // receipt: a paid row usually comes back with a null
+                        // merchant_order_id, so going via `payment` left the time and
+                        // the reference blank on exactly the tickets that had them.
                         val charge = ticket.chargeRupees
                         when {
-                            ticket.chargePaid && charge != null -> {
-                                LabelValueRow("Service charge", "₹$charge paid")
-                                ticket.payment?.paidAtMillis?.takeIf { it > 0 }?.let {
+                            ticket.chargePaid -> {
+                                LabelValueRow(
+                                    "Service charge",
+                                    charge?.let { "₹$it paid" } ?: "Paid",
+                                )
+                                ticket.chargePaidAtMillis?.let {
                                     LabelValueRow("Paid on", it.asServiceDateTime())
                                 }
-                                ticket.payment?.merchantOrderId
-                                    ?.takeIf { it.isNotBlank() }
-                                    ?.let { LabelValueRow("Payment ref", it) }
+                                ticket.chargeReference?.let {
+                                    LabelValueRow("Payment ref", it)
+                                }
                             }
-                            ticket.chargePaid -> LabelValueRow("Service charge", "Paid")
-                            ticket.chargePending && charge != null ->
-                                LabelValueRow("Service charge", "₹$charge · payment pending")
+                            ticket.chargePending -> {
+                                LabelValueRow(
+                                    "Service charge",
+                                    charge?.let { "₹$it · payment pending" }
+                                        ?: "Payment pending",
+                                )
+                                ticket.chargeReference?.let {
+                                    LabelValueRow("Payment ref", it)
+                                }
+                            }
+                            // Said out loud rather than left blank: an EVA2Z Connect
+                            // customer pays nothing, and an empty space where the
+                            // charge should be reads as missing data.
+                            ticket.chargeNotRequired ->
+                                LabelValueRow("Service charge", "Not applicable")
+
+                            charge != null ->
+                                LabelValueRow("Service charge", "₹$charge")
                         }
                     }
                 }

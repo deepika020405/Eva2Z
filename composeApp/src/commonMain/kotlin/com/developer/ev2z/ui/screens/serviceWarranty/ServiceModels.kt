@@ -157,17 +157,15 @@ val ServiceProblemComponent = ServiceComponentItem(
 /**
  * Whether the person raising the complaint is on EVA2Z Connect.
  *
- * It is only ever an answer sent to the server — what it costs is the server's
- * call, made on the submission response (`payment_required` / `service_charge`),
- * so nothing here is shown to the user as a price.
+ * It is only ever an answer sent to the server; it no longer decides the price —
+ * every complaint costs the flat ₹[SERVICE_FEE_RUPEES] whoever is asking.
  */
 enum class ServiceCustomerType(
     val label: String,
     /**
-     * What this flow expects to be charged, used for the submit button before the
-     * server has said anything and as the amount for a `payment_required` response
-     * that names no figure. The server's own quote replaces it as soon as there is
-     * one — nothing else in the form states a price.
+     * What this flow charges. Flat for both kinds of customer, so the submit button
+     * can name the fee from the first tap instead of waiting for the server to
+     * quote one — a charge the button never mentioned is never opened in PhonePe.
      */
     val expectedFeeRupees: Int,
     /** What `POST service/complaints` expects in `customer_type`. */
@@ -175,7 +173,7 @@ enum class ServiceCustomerType(
 ) {
     EVA2Z_CUSTOMER(
         label = "Yes, I'm an EVA2Z Connect customer",
-        expectedFeeRupees = 0,
+        expectedFeeRupees = SERVICE_FEE_RUPEES,
         apiValue = "existing",
     ),
     NON_CUSTOMER(
@@ -384,6 +382,18 @@ data class ServiceTicket(
     val paymentStatus: String? = null,
     /** The row's `payment_amount` / `service_charge`, whether or not it is paid yet. */
     val paymentAmountRupees: Int? = null,
+    /**
+     * The row's own `paid_at` / `payment_completed_at`, read independently of
+     * [payment]. A paid row usually comes back without a `merchant_order_id`, which
+     * leaves [payment] null — the timestamp is still there and is what "Paid on" shows.
+     */
+    val paymentPaidAtMillis: Long? = null,
+    /**
+     * Whatever reference the row carries for the charge — `merchant_order_id` when
+     * it has one, otherwise PhonePe's order id or a transaction id. Read separately
+     * from [payment] for the same reason as [paymentPaidAtMillis].
+     */
+    val paymentReference: String? = null,
     val createdAtMillis: Long,
     val lastUpdatedMillis: Long,
 ) {
@@ -414,6 +424,28 @@ data class ServiceTicket(
     val chargeRupees: Int?
         get() = payment?.amountRupees?.takeIf { it > 0 }
             ?: paymentAmountRupees?.takeIf { it > 0 }
+
+    /** No charge was ever due on this ticket — an EVA2Z customer's complaint is free. */
+    val chargeNotRequired: Boolean
+        get() = !chargePaid && !chargePending &&
+            (statusSlug == "not_required" || statusSlug == "free" || (chargeRupees ?: 0) <= 0)
+
+    /**
+     * When the charge was collected, from the receipt when there is one and the row
+     * otherwise. Null when neither carries a usable timestamp.
+     */
+    val chargePaidAtMillis: Long?
+        get() = payment?.paidAtMillis?.takeIf { it > 0 }
+            ?: paymentPaidAtMillis?.takeIf { it > 0 }
+
+    /**
+     * The reference to quote to support for this charge — ours (`merchant_order_id`)
+     * in preference to PhonePe's, which is all the row sometimes carries.
+     */
+    val chargeReference: String?
+        get() = payment?.merchantOrderId?.takeIf { it.isNotBlank() }
+            ?: payment?.phonepeOrderId?.takeIf { it.isNotBlank() }
+            ?: paymentReference?.takeIf { it.isNotBlank() }
 }
 
 /** Filter tabs on the My Complaints screen — one per [TicketStatus], plus "All". */

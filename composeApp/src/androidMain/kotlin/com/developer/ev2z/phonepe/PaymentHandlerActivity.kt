@@ -19,7 +19,7 @@ class PaymentHandlerActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        Log.d("PhonePe", "🏗️ PaymentHandlerActivity created")
+        Log.d("PhonePe", "🏗 PaymentHandlerActivity created")
 
         // ✅ 1. Register launcher FIRST
         launcher = registerForActivityResult(
@@ -113,7 +113,6 @@ class PaymentHandlerActivity : ComponentActivity() {
                 PaymentBus.notify(false, null, "Payment failed")
             }
         }
-
         finish()
     }
 

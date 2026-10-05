@@ -145,8 +145,8 @@ android {
         applicationId = "com.developer.ev2z"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 110
-        versionName = "5.7.0"
+        versionCode = 113
+        versionName = "5.7.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

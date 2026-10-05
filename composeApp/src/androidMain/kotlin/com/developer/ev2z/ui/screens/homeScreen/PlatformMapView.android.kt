@@ -37,75 +37,70 @@ actual fun PlatformMapView(
 ) {
     var isMapLoaded by remember { mutableStateOf(false) }
     var mapType by remember { mutableStateOf(MapType.NORMAL) } // ✅ ADD
-    val cameraPositionState = rememberCameraPositionState()
-    val indiaLatLng = LatLng(22.9734, 78.6569)
 
-    // Initial camera position - will be updated when map loads
-    LaunchedEffect(Unit, devices) {
-        val firstValidDevice = devices.firstOrNull { it.hasValidLocation() }
+    // Drawn positions, which glide towards the polled ones over ~1.5s instead of
+    // snapping. Updated every animation frame, so reading it here is what drives the
+    // marker across the map.
+    val smoothedPositions = rememberSmoothDevicePositions(devices)
 
-        cameraPositionState.position =
-            if (firstValidDevice != null) {
-                CameraPosition.fromLatLngZoom(
-                    LatLng(
-                        firstValidDevice.getLatitudeDouble()!!,
-                        firstValidDevice.getLongitudeDouble()!!
-                    ),
-                    10f
-                )
-            } else {
-                // 🇮🇳 No device / no valid location
-                CameraPosition.fromLatLngZoom(indiaLatLng, 4f)
-            }
+    // 🇮🇳 Opening view, set once at construction. Doing it here rather than from an
+    // effect keyed on `devices` means a polled coordinate update can't drag the
+    // camera back to the start.
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(LatLng(22.9734, 78.6569), 4f)
     }
 
-    // Zoom to all devices when map is loaded
+    // Auto-fit happens ONCE, on the first batch of coordinates to arrive. After that
+    // the viewport belongs to the user: positions now refresh every 15s, and
+    // re-fitting on each one would throw away their pan and zoom while they look.
+    var hasFittedCamera by remember { mutableStateOf(false) }
+
     LaunchedEffect(isMapLoaded, devices) {
-        if (isMapLoaded && devices.isNotEmpty()) {
-            val boundsBuilder = LatLngBounds.Builder()
-            var hasValidLocation = false
+        if (hasFittedCamera || !isMapLoaded) return@LaunchedEffect
 
-            devices.forEach { device ->
-                device.getLatitudeDouble()?.let { lat ->
-                    device.getLongitudeDouble()?.let { lng ->
-                        boundsBuilder.include(LatLng(lat, lng))
-                        hasValidLocation = true
-                    }
-                }
-            }
+        val located = devices.mapNotNull { device ->
+            val lat = device.getLatitudeDouble() ?: return@mapNotNull null
+            val lng = device.getLongitudeDouble() ?: return@mapNotNull null
+            LatLng(lat, lng)
+        }
+        if (located.isEmpty()) return@LaunchedEffect
 
-            if (hasValidLocation) {
-                try {
-                    val bounds = boundsBuilder.build()
-                    val padding = 100
-                    cameraPositionState.animate(
-                        CameraUpdateFactory.newLatLngBounds(bounds, padding),
-                        durationMs = 1000
-                    )
-                } catch (e: Exception) {
-                    println("❌ Error zooming to bounds: ${e.message}")
-                }
-            }
+        hasFittedCamera = true
+        try {
+            cameraPositionState.animate(
+                // newLatLngBounds on a single point zooms to the maximum level, so a
+                // one-device account gets an explicit sensible zoom instead.
+                if (located.size == 1) {
+                    CameraUpdateFactory.newLatLngZoom(located.first(), 15f)
+                } else {
+                    val bounds = LatLngBounds.Builder()
+                        .apply { located.forEach { include(it) } }
+                        .build()
+                    CameraUpdateFactory.newLatLngBounds(bounds, 100)
+                },
+                durationMs = 1000
+            )
+        } catch (e: Exception) {
+            println("❌ Error fitting camera: ${e.message}")
         }
     }
 
-    // Zoom to selected device
-    LaunchedEffect(isMapLoaded, selectedDevice) {
-        if (isMapLoaded) {
-            selectedDevice?.let { device ->
-                device.getLatitudeDouble()?.let { lat ->
-                    device.getLongitudeDouble()?.let { lng ->
-                        try {
-                            cameraPositionState.animate(
-                                CameraUpdateFactory.newLatLngZoom(LatLng(lat, lng), 15f),
-                                durationMs = 1000
-                            )
-                        } catch (e: Exception) {
-                            println("❌ Error zooming to device: ${e.message}")
-                        }
-                    }
-                }
-            }
+    // Zoom to a device the user picked. Keyed on the id, not the Device object —
+    // keying on the object would re-run on every position refresh and re-centre the
+    // map every 15s, which is the follow-the-vehicle behaviour this screen does not
+    // want (Track & Trace is the screen for that).
+    LaunchedEffect(isMapLoaded, selectedDevice?.deviceId) {
+        if (!isMapLoaded) return@LaunchedEffect
+        val device = selectedDevice ?: return@LaunchedEffect
+        val lat = device.getLatitudeDouble() ?: return@LaunchedEffect
+        val lng = device.getLongitudeDouble() ?: return@LaunchedEffect
+        try {
+            cameraPositionState.animate(
+                CameraUpdateFactory.newLatLngZoom(LatLng(lat, lng), 15f),
+                durationMs = 1000
+            )
+        } catch (e: Exception) {
+            println("❌ Error zooming to device: ${e.message}")
         }
     }
 
@@ -123,26 +118,51 @@ actual fun PlatformMapView(
             onMapLoaded = { isMapLoaded = true }
         ) {
         devices.forEach { device ->
-            device.getLatitudeDouble()?.let { lat ->
-                device.getLongitudeDouble()?.let { lng ->
-                    val markerColor = when (device.status) {
-                        "moving" -> com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_GREEN
-                        "idle" -> com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_YELLOW
-                        "offline" -> com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_AZURE
-                        else -> com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_AZURE
-                    }
-
-                    Marker(
-                        state = MarkerState(position = LatLng(lat, lng)),
-                        title = device.getDisplayName(),
-                        snippet = "${device.getStatusDisplay()} - ${device.speed} km/h",
-                        icon = com.google.android.gms.maps.model.BitmapDescriptorFactory.defaultMarker(markerColor),
-                        onClick = {
-                            onMarkerClick(device)
-                            false
-                        }
-                    )
+            // The glided position when there is one; the raw coordinates on the very
+            // first frame, before the animation has had a chance to seed itself.
+            val position = smoothedPositions[device.deviceId]
+                ?: device.getLatitudeDouble()?.let { lat ->
+                    device.getLongitudeDouble()?.let { lng -> lat to lng }
                 }
+                ?: return@forEach
+            val (lat, lng) = position
+
+            // Keyed per device so each marker keeps its own state slot. Without a key
+            // the slots are positional, and a device dropping out of the list would
+            // hand its state — and its position — to whichever device shifted up.
+            key(device.deviceId) {
+                // Keyed off getStatusKind() so the pin agrees with the label and the
+                // dot in the overview sheet. The raw `when (device.status)` this
+                // replaces knew only three values and matched them case-sensitively,
+                // so a parked vehicle drew the same azure pin as an offline one —
+                // there was no way to tell a parked vehicle from a dead tracker.
+                val markerColor = when (device.getStatusKind()) {
+                    "running" -> com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_GREEN
+                    "idle" -> com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_YELLOW
+                    "parked", "stopped" -> com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_RED
+                    else -> com.google.android.gms.maps.model.BitmapDescriptorFactory.HUE_AZURE
+                }
+
+                // Tapping a pin is the most direct way to ask "where is it?", so the
+                // info window answers with the address for the coordinates of the
+                // latest poll, falling back to status and speed until it resolves.
+                val address = rememberDeviceAddress(device)
+
+                Marker(
+                    // rememberUpdatedMarkerState pushes each new position into the one
+                    // remembered state, which is what actually walks the marker across
+                    // the map. Constructing MarkerState inline here instead would throw
+                    // the state away on every recomposition.
+                    state = rememberUpdatedMarkerState(position = LatLng(lat, lng)),
+                    title = device.getDisplayName(),
+                    snippet = address
+                        ?: "${device.getStatusDisplay()} - ${device.speed} km/h",
+                    icon = com.google.android.gms.maps.model.BitmapDescriptorFactory.defaultMarker(markerColor),
+                    onClick = {
+                        onMarkerClick(device)
+                        false
+                    }
+                )
             }
         }
     }
@@ -168,6 +188,9 @@ actual fun PlatformMapView(
                 fontSize = 18.sp
             )
         }
-            }
-        }
+
+
+    }
+
+}
 

@@ -329,11 +329,10 @@ fun RaiseComplaintScreen(
                     /* ──────────────── 4. service charge & terms ──────────────── */
                     item(key = "charge") {
                         ServiceCard(title = "4. Service charge") {
-                            // The figure is the server's `service_charge` once it has
-                            // stated one; the published fee stands in until then,
-                            // because no endpoint quotes it ahead of the submission.
-                            val charge = state.chargeRupees.takeIf { it > 0 }
-                                ?: SERVICE_FEE_RUPEES
+                            // The flat ₹SERVICE_FEE_RUPEES, unless the server quotes
+                            // more on `service_charge` — it is never less, so the
+                            // figure here is the one PhonePe will open with.
+                            val charge = state.chargeRupees
                             ChargeRow(
                                 amountRupees = charge,
                                 quoted = state.chargeIsFromServer,

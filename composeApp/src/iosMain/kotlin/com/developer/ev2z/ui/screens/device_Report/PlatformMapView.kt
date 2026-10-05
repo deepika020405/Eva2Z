@@ -56,7 +56,10 @@ actual fun PlatformMapView(
     val mapViewRef         = remember { arrayOfNulls<MKMapView>(1) }
     val delegateHolder     = remember { arrayOfNulls<Any>(1) }
     val locationManager    = remember { CLLocationManager() }
+    // Last point the arrow's heading was computed from, plus that heading. Both only
+    // advance once the vehicle has really travelled BEARING_MIN_MOVE_METERS.
     val lastLocation       = remember { doubleArrayOf(latitude, longitude) }
+    val lastBearing        = remember { doubleArrayOf(0.0) }
     val currentLocation    = remember { doubleArrayOf(latitude, longitude) }
     val routeActiveHolder  = remember { booleanArrayOf(false) }
     val arrowImage         = remember { buildNavigationArrowImage() }
@@ -153,25 +156,38 @@ actual fun PlatformMapView(
 
                 val newCoord = CLLocationCoordinate2DMake(latitude, longitude)
 
-                // Vehicle marker bearing + position
-                val bearing = calculateBearing(lastLocation[0], lastLocation[1], latitude, longitude)
-                vehicleAnnotation.setCoordinate(newCoord)
-                mapView.viewForAnnotation(vehicleAnnotation)?.transform =
-                    CGAffineTransformMakeRotation(bearing * PI / 180.0)
+                // latitude/longitude are interpolated frames between two real fixes
+                // (see rememberAnimatedLatLng), so this block runs ~60 times a second.
+                val moved = distanceMeters(lastLocation[0], lastLocation[1], latitude, longitude)
 
-                // Camera follows device only when route is NOT active
-                if (!routeActive) {
-                    mapView.setCenterCoordinate(newCoord, animated = true)
+                // Vehicle marker position every frame; heading only once the vehicle has
+                // really moved — a sub-metre step gives an essentially random angle,
+                // which made the arrow spin on the spot.
+                vehicleAnnotation.setCoordinate(newCoord)
+                if (moved >= BEARING_MIN_MOVE_METERS) {
+                    lastBearing[0] = calculateBearing(
+                        lastLocation[0], lastLocation[1], latitude, longitude
+                    )
+                    lastLocation[0] = latitude
+                    lastLocation[1] = longitude
+                    mapView.viewForAnnotation(vehicleAnnotation)?.transform =
+                        CGAffineTransformMakeRotation(lastBearing[0] * PI / 180.0)
                 }
 
-                lastLocation[0]      = latitude
-                lastLocation[1]      = longitude
+                // Camera follows device only when route is NOT active.
+                // animated = false: an animated recentre started on every frame was
+                // superseded before it finished, so the camera lagged behind the marker.
+                if (!routeActive) {
+                    mapView.setCenterCoordinate(newCoord, animated = false)
+                }
+
                 currentLocation[0]   = latitude
                 currentLocation[1]   = longitude
                 routeActiveHolder[0] = routeActive
 
-                // Device moved → refresh route line if active
-                if (routeActive) {
+                // Device moved → refresh route line if active. MKPolyline is immutable,
+                // so this replaces an overlay; only do it on real movement, not per frame.
+                if (routeActive && moved >= BEARING_MIN_MOVE_METERS) {
                     val userLoc = mapView.userLocation.location
                     if (userLoc != null) {
                         val uLat = userLoc.coordinate.useContents { latitude }
@@ -251,6 +267,20 @@ actual fun PlatformMapView(
             }
         }
     }
+}
+
+/**
+ * Travel below this is interpolation noise rather than a heading, so the arrow keeps
+ * the rotation it already has and the route line is left alone.
+ */
+private const val BEARING_MIN_MOVE_METERS = 3.0
+
+/** Flat-earth distance — accurate enough for a few-metre threshold, and cheap. */
+private fun distanceMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+    val meanLat = (lat1 + lat2) / 2 * PI / 180
+    val dLat = (lat2 - lat1) * 111_320.0
+    val dLng = (lon2 - lon1) * 111_320.0 * cos(meanLat)
+    return sqrt(dLat * dLat + dLng * dLng)
 }
 
 // Draw/refresh the blue user→device polyline

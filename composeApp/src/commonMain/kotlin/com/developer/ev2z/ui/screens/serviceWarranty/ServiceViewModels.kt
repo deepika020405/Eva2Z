@@ -1,6 +1,9 @@
 package com.developer.ev2z.ui.screens.serviceWarranty
 
 import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.network.ServiceEndpointMissingException
+import com.developer.ev2z.network.UnauthorizedException
+import com.developer.ev2z.network.describe
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -180,16 +183,24 @@ data class RaiseComplaintState(
     val pendingRequirement: String? get() = if (isBusy) null else draft.validationError
 
     /**
-     * What the complaint costs. `service/complaints` is the authority — it states
-     * `service_charge` in its answer, and that figure is used for the checkout, the
-     * button and the charge card from the moment it arrives. There is no endpoint
-     * that quotes it beforehand, so until the first post it is the published
-     * ₹[SERVICE_FEE_RUPEES].
+     * What the complaint costs: the flat ₹[SERVICE_FEE_RUPEES], from the first tap.
+     *
+     * The server may quote more in `service_charge` and that quote wins, but it
+     * cannot quote *less* — the live route still answers with the ₹1 test figure,
+     * and honouring it would take ₹1 off the user while the real fee went
+     * uncollected. The floor is applied in [ApiService.submitServiceComplaint] too,
+     * so the checkout and this figure can never disagree.
      */
-    val chargeRupees: Int get() = serverQuotedRupees ?: draft.customerType?.expectedFeeRupees ?: 0
+    val chargeRupees: Int
+        get() = serverQuotedRupees?.coerceAtLeast(SERVICE_FEE_RUPEES) ?: SERVICE_FEE_RUPEES
 
-    /** True once the server has stated the charge itself, rather than the app guessing. */
-    val chargeIsFromServer: Boolean get() = serverQuotedRupees != null
+    /**
+     * True once the figure on screen is the server's own, rather than the app's
+     * published fee. An overridden under-quote does not count — what is shown then
+     * is [SERVICE_FEE_RUPEES], so saying the server confirmed it would be a lie.
+     */
+    val chargeIsFromServer: Boolean
+        get() = (serverQuotedRupees ?: 0) >= SERVICE_FEE_RUPEES
 
     /**
      * Carries the charge the moment the form is complete, so nobody reaches a
@@ -225,6 +236,18 @@ class RaiseComplaintViewModel(
      * — otherwise a recomposition would open a second checkout for the same order.
      */
     private var activeOrder: ServicePaymentOrder? = null
+
+    /**
+     * Whether [activeOrder]'s token has already been handed to the PhonePe SDK.
+     *
+     * A checkout token is single-use. Once its web flow has opened, PhonePe answers
+     * `401 API Failure` on `pg/checkout/v2/sdk/pay` to every reopen of the same
+     * token — the order itself is still CREATED, but the token is spent. Reopening it
+     * is what put a cancelled payment into a loop where every retry failed instantly
+     * (observed on iOS 2026-09-30, SERVICE-84OR9NBNHS). A retry therefore needs a
+     * *fresh* order; what must never be repeated is the complaint POST, not the charge.
+     */
+    private var activeOrderSpent = false
 
     /**
      * The ticket `service/complaints` filed when it asked for the charge. Once this
@@ -345,17 +368,19 @@ class RaiseComplaintViewModel(
 
         // Filed already, charge outstanding: pay for what exists, never post again.
         if (current.unpaidTicket != null) {
-            val order = activeOrder
-            if (order == null) {
-                _state.value = current.copy(
-                    errorMessage = "Complaint ${current.unpaidTicket.ticketId} is already " +
-                        "filed. Its ₹${current.chargeRupees} charge is still due — open it " +
-                        "from My Complaints to pay.",
+            // Only an order whose token is still unspent can be reopened — see
+            // [activeOrderSpent]. Otherwise a new checkout is created for the same
+            // ticket, which is the only thing PhonePe will accept a second payment on.
+            val reusable = activeOrder?.takeIf { !activeOrderSpent }
+            if (reusable != null) {
+                println("💳 Reopening ${reusable.merchantOrderId} for ${current.unpaidTicket.ticketId}.")
+            } else {
+                println(
+                    "💳 ${activeOrder?.merchantOrderId ?: "No order"} is spent — creating a " +
+                        "fresh ₹${current.chargeRupees} checkout for ${current.unpaidTicket.ticketId}."
                 )
-                return
             }
-            println("💳 Reopening ${order.merchantOrderId} for ${current.unpaidTicket.ticketId}.")
-            startServicePayment(order.amountRupees, order)
+            startServicePayment(current.chargeRupees, reusable)
             return
         }
 
@@ -387,6 +412,7 @@ class RaiseComplaintViewModel(
                             // submitted a second time. The receipt is kept because the
                             // success dialog still names the charge that was paid.
                             filedTicket = null
+                            rememberPaidCharge(result.ticket.ticketId)
                             _state.value = _state.value.copy(
                                 isSubmitting = false,
                                 isConfirmingPayment = false,
@@ -493,7 +519,7 @@ class RaiseComplaintViewModel(
                     }
                 }
             } catch (e: Exception) {
-                println("❌ Complaint submit failed: ${e.message}")
+                println("❌ Complaint submit failed: ${e.describe()}")
                 _state.value = _state.value.copy(
                     isSubmitting = false,
                     isConfirmingPayment = false,
@@ -501,10 +527,18 @@ class RaiseComplaintViewModel(
                     errorMessage = if (_state.value.paidReceipt != null) {
                         "Your payment went through but the complaint couldn't be filed. " +
                             "Tap submit again — you won't be charged twice."
-                    } else {
-                        // The repository already retried and checked the list, so
-                        // reaching here means the upload genuinely did not complete.
-                        "Couldn't upload your complaint. Check your connection and try again."
+                    } else when (e) {
+                        // Told apart because the fix is different for each, and
+                        // "check your connection" sent a signed-out user to their
+                        // router when the session was what had lapsed.
+                        is UnauthorizedException ->
+                            "Your session has expired. Please sign in again and resubmit."
+                        is ServiceEndpointMissingException ->
+                            "Complaints aren't available right now. Please try again later."
+                        else ->
+                            // The repository already retried and checked the list, so
+                            // reaching here means the upload genuinely did not complete.
+                            "Couldn't upload your complaint. Check your connection and try again."
                     },
                 )
             }
@@ -520,6 +554,7 @@ class RaiseComplaintViewModel(
 
         if (readyOrder != null) {
             activeOrder = readyOrder
+            activeOrderSpent = false
             _state.value = _state.value.copy(pendingPayment = readyOrder)
             return
         }
@@ -528,6 +563,7 @@ class RaiseComplaintViewModel(
             try {
                 val order = apiService.buildServicePaymentOrder(amountRupees)
                 activeOrder = order
+                activeOrderSpent = false
                 _state.value = _state.value.copy(pendingPayment = order)
             } catch (e: Exception) {
                 println("❌ Service fee order failed: ${e.message}")
@@ -542,6 +578,8 @@ class RaiseComplaintViewModel(
 
     /** Called by the screen the instant it hands the order to the PhonePe SDK. */
     fun paymentLaunched() {
+        // The token is spent the moment the SDK has it, whatever the outcome.
+        activeOrderSpent = true
         _state.value = _state.value.copy(pendingPayment = null)
     }
 
@@ -564,9 +602,10 @@ class RaiseComplaintViewModel(
 
         if (!success) {
             val filed = filedTicket
-            // The order is kept when a ticket is already filed against it: the retry
-            // has to reopen this same checkout, because posting the complaint again
-            // would file a duplicate.
+            // The order is kept when a ticket is already filed against it, so the
+            // amount and the ticket survive for the retry — but its token is spent, so
+            // [submit] builds a fresh checkout rather than reopening this one. Posting
+            // the complaint again is what must not happen; re-charging is fine.
             if (filed == null) activeOrder = null
             _state.value = _state.value.copy(
                 isPreparingPayment = false,
@@ -629,6 +668,7 @@ class RaiseComplaintViewModel(
             filedTicket?.let { ticket ->
                 println("✅ ${ticket.ticketId} paid — ₹${receipt.amountRupees} / ${receipt.merchantOrderId}.")
                 filedTicket = null
+                ServicePaymentStore.save(ticket.ticketId, receipt)
                 _state.value = _state.value.copy(
                     isConfirmingPayment = false,
                     draft = ComplaintDraft(vehicle = _state.value.draft.vehicle),
@@ -650,6 +690,17 @@ class RaiseComplaintViewModel(
             // Second post — same complaint, now carrying the payment reference.
             postComplaint()
         }
+    }
+
+    /**
+     * Writes this session's receipt against the ticket it just paid for.
+     *
+     * Called the moment the ticket number is known rather than when the user leaves
+     * the success dialog: the server keeps no usable record of the charge, so until
+     * this is on disk a process death loses it for good.
+     */
+    private fun rememberPaidCharge(ticketId: String) {
+        _state.value.paidReceipt?.let { ServicePaymentStore.save(ticketId, it) }
     }
 
     fun consumeSubmission() {
@@ -772,7 +823,23 @@ class ComplaintDetailViewModel(
     private val _state = MutableStateFlow(ComplaintDetailState())
     val state: StateFlow<ComplaintDetailState> = _state.asStateFlow()
 
+    /**
+     * The receipt to lay over the server's account of the charge.
+     *
+     * [justPaid] when this screen was opened straight off the form, and otherwise
+     * whatever this device recorded when the ticket was paid for. The second half is
+     * what makes the charge survive a restart: reached from the dashboard or the
+     * complaints list there is no navigation argument, and the row itself comes back
+     * with no `merchant_order_id` and no `paid_at`.
+     */
+    private val receipt: ServicePaymentReceipt? =
+        justPaid ?: ServicePaymentStore.receiptFor(ticketId)
+
     init {
+        // A receipt handed over by the form is the newest word on the charge, so it
+        // is written through — the ticket may have been filed by a path that could
+        // not store it, and this screen is always reached with it in hand.
+        justPaid?.let { ServicePaymentStore.save(ticketId, it) }
         load()
     }
 
@@ -788,7 +855,7 @@ class ComplaintDetailViewModel(
                 // The row's own account of the charge, with this session's receipt
                 // laid over it — the app knows the money went through before the
                 // server has finished agreeing.
-                apiService.fetchServiceComplaint(ticketId, vehicles)?.withPaidCharge(justPaid)
+                apiService.fetchServiceComplaint(ticketId, vehicles)?.withPaidCharge(receipt)
             } catch (e: Exception) {
                 println("❌ Complaint $ticketId detail failed: ${e.message}")
                 null
@@ -807,18 +874,27 @@ class ComplaintDetailViewModel(
 }
 
 /**
- * Lays a receipt this session holds over what the server said about the charge.
+ * Lays the receipt this device holds over what the server said about the charge.
  *
- * Only ever upgrades: a ticket the server already reports as paid is left alone, and
- * without a receipt nothing changes. It exists because `service/my-complaints` keeps
- * answering `payment_status: "PENDING"` for a minute or two after PhonePe has
- * settled, and a user who has just paid must not be shown "payment pending".
+ * Only ever fills gaps — every field the row did send is kept, and without a receipt
+ * nothing changes at all. Two separate holes it covers:
+ *
+ *  - `service/my-complaints` keeps answering `payment_status: "PENDING"` for a minute
+ *    or two after PhonePe has settled, so a user who has just paid would be shown
+ *    "payment pending". Hence the status upgrade.
+ *  - A row the server *does* call paid still comes back with a null
+ *    `merchant_order_id` and no `paid_at`. It used to return early on those, which is
+ *    why "Paid on" and "Payment ref" vanished once the paying session was gone — the
+ *    one case the stored receipt exists for.
  */
 private fun ServiceTicket.withPaidCharge(receipt: ServicePaymentReceipt?): ServiceTicket {
-    if (receipt == null || chargePaid) return this
+    if (receipt == null) return this
     return copy(
-        payment = receipt,
-        paymentStatus = "SUCCESS",
-        paymentAmountRupees = receipt.amountRupees,
+        payment = payment ?: receipt,
+        // The server's own word stands when it already reports the charge as settled.
+        paymentStatus = if (chargePaid) paymentStatus else "SUCCESS",
+        paymentAmountRupees = paymentAmountRupees?.takeIf { it > 0 } ?: receipt.amountRupees,
+        paymentPaidAtMillis = paymentPaidAtMillis ?: receipt.paidAtMillis.takeIf { it > 0 },
+        paymentReference = paymentReference ?: receipt.merchantOrderId.takeIf { it.isNotBlank() },
     )
 }

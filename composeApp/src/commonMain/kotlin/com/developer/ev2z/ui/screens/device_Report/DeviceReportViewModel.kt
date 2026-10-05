@@ -3,6 +3,7 @@ package com.developer.ev2z.ui.screens.device_Report
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
+import com.developer.ev2z.network.LIVE_LOCATION_POLL_INTERVAL_MS
 import com.developer.ev2z.network.UnauthorizedException
 import com.developer.ev2z.repository.DeviceReportRepository
 import com.developer.ev2z.response.Device
@@ -199,7 +200,7 @@ class DeviceReportViewModel(
         liveLocationJob = viewModelScope.launch {
             while (isActive) {
                 fetchDeviceLiveLocation(token, deviceId)
-                delay(10_000)
+                delay(LIVE_LOCATION_POLL_INTERVAL_MS)
             }
         }
     }

@@ -249,9 +249,19 @@ class ShopViewModel(
         onError: (() -> Unit)? = null
     ) {
         val token = tokenProvider()
+
+        // Products 10 and 11 are the plan-based GPS trackers: the cart API refuses them
+        // with 422 {"message":"plan_type must be selected for this product."} when the
+        // plan is empty. The shop listing's Add button has no plan picker, so fall back
+        // to the device-only plan — exactly the price the card shows. The details screen
+        // still sends its own choice, and that one wins.
+        val finalPlanType =
+            if (plan_type.isBlank() && (productId == 10 || productId == 11)) "without_recharge"
+            else plan_type
+
         scope.launch {
             try {
-                val ok = repo.addToCart(token, add, productId, quantity, plan_type, device_type)
+                val ok = repo.addToCart(token, add, productId, quantity, finalPlanType, device_type)
                 if (ok) {
                     refreshCart()
                     onSuccess?.invoke()
@@ -292,6 +302,7 @@ class ShopViewModel(
         scope.launch {
             val finalPlan = normalizedPlanType(productId, plan_type)
             val finalDevice = normalizedDeviceType(device_type)
+
 
             try {
                 val ok = repo.updateCartQuantity(
@@ -378,6 +389,46 @@ class ShopViewModel(
             } else {
                 println("❌ Failed to Add Address")
             }
+        }
+    }
+
+    /**
+     * Edit a saved delivery address.
+     *
+     * The backend has no update route: `POST gps-billing` always INSERTs — it ignores a
+     * billing_id and hands back a fresh row (verified 2026-09-29). So an edit is saved as
+     * a new address first and the old row removed only once that succeeded, which also
+     * means a failure can never leave the user with no address at all. The row id changes,
+     * and loadBillingAddresses() selects the newest row, so the edited one stays selected.
+     */
+    fun updateAddress(
+        oldId: Int,
+        fname: String,
+        phone: String,
+        email: String,
+        address: String,
+        city: String,
+        state: String,
+        pincode: String,
+        onDone: () -> Unit
+    ) {
+        val token = tokenProvider()
+
+        scope.launch {
+            val saved = repo.addBillingAddress(
+                token, fname, phone, email, address, city, state, pincode
+            )
+
+            if (!saved) {
+                println("❌ updateAddress: saving the edited address failed, old one kept")
+                return@launch
+            }
+
+            val removed = repo.deleteBillingAddress(token, oldId)
+            if (!removed) println("⚠️ updateAddress: old address $oldId could not be removed")
+
+            loadBillingAddresses()
+            onDone()
         }
     }
 

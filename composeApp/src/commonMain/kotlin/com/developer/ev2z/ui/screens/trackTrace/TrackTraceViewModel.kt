@@ -3,6 +3,7 @@ package com.developer.ev2z.ui.screens.trackTrace
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
+import com.developer.ev2z.network.LIVE_LOCATION_POLL_INTERVAL_MS
 import com.developer.ev2z.network.UnauthorizedException
 import com.developer.ev2z.repository.TrackTraceRepository
 import com.developer.ev2z.response.Device
@@ -168,7 +169,7 @@ class TrackTraceViewModel(
         liveLocationJob = viewModelScope.launch {
             while (isActive) {
                 fetchLiveLocation(deviceId)
-                delay(10_000)
+                delay(LIVE_LOCATION_POLL_INTERVAL_MS)
             }
         }
     }

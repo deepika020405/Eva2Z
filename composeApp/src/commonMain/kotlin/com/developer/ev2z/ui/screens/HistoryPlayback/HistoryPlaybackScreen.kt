@@ -25,6 +25,8 @@ import com.developer.ev2z.BackPressHandler
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.network.SnappedRoute
+import com.developer.ev2z.repository.HistoryPlaybackRepository
 import com.developer.ev2z.response.Device
 import com.developer.ev2z.response.RoutePoint
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
@@ -33,6 +35,7 @@ import kotlinx.datetime.*
 import org.jetbrains.compose.resources.painterResource
 import kotlin.time.ExperimentalTime
 import com.developer.ev2z.theme.AppPageBg
+import org.jetbrains.compose.ui.tooling.preview.Preview
 
 @OptIn(ExperimentalMaterial3Api::class, kotlin.time.ExperimentalTime::class)
 @Composable
@@ -51,6 +54,7 @@ fun HistoryPlaybackScreen(
     val startDate by viewModel.startDate.collectAsState()
     val endDate by viewModel.endDate.collectAsState()
     val routePoints by viewModel.routePoints.collectAsState()
+    val snappedRoute by viewModel.snappedRoute.collectAsState()
     val isPlaying by viewModel.isPlaying.collectAsState()
     val currentIndex by viewModel.currentPlaybackIndex.collectAsState()
     val totalDistance by viewModel.totalDistance.collectAsState()
@@ -87,6 +91,91 @@ fun HistoryPlaybackScreen(
         }
     }
 
+    HistoryPlaybackContent(
+        devices = devices,
+        selectedDevice = selectedDevice,
+        routePoints = routePoints,
+        snappedRoute = snappedRoute,
+        currentIndex = currentIndex,
+        startDate = startDate,
+        endDate = endDate,
+        totalDistance = totalDistance,
+        averageSpeed = averageSpeed,
+        currentSpeed = currentSpeed,
+        isPlaying = isPlaying,
+        isLoading = uiState is HistoryPlaybackUiState.Loading,
+        showDeviceDropdown = showDeviceDropdown,
+        onBackClick = onBackPressed,
+        onDropdownClick = {
+            if (devices.size > 1) {
+                viewModel.toggleDeviceDropdown()
+            }
+        },
+        onDismissDropdown = { viewModel.toggleDeviceDropdown() },
+        onDeviceSelected = { viewModel.selectDevice(it) },
+        onPreviousDate = { viewModel.navigateToPreviousDate() },
+        onNextDate = { viewModel.navigateToNextDate() },
+        onDateClick = { showDatePicker = true },
+        onPlayClick = { viewModel.togglePlayback() }
+    )
+
+    if (showDatePicker) {
+        DateRangePickerDialog(
+            startDate = startDate,
+            endDate = endDate,
+            minDate = viewModel.minSelectableDate,
+            maxDate = viewModel.maxSelectableDate,
+            onDatesSelected = { start, end ->
+                viewModel.selectDateRange(start, end)
+            },
+            onDismiss = { showDatePicker = false }
+        )
+    }
+
+    if (showNoDataDialog) {
+        NoHistoryDialog(onDismiss = { viewModel.dismissNoDataDialog() })
+    }
+}
+
+/**
+ * Stateless UI for the playback screen — every value comes in as a parameter so the
+ * layout can be rendered by `@Preview` without an ApiService, StorageManager or ViewModel.
+ *
+ * [mapContent] is a slot because [HistoryMapView] is an `expect` function with no
+ * commonMain implementation; previews pass a placeholder instead.
+ */
+@Composable
+fun HistoryPlaybackContent(
+    devices: List<Device>,
+    selectedDevice: Device?,
+    routePoints: List<RoutePoint>,
+    snappedRoute: SnappedRoute = SnappedRoute.EMPTY,
+    currentIndex: Int,
+    startDate: String,
+    endDate: String,
+    totalDistance: Double,
+    averageSpeed: Double,
+    currentSpeed: Int,
+    isPlaying: Boolean,
+    isLoading: Boolean,
+    showDeviceDropdown: Boolean,
+    onBackClick: () -> Unit,
+    onDropdownClick: () -> Unit,
+    onDismissDropdown: () -> Unit,
+    onDeviceSelected: (Device) -> Unit,
+    onPreviousDate: () -> Unit,
+    onNextDate: () -> Unit,
+    onDateClick: () -> Unit,
+    onPlayClick: () -> Unit,
+    mapContent: @Composable (Modifier) -> Unit = { mapModifier ->
+        HistoryMapView(
+            routePoints = routePoints,
+            snappedRoute = snappedRoute,
+            currentIndex = currentIndex,
+            modifier = mapModifier
+        )
+    }
+) {
     Box(modifier = Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
@@ -94,11 +183,7 @@ fun HistoryPlaybackScreen(
                 .background(AppPageBg)
         ) {
             if (routePoints.isNotEmpty()) {
-                HistoryMapView(
-                    routePoints = routePoints,
-                    currentIndex = currentIndex,
-                    modifier = Modifier.fillMaxSize()
-                )
+                mapContent(Modifier.fillMaxSize())
             } else {
                 Box(
                     modifier = Modifier.fillMaxSize(),
@@ -121,12 +206,9 @@ fun HistoryPlaybackScreen(
         TopDeviceBoxWithData(
             deviceCount = devices.size,
             selectedDevice = selectedDevice?.device_name,
-            onBackClick = onBackPressed,
-            onDropdownClick = {
-                if (devices.size > 1) {
-                    viewModel.toggleDeviceDropdown()
-                }
-            }        )
+            onBackClick = onBackClick,
+            onDropdownClick = onDropdownClick
+        )
 
         HistoryPlaybackBottomSheet(
             hasData = routePoints.isNotEmpty(),
@@ -137,10 +219,10 @@ fun HistoryPlaybackScreen(
             averageSpeed = averageSpeed,
             currentSpeed = currentSpeed,
             isPlaying = isPlaying,
-            onPreviousDate = { viewModel.navigateToPreviousDate() },
-            onNextDate = { viewModel.navigateToNextDate() },
-            onDateClick = { showDatePicker = true },
-            onPlayClick = { viewModel.togglePlayback() }
+            onPreviousDate = onPreviousDate,
+            onNextDate = onNextDate,
+            onDateClick = onDateClick,
+            onPlayClick = onPlayClick
         )
 
         // ✅ DROPDOWN (HOME SCREEN STYLE - FIXED)
@@ -150,7 +232,7 @@ fun HistoryPlaybackScreen(
                     .fillMaxSize()
                     .background(Color(0x55000000))
                     .zIndex(999f)
-                    .clickable { viewModel.toggleDeviceDropdown() },
+                    .clickable { onDismissDropdown() },
                 contentAlignment = Alignment.TopCenter
             ) {
                 Card(
@@ -177,7 +259,7 @@ fun HistoryPlaybackScreen(
                                 contentDescription = "Close",
                                 modifier = Modifier
                                     .size(20.dp)
-                                    .clickable { viewModel.toggleDeviceDropdown() }
+                                    .clickable { onDismissDropdown() }
                             )
                         }
 
@@ -218,7 +300,7 @@ fun HistoryPlaybackScreen(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .clickable {
-                                                viewModel.selectDevice(device)
+                                                onDeviceSelected(device)
                                             }
                                             .padding(horizontal = 16.dp, vertical = 12.dp),
                                         verticalAlignment = Alignment.CenterVertically
@@ -261,32 +343,7 @@ fun HistoryPlaybackScreen(
             }
         }
 
-        if (showDatePicker) {
-            DateRangePickerDialog(
-                startDate = startDate,
-                endDate = endDate,
-                minDate = viewModel.minSelectableDate,
-                maxDate = viewModel.maxSelectableDate,
-                onDatesSelected = { start, end ->
-                    viewModel.selectDateRange(start, end)
-                },
-                onDismiss = { showDatePicker = false }
-            )
-        }
-
-        if (showNoDataDialog) {
-            AlertDialog(
-                onDismissRequest = { viewModel.dismissNoDataDialog() },
-                icon = { Icon(Icons.Default.Info, null, tint = Color(0xFF7CB342)) },
-                title = { Text("No History Found") },
-                text = { Text("No route data available for the selected date range. Please try a different date range.") },
-                confirmButton = {
-                    TextButton(onClick = { viewModel.dismissNoDataDialog() }) { Text("OK") }
-                }
-            )
-        }
-
-        if (uiState is HistoryPlaybackUiState.Loading) {
+        if (isLoading) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -297,6 +354,19 @@ fun HistoryPlaybackScreen(
             }
         }
     }
+}
+
+@Composable
+fun NoHistoryDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Default.Info, null, tint = Color(0xFF7CB342)) },
+        title = { Text("No History Found") },
+        text = { Text("No route data available for the selected date range. Please try a different date range.") },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("OK") }
+        }
+    )
 }
 
 @Composable
@@ -358,7 +428,9 @@ fun BoxScope.TopDeviceBoxWithData(
                             text = selectedDevice ?: "Select Device",
                             fontSize = 15.sp,
                             maxLines = 1
-                        )                    }
+
+                        )
+                    }
 
                     Icon(Icons.Default.ArrowDropDown, contentDescription = null)
                 }
@@ -783,11 +855,229 @@ fun formatShortDate(date: LocalDate): String {
     return "$dayOfWeek, $monthName ${date.dayOfMonth}"
 }
 
+/**
+ * [snappedRoute] is the route laid onto the road network — what the map draws, so the
+ * line follows the streets instead of cutting straight between fixes. It arrives a
+ * moment after [routePoints] and is empty when snapping is unavailable; in both cases
+ * the map falls back to drawing [routePoints] directly.
+ */
 @Composable
 expect fun HistoryMapView(
     routePoints: List<RoutePoint>,
+    snappedRoute: SnappedRoute,
     currentIndex: Int,
     modifier: Modifier
 )
 
 
+// =========================================================
+// PREVIEWS
+//
+// These render HistoryPlaybackContent (the stateless UI) with mock data —
+// no ApiService / StorageManager / ViewModel involved. The map is a
+// placeholder because HistoryMapView is an `expect` function with no
+// commonMain implementation.
+// =========================================================
+
+private val previewDevices = listOf(
+    Device(
+        id = 1,
+        device_id = "864636051234567",
+        device_name = "Tata Ace — MH12 AB 1234",
+        engine_status = "running",
+        status = "moving"
+    ),
+    Device(
+        id = 2,
+        device_id = "864636051234568",
+        device_name = "Bolero Pickup — MH14 CD 5678",
+        engine_status = "idle",
+        status = "idle"
+    ),
+    Device(
+        id = 3,
+        device_id = "864636051234569",
+        device_name = "Scooter — MH12 XY 9012",
+        engine_status = "parked",
+        status = "parked"
+    ),
+    Device(
+        id = 4,
+        device_id = "864636051234570",
+        device_name = "Truck — MH09 ZZ 3456",
+        engine_status = "offline",
+        status = null
+    )
+)
+
+private val previewRoutePoints = List(40) { i ->
+    RoutePoint(
+        latitude = (18.5204 + i * 0.001).toString(),
+        longitude = (73.8567 + i * 0.001).toString(),
+        speed = (20 + i % 25).toString(),
+        createdAt = "2026-10-03 09:${(10 + i % 45).toString().padStart(2, '0')}:00",
+        movement = "moving"
+    )
+}
+
+@Composable
+private fun PreviewMapPlaceholder(modifier: Modifier) {
+    Box(
+        modifier = modifier.background(Color(0xFFE8EDE4)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text("Map preview", color = Color.Gray, fontSize = 13.sp)
+    }
+}
+
+/** Route loaded, playback paused — the common "happy path" state. */
+@Preview(name = "1 · With route data", widthDp = 360, heightDp = 800, showBackground = true)
+@Composable
+private fun HistoryPlaybackContentPreview() {
+    HistoryPlaybackContent(
+        devices = previewDevices,
+        selectedDevice = previewDevices.first(),
+        routePoints = previewRoutePoints,
+        currentIndex = 12,
+        startDate = "2026-10-03",
+        endDate = "2026-10-03",
+        totalDistance = 42.0,
+        averageSpeed = 36.0,
+        currentSpeed = 0,
+        isPlaying = false,
+        isLoading = false,
+        showDeviceDropdown = false,
+        onBackClick = {},
+        onDropdownClick = {},
+        onDismissDropdown = {},
+        onDeviceSelected = {},
+        onPreviousDate = {},
+        onNextDate = {},
+        onDateClick = {},
+        onPlayClick = {},
+        mapContent = { PreviewMapPlaceholder(it) }
+    )
+}
+
+/** Playing — Speed box turns orange and the button flips to "Pause". */
+@Preview(name = "2 · Playing", widthDp = 360, heightDp = 800, showBackground = true)
+@Composable
+private fun HistoryPlaybackContentPlayingPreview() {
+    HistoryPlaybackContent(
+        devices = previewDevices,
+        selectedDevice = previewDevices.first(),
+        routePoints = previewRoutePoints,
+        currentIndex = 18,
+        startDate = "2026-09-28",
+        endDate = "2026-10-03",
+        totalDistance = 128.0,
+        averageSpeed = 41.0,
+        currentSpeed = 54,
+        isPlaying = true,
+        isLoading = false,
+        showDeviceDropdown = false,
+        onBackClick = {},
+        onDropdownClick = {},
+        onDismissDropdown = {},
+        onDeviceSelected = {},
+        onPreviousDate = {},
+        onNextDate = {},
+        onDateClick = {},
+        onPlayClick = {},
+        mapContent = { PreviewMapPlaceholder(it) }
+    )
+}
+
+/** No device selected yet — disabled controls and the empty-map hint. */
+@Preview(name = "3 · Empty state", widthDp = 360, heightDp = 800, showBackground = true)
+@Composable
+private fun HistoryPlaybackContentEmptyPreview() {
+    HistoryPlaybackContent(
+        devices = emptyList(),
+        selectedDevice = null,
+        routePoints = emptyList(),
+        currentIndex = 0,
+        startDate = "2026-10-03",
+        endDate = "2026-10-03",
+        totalDistance = 0.0,
+        averageSpeed = 0.0,
+        currentSpeed = 0,
+        isPlaying = false,
+        isLoading = false,
+        showDeviceDropdown = false,
+        onBackClick = {},
+        onDropdownClick = {},
+        onDismissDropdown = {},
+        onDeviceSelected = {},
+        onPreviousDate = {},
+        onNextDate = {},
+        onDateClick = {},
+        onPlayClick = {},
+        mapContent = { PreviewMapPlaceholder(it) }
+    )
+}
+
+/** Device picker open — shows all four status colours. */
+@Preview(name = "4 · Device dropdown", widthDp = 360, heightDp = 800, showBackground = true)
+@Composable
+private fun HistoryPlaybackContentDropdownPreview() {
+    HistoryPlaybackContent(
+        devices = previewDevices,
+        selectedDevice = previewDevices.first(),
+        routePoints = previewRoutePoints,
+        currentIndex = 0,
+        startDate = "2026-10-03",
+        endDate = "2026-10-03",
+        totalDistance = 42.0,
+        averageSpeed = 36.0,
+        currentSpeed = 0,
+        isPlaying = false,
+        isLoading = false,
+        showDeviceDropdown = true,
+        onBackClick = {},
+        onDropdownClick = {},
+        onDismissDropdown = {},
+        onDeviceSelected = {},
+        onPreviousDate = {},
+        onNextDate = {},
+        onDateClick = {},
+        onPlayClick = {},
+        mapContent = { PreviewMapPlaceholder(it) }
+    )
+}
+
+/** Loading overlay on top of the screen. */
+@Preview(name = "5 · Loading", widthDp = 360, heightDp = 800, showBackground = true)
+@Composable
+private fun HistoryPlaybackContentLoadingPreview() {
+    HistoryPlaybackContent(
+        devices = previewDevices,
+        selectedDevice = previewDevices.first(),
+        routePoints = emptyList(),
+        currentIndex = 0,
+        startDate = "2026-10-03",
+        endDate = "2026-10-03",
+        totalDistance = 0.0,
+        averageSpeed = 0.0,
+        currentSpeed = 0,
+        isPlaying = false,
+        isLoading = true,
+        showDeviceDropdown = false,
+        onBackClick = {},
+        onDropdownClick = {},
+        onDismissDropdown = {},
+        onDeviceSelected = {},
+        onPreviousDate = {},
+        onNextDate = {},
+        onDateClick = {},
+        onPlayClick = {},
+        mapContent = { PreviewMapPlaceholder(it) }
+    )
+}
+
+/** The "No History Found" dialog on its own. */
+@Preview(name = "6 · No history dialog", widthDp = 360, heightDp = 400, showBackground = true)
+@Composable
+private fun NoHistoryDialogPreview() {
+    NoHistoryDialog(onDismiss = {})
+}
