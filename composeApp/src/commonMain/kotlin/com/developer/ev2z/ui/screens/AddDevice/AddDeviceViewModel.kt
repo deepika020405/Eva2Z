@@ -32,6 +32,44 @@ class AddDeviceViewModel : ViewModel() {
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
+    /** The vehicle catalogue behind the "Vehicle Type Icon" picker. */
+    private val _vehicleTypes = MutableStateFlow<List<VehicleType>>(emptyList())
+    val vehicleTypes: StateFlow<List<VehicleType>> = _vehicleTypes.asStateFlow()
+
+    private val _isLoadingVehicleTypes = MutableStateFlow(false)
+    val isLoadingVehicleTypes: StateFlow<Boolean> = _isLoadingVehicleTypes.asStateFlow()
+
+    /**
+     * Loads the vehicle catalogue. Separate from [errorMessage] so a catalogue that
+     * fails to load does not read as an add-device failure; the picker says so itself
+     * and offers a retry.
+     */
+    private val _vehicleTypesError = MutableStateFlow<String?>(null)
+    val vehicleTypesError: StateFlow<String?> = _vehicleTypesError.asStateFlow()
+
+    fun loadVehicleTypes(token: String) {
+        if (_isLoadingVehicleTypes.value || _vehicleTypes.value.isNotEmpty()) return
+
+        _isLoadingVehicleTypes.value = true
+        _vehicleTypesError.value = null
+
+        viewModelScope.launch {
+            try {
+                val response = apiService.getVehicleTypes(token)
+                println("🚗 Vehicle types: ${response.data.size} of ${response.total}")
+                _vehicleTypes.value = response.data
+                if (response.data.isEmpty()) {
+                    _vehicleTypesError.value = "No vehicle types available"
+                }
+            } catch (e: Exception) {
+                println("❌ Vehicle types failed: ${e.message}")
+                _vehicleTypesError.value = "Couldn't load vehicle types"
+            } finally {
+                _isLoadingVehicleTypes.value = false
+            }
+        }
+    }
+
     fun setDeviceId(id: String) {
         _scannedDeviceId.value = id
     }
@@ -53,7 +91,14 @@ class AddDeviceViewModel : ViewModel() {
         deviceName: String,
         deviceId: String,
         simNumber: String,
-        deviceType: String // ✅ New parameter
+        deviceType: String, // ✅ New parameter
+        /**
+         * The picked [VehicleType]'s id. Required by the server — an add-device with
+         * no `vehicle_id` is rejected 422 "The vehicle id field is required" — and
+         * sent as a **string**: the same validator rejects the number with "The
+         * vehicle id field must be a string".
+         */
+        vehicleId: Int
     ) {
         if (token.isEmpty() || token == "YOUR_TOKEN_HERE") {
             _errorMessage.value = "Authentication token not found. Please login again."
@@ -83,6 +128,7 @@ class AddDeviceViewModel : ViewModel() {
                     put("device_name", deviceName)
                     put("sim_number", simNumSave)
                     put("device_type", deviceType) // ✅ Send device type
+                    put("vehicle_id", vehicleId.toString())
                 }
 
                 println("🔹 AddDevice Request:")
@@ -123,6 +169,8 @@ class AddDeviceViewModel : ViewModel() {
         }
     }
 }
+
+
 
 // ✅ Updated sealed class
 sealed class AddDeviceResult {

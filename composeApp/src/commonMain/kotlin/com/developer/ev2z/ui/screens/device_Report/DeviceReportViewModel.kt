@@ -3,12 +3,15 @@ package com.developer.ev2z.ui.screens.device_Report
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
-import com.developer.ev2z.network.LIVE_LOCATION_POLL_INTERVAL_MS
+import com.developer.ev2z.network.DEVICES_POLL_INTERVAL_MS
 import com.developer.ev2z.network.UnauthorizedException
+import com.developer.ev2z.network.pollAtFixedRate
 import com.developer.ev2z.repository.DeviceReportRepository
 import com.developer.ev2z.response.Device
 import com.developer.ev2z.response.DeviceAnalyticsData
 import com.developer.ev2z.response.TotalMilagesData
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,11 +19,29 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sqrt
 
 enum class AnalyticsRange(val apiValue: String) {
     TODAY("today"),
     WEEK("week"),
     MONTH("month")
+}
+
+/**
+ * How far the vehicle has to move before the shown address is looked up again. Street
+ * granularity — anything smaller resolves to the same text.
+ */
+private const val ADDRESS_REFRESH_METERS = 40.0
+
+/** Flat-earth distance — accurate enough at this scale and far cheaper than haversine. */
+private fun distanceMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+    val meanLat = (lat1 + lat2) / 2 * PI / 180
+    val dLat = (lat2 - lat1) * 111_320.0
+    val dLng = (lon2 - lon1) * 111_320.0 * cos(meanLat)
+    return sqrt(dLat * dLat + dLng * dLng)
 }
 
 class DeviceReportViewModel(
@@ -38,7 +59,6 @@ class DeviceReportViewModel(
 
     private val _myDevices = MutableStateFlow<List<Device>>(emptyList())
     val myDevices: StateFlow<List<Device>> = _myDevices.asStateFlow()
-
     private val _selectedDevice = MutableStateFlow<Device?>(null)
     val selectedDevice: StateFlow<Device?> = _selectedDevice.asStateFlow()
 
@@ -50,6 +70,20 @@ class DeviceReportViewModel(
 
     private val _address = MutableStateFlow<String?>(null)
     val address: StateFlow<String?> = _address.asStateFlow()
+
+    /**
+     * Coordinates the address currently on screen was resolved from.
+     *
+     * Set only once a lookup has actually come back with an address. Recording it up
+     * front — which is what this used to do — meant a geocode that failed (no network,
+     * the Geocoder service unavailable, which is routine) counted as done: the next
+     * forty metres of driving were inside the "already resolved" radius, so the retry
+     * never came and the row sat on "Address not found" while the vehicle drove away.
+     */
+    private var lastGeocodedAt: Pair<Double, Double>? = null
+
+    /** The lookup in flight, so a slow geocode cannot have the next poll start another. */
+    private var addressJob: Job? = null
 
     // ── mileage + mobilize ──────────────────────────────────────────
     private val _totalMilages = MutableStateFlow<TotalMilagesData?>(null)
@@ -96,7 +130,12 @@ class DeviceReportViewModel(
         _selectedDevice.value = null
         _liveLocation.value = null
         _totalDevices.value = 0
+        addressJob?.cancel()
         _address.value = null
+        // Cleared with the address it belongs to: left behind, it tells the next
+        // session's first fix that it has already been resolved, and the row opens
+        // blank until the vehicle moves forty metres.
+        lastGeocodedAt = null
         _totalMilages.value = null
         _mobilizeMessage.value = null
         _showConfirmationDialog.value = null
@@ -133,18 +172,15 @@ class DeviceReportViewModel(
     }
 
     /**
-     * Polls `getMyDevices` every 15s so the dropdown's engine_status stays
-     * in sync with real vehicle state. The first successful response flips
+     * Polls `getMyDevices` every [DEVICES_POLL_INTERVAL_MS] so the dropdown's
+     * engine_status stays in sync with real vehicle state. The first successful response flips
      * ui state to Success immediately — we do NOT wait for live-location to
      * return before showing the UI (that was the old bug).
      */
     private fun startDevicesPolling(token: String) {
         devicesPollingJob?.cancel()
         devicesPollingJob = viewModelScope.launch {
-            while (isActive) {
-                refreshDevices(token)
-                delay(15_000)
-            }
+            pollAtFixedRate(DEVICES_POLL_INTERVAL_MS) { refreshDevices(token) }
         }
     }
 
@@ -198,36 +234,52 @@ class DeviceReportViewModel(
     private fun startLiveLocationPolling(token: String, deviceId: String) {
         liveLocationJob?.cancel()
         liveLocationJob = viewModelScope.launch {
-            while (isActive) {
-                fetchDeviceLiveLocation(token, deviceId)
-                delay(LIVE_LOCATION_POLL_INTERVAL_MS)
-            }
+            // Fixed rate, and the tick is awaited: this loop used to fire a
+            // fire-and-forget coroutine every interval regardless of whether the
+            // previous request had come back, so on a slow connection two calls were in
+            // flight at once and the older response landing last jumped the marker
+            // backwards.
+            pollAtFixedRate { fetchDeviceLiveLocation(token, deviceId) }
         }
     }
 
-    fun fetchDeviceLiveLocation(token: String, deviceId: String) {
-        viewModelScope.launch {
-            try {
-                val response = repository.getDeviceLiveLocation(token, deviceId)
-                if (response.success) {
-                    _liveLocation.value = response
-                    response.data?.latestLocation?.let {
-                        getAddressFromLatLng(
-                            it.latitude.toDouble(),
-                            it.longitude.toDouble()
-                        )
-                    }
+    suspend fun fetchDeviceLiveLocation(token: String, deviceId: String) {
+        try {
+            val response = repository.getDeviceLiveLocation(token, deviceId)
+            if (response.success) {
+                _liveLocation.value = response
+                // validPosition() drops the "0"/"0" a tracker sends while it has no
+                // satellite fix, which would otherwise be geocoded and shown as an
+                // address in the Atlantic.
+                response.data?.latestLocation?.validPosition()?.let { (lat, lng) ->
+                    refreshAddressIfMoved(lat, lng)
                 }
-                // Note: we do NOT blank out _liveLocation on a failed tick —
-                // that would cause flicker. We keep the last-good location on
-                // screen until the next successful poll.
-            } catch (e: UnauthorizedException) {
-                println("🔒 [DeviceReport] 401 Unauthorized — stopping live-location polling")
-                stopPolling()
-            } catch (_: Exception) {
-                // Silent — live-location failures should never tear down the UI.
             }
+            // Note: we do NOT blank out _liveLocation on a failed tick —
+            // that would cause flicker. We keep the last-good location on
+            // screen until the next successful poll.
+        } catch (e: UnauthorizedException) {
+            println("🔒 [DeviceReport] 401 Unauthorized — stopping live-location polling")
+            stopPolling()
+        } catch (_: Exception) {
+            // Silent — live-location failures should never tear down the UI.
         }
+    }
+
+    /**
+     * Reverse-geocodes only once the vehicle has left the area the shown address
+     * describes.
+     *
+     * This used to run on every tick, so a parked vehicle was geocoded every few
+     * seconds forever to be told the same street name — work that competes with the
+     * live-location requests themselves and, on Android, blocks on a Geocoder call.
+     */
+    fun refreshAddressIfMoved(lat: Double, lng: Double) {
+        val last = lastGeocodedAt
+        if (last != null && distanceMeters(last.first, last.second, lat, lng) < ADDRESS_REFRESH_METERS) {
+            return
+        }
+        getAddressFromLatLng(lat, lng)
     }
 
     /**
@@ -240,7 +292,11 @@ class DeviceReportViewModel(
 
         _selectedDevice.value = device
         _liveLocation.value = null
+        // Cancelled, not just blanked: a lookup still running for the previous vehicle
+        // would otherwise land afterwards and write its street under the new one.
+        addressJob?.cancel()
         _address.value = null
+        lastGeocodedAt = null
 
         startLiveLocationPolling(token, device.device_id)
     }
@@ -257,10 +313,34 @@ class DeviceReportViewModel(
     }
 
     // ── address reverse geocoding ───────────────────────────────────
+    /**
+     * Resolves [lat]/[lng] into the street address shown under the vehicle.
+     *
+     * **Off the main thread.** The Android provider calls `Geocoder.getFromLocation`,
+     * which goes to the network and blocks until it answers, and `viewModelScope` is
+     * `Dispatchers.Main` — so every refresh froze the UI for as long as the lookup took.
+     * That is the same fault as the API calls in `ApiService`, on a screen that then
+     * repeats it every poll.
+     *
+     * A failed lookup keeps whatever address is already on screen rather than replacing
+     * a real street with "Address not found": the coordinates have not changed, only
+     * the lookup failed, and [lastGeocodedAt] is left alone so the next poll tries
+     * again instead of waiting for the vehicle to drive another forty metres.
+     */
     fun getAddressFromLatLng(lat: Double, lng: Double) {
-        viewModelScope.launch {
-            platformAddressProvider.getAddress(lat, lng) { address ->
-                _address.value = address ?: "Address not found"
+        // One at a time: a geocode slower than the poll interval would otherwise have
+        // two in flight, and the older answer landing last puts a stale street on screen.
+        addressJob?.cancel()
+        addressJob = viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                platformAddressProvider.getAddress(lat, lng) { resolved ->
+                    if (resolved != null) {
+                        lastGeocodedAt = lat to lng
+                        _address.value = resolved
+                    } else if (_address.value == null) {
+                        _address.value = "Address not found"
+                    }
+                }
             }
         }
     }

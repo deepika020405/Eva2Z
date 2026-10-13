@@ -469,13 +469,13 @@ fun App() {
                         showForgetPassword = true
                     },
                     onSignupOTPClick = { name, phone, email ->
-                        registrationName = name
-                        registrationPhone = phone
-                        registrationEmail = email
-                        // phone already contains the full international number (e.g. +929319837225)
-                        authViewModel.signUp(name, phone, "", email)
-                        // showRegistration is set by LaunchedEffect(signupSuccess)
-                        // only after the OTP is confirmed sent successfully
+                            registrationName = name
+                            registrationPhone = phone
+                            registrationEmail = email
+                            // phone already contains the full international number (e.g. +929319837225)
+                            authViewModel.signUp(name, phone, "", email)
+                            // showRegistration is set by LaunchedEffect(signupSuccess)
+                            // only after the OTP is confirmed sent successfully
                     }
                 )
             }

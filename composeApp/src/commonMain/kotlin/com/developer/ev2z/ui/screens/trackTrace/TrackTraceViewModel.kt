@@ -3,8 +3,12 @@ package com.developer.ev2z.ui.screens.trackTrace
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
-import com.developer.ev2z.network.LIVE_LOCATION_POLL_INTERVAL_MS
+import com.developer.ev2z.network.DEVICES_POLL_INTERVAL_MS
 import com.developer.ev2z.network.UnauthorizedException
+import com.developer.ev2z.network.GeoPoint
+import com.developer.ev2z.network.RoadSnapService
+import com.developer.ev2z.network.approxDistanceMeters
+import com.developer.ev2z.network.pollAtFixedRate
 import com.developer.ev2z.repository.TrackTraceRepository
 import com.developer.ev2z.response.Device
 import io.ktor.util.date.getTimeMillis
@@ -30,6 +34,9 @@ class TrackTraceViewModel(
     private var liveLocationJob: Job? = null
     private var devicesPollingJob: Job? = null
 
+    /** Coordinates + timestamp of the last fix seen, so a repeat can be named as one. */
+    private var lastFixSignature: String? = null
+
     private val _devices = MutableStateFlow<List<Device>>(emptyList())
     val devices = _devices.asStateFlow()
 
@@ -54,6 +61,31 @@ class TrackTraceViewModel(
     private val _trailPoints = MutableStateFlow<List<TrailPoint>>(emptyList())
     val trailPoints = _trailPoints.asStateFlow()
 
+    // =========================================================
+    // THE ROAD THE MARKER IS DRIVING ALONG
+    // =========================================================
+    //
+    // The leg between the last two fixes, as road geometry. A tracker reports every
+    // few tens of seconds, so the straight line between two fixes is hundreds of
+    // metres of chord — and a chord cuts across the blocks, the central reservation
+    // and the island of every roundabout on it. The map walks this instead, so the
+    // vehicle follows the street.
+    //
+    // Published twice per fix on purpose: the straight chord the instant the fix
+    // lands, so the marker starts moving, then the snapped road a moment later. The
+    // walk resumes from where the marker already is, so the swap is not a jump.
+    // =========================================================
+
+    private val roadSnapper = RoadSnapService()
+
+    private var roadSnapJob: Job? = null
+
+    /** The fix the current leg starts from, and the one it ends at. */
+    private var legStart: GeoPoint? = null
+
+    private val _roadLeg = MutableStateFlow<List<GeoPoint>>(emptyList())
+    val roadLeg = _roadLeg.asStateFlow()
+
     fun start() {
         // First-time load shows a spinner; refreshes are silent.
         if (_devices.value.isEmpty()) {
@@ -74,6 +106,11 @@ class TrackTraceViewModel(
         _selectedDevice.value = device
         _liveLocation.value = null
         _trailPoints.value = emptyList()
+        roadSnapJob?.cancel()
+        roadSnapJob = null
+        legStart = null
+        _roadLeg.value = emptyList()
+        lastFixSignature = null
         startLiveLocationPolling(device.device_id)
     }
 
@@ -107,10 +144,7 @@ class TrackTraceViewModel(
     private fun startDevicesPolling() {
         devicesPollingJob?.cancel()
         devicesPollingJob = viewModelScope.launch {
-            while (isActive) {
-                refreshDevices()
-                delay(15_000)
-            }
+            pollAtFixedRate(DEVICES_POLL_INTERVAL_MS) { refreshDevices() }
         }
     }
 
@@ -167,10 +201,10 @@ class TrackTraceViewModel(
     private fun startLiveLocationPolling(deviceId: String) {
         liveLocationJob?.cancel()
         liveLocationJob = viewModelScope.launch {
-            while (isActive) {
-                fetchLiveLocation(deviceId)
-                delay(LIVE_LOCATION_POLL_INTERVAL_MS)
-            }
+            // Fixed rate, not a fixed gap: the marker animation is paced to the poll
+            // interval, so request latency added on top of the delay would leave the
+            // marker frozen for the overshoot at the end of every cycle.
+            pollAtFixedRate { fetchLiveLocation(deviceId) }
         }
     }
 
@@ -186,15 +220,21 @@ class TrackTraceViewModel(
 
             _liveLocation.value = res
 
-            val lat = res.data?.latestLocation?.latitude?.toDoubleOrNull()
-            val lng = res.data?.latestLocation?.longitude?.toDoubleOrNull()
+            logFixFreshness(res.data?.latestLocation)
 
-            if (lat != null && lng != null) {
+            // validPosition() drops the "0"/"0" a tracker reports while it has no
+            // satellite fix; appending that to the trail drew a line out to the
+            // Atlantic and back.
+            val position = res.data?.latestLocation?.validPosition()
+
+            if (position != null) {
+                val (lat, lng) = position
                 val newPoint = TrailPoint(lat, lng)
                 val current = _trailPoints.value
                 if (current.lastOrNull() != newPoint) {
                     _trailPoints.value = (current + newPoint).takeLast(100)
                 }
+                onFixForRoadLeg(GeoPoint(lat, lng))
             }
         } catch (e: UnauthorizedException) {
             println("🔒 [TrackTrace] 401 Unauthorized (live location) — stopping polling")
@@ -203,6 +243,68 @@ class TrackTraceViewModel(
         } catch (e: Exception) {
             println("💥 [TrackTrace] Exception in fetchLiveLocation: ${e::class.simpleName} — ${e.message}")
         }
+    }
+
+    /**
+     * Starts a new leg at [fix], straight away and then snapped to the road.
+     *
+     * Several polls in a row routinely bring the identical fix — the tracker uploads on
+     * its own schedule, not the app's — and re-publishing the same leg for each of them
+     * would restart the walk and leave the marker stuttering on the spot. Only a fix
+     * that has actually moved starts a leg.
+     */
+    private fun onFixForRoadLeg(fix: GeoPoint) {
+        val from = legStart
+        legStart = fix
+
+        if (from == null || approxDistanceMeters(from, fix) < MIN_LEG_METERS) {
+            // Nothing to drive along: the first fix of the session, or a vehicle that
+            // has not moved. The map parks the marker on the single point.
+            _roadLeg.value = listOf(fix)
+            return
+        }
+
+        // The chord first, so the marker is moving within the frame — snapping is a
+        // network round trip and the vehicle should not stand still waiting for it.
+        _roadLeg.value = listOf(from, fix)
+
+        roadSnapJob?.cancel()
+        roadSnapJob = viewModelScope.launch {
+            val snapped = roadSnapper.snapToRoads(listOf(from, fix))
+            // Only if this is still the leg being driven: a fix that landed while the
+            // request was in flight has already moved the marker on, and replacing its
+            // leg with the previous one's road would drag the vehicle backwards.
+            if (legStart == fix && snapped.path.size >= 2) {
+                _roadLeg.value = snapped.path
+            }
+        }
+    }
+
+    /**
+     * Says whether each poll actually brought a new fix, which is the one thing that
+     * explains a marker standing still.
+     *
+     * Polling rate and *reporting* rate are separate: the app asks every
+     * [LIVE_LOCATION_POLL_INTERVAL_MS], but the tracker only uploads on its own
+     * schedule, so several polls in a row can hand back the identical fix. The marker
+     * is then correct to stay put — there is nowhere new to go — and polling faster
+     * cannot help, because the gap is upstream of the app. REPEAT lines with a rising
+     * `age` are that case; a REPEAT with `speed` well above zero is a tracker sending
+     * stale coordinates, which is a device-side fault.
+     */
+    private fun logFixFreshness(fix: com.developer.ev2z.data.local.remote.LatestLocation?) {
+        if (fix == null) {
+            println("📍 [TrackTrace] fix=NONE — response carried no latest_location")
+            return
+        }
+        val signature = "${fix.latitude},${fix.longitude}@${fix.timestamp}"
+        val repeated = signature == lastFixSignature
+        lastFixSignature = signature
+        println(
+            "📍 [TrackTrace] fix=${if (repeated) "REPEAT" else "NEW"} " +
+                    "pos=${fix.latitude},${fix.longitude} speed=${fix.speed} " +
+                    "status=${fix.status} ts=${fix.timestamp} age=${fix.lastSeenMinutesAgo}min"
+        )
     }
 
     /**
@@ -219,5 +321,16 @@ class TrackTraceViewModel(
     override fun onCleared() {
         stop()
         super.onCleared()
+    }
+
+    private companion object {
+        /**
+         * How far a fix has to be from the one before it to count as a leg to drive.
+         *
+         * Five metres: below that it is the receiver wandering while the vehicle stands
+         * still, and snapping that to a road would ask the Roads API which street a
+         * parked car is creeping along — once per poll, all day.
+         */
+        const val MIN_LEG_METERS = 5.0
     }
 }

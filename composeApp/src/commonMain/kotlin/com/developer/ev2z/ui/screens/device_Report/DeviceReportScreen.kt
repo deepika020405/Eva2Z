@@ -48,9 +48,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.developer.ev2z.BackPressHandler
+import com.developer.ev2z.data.local.model.isMotionKind
+import com.developer.ev2z.data.local.model.statusDisplayOf
+import com.developer.ev2z.data.local.model.statusKindOf
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
 import com.developer.ev2z.response.Device
 import com.developer.ev2z.response.DeviceAnalyticsData
+import com.developer.ev2z.ui.screens.trackTrace.rememberAnimatedLatLng
 import com.developer.ev2z.util.Analytics
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
@@ -81,22 +85,31 @@ private val DR_Idle = Color(0xFFF4C44E)
 private val DR_Stopped = Color(0xFFE5565B)
 private val DR_CardShadow = Color(0x12000000)
 
-fun statusColor(status: String) = when (status.lowercase()) {
-    "on", "moving" -> DR_Running
+/**
+ * The badge colour, in this screen's palette, for whatever the server called the state.
+ *
+ * Through [statusKindOf] rather than matching the raw string here. The gateway spells
+ * this field a dozen ways — on, off, moving, running, idle, **ideal**, parked, stop,
+ * stopped, offline, no_data — and the list this used to match on covered six of them,
+ * so a vehicle reported as "running" (rather than "moving") fell through to grey, and
+ * so did "stopped" and the server's "ideal" misspelling of idle. Grey next to a moving
+ * vehicle reads as a dead tracker.
+ */
+fun statusColor(status: String) = when (statusKindOf(status)) {
+    "running" -> DR_Running
     "idle" -> DR_Idle
-    "off", "parked", "offline", "no_data" -> DR_Stopped
+    // A stop and a park are the same red here, as they are on the map.
+    "parked", "stopped" -> DR_Stopped
+    "offline", "no_data" -> Color.Gray
     else -> Color.Gray
 }
 
-fun statusLabel(status: String) = when (status.lowercase()) {
-    "on", "moving" -> "Running"
-    "idle" -> "Idle"
-    "off" -> "Stopped"
-    "parked" -> "Parked"
-    "offline" -> "Offline"
-    "no_data" -> "No Data"
-    else -> status.replaceFirstChar { it.uppercase() }
-}
+/**
+ * The badge text, from the same vocabulary every other screen reads — so "ideal" shows
+ * as "Idle" rather than as "Ideal", and a spelling the app has never seen is shown as
+ * the server wrote it instead of hiding behind "Unknown".
+ */
+fun statusLabel(status: String) = statusDisplayOf(status)
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -237,16 +250,33 @@ fun DeviceReportContent(
             .fillMaxSize()
             .background(DR_Background)
     ) {
-        // Map
-        val lat = liveLocation?.data?.latestLocation?.latitude?.toDoubleOrNull()
-        val lng = liveLocation?.data?.latestLocation?.longitude?.toDoubleOrNull()
+        // Map. validPosition() rather than toDoubleOrNull(): a tracker with no
+        // satellite fix reports "0"/"0", which is a real place in the Gulf of Guinea.
+        val latestFix = liveLocation?.data?.latestLocation
+        val position = latestFix?.validPosition()
 
-        if (lat != null && lng != null) {
+        if (position != null) {
+            // Each poll is handed to the map as interpolated frames, the same as Track
+            // & Trace. Passing the polled coordinates straight through — which this did
+            // — teleported the marker every interval instead of driving it.
+            val (animatedLat, animatedLng) = rememberAnimatedLatLng(position.first, position.second)
             PlatformMapView(
                 modifier = Modifier.fillMaxSize(),
-                latitude = lat,
-                longitude = lng,
-                zoom = 15.0
+                latitude = animatedLat,
+                longitude = animatedLng,
+                zoom = 15.0,
+                // The same rule as Track & Trace, which this claimed to follow and did
+                // not: motionKind(), not statusKind().
+                //
+                // This endpoint reports a tracker that has not checked in recently as
+                // `"status":"offline"` while `"db_status"` still says `"parked"`, and
+                // statusKind() prefers `status` — so the vehicle came out grey on the
+                // map while the badge inches above it read "Parked" in red. Seen on
+                // device 0869727076942661 on 2026-10-13, which is exactly that payload.
+                statusKind = latestFix.motionKind().takeIf { isMotionKind(it) }
+                    ?: latestFix.statusKind().takeIf { it != "unknown" }
+                    ?: statusKindOf(selectedDevice?.engine_status),
+                vehicleSlug = latestFix.iconSlug
             )
         }
 
@@ -673,7 +703,18 @@ fun BoxScope.DeviceReportBottomSheetWithData(
             ReportHeaderWithData(
                 deviceName = device.device_name,
                 speed = liveLocation?.data?.latestLocation?.speed?.toString() ?: "0",
-                status = liveLocation?.data?.latestLocation?.status ?: "Unknown"
+                // The same two sources, in the same order, as the map marker above:
+                // the live fix when there is one, the polled device list until then.
+                // Reading only the live fix left the badge on "Unknown" for the first
+                // poll and again after any tick that failed, while the marker beside
+                // it already knew — one screen disagreeing with itself.
+                //
+                // motionKind(), not status: this endpoint sends "status":"offline"
+                // next to "db_status":"parked" on the same vehicle, so the raw field
+                // reports the connection and loses what the vehicle is doing.
+                status = liveLocation?.data?.latestLocation?.motionKind()
+                    ?.takeIf { it != "unknown" }
+                    ?: device.engine_status.ifBlank { "offline" }
             )
 
             // Device Basic Info
@@ -904,12 +945,12 @@ fun DeviceBasicInfoWithData(
     val latest = liveLocation?.data?.latestLocation
     val currentStatus = latest?.status ?: ""
 
+    // Goes through the ViewModel's distance throttle, not straight to the geocoder:
+    // this fires on every poll, and `latitude.toDouble()` — which this used — throws
+    // on a non-numeric field rather than returning null.
     LaunchedEffect(latest?.latitude, latest?.longitude) {
-        latest?.let {
-            viewModel.getAddressFromLatLng(
-                it.latitude.toDouble(),
-                it.longitude.toDouble()
-            )
+        latest?.validPosition()?.let { (lat, lng) ->
+            viewModel.refreshAddressIfMoved(lat, lng)
         }
     }
 

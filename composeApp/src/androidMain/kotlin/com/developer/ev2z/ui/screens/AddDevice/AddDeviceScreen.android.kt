@@ -112,6 +112,8 @@ actual fun OpenCamera(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraExecutor: ExecutorService = remember { Executors.newSingleThreadExecutor() }
+    /** The bound provider, so leaving the screen can let go of the camera. */
+    val boundProvider = remember { arrayOfNulls<ProcessCameraProvider>(1) }
 
     AndroidView(
         factory = {
@@ -120,6 +122,7 @@ actual fun OpenCamera(
 
             cameraProviderFuture.addListener({
                 val cameraProvider = cameraProviderFuture.get()
+                boundProvider[0] = cameraProvider
                 val preview = Preview.Builder().build()
                 preview.setSurfaceProvider(previewView.surfaceProvider)
 
@@ -145,7 +148,22 @@ actual fun OpenCamera(
     )
 
     DisposableEffect(Unit) {
-        onDispose { cameraExecutor.shutdown() }
+        onDispose {
+            // `unbindAll`, not just the executor.
+            //
+            // The use cases are bound to the *Activity* lifecycle, and this app
+            // navigates with Voyager — one Activity for the whole session. So leaving
+            // the scanner never stopped the camera: nothing in the Activity's lifecycle
+            // changed, and CameraX had no reason to let go. An ANR trace on 2026-10-13,
+            // taken seven minutes after the scanner was last on screen, still showed
+            // `camerahalserver` burning 51-59% CPU behind a completely different screen.
+            //
+            // Releasing it here is what ties the camera to the *composable's* life
+            // rather than the Activity's, which is what "leaving the scanner" means.
+            boundProvider[0]?.unbindAll()
+            boundProvider[0] = null
+            cameraExecutor.shutdown()
+        }
     }
 }
 

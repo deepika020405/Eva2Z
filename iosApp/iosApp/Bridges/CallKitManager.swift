@@ -40,7 +40,9 @@ class CallKitManager: NSObject, CXProviderDelegate, IOSCallKitDelegate {
     private var pendingChatId:       Int32  = -1
 
     private override init() {
-        let config = CXProviderConfiguration(localizedName: "Eva2z Connect")
+        // The no-arg initialiser takes the name from CFBundleDisplayName, so the
+        // native call screen stays in sync with the app's display name.
+        let config = CXProviderConfiguration()
         config.supportsVideo            = false
         config.maximumCallsPerCallGroup = 1
         config.maximumCallGroups        = 1

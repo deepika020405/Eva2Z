@@ -10,13 +10,10 @@ import kotlinx.serialization.json.Json
 
 actual fun createHttpClient(): HttpClient {
     return HttpClient(Darwin) {
+        // Same ApiJson as Android — the two platforms must not disagree about which
+        // responses parse.
         install(ContentNegotiation) {
-            json(Json {
-                ignoreUnknownKeys = true
-                isLenient = true
-                prettyPrint = true
-                encodeDefaults = true   // ⭐ MUST ADD HERE ALSO
-            })
+            json(ApiJson)
         }
 
         install(Logging) {

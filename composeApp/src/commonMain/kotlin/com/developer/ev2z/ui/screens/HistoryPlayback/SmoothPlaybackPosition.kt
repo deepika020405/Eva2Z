@@ -1,3 +1,4 @@
+
 // composeApp/src/commonMain/kotlin/com/developer/ev2z/ui/screens/HistoryPlayback/SmoothPlaybackPosition.kt
 package com.developer.ev2z.ui.screens.HistoryPlayback
 
@@ -6,23 +7,34 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.withFrameNanos
 import com.developer.ev2z.network.GeoPoint
 import com.developer.ev2z.network.SnappedRoute
-import com.developer.ev2z.network.approxDistanceMeters
 import com.developer.ev2z.response.RoutePoint
+import com.developer.ev2z.util.PathPosition
+import com.developer.ev2z.util.asGeoPoint
+import com.developer.ev2z.util.bearingBetween
+import com.developer.ev2z.util.cumulativeDistances
+import com.developer.ev2z.util.eachFrameUntilDone
+import com.developer.ev2z.util.positionAlong
+import com.developer.ev2z.util.samePlace
+import com.developer.ev2z.util.stepBearing
 
-/** A point on the route as it is drawn, somewhere between two recorded samples. */
-data class PlaybackPosition(val latitude: Double, val longitude: Double)
+/**
+ * A point on the route as it is drawn, somewhere between two recorded samples.
+ *
+ * The same type the live map walks along — see [PathPosition]. Kept under this name
+ * because that is what the playback screen and its map call it.
+ */
+typealias PlaybackPosition = PathPosition
 
 /**
  * Walks the playback marker along the route instead of letting it hop from one
  * recorded point to the next.
  *
- * Playback advances `currentIndex` once every
- * [HistoryPlaybackViewModel.PLAYBACK_STEP_MS], so applying each new point directly
- * means the marker stands still for half a second and then teleports — at highway
- * sampling intervals that can be a hundred metres at a time.
+ * Playback advances `currentIndex` once per recorded fix — see [playbackStepMillis]
+ * for how long that takes — so applying each new point directly means the marker
+ * stands still and then teleports, which at highway sampling intervals is a hundred
+ * metres at a time.
  *
  * Given a road-snapped [snappedRoute], the marker follows the road geometry between
  * two samples — the same vertices the drawn line uses — so it stays on the line and
@@ -41,7 +53,15 @@ fun rememberSmoothPlaybackPosition(
     routePoints: List<RoutePoint>,
     currentIndex: Int,
     snappedRoute: SnappedRoute = SnappedRoute.EMPTY,
-    stepDurationMs: Double = HistoryPlaybackViewModel.PLAYBACK_STEP_MS.toDouble(),
+    /**
+     * How long the glide into [currentIndex] takes. Defaults to the real duration of
+     * that leg, compressed — the same figure the playback loop waits, from the same
+     * function, so the marker arrives exactly as the index moves on.
+     *
+     * Pass a constant to glide every leg at one rate, which draws the marker's speed
+     * as a function of fix spacing rather than of how fast the vehicle was going.
+     */
+    stepDurationMs: Double = playbackStepMillis(routePoints, currentIndex).toDouble(),
 ): State<PlaybackPosition?> {
 
     // Usable only while it describes this exact route: a mapping left over from the
@@ -69,20 +89,32 @@ fun rememberSmoothPlaybackPosition(
         val fromIndex = drawnIndex.value
         drawnIndex.value = currentIndex
 
+        // The heading already on screen. Each frame eases towards the direction of the
+        // stretch being travelled rather than snapping to it, so a corner reads as the
+        // vehicle turning through it instead of pivoting on the spot.
+        var bearing = from?.bearingDegrees ?: Double.NaN
+
         if (road == null) {
             val to = routePoints.getOrNull(currentIndex)?.toPlaybackPosition()
                 ?: return@LaunchedEffect
 
             // Nothing to travel from — first point of a route, or already there.
-            if (from == null || from == to) {
-                drawn.value = to
+            if (from == null || samePlace(from.asGeoPoint(), to.asGeoPoint())) {
+                drawn.value = to.copy(bearingDegrees = bearing)
                 return@LaunchedEffect
             }
 
+            val legBearing = bearingBetween(
+                GeoPoint(from.latitude, from.longitude),
+                GeoPoint(to.latitude, to.longitude),
+            )
+
             eachFrameUntilDone(stepDurationMs) { fraction ->
+                bearing = stepBearing(bearing, legBearing)
                 drawn.value = PlaybackPosition(
                     latitude = from.latitude + (to.latitude - from.latitude) * fraction,
                     longitude = from.longitude + (to.longitude - from.longitude) * fraction,
+                    bearingDegrees = bearing,
                 )
             }
             return@LaunchedEffect
@@ -94,49 +126,36 @@ fun rememberSmoothPlaybackPosition(
         // not move (or the fix was thinned out of the snap request) — nothing to walk.
         val stretch = road.pathBetween(fromIndex, currentIndex)
         if (from == null || stretch.size < 2) {
-            drawn.value = target
+            drawn.value = target.copy(bearingDegrees = bearing)
             return@LaunchedEffect
         }
 
         // The marker normally ends a step exactly on the vertex this one starts from.
         // It does not the first time a snapped route replaces the straight one, so the
         // walk begins from wherever it actually is and joins the road.
-        val walk = if (from.matches(stretch.first())) stretch
+        val walk = if (samePlace(from.asGeoPoint(), stretch.first())) stretch
         else listOf(GeoPoint(from.latitude, from.longitude)) + stretch
 
         val travelled = cumulativeDistances(walk)
         val total = travelled.last()
         if (total <= 0.0) {
-            drawn.value = target
+            drawn.value = target.copy(bearingDegrees = bearing)
             return@LaunchedEffect
         }
 
         eachFrameUntilDone(stepDurationMs) { fraction ->
-            drawn.value = positionAt(walk, travelled, total * fraction)
+            val at = positionAlong(walk, travelled, total * fraction)
+            // Where the road goes next (see positionAt), eased into. That is what
+            // brings the marker round a roundabout facing the way it is going instead
+            // of holding the straight-line heading between the two fixes either side
+            // of it — and what keeps it dead straight down a straight road, where the
+            // snapped polyline's own vertices wander by a metre or two.
+            bearing = stepBearing(bearing, at.bearingDegrees)
+            drawn.value = at.copy(bearingDegrees = bearing)
         }
     }
 
     return drawn
-}
-
-/**
- * Runs [onFrame] on the frame clock with how far through [durationMs] it is, ending on
- * exactly 1.0.
- *
- * Tying the glide to the real frame clock is what keeps it from drifting, or from
- * burning frames the display is not going to show.
- */
-private suspend fun eachFrameUntilDone(
-    durationMs: Double,
-    onFrame: (fraction: Double) -> Unit,
-) {
-    val startedAt = withFrameNanos { it }
-    while (true) {
-        val elapsedMs = (withFrameNanos { it } - startedAt) / 1_000_000.0
-        val fraction = (elapsedMs / durationMs).coerceAtMost(1.0)
-        onFrame(fraction)
-        if (fraction >= 1.0) return
-    }
 }
 
 /** Where the drawn line puts sample [pointIndex]. */
@@ -157,48 +176,10 @@ private fun SnappedRoute.pathBetween(fromIndex: Int, toIndex: Int): List<GeoPoin
     else path.subList(to, from + 1).asReversed()
 }
 
-/**
- * Running distance along [walk], so the marker crosses a stretch at a steady speed.
- *
- * Spreading the step evenly over the *vertices* instead would race the marker through
- * a long straight and crawl it around a corner, where the road geometry is dense.
- */
-private fun cumulativeDistances(walk: List<GeoPoint>): List<Double> {
-    var running = 0.0
-    return List(walk.size) { index ->
-        if (index > 0) running += approxDistanceMeters(walk[index - 1], walk[index])
-        running
-    }
-}
-
-private fun positionAt(
-    walk: List<GeoPoint>,
-    travelled: List<Double>,
-    distance: Double,
-): PlaybackPosition {
-    // The vertex the marker has just passed. Linear scan is fine: one stretch is a
-    // handful of vertices, and it is walked once per frame.
-    var segment = 0
-    while (segment < walk.size - 2 && travelled[segment + 1] < distance) segment++
-
-    val from = walk[segment]
-    val to = walk[segment + 1]
-    val segmentLength = travelled[segment + 1] - travelled[segment]
-    val fraction = if (segmentLength <= 0.0) 1.0
-    else ((distance - travelled[segment]) / segmentLength).coerceIn(0.0, 1.0)
-
-    return PlaybackPosition(
-        latitude = from.latitude + (to.latitude - from.latitude) * fraction,
-        longitude = from.longitude + (to.longitude - from.longitude) * fraction,
-    )
-}
-
-/** Same spot to well under a metre — the two were computed by different routes. */
-private fun PlaybackPosition.matches(point: GeoPoint): Boolean =
-    approxDistanceMeters(GeoPoint(latitude, longitude), point) < 0.5
-
 private fun RoutePoint.toPlaybackPosition(): PlaybackPosition? {
     val lat = getLatDouble() ?: return null
     val lng = getLngDouble() ?: return null
     return PlaybackPosition(lat, lng)
 }
+
+

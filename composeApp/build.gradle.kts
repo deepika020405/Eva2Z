@@ -19,7 +19,7 @@ plugins {
 kotlin {
     androidTarget {
         compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_11)
+            jvmTarget.set(JvmTarget.JVM_17)
         }
     }
 
@@ -73,11 +73,11 @@ kotlin {
             implementation(project.dependencies.platform("com.google.firebase:firebase-bom:33.7.0"))
             implementation(libs.firebase.analytics)
             implementation(libs.firebase.crashlytics)
-            implementation("com.google.firebase:firebase-messaging:24.0.0")
-            implementation("com.facebook.android:facebook-android-sdk:17.0.2")
+            implementation("com.google.firebase:firebase-messaging:26.0.0")
+            implementation("com.facebook.android:facebook-android-sdk:18.3.0")
 
             // WebRTC SDK — Stream's pre-built WebRTC for Android (Maven Central)
-            implementation("io.getstream:stream-webrtc-android:1.3.3")
+            implementation("io.getstream:stream-webrtc-android:1.3.10")
 
             // Socket.IO client — WebRTC signaling channel
             implementation("io.socket:socket.io-client:2.1.0") {
@@ -145,8 +145,8 @@ android {
         applicationId = "com.developer.ev2z"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 113
-        versionName = "5.7.3"
+        versionCode = 115
+        versionName = "5.7.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -244,8 +244,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 }
 

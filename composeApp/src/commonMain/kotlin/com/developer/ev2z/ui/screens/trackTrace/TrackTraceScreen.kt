@@ -40,8 +40,16 @@ import androidx.compose.ui.zIndex
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.network.LIVE_LOCATION_POLL_INTERVAL_MS
 import com.developer.ev2z.response.Device
+import com.developer.ev2z.data.local.model.statusDisplayOf
+import com.developer.ev2z.data.local.model.isMotionKind
+import com.developer.ev2z.data.local.model.statusKindOf
 import com.developer.ev2z.ui.components.FloatingContactButton
+import com.developer.ev2z.ui.components.glideDurationMs
+import com.developer.ev2z.ui.components.isFarJump
 import com.developer.ev2z.ui.screens.device_Report.PlatformMapView
+import com.developer.ev2z.ui.screens.homeScreen.rememberAddressAt
+import com.developer.ev2z.util.rememberRoadWalk
+import io.ktor.util.date.getTimeMillis
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
 import org.jetbrains.compose.resources.painterResource
@@ -64,22 +72,23 @@ private val TT_Running = Color(0xFF85B070)
 private val TT_Idle = Color(0xFFF4C44E)
 private val TT_Stopped = Color(0xFFE5565B)
 
-private fun ttStatusColor(status: String) = when (status.lowercase()) {
-    "on", "moving" -> TT_Running
+/**
+ * The screen's own softer palette, but keyed off the shared vocabulary rather than off
+ * raw strings. Matching literally missed "running" — which is exactly what
+ * `live-location` sends for a moving vehicle — so the dot fell through to grey while
+ * the label beside it read "Running".
+ */
+private fun ttStatusColor(status: String) = when (statusKindOf(status)) {
+    "running" -> TT_Running
     "idle" -> TT_Idle
-    "off", "parked", "offline", "no_data" -> TT_Stopped
+    "parked", "stopped" -> TT_Stopped
+    // Offline is a tracker that stopped reporting, not a vehicle that stopped. Red
+    // here would have claimed the vehicle is parked when the truth is the app has no
+    // idea where it is — and the arrow on the map beside this badge draws it grey.
     else -> Color.Gray
 }
 
-private fun ttStatusLabel(status: String) = when (status.lowercase()) {
-    "on", "moving" -> "Running"
-    "idle" -> "Idle"
-    "off" -> "Stopped"
-    "parked" -> "Parked"
-    "offline" -> "Offline"
-    "no_data" -> "No Data"
-    else -> status.replaceFirstChar { it.uppercase() }
-}
+private fun ttStatusLabel(status: String) = statusDisplayOf(status)
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  TrackTraceScreen
@@ -263,19 +272,74 @@ private fun LiveDeviceCard(viewModel: TrackTraceViewModel) {
 private fun StableTrackMapSection(viewModel: TrackTraceViewModel) {
     val liveLocation by viewModel.liveLocation.collectAsState()
     val trailPoints by viewModel.trailPoints.collectAsState()
+    val selectedDevice by viewModel.selectedDevice.collectAsState()
 
-    val lat = liveLocation?.data?.latestLocation?.latitude?.toDoubleOrNull()
-    val lng = liveLocation?.data?.latestLocation?.longitude?.toDoubleOrNull()
+    val latest = liveLocation?.data?.latestLocation
 
-    if (lat != null && lng != null) {
-        val (animatedLat, animatedLng) = rememberAnimatedLatLng(lat, lng)
+    // validPosition() rather than toDoubleOrNull(): a tracker with no satellite fix
+    // reports "0"/"0", and feeding that through teleports the marker to the Gulf of
+    // Guinea and back on the next good fix.
+    val position = latest?.validPosition()
+
+    // The live fix decides the colour, with the device list's cached state as the
+    // fallback.
+    //
+    // motionKind(), not statusKind(): this endpoint reports a tracker that has not
+    // phoned home recently as `"status":"offline"` while `"db_status"` still says
+    // "parked", and statusKind() prefers `status` — so a parked vehicle came out grey
+    // instead of red, and a running one would too the moment its tracker fell behind.
+    //
+    // The device row's own statusKind() behind it rather than engine_status, which is
+    // ignition and comes back "unknown" on most devices — another route to grey.
+    val statusKind = latest?.motionKind()?.takeIf { isMotionKind(it) }
+        ?: selectedDevice?.statusKind()?.takeIf { isMotionKind(it) }
+        ?: latest?.motionKind()
+        ?: statusKindOf(selectedDevice?.engine_status)
+
+    // Resolved from the real fix, not from the interpolated frame below: the lookup is
+    // keyed on position, and handing it 60 positions a second would geocode the gaps
+    // between the fixes instead of the fix. Called outside the `if` so the composable
+    // keeps its slot when a vehicle drops to no-fix and comes back.
+    val address = rememberAddressAt(
+        latitude = position?.first,
+        longitude = position?.second,
+        ownerKey = selectedDevice?.device_id?.takeIf { it.isNotEmpty() } ?: "track-trace"
+    )
+
+    // The road between the last two fixes, walked rather than cut across.
+    //
+    // rememberAnimatedLatLng — which this replaces — slid the marker down the straight
+    // line between two fixes. A tracker reports every few tens of seconds, so that
+    // line is hundreds of metres of chord: the vehicle drove through the buildings
+    // inside every bend and straight over the island of every roundabout, and its
+    // heading was the chord's, so it came out of the turn facing the wrong way. The
+    // walk follows the same snapped road geometry the history map uses and takes its
+    // heading from the road ahead.
+    val roadLeg by viewModel.roadLeg.collectAsState()
+    val walked by rememberRoadWalk(roadLeg)
+
+    if (position != null) {
+        val (lat, lng) = position
 
         PlatformMapView(
             modifier = Modifier.fillMaxSize(),
-            latitude = animatedLat,
-            longitude = animatedLng,
+            // The walk while there is one; the raw fix until the first leg exists, so
+            // the map still opens on the vehicle rather than on nothing.
+            latitude = walked?.latitude ?: lat,
+            longitude = walked?.longitude ?: lng,
             zoom = 15.0,
-            trailPoints = trailPoints
+            trailPoints = trailPoints,
+            statusKind = statusKind,
+            // The vehicle the server says this tracker is on; null until one is
+            // assigned, and the marker falls back to the heading arrow.
+            vehicleSlug = latest?.iconSlug,
+            // Null until the first geocode lands, which draws no chip rather than an
+            // empty box over the vehicle.
+            addressLabel = address,
+            // From the road ahead, not from where the coordinates have been. NaN until
+            // the vehicle has travelled far enough to have a direction, which the map
+            // then falls back to measuring itself.
+            headingDegrees = walked?.bearingDegrees ?: Double.NaN
         )
     }
 }
@@ -603,16 +667,16 @@ fun DeviceDropdownCardSimple(
 //  rememberAnimatedLatLng — smooth lat/lng animation helper
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** A jump larger than this is a signal recovery, not travel — snap instead of gliding. */
-private const val SNAP_DEGREES = 0.02   // ≈ 2 km
-
 /**
  * Interpolates between two live fixes so the marker moves continuously.
  *
- * [durationMillis] is paced to the live-location poll interval. It used to be a flat
- * 1000 ms while fixes arrive every 10 s, so the marker covered a whole interval of
- * travel in one second and then stood still for nine — a lurch-and-freeze that read
- * as the marker crawling far slower than the speed shown on the chip.
+ * The glide is paced by the gap *actually observed* between the last two fixes rather
+ * than by the nominal poll interval. A flat duration only matches reality when the
+ * network does, and it used to be 1000 ms against fixes arriving every 10 s: the marker
+ * covered a whole interval of travel in one second and then stood still for nine — a
+ * lurch-and-freeze that read as the marker crawling far slower than the speed on the
+ * chip. [durationMillis] now only seeds the very first glide, before there are two
+ * fixes to measure a gap from.
  *
  * A progress fraction is animated rather than the coordinates themselves: a Float
  * longitude quantises to roughly a metre, which stair-steps at high zoom. A fix that
@@ -629,12 +693,21 @@ fun rememberAnimatedLatLng(
     val progress = remember { Animatable(1f) }
     var from by remember { mutableStateOf(latitude to longitude) }
     var to by remember { mutableStateOf(latitude to longitude) }
+    // Arrival time of the fix currently being glided towards, so the next glide can be
+    // paced by a real measurement. 0 until the first fix lands.
+    var lastFixAtMs by remember { mutableStateOf(0L) }
+    var glideMillis by remember { mutableStateOf(durationMillis) }
 
     LaunchedEffect(latitude, longitude) {
         if (latitude == to.first && longitude == to.second) return@LaunchedEffect
 
-        val farJump = abs(latitude - to.first) > SNAP_DEGREES ||
-                abs(longitude - to.second) > SNAP_DEGREES
+        val farJump = isFarJump(to.first, to.second, latitude, longitude)
+
+        val now = getTimeMillis()
+        if (lastFixAtMs != 0L) {
+            glideMillis = glideDurationMs(now - lastFixAtMs)
+        }
+        lastFixAtMs = now
 
         // Resume from wherever the previous glide had reached.
         val reached = progress.value.toDouble()
@@ -647,7 +720,7 @@ fun rememberAnimatedLatLng(
             progress.snapTo(1f)
         } else {
             progress.snapTo(0f)
-            progress.animateTo(1f, tween(durationMillis, easing = LinearEasing))
+            progress.animateTo(1f, tween(glideMillis, easing = LinearEasing))
         }
     }
 

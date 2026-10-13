@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardBackspace
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.*
@@ -285,16 +286,26 @@ fun AddDeviceDetailsCommon(
     var deviceType by remember { mutableStateOf("") }
     var expanded by remember { mutableStateOf(false) }
     val deviceTypes = listOf("Wired", "Wireless")
+    var selectedVehicle by remember { mutableStateOf<VehicleType?>(null) }
+    var vehicleExpanded by remember { mutableStateOf(false) }
 
     val scannedDeviceId by viewModel.scannedDeviceId.collectAsState()
     val scannedSimNumber by viewModel.scannedSimNumber.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val addDeviceResult by viewModel.addDeviceResult.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
+    val vehicleTypes by viewModel.vehicleTypes.collectAsState()
+    val isLoadingVehicleTypes by viewModel.isLoadingVehicleTypes.collectAsState()
+    val vehicleTypesError by viewModel.vehicleTypesError.collectAsState()
 
     val storage = remember { com.developer.ev2z.data.local.createStorageManager() }
     val userPrefs = remember { com.developer.ev2z.data.local.UserPrefs(storage) }
     val authToken = remember { userPrefs.getToken() ?: "" }
+
+    // The catalogue is fetched as the form opens rather than when the picker is
+    // tapped: `vehicle_id` is required, so an empty catalogue blocks the whole form
+    // and the user should not discover that at the last field.
+    LaunchedEffect(Unit) { viewModel.loadVehicleTypes(authToken) }
 
     LaunchedEffect(scannedDeviceId, scannedSimNumber) {
         deviceId = scannedDeviceId
@@ -357,6 +368,119 @@ fun AddDeviceDetailsCommon(
                 singleLine = true,
                 shape = RoundedCornerShape(8.dp)
             )
+
+            // Same ExposedDropdownMenuBox shape as Device Type below, so the two
+            // pickers on this form read as one control and not two. The list is the
+            // server's catalogue — 41 types — so the menu is scrollable and the field
+            // says what it is doing while that catalogue is still arriving.
+            ExposedDropdownMenuBox(
+                expanded = vehicleExpanded && vehicleTypes.isNotEmpty(),
+                onExpandedChange = { if (vehicleTypes.isNotEmpty()) vehicleExpanded = !vehicleExpanded },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                OutlinedTextField(
+                    value = selectedVehicle?.name.orEmpty(),
+                    onValueChange = {},
+                    readOnly = true,
+                    enabled = vehicleTypes.isNotEmpty(),
+                    label = { Text("Vehicle Type Icon") },
+                    placeholder = {
+                        Text(
+                            when {
+                                isLoadingVehicleTypes -> "Loading vehicle types…"
+                                vehicleTypesError != null -> "Vehicle types unavailable"
+                                else -> "Select vehicle type"
+                            },
+                            color = Color.Gray
+                        )
+                    },
+                    // The picked icon shown in the field itself — the point of the
+                    // field is the icon, so the name alone would not confirm it.
+                    leadingIcon = selectedVehicle?.let { vehicle ->
+                        {
+                            Icon(
+                                imageVector = vehicle.displayIcon,
+                                contentDescription = null,
+                                tint = primaryContainerLight,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    },
+                    trailingIcon = {
+                        when {
+                            isLoadingVehicleTypes -> CircularProgressIndicator(
+                                color = primaryContainerLight,
+                                strokeWidth = 2.dp,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            // A failed catalogue is a dead end without this: the field
+                            // cannot be typed into, so a retry has to live in it.
+                            vehicleTypesError != null -> IconButton(
+                                onClick = { viewModel.loadVehicleTypes(authToken) }
+                            ) {
+                                Icon(
+                                    Icons.Filled.Refresh,
+                                    contentDescription = "Retry loading vehicle types",
+                                    tint = primaryContainerLight
+                                )
+                            }
+                            else -> ExposedDropdownMenuDefaults.TrailingIcon(vehicleExpanded)
+                        }
+                    },
+                    isError = vehicleTypesError != null,
+                    supportingText = vehicleTypesError?.let {
+                        { Text(it, color = Color.Red, style = MaterialTheme.typography.bodySmall) }
+                    },
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = primaryContainerLight,
+                        unfocusedBorderColor = Color.Gray,
+                        // Disabled only means "catalogue not here yet", so the field
+                        // keeps reading as a normal one rather than greying out.
+                        disabledBorderColor = Color.Gray,
+                        disabledTextColor = Color.Black,
+                        disabledLabelColor = Color.Gray,
+                        disabledTrailingIconColor = Color.Gray
+                    ),
+                    modifier = Modifier.menuAnchor().fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp)
+                )
+
+                ExposedDropdownMenu(
+                    expanded = vehicleExpanded && vehicleTypes.isNotEmpty(),
+                    onDismissRequest = { vehicleExpanded = false },
+                    modifier = Modifier
+                        .background(Color.White)
+                        // Capped so the menu cannot run off a short screen — 41 rows
+                        // is far more than fits.
+                        .heightIn(max = 320.dp)
+                ) {
+                    vehicleTypes.forEach { vehicle ->
+                        DropdownMenuItem(
+                            text = { Text(vehicle.name, style = MaterialTheme.typography.bodyLarge) },
+                            onClick = {
+                                selectedVehicle = vehicle
+                                vehicleExpanded = false
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            leadingIcon = {
+                                Icon(
+                                    imageVector = vehicle.displayIcon,
+                                    contentDescription = null,
+                                    tint = if (selectedVehicle?.vehicleId == vehicle.vehicleId) {
+                                        primaryContainerLight
+                                    } else {
+                                        Color.Black
+                                    },
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        )
+                        if (vehicle != vehicleTypes.last()) {
+                            HorizontalDivider(color = Color.LightGray, thickness = 0.5.dp)
+                        }
+                    }
+                }
+            }
 
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(
@@ -454,13 +578,27 @@ fun AddDeviceDetailsCommon(
                 Button(
                     {
                         val isDeviceIdValid = deviceId.length in 15..16
+                        val vehicle = selectedVehicle
 
-                        if (deviceName.isNotEmpty() && isDeviceIdValid && simNumber.isValidSimNumber() && deviceType.isNotEmpty()) {
-                            viewModel.addDevice(authToken, deviceName, deviceId, simNumber, deviceType.lowercase())
+                        if (deviceName.isNotEmpty() && isDeviceIdValid && simNumber.isValidSimNumber() &&
+                            deviceType.isNotEmpty() && vehicle != null
+                        ) {
+                            viewModel.addDevice(
+                                authToken,
+                                deviceName,
+                                deviceId,
+                                simNumber,
+                                deviceType.lowercase(),
+                                vehicle.vehicleId
+                            )
                         }
                     },
+                    // The vehicle is part of this list because the server requires
+                    // `vehicle_id`: without it the call comes back 422 and the user
+                    // would only find out after pressing the button.
                     enabled = !isLoading && deviceName.isNotEmpty() && deviceId.length in 15..16 &&
-                            simNumber.isValidSimNumber() && deviceType.isNotEmpty(),
+                            simNumber.isValidSimNumber() && deviceType.isNotEmpty() &&
+                            selectedVehicle != null,
                     modifier = Modifier.weight(0.65f),
                     colors = ButtonDefaults.buttonColors(containerColor = primaryContainerLight),
                     shape = RoundedCornerShape(100.dp)

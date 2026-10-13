@@ -47,10 +47,16 @@ private let kStunServer2        = "stun:stun1.l.google.com:19302"
     private var socketManager: SocketManager?
     private var socket:        SocketIOClient?
 
-    // ICE candidate buffer — remote candidates that arrived before our local
-    // description was set are held here and flushed once ready.
+    // ICE candidate buffer — libwebrtc rejects addIceCandidate until the REMOTE
+    // description is set, so candidates arriving before that are held here and
+    // flushed once setRemoteDescription succeeds.
     private var pendingRemoteCandidates: [RTCIceCandidate] = []
-    private var isLocalDescriptionSet:   Bool = false
+    private var isRemoteDescriptionSet:  Bool = false
+
+    // Serialises the two fields above — they are touched both from Socket.IO's
+    // handler queue and from WebRTC's signaling thread (setRemoteDescription
+    // completion), which would otherwise be a data race.
+    private let candidateQueue = DispatchQueue(label: "com.developer.ev2z.webrtc.candidates")
 
     // MARK: - IOSWebRtcDelegate
 
@@ -58,8 +64,7 @@ private let kStunServer2        = "stun:stun1.l.google.com:19302"
         teardownInternal()
         isCallActive          = true
         audioSessionReady     = false
-        isLocalDescriptionSet = false
-        pendingRemoteCandidates.removeAll()
+        resetCandidateBuffer()
         self.roomId   = roomId
         self.isCaller = false
         print("📞 [WebRtcBridge] startAsCallee roomId=\(roomId)")
@@ -82,8 +87,7 @@ private let kStunServer2        = "stun:stun1.l.google.com:19302"
         teardownInternal()
         isCallActive          = true
         audioSessionReady     = false
-        isLocalDescriptionSet = false
-        pendingRemoteCandidates.removeAll()
+        resetCandidateBuffer()
         self.roomId   = roomId
         self.isCaller = true
         print("📞 [WebRtcBridge] startAsCaller roomId=\(roomId)")
@@ -194,7 +198,7 @@ private let kStunServer2        = "stun:stun1.l.google.com:19302"
             let s = AVAudioSession.sharedInstance()
             try s.setCategory(.playAndRecord,
                               mode: .voiceChat,
-                              options: [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker])
+                              options: [.allowBluetoothHFP, .allowBluetoothA2DP, .defaultToSpeaker])
             try s.setActive(true)
             print("✅ [WebRtcBridge] Audio session configured (voiceChat)")
         } catch {
@@ -240,9 +244,10 @@ private let kStunServer2        = "stun:stun1.l.google.com:19302"
             ],
             optionalConstraints: nil
         )
-        let audioSource     = factory?.audioSource(with: audioConstraints)
-        localAudioTrack     = factory?.audioTrack(with: audioSource!, trackId: "ARDAMSa0")
-        if let track = localAudioTrack {
+        if let factory = factory {
+            let audioSource = factory.audioSource(with: audioConstraints)
+            let track       = factory.audioTrack(with: audioSource, trackId: "ARDAMSa0")
+            localAudioTrack = track
             peerConnection?.add(track, streamIds: ["ARDAMS"])
         }
         print("✅ [WebRtcBridge] WebRTC peer connection ready")
@@ -304,6 +309,7 @@ private let kStunServer2        = "stun:stun1.l.google.com:19302"
                 if let error = error {
                     print("❌ [WebRtcBridge] setRemoteDescription(offer) error: \(error)"); return
                 }
+                self.onRemoteDescriptionSet()
                 self.createAnswer()
             }
         }
@@ -321,8 +327,8 @@ private let kStunServer2        = "stun:stun1.l.google.com:19302"
                 if let error = error {
                     print("❌ [WebRtcBridge] setRemoteDescription(answer) error: \(error)"); return
                 }
-                // Caller: flush any buffered remote ICE candidates now that both descs are set
-                self?.flushPendingCandidates()
+                // Caller: flush buffered remote ICE candidates now that the remote desc exists
+                self?.onRemoteDescriptionSet()
             }
         }
 
@@ -336,14 +342,7 @@ private let kStunServer2        = "stun:stun1.l.google.com:19302"
             print("🧊 [WebRtcBridge] Received ICE candidate sdpMid=\(sdpMid)")
             let candidate = RTCIceCandidate(sdp: sdp, sdpMLineIndex: sdpMLineIndex, sdpMid: sdpMid)
 
-            // Buffer until local description is set — applying candidates before that
-            // causes them to be dropped silently, slowing ICE negotiation.
-            if self.isLocalDescriptionSet {
-                self.peerConnection?.add(candidate)
-            } else {
-                print("🧊 [WebRtcBridge] Buffering ICE candidate (local desc not set yet)")
-                self.pendingRemoteCandidates.append(candidate)
-            }
+            self.receiveRemoteCandidate(candidate)
         }
 
         socket?.on("end-call") { [weak self] _, _ in
@@ -383,8 +382,6 @@ private let kStunServer2        = "stun:stun1.l.google.com:19302"
                 if let error = error {
                     print("❌ [WebRtcBridge] setLocalDescription(offer) error: \(error)"); return
                 }
-                self.isLocalDescriptionSet = true
-                self.flushPendingCandidates()
                 print("📤 [WebRtcBridge] Emitting offer to room \(self.roomId)")
                 self.socket?.emit("offer", [
                     "sdp": sdp.sdp, "type": "offer", "roomId": self.roomId
@@ -406,9 +403,6 @@ private let kStunServer2        = "stun:stun1.l.google.com:19302"
                 if let error = error {
                     print("❌ [WebRtcBridge] setLocalDescription(answer) error: \(error)"); return
                 }
-                // Mark ready and flush buffered remote candidates immediately
-                self.isLocalDescriptionSet = true
-                self.flushPendingCandidates()
                 print("📤 [WebRtcBridge] Emitting answer to room \(self.roomId)")
                 self.socket?.emit("answer", [
                     "sdp": sdp.sdp, "type": "answer", "roomId": self.roomId
@@ -417,11 +411,49 @@ private let kStunServer2        = "stun:stun1.l.google.com:19302"
         }
     }
 
-    private func flushPendingCandidates() {
-        guard !pendingRemoteCandidates.isEmpty else { return }
-        print("🧊 [WebRtcBridge] Flushing \(pendingRemoteCandidates.count) buffered ICE candidates")
-        pendingRemoteCandidates.forEach { peerConnection?.add($0) }
-        pendingRemoteCandidates.removeAll()
+    // MARK: - Remote ICE candidates
+
+    private func resetCandidateBuffer() {
+        candidateQueue.sync {
+            isRemoteDescriptionSet = false
+            pendingRemoteCandidates.removeAll()
+        }
+    }
+
+    // A remote candidate is only usable once the remote description exists;
+    // before that libwebrtc rejects it outright, so hold it back.
+    private func receiveRemoteCandidate(_ candidate: RTCIceCandidate) {
+        candidateQueue.async { [weak self] in
+            guard let self = self else { return }
+            if self.isRemoteDescriptionSet {
+                self.applyRemoteCandidate(candidate)
+            } else {
+                self.pendingRemoteCandidates.append(candidate)
+                print("🧊 [WebRtcBridge] Buffering ICE candidate (remote desc not set yet)")
+            }
+        }
+    }
+
+    private func onRemoteDescriptionSet() {
+        candidateQueue.async { [weak self] in
+            guard let self = self else { return }
+            self.isRemoteDescriptionSet = true
+            guard !self.pendingRemoteCandidates.isEmpty else { return }
+            let buffered = self.pendingRemoteCandidates
+            self.pendingRemoteCandidates.removeAll()
+            print("🧊 [WebRtcBridge] Flushing \(buffered.count) buffered ICE candidates")
+            buffered.forEach { self.applyRemoteCandidate($0) }
+        }
+    }
+
+    // The completion-handler overload surfaces failures that the deprecated
+    // add(_:) swallowed silently.
+    private func applyRemoteCandidate(_ candidate: RTCIceCandidate) {
+        peerConnection?.add(candidate) { error in
+            if let error = error {
+                print("❌ [WebRtcBridge] addIceCandidate error: \(error)")
+            }
+        }
     }
 
     // MARK: - Teardown (idempotent)
@@ -430,8 +462,7 @@ private let kStunServer2        = "stun:stun1.l.google.com:19302"
         guard isCallActive else { return }
         isCallActive          = false
         audioSessionReady     = false
-        isLocalDescriptionSet = false
-        pendingRemoteCandidates.removeAll()
+        resetCandidateBuffer()
 
         cancelRingTimeout()
 

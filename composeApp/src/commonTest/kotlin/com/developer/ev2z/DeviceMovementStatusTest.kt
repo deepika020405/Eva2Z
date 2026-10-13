@@ -4,6 +4,8 @@ import com.developer.ev2z.data.local.model.Device
 import com.developer.ev2z.data.local.model.DeviceResponse
 import com.developer.ev2z.network.GeoPoint
 import com.developer.ev2z.ui.screens.homeScreen.MOVEMENT_THRESHOLD_METERS
+import com.developer.ev2z.ui.screens.homeScreen.MOVEMENT_WINDOW_MS
+import com.developer.ev2z.ui.screens.homeScreen.MovementStatusTracker
 import com.developer.ev2z.ui.screens.homeScreen.positionsById
 import com.developer.ev2z.ui.screens.homeScreen.withMovementStatus
 import kotlin.test.Test
@@ -155,6 +157,100 @@ class DeviceMovementStatusTest {
         // it is compared against where it actually was.
         assertEquals(setOf("a", "b"), positions.keys)
         assertEquals(here, positions["a"])
+    }
+
+    // ── MovementStatusTracker ────────────────────────────────────────────────
+    //  Positions are polled far faster than the window the verdict is decided over.
+    //  What has to hold is that the extra polls refresh coordinates without being
+    //  mistaken for evidence that a vehicle has stopped.
+
+    private fun response(vararg devices: Device) = DeviceResponse(
+        success = true,
+        userId = 1,
+        name = "Test",
+        totalDevices = devices.size,
+        runningCount = 0,
+        idleCount = 0,
+        parkedCount = 0,
+        offlineCount = 0,
+        data = devices.toList(),
+    )
+
+    @Test
+    fun aVehicleStaysRunningThroughPollsTakenInsideTheWindow() {
+        val tracker = MovementStatusTracker()
+
+        // Opening poll: nothing to compare against, so the reported speed stands in.
+        tracker.apply(response(device(speed = 40)), nowMs = 0)
+
+        // 5s later the tracker has not uploaded again, so the identical fix comes back.
+        // Comparing those two would say "has not moved" and call a moving vehicle
+        // Stopped — the window is not up, so the verdict must be carried instead.
+        val midWindow = tracker.apply(response(device(speed = 40)), nowMs = 5_000)
+        assertEquals("Running", midWindow.data.single().getStatusDisplay())
+        assertEquals(1, midWindow.runningCount)
+
+        // Once the window is up the coordinates are compared for real, and they have
+        // moved, so the verdict is re-derived rather than carried.
+        val moved = device(lat = north(200.0).latitude.toString(), speed = 40)
+        val afterWindow = tracker.apply(response(moved), nowMs = MOVEMENT_WINDOW_MS)
+        assertEquals("Running", afterWindow.data.single().getStatusDisplay())
+    }
+
+    @Test
+    fun aVehicleThatStoppedIsCalledStoppedOnceTheWindowIsUp() {
+        val tracker = MovementStatusTracker()
+        tracker.apply(response(device(speed = 40)), nowMs = 0)
+
+        // Window elapsed and the fix is in the same place: genuinely stopped.
+        val verdict = tracker.apply(response(device(speed = 0)), nowMs = MOVEMENT_WINDOW_MS)
+        assertEquals("Stopped", verdict.data.single().getStatusDisplay())
+        assertEquals(1, verdict.parkedCount)
+    }
+
+    @Test
+    fun losingTheFixReadsAsOfflineWithoutWaitingForTheWindow() {
+        val tracker = MovementStatusTracker()
+        tracker.apply(response(device(speed = 40)), nowMs = 0)
+
+        // Offline is a property of the response in hand, not of movement, so it is not
+        // something a carried verdict may hide for the rest of the window.
+        val lostFix = tracker.apply(response(device(lat = null, speed = 40)), nowMs = 2_000)
+        assertEquals("Offline", lostFix.data.single().getStatusDisplay())
+        assertEquals(1, lostFix.offlineCount)
+    }
+
+    @Test
+    fun aDeviceFirstSeenMidWindowFallsBackToItsReportedSpeed() {
+        val tracker = MovementStatusTracker()
+        tracker.apply(response(device(id = "known", speed = 0)), nowMs = 0)
+
+        // "new" has no verdict to carry and no reference to compare against, which is
+        // the same position a device is in on the very first poll.
+        val withNewcomer = tracker.apply(
+            response(device(id = "known", speed = 0), device(id = "new", speed = 40)),
+            nowMs = 3_000,
+        )
+        assertEquals("Running", withNewcomer.data.single { it.deviceId == "new" }.getStatusDisplay())
+        assertEquals("Stopped", withNewcomer.data.single { it.deviceId == "known" }.getStatusDisplay())
+    }
+
+    @Test
+    fun theReferenceIsNotRefreshedByPollsInsideTheWindow() {
+        val tracker = MovementStatusTracker()
+        tracker.apply(response(device(speed = 0)), nowMs = 0)
+
+        // Three polls, each 8 m further on — under the threshold individually, 24 m in
+        // total. Had each poll replaced the reference, the vehicle would read Stopped
+        // forever; the reference is the position at t=0, so the real travel is seen.
+        tracker.apply(response(device(lat = north(8.0).latitude.toString())), nowMs = 5_000)
+        tracker.apply(response(device(lat = north(16.0).latitude.toString())), nowMs = 10_000)
+        val verdict = tracker.apply(
+            response(device(lat = north(24.0).latitude.toString())),
+            nowMs = MOVEMENT_WINDOW_MS,
+        )
+
+        assertEquals("Running", verdict.data.single().getStatusDisplay())
     }
 
     @Test

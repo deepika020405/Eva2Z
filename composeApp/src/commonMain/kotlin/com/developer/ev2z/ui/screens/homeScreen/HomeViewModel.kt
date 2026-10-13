@@ -5,10 +5,11 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.developer.ev2z.data.local.model.Device
 import com.developer.ev2z.data.local.model.DeviceResponse
-import com.developer.ev2z.network.GeoPoint
+import com.developer.ev2z.network.DEVICES_POLL_INTERVAL_MS
 import com.developer.ev2z.network.UnauthorizedException
 import com.developer.ev2z.repository.HomeRepository
 import com.developer.ev2z.util.SessionState
+import io.ktor.util.date.getTimeMillis
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,10 +46,11 @@ class HomeViewModel(
 
     private var devicesPollingJob: Job? = null
 
-    // Where each device was on the previous poll. This is the whole basis of the
-    // Running/Stopped status: the server's own `status` field is overridden with what
-    // the coordinates are actually doing between two polls (see withMovementStatus).
-    private var previousPositions: Map<String, GeoPoint> = emptyMap()
+    // The whole basis of the Running/Stopped status: the server's own `status` field is
+    // overridden with what the coordinates are actually doing. The tracker owns the
+    // reference position and decides when it is old enough to compare against, so the
+    // verdict stays a 15s one however often this screen polls.
+    private val movementTracker = MovementStatusTracker()
 
     fun loadDevices(token: String) {
         viewModelScope.launch { fetchDevices(token, showLoading = true) }
@@ -59,9 +61,9 @@ class HomeViewModel(
      *
      * The map marker's position comes straight out of `response.data`, so without
      * this the coordinates read when the screen opened are the only ones it ever
-     * sees and the marker sits still however far the vehicle travels. 15s matches
-     * DeviceReportViewModel and TrackTraceViewModel, the two screens that already
-     * poll.
+     * sees and the marker sits still however far the vehicle travels. The interval is
+     * [DEVICES_POLL_INTERVAL_MS], shared with the two dropdown screens that poll the
+     * same endpoint.
      *
      * The caller owns the lifetime: start it when the map appears and call
      * [stopDevicesPolling] when it goes away, or it keeps spending requests behind
@@ -89,18 +91,17 @@ class HomeViewModel(
      * on, and that matters for more than the spinner: `HomeUiState.Loading` makes
      * LiveLocationScreen swap the whole map out for a progress indicator, so a
      * polled refresh announcing Loading would tear the map down and rebuild it —
-     * camera and all — every 15 seconds.
+     * camera and all — on every poll.
      */
     private suspend fun fetchDevices(token: String, showLoading: Boolean) {
         if (showLoading) _uiState.value = HomeUiState.Loading
 
         repository.getDevicesLatestLocations(token).fold(
             onSuccess = { response ->
-                // Status comes from whether the coordinates moved since the last poll,
-                // not from the server's field. Compared against the previous positions
-                // first, then those are replaced for the next tick to compare against.
-                val withStatus = response.withMovementStatus(previousPositions)
-                previousPositions = response.data.positionsById()
+                // Status comes from whether the coordinates moved, not from the
+                // server's field. The tracker holds the reference position across polls
+                // so the comparison always spans MOVEMENT_WINDOW_MS.
+                val withStatus = movementTracker.apply(response, getTimeMillis())
 
                 _uiState.value = HomeUiState.Success(withStatus)
                 // First proof this run that the stored token is still good. FCM registration
@@ -125,7 +126,7 @@ class HomeViewModel(
                 } else {
                     println("❌ Error loading devices: ${error.message}")
                     // One dropped poll must not replace coordinates already on the
-                    // map with an error screen — the next tick is only 15s away.
+                    // map with an error screen — another tick is only DEVICES_POLL_INTERVAL_MS away.
                     if (_uiState.value !is HomeUiState.Success) {
                         _uiState.value = HomeUiState.Error(error.message ?: "Unknown error")
                     }
@@ -174,9 +175,5 @@ class HomeViewModel(
     override fun onCleared() {
         stopDevicesPolling()
         super.onCleared()
-    }
-
-    private companion object {
-        const val DEVICES_POLL_INTERVAL_MS = 15_000L
     }
 }

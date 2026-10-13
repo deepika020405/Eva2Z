@@ -138,6 +138,7 @@ fun LiveLocationScreen(
             }
         }
 
+/*
         is HomeUiState.Success -> {
             val response = state.deviceResponse
             val devices = response.data ?: emptyList()
@@ -189,7 +190,10 @@ fun LiveLocationScreen(
                         .padding(16.dp)
                 ) {
                     TopDeviceCard(
-                        userName = response.name ?: "User",
+                        // displayName, not name: the payload carries the account
+                        // holder under both `name` and `username`, and the elvis
+                        // here never fired because `name` is not nullable.
+                        userName = response.displayName.ifBlank { "User" },
                         deviceCount = deviceCount,
                         selectedDevice = selectedDevice,
                         onBackClick = { onBack() },
@@ -238,6 +242,121 @@ fun LiveLocationScreen(
                 )
             }
         }
+*/
+
+
+
+       is HomeUiState.Success -> {
+            val response = state.deviceResponse
+
+            // Latest device list from API state.
+            val devices = response.data ?: emptyList()
+            val deviceCount = devices.size
+
+            // Filter valid coordinates.
+            val devicesWithLocation = remember(devices) {
+                devices.filter { it.hasValidLocation() }
+            }
+
+            // Resolve selected device from the latest API list.
+            // This prevents stale selected-device coordinates.
+            val latestSelectedDevice = remember(
+                devicesWithLocation,
+                selectedDevice?.deviceId
+            ) {
+                devicesWithLocation.firstOrNull {
+                    it.deviceId == selectedDevice?.deviceId
+                } ?: selectedDevice
+            }
+
+            // Build map state from the latest API data.
+            val mapState = remember(
+                devicesWithLocation,
+                latestSelectedDevice
+            ) {
+                MapState(
+                    devices = devicesWithLocation,
+                    selectedDevice = latestSelectedDevice
+                )
+            }
+
+            LaunchedEffect(deviceCount) {
+                if (deviceCount == 1 && !autoNavigated) {
+                    autoNavigated = true
+                    viewModel.selectDevice(devices.first())
+                    onNavigateToDeviceReport()
+                }
+            }
+
+            Box(modifier = Modifier.fillMaxSize()) {
+
+                // Map gets updated when API state provides new coordinates.
+                StableMapSection(
+                    mapState = mapState,
+                    onMarkerClick = { device ->
+                        viewModel.selectDevice(device)
+                    }
+                )
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.TopCenter)
+                        .padding(16.dp)
+                ) {
+                    TopDeviceCard(
+                        userName = response.displayName.ifBlank { "User" },
+                        deviceCount = deviceCount,
+                        selectedDevice = latestSelectedDevice,
+                        onBackClick = { onBack() },
+                        onDropdownClick = {
+                            viewModel.toggleDeviceDropdown()
+                        },
+                        onLocationClick = {
+                            when (deviceCount) {
+                                0 -> Unit
+                                1 -> onNavigateToDeviceReport()
+                                else -> viewModel.showOverviewSheet()
+                            }
+                        },
+                        showDropdown = deviceCount > 1
+                    )
+
+                    Spacer(Modifier.height(4.dp))
+
+                    CommunityEntryCard(
+                        onClick = { onOpenCommunity() }
+                    )
+
+                    if (showDeviceDropdown && deviceCount > 1) {
+                        key("device_dropdown") {
+                            DeviceDropdownSheet(
+                                devices = devices,
+                                onDeviceSelect = { device ->
+                                    viewModel.selectDevice(device)
+                                    onNavigateToDeviceReport()
+                                },
+                                onAddDevice = {
+                                    viewModel.toggleDeviceDropdown()
+                                    onNavigateToAddDevice()
+                                },
+                                onDismiss = {
+                                    viewModel.toggleDeviceDropdown()
+                                }
+                            )
+                        }
+                    }
+                }
+
+                FloatingContactButton(
+                    phoneNumber = "919755273822",
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(start = 20.dp, bottom = 20.dp)
+                )
+            }
+        }
+
     }
 }
 

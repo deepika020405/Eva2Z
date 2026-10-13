@@ -2,40 +2,94 @@ package com.developer.ev2z.data.local.model
 
 
 
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonNames
 import kotlin.math.abs
 
+/**
+ * `user/devices/latest-locations` — one request covering the whole fleet.
+ *
+ * Every field carries a default on purpose. This response is the home map: if one
+ * count arrives null, or the gateway drops a key it used to send, a model without
+ * defaults throws and the user's whole fleet vanishes from the screen with no error
+ * to explain it. That is not hypothetical here — `live-location` nulls
+ * `battery_level` per device and did exactly that. Defaults plus `coerceInputValues`
+ * (see `ApiJson`) mean a bad field costs that field alone.
+ */
 @Serializable
 data class DeviceResponse(
-    val success: Boolean,
-    @SerialName("user_id") val userId: Int,
-    val name: String,
-    @SerialName("total_devices") val totalDevices: Int,
-    @SerialName("running_count") val runningCount: Int,
-    @SerialName("idle_count") val idleCount: Int,
-    @SerialName("parked_count") val parkedCount: Int,
-    @SerialName("offline_count") val offlineCount: Int,
-    val data: List<Device>
-)
+    val success: Boolean = false,
+    @SerialName("user_id") val userId: Int = 0,
+    /** The payload sends the account holder twice, under both names. */
+    val username: String = "",
+    val name: String = "",
+    @SerialName("total_devices") val totalDevices: Int = 0,
+    @SerialName("running_count") val runningCount: Int = 0,
+    @SerialName("idle_count") val idleCount: Int = 0,
+    @SerialName("parked_count") val parkedCount: Int = 0,
+    @SerialName("offline_count") val offlineCount: Int = 0,
+    val data: List<Device> = emptyList()
+) {
+    /** Whichever of the two spellings of the account holder's name arrived. */
+    val displayName: String get() = name.ifBlank { username }
+}
 
+@OptIn(ExperimentalSerializationApi::class)
 @Serializable
 data class Device(
-    @SerialName("device_id") val deviceId: String,
-    @SerialName("device_name") val deviceName: String?,
-    val latitude: String?,
-    val longitude: String?,
-    val speed: Int,
+    @SerialName("device_id") @JsonNames("terminal_id") val deviceId: String = "",
+    @SerialName("device_name") val deviceName: String? = null,
+    val latitude: String? = null,
+    val longitude: String? = null,
+    // Defaulted rather than nullable: the whole app treats "no speed" as 0, and a
+    // nullable Int here would push a `?: 0` into every call site instead.
+    val speed: Int = 0,
     // Raw server value. Read it through getStatusKind() rather than comparing it
     // directly — the casing and the spelling both vary, and the API sends "parked"
     // (it has a parked_count bucket) on top of the four values listed here before.
     // Seen across the app: on, off, moving, running, idle, ideal, parked, stop,
     // stopped, offline, no_data.
-    val status: String,
-    val timestamp: String?,
-    @SerialName("last_seen_minutes_ago") val lastSeenMinutesAgo: Int?
+    @JsonNames("db_status", "movement") val status: String = "offline",
+    // `timestamp` here, `timestamp_utc` on live-location, `created_at` on route
+    // history — the same fix time under three names, so all three are accepted.
+    @JsonNames("timestamp_utc", "created_at") val timestamp: String? = null,
+    @SerialName("last_seen_minutes_ago") val lastSeenMinutesAgo: Int? = null,
+    // Not an alias of the above: this endpoint counts minutes and live-location
+    // counts seconds, so the unit has to be kept apart from the name.
+    @SerialName("last_seen_seconds_ago") val lastSeenSecondsAgo: Int? = null,
+    /**
+     * The catalogue id of the vehicle this tracker is fitted to, as `vehicle-types`
+     * numbers them — 1..41, null while no vehicle is assigned.
+     *
+     * The **first** choice for the marker, ahead of the slug below: an integer cannot
+     * arrive hyphenated on one endpoint and underscored on another, inside a URL that
+     * 404s, or spelled a way this build has never seen. See `vehicleSlugForId`.
+     */
+    @SerialName("vehicle_id") val vehicleId: Int? = null,
+    /** What the catalogue calls it — "Electric Scooter". Not drawn; useful in logs. */
+    @SerialName("vehicle_name") val vehicleName: String? = null,
+    /** The slug on its own, which saves picking it back out of [iconUrl]. */
+    val icon: String? = null,
+    /**
+     * The server's artwork for the vehicle — see
+     * [com.developer.ev2z.data.local.remote.LatestLocation.iconUrl] for why the URL
+     * itself is never fetched. The fleet payload gained this field, along with
+     * [vehicleId], [vehicleName] and [icon], on 2026-10-13; before that it carried no
+     * vehicle at all and every fleet marker was the heading arrow.
+     */
+    @SerialName("icon_url")
+    @JsonNames("vehicle_icon_url")
+    val iconUrl: String? = null
 ) {
     fun getDisplayName(): String = deviceName?.takeIf { it.isNotBlank() } ?: "Device ${deviceId.take(8)}"
+
+    /**
+     * Fix age in minutes, whichever unit this endpoint happens to be counting in.
+     * Null when it reported neither.
+     */
+    fun lastSeenMinutes(): Int? = lastSeenMinutesAgo ?: lastSeenSecondsAgo?.let { it / 60 }
 
     /**
      * The reported coordinates as a real position on earth, or null if they are not one.
@@ -74,52 +128,51 @@ data class Device(
     /**
      * The reported status reduced to the buckets the UI actually shows.
      *
-     * Normalised first, because the raw `when (status)` this replaces matched
-     * lower-case literals against the string exactly as the server sent it: a
-     * `"Parked"` or `"PARKED"` matched nothing, fell through to the `else`, and so
-     * carried the grey "unknown" dot while the label still read something plausible —
-     * the status looked wrong without looking broken.
-     *
-     * The vocabulary is wider than the four values this model's comment used to claim.
-     * `TrackTraceScreen`, `DeviceReportScreen` and `HistoryPlaybackScreen` all accept
-     * `on`/`off` and the `running`/`ideal` spellings as well, so the live map accepts
-     * the same set rather than being the one screen that does not recognise a status
-     * the rest of the app does.
+     * The vocabulary lives in [statusKindOf] rather than here, because this model is
+     * only one of the shapes the same tracker arrives in — the live-location and
+     * route-history payloads describe the identical state under different field names
+     * and different words, and a spelling only this model recognised would make the
+     * fleet map and the live map disagree about one vehicle.
      */
-    fun getStatusKind(): String = when (status.trim().lowercase()) {
-        "on", "moving", "running" -> "running"
-        "idle", "ideal" -> "idle"
-        "parked" -> "parked"
-        // Ignition off is a stop, not a park: only the server decides a vehicle is
-        // parked, and calling every "off" a park would invent that distinction.
-        "off", "stop", "stopped" -> "stopped"
-        "offline" -> "offline"
-        "no_data", "nodata" -> "no_data"
-        else -> "unknown"
-    }
+    fun getStatusKind(): String = statusKindOf(status)
 
-    fun getStatusDisplay(): String = when (getStatusKind()) {
-        "running" -> "Running"
-        "idle" -> "Idle"
-        "parked" -> "Parked"
-        "stopped" -> "Stopped"
-        "offline" -> "Offline"
-        "no_data" -> "No Data"
-        else -> status.trim().replaceFirstChar { it.uppercase() }
-    }
+    /**
+     * The vehicle type — "electric-scooter" — spelled the way `vehicle-types` spells
+     * it, so one icon table serves every endpoint.
+     *
+     * Three sources, in order of how much they can be trusted: [vehicleId] through the
+     * catalogue, then [icon], then the slug picked out of [iconUrl]. The id is exact;
+     * the URL is the one that has actually gone wrong, spelling the slug with
+     * underscores while the files are served with hyphens.
+     *
+     * Deliberately the same derivation as
+     * [com.developer.ev2z.data.local.remote.LatestLocation.iconSlug]: the fleet map and
+     * the single-vehicle map must draw the same vehicle for the same tracker, and that
+     * only holds while both read the slug the same way. Null when no vehicle is
+     * assigned, which the marker draws as the heading arrow.
+     */
+    val iconSlug: String?
+        get() = vehicleSlugForId(vehicleId)
+            ?: icon?.trim()?.replace('_', '-')?.takeIf { it.isNotBlank() }
+            ?: iconUrl
+                ?.substringAfterLast('/')
+                ?.substringBeforeLast('.')
+                ?.replace('_', '-')
+                ?.takeIf { it.isNotBlank() }
 
-    fun getStatusColor(): Long = when (getStatusKind()) {
-        "running" -> 0xFF4CAF50  // Green
-        "idle" -> 0xFFFFC107     // Yellow
-        "parked" -> 0xFFF44336   // Red, matching the Parked swatch in the overview sheet
-        "stopped" -> 0xFFF44336  // Red — a stop reads the same as a park on the map
-        "offline" -> 0xFFBDBDBD  // Gray
-        "no_data" -> 0xFF9E9E9E  // Light Gray
-        else -> 0xFF9E9E9E
-    }
+    fun getStatusDisplay(): String = statusDisplayOf(status)
 
-    private companion object {
-        /** ~110 m — tight enough that only a genuine 0,0 sentinel falls inside it. */
+    fun getStatusColor(): Long = statusColorOf(status)
+
+    internal companion object {
+        /**
+         * ~110 m — tight enough that only a genuine 0,0 sentinel falls inside it.
+         *
+         * Shared with [com.developer.ev2z.data.local.remote.LatestLocation], which has
+         * to reject the same sentinel out of the live-location endpoint: the two models
+         * describe the same trackers, so a tolerance tuned here must not be re-guessed
+         * there.
+         */
         const val NO_FIX_DEGREES = 0.001
     }
 }

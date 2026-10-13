@@ -15,22 +15,35 @@ import com.developer.ev2z.network.approxDistanceMeters
  * field was telling a different story — it carries its own notion of moving/idle/parked
  * that did not match what the coordinates were doing on screen.
  *
- * Polls land every 15s (`HomeViewModel.DEVICES_POLL_INTERVAL_MS`), so a running vehicle
- * moves a long way between two of them and a stopped one does not move at all. Only the
- * previous poll's position is kept per device; comparing against it is what makes this
- * work without any history from the server.
+ * The comparison is made over [MOVEMENT_WINDOW_MS], which is a separate thing from how
+ * often positions are polled — see [MovementStatusTracker] for why the two must not be
+ * the same number.
  */
 
 /**
- * How far a vehicle must move between two polls to count as running.
+ * How far a vehicle must move across the comparison window to count as running.
  *
  * A standing vehicle's reported position still wanders a few metres as the fix is
  * recomputed, so a bare "did the numbers change" test would flicker between Running and
- * Stopped while parked. 20 m is clear of that drift, and over a 15s poll it means
- * anything above about 5 km/h reads as running — below that the vehicle is crawling,
- * which is the answer the screen wants anyway.
+ * Stopped while parked. 20 m is clear of that drift, and over [MOVEMENT_WINDOW_MS] it
+ * means anything above about 5 km/h reads as running — below that the vehicle is
+ * crawling, which is the answer the screen wants anyway.
  */
 internal const val MOVEMENT_THRESHOLD_METERS = 20.0
+
+/**
+ * How far apart the two positions being compared have to be in *time*.
+ *
+ * [MOVEMENT_THRESHOLD_METERS] only means "about 5 km/h" against a span this wide; over a
+ * 5s span the same 20 m would mean 14 km/h, so every vehicle in city traffic would read
+ * as Stopped. Worse, trackers upload on their own schedule — often slower than the app
+ * polls — so consecutive polls frequently return the *identical* fix, and a verdict
+ * taken on those would call a moving vehicle stopped.
+ *
+ * Holding the window at 15s is what keeps the verdict meaningful while positions refresh
+ * as fast as the poll interval allows.
+ */
+internal const val MOVEMENT_WINDOW_MS = 15_000L
 
 /** The status values this produces, in the spelling `Device.getStatusKind()` reads. */
 internal const val STATUS_RUNNING = "moving"
@@ -41,15 +54,25 @@ internal const val STATUS_OFFLINE = "offline"
  * The devices with their status replaced by what their coordinates say, and the counts
  * recomputed to match.
  *
+ * [previousPositions] is the reference the current fix is measured against, and it has
+ * to be [MOVEMENT_WINDOW_MS] old for the verdict to mean anything — which is
+ * [MovementStatusTracker]'s job, not this function's. Call this directly only where that
+ * is already guaranteed.
+ */
+internal fun DeviceResponse.withMovementStatus(
+    previousPositions: Map<String, GeoPoint>,
+): DeviceResponse = withStatuses { it.withMovementStatus(previousPositions[it.deviceId]).status }
+
+/**
+ * The devices restamped with [statusOf], and the counts rebuilt from the result.
+ *
  * The counts are rebuilt rather than passed through because the server's
  * `running_count` is derived from the same `status` field being overridden here —
  * leaving it alone would put "Running 1" at the top of the overview sheet above a row
  * reading "Stopped".
  */
-internal fun DeviceResponse.withMovementStatus(
-    previousPositions: Map<String, GeoPoint>,
-): DeviceResponse {
-    val updated = data.map { it.withMovementStatus(previousPositions[it.deviceId]) }
+private fun DeviceResponse.withStatuses(statusOf: (Device) -> String): DeviceResponse {
+    val updated = data.map { it.copy(status = statusOf(it)) }
 
     return copy(
         data = updated,
@@ -60,6 +83,48 @@ internal fun DeviceResponse.withMovementStatus(
         parkedCount = updated.count { it.getStatusKind() == "stopped" },
         offlineCount = updated.count { it.getStatusKind() == "offline" },
     )
+}
+
+/**
+ * Keeps the Running/Stopped verdict on a [MOVEMENT_WINDOW_MS] cadence while positions
+ * refresh at whatever rate the caller polls.
+ *
+ * The two used to be the same thing: every poll became the reference the next poll was
+ * compared against. That only worked while the poll interval happened to equal the
+ * window, and polling faster silently broke the verdict — a 5s span is too short to tell
+ * 20 m of travel from 20 m of GPS drift, and a tracker that uploads slower than the app
+ * polls hands back the same fix twice, which reads as "has not moved".
+ *
+ * So the reference position is held until it is old enough to be worth comparing against,
+ * and in between the last verdict is carried. Offline is decided fresh on every poll
+ * regardless: losing the fix is a property of the response in hand, not of movement.
+ */
+internal class MovementStatusTracker(private val windowMs: Long = MOVEMENT_WINDOW_MS) {
+
+    private var reference: Map<String, GeoPoint> = emptyMap()
+    private var referenceAtMs: Long? = null
+    private var verdict: Map<String, String> = emptyMap()
+
+    fun apply(response: DeviceResponse, nowMs: Long): DeviceResponse {
+        val windowElapsed = referenceAtMs?.let { nowMs - it >= windowMs } ?: true
+
+        if (windowElapsed) {
+            val decided = response.withMovementStatus(reference)
+            verdict = decided.data.associate { it.deviceId to it.status }
+            reference = response.data.positionsById()
+            referenceAtMs = nowMs
+            return decided
+        }
+
+        return response.withStatuses { device ->
+            when {
+                device.currentPosition() == null -> STATUS_OFFLINE
+                // A device first seen mid-window has no verdict to carry, so it falls
+                // back to its reported speed exactly as a first sighting does.
+                else -> verdict[device.deviceId] ?: device.withMovementStatus(null).status
+            }
+        }
+    }
 }
 
 /**

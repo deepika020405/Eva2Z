@@ -14,12 +14,14 @@ import com.developer.ev2z.repository.HistoryPlaybackRepository
 import com.developer.ev2z.response.Device
 import com.developer.ev2z.response.RoutePoint
 import io.ktor.util.date.getTimeMillis
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.datetime.*
 import kotlin.math.PI
 import kotlin.math.atan2
@@ -129,6 +131,23 @@ class HistoryPlaybackViewModel(
 
     val routePoints: StateFlow<List<RoutePoint>> =
         _routePoints.asStateFlow()
+
+
+    // =========================================================
+    // VEHICLE TYPE
+    // =========================================================
+    //
+    // The vehicle this terminal is fitted to, as the slug out of the response's
+    // `vehicle_icon_url`, so the playback marker is the vehicle rather than a
+    // dropped pin. Null until a history response lands, and on any device the
+    // server has no vehicle for — the marker falls back to a heading arrow.
+    // =========================================================
+
+    private val _vehicleSlug =
+        MutableStateFlow<String?>(null)
+
+    val vehicleSlug: StateFlow<String?> =
+        _vehicleSlug.asStateFlow()
 
 
     // =========================================================
@@ -619,6 +638,17 @@ class HistoryPlaybackViewModel(
 
 
                             /*
+                             * The vehicle type for the playback marker. Read from the
+                             * response rather than the device row: this endpoint is
+                             * the one that reports which vehicle the terminal was on
+                             * for the range being played back.
+                             */
+
+                            _vehicleSlug.value =
+                                response.vehicleIconSlug
+
+
+                            /*
                              * Keep existing validity check.
                              *
                              * IMPORTANT:
@@ -629,19 +659,51 @@ class HistoryPlaybackViewModel(
                              */
 
                             /*
-                             * The endpoint interleaves a stale "parked at
-                             * base" fix into a live trace, which draws the
-                             * route as a star radiating from the depot.
-                             * Those have to go before anything reads the
-                             * points — see dropStaleBeaconFixes().
+                             * The endpoint does not return one vehicle's
+                             * journey in travel order. It interleaves a
+                             * stale "parked at base" fix into a live trace
+                             * (a star radiating from the depot), and it
+                             * weaves a second stream through the day — a
+                             * backlog re-stamped with its upload time, or
+                             * another terminal's fixes — which draws the
+                             * route as a cobweb across the city.
+                             *
+                             * Both have to go before anything reads the
+                             * points: no amount of road snapping repairs
+                             * geometry that is not a journey. See
+                             * dropStaleBeaconFixes() and
+                             * keepTravelableFixes().
+                             *
+                             * Off the main thread: a day of 2,500 fixes
+                             * measured ~200 ms of filtering, which is a
+                             * dozen dropped frames if it runs where the
+                             * map is being drawn.
+                             */
+
+                            /*
+                             * collapseStationaryRuns last: a tracker reports every
+                             * ~60 s whether the vehicle moved or not, so a day that
+                             * begins with an overnight park begins with hundreds of
+                             * fixes on one coordinate. Playback spends half a second
+                             * on each, which is a marker standing still for a minute
+                             * — reported, reasonably, as a Play button that does
+                             * nothing. One fix per place is all the route and the
+                             * marker can show anyway.
                              */
 
                             val validPoints =
-                                dropStaleBeaconFixes(
-                                    response.data.filter {
-                                        it.isValid()
-                                    }
-                                )
+                                withContext(Dispatchers.Default) {
+
+                                    collapseStationaryRuns(
+                                        keepTravelableFixes(
+                                            dropStaleBeaconFixes(
+                                                response.data.filter {
+                                                    it.isValid()
+                                                }
+                                            )
+                                        )
+                                    )
+                                }
 
 
                             println(
@@ -700,6 +762,33 @@ class HistoryPlaybackViewModel(
                                  * Playback needs the complete
                                  * route data.
                                  */
+
+                                /*
+                                 * A day the vehicle never left its spot: every fix
+                                 * carries the same coordinate, so playback runs but
+                                 * the marker has nowhere to travel to. Logged because
+                                 * that is indistinguishable from a broken Play button
+                                 * on screen, and it is the first thing to rule out.
+                                 */
+
+                                val distinctSpots =
+                                    validPoints
+                                        .distinctBy {
+                                            it.latitude to it.longitude
+                                        }
+                                        .size
+
+
+                                if (distinctSpots <= 1) {
+
+                                    println(
+                                        "⚠️ [History] all " +
+                                                validPoints.size +
+                                                " fixes are at one coordinate — " +
+                                                "playback has nothing to move along"
+                                    )
+                                }
+
 
                                 _routePoints.value =
                                     validPoints
@@ -956,268 +1045,130 @@ class HistoryPlaybackViewModel(
     // They are ignored ONLY for distance calculation.
     // =========================================================
 
-    private fun calculateTotalDistance(
-        points: List<RoutePoint>
-    ) {
 
-        var totalDist =
-            0.0
-
-
+    private fun calculateTotalDistance(points: List<RoutePoint>) {
         if (points.size < 2) {
-
-            _totalDistance.value =
-                0.0
-
+            _totalDistance.value = 0.0
             return
         }
 
+        // Sort a copy; do not change playback route ordering.
+        val sortedPoints = points
+            .mapNotNull { point ->
+                val timestamp = parseDateTimeToMillisOrNull(point.createdAt)
+                    ?: return@mapNotNull null
+                point to timestamp
+            }
+            .sortedBy { it.second }
 
-        for (
-        i in 0 until points.size - 1
-        ) {
+        if (sortedPoints.size < 2) {
+            _totalDistance.value = 0.0
+            println("[Distance] Not enough points with valid timestamps")
+            return
+        }
 
-            val p1 =
-                points[i]
+        var totalKm = 0.0
+        var accepted = 0
+        var rejected = 0
+        var ignoredSmall = 0
 
+        for (i in 0 until sortedPoints.lastIndex) {
+            val (first, time1) = sortedPoints[i]
+            val (second, time2) = sortedPoints[i + 1]
 
-            val p2 =
-                points[i + 1]
+            val lat1 = first.getLatDouble()
+            val lng1 = first.getLngDouble()
+            val lat2 = second.getLatDouble()
+            val lng2 = second.getLngDouble()
 
+            if (lat1 == null || lng1 == null ||
+                lat2 == null || lng2 == null
+            ) {
+                rejected++
+                continue
+            }
 
-            val lat1 =
-                p1.getLatDouble()
-                    ?: continue
-
-
-            val lng1 =
-                p1.getLngDouble()
-                    ?: continue
-
-
-            val lat2 =
-                p2.getLatDouble()
-                    ?: continue
-
-
-            val lng2 =
-                p2.getLngDouble()
-                    ?: continue
-
-
-            // -------------------------------------------------
-            // Validate coordinates
-            // -------------------------------------------------
-
-            if (
+            if (!lat1.isFinite() || !lng1.isFinite() ||
+                !lat2.isFinite() || !lng2.isFinite() ||
                 lat1 !in -90.0..90.0 ||
                 lat2 !in -90.0..90.0 ||
                 lng1 !in -180.0..180.0 ||
                 lng2 !in -180.0..180.0
             ) {
+                rejected++
                 continue
             }
 
+            val timeSeconds = (time2 - time1) / 1000.0
 
-            // -------------------------------------------------
-            // Calculate GPS distance
-            // -------------------------------------------------
-
-            val segmentDistance =
-                haversineDistance(
-                    lat1,
-                    lng1,
-                    lat2,
-                    lng2
-                )
-
-
-            // -------------------------------------------------
-            // Get time difference
-            // -------------------------------------------------
-
-            val timeDiffSeconds =
-                getTimeDifferenceSeconds(
-                    p1.createdAt,
-                    p2.createdAt
-                )
-
-
-            /*
-             * If timestamp cannot be parsed,
-             * do not add the segment.
-             *
-             * This prevents a bad GPS point from
-             * creating fake distance.
-             */
-
-            if (timeDiffSeconds <= 0) {
-
-                continue
-            }
-
-
-            // -------------------------------------------------
-            // Calculate implied speed
-            // -------------------------------------------------
-
-            val calculatedSpeed =
-                (
-                        segmentDistance /
-                                timeDiffSeconds
-                        ) * 3600.0
-
-
-            // -------------------------------------------------
-            // Reject impossible GPS jumps
-            // -------------------------------------------------
-
-            if (
-                calculatedSpeed > MAX_VALID_GPS_SPEED_KMH
+            if (timeSeconds <= 0.0 ||
+                timeSeconds > MAX_DISTANCE_GAP_SECONDS
             ) {
+                rejected++
+                continue
+            }
 
+            val distanceKm = haversineDistance(
+                lat1, lng1, lat2, lng2
+            )
+
+            if (!distanceKm.isFinite() || distanceKm < 0.0) {
+                rejected++
+                continue
+            }
+
+            val speedKmh = distanceKm * 3600.0 / timeSeconds
+
+            if (!speedKmh.isFinite() ||
+                speedKmh > MAX_VALID_GPS_SPEED_KMH
+            ) {
                 println(
-                    "⚠️ [Distance] GPS jump ignored: " +
-                            "segment=${segmentDistance} km, " +
-                            "time=${timeDiffSeconds}s, " +
-                            "calculatedSpeed=${calculatedSpeed} km/h"
+                    "[Distance] GPS jump rejected: " +
+                            "distance=$distanceKm km, speed=$speedKmh km/h"
                 )
-
+                rejected++
                 continue
             }
 
-
-            // -------------------------------------------------
-            // Ignore tiny GPS noise
-            // -------------------------------------------------
-
-            if (
-                segmentDistance <
-                MIN_DISTANCE_KM
-            ) {
-
+            if (distanceKm < MIN_DISTANCE_KM) {
+                ignoredSmall++
                 continue
             }
 
-
-            // -------------------------------------------------
-            // Add valid segment
-            // -------------------------------------------------
-
-            totalDist +=
-                segmentDistance
+            totalKm += distanceKm
+            accepted++
         }
 
-
-        _totalDistance.value =
-            totalDist
-
+        _totalDistance.value = totalKm
 
         println(
-            "📏 [Distance] Final calculated distance = " +
-                    "$totalDist km"
+            "[Distance] Total=${totalKm}km, " +
+                    "accepted=$accepted, rejected=$rejected, " +
+                    "small=$ignoredSmall"
         )
     }
 
+    private fun parseDateTimeToMillisOrNull(value: String?): Long? {
+        if (value.isNullOrBlank()) return null
 
-    // =========================================================
-    // TIME DIFFERENCE
-    // =========================================================
+        val normalized = value.trim().replace(' ', 'T')
 
-    private fun getTimeDifferenceSeconds(
-        firstDate: String?,
-        secondDate: String?
-    ): Double {
-
-        if (
-            firstDate.isNullOrBlank() ||
-            secondDate.isNullOrBlank()
-        ) {
-
-            return 0.0
+        // First handle ISO timestamps containing Z or UTC offsets.
+        try {
+            return Instant.parse(normalized).toEpochMilliseconds()
+        } catch (_: Exception) {
+            // Fall through to timezone-less parsing.
         }
-
 
         return try {
-
-            val firstMillis =
-                parseDateTimeToMillis(
-                    firstDate
-                )
-
-
-            val secondMillis =
-                parseDateTimeToMillis(
-                    secondDate
-                )
-
-
-            (
-                    secondMillis -
-                            firstMillis
-                    ) / 1000.0
-
-
-        } catch (e: Exception) {
-
-            println(
-                "⚠️ [Distance] " +
-                        "Unable to parse timestamp: " +
-                        "first=$firstDate, " +
-                        "second=$secondDate, " +
-                        "error=${e.message}"
-            )
-
-
-            0.0
+            LocalDateTime.parse(normalized)
+                .toInstant(TimeZone.UTC)
+                .toEpochMilliseconds()
+        } catch (_: Exception) {
+            println("[Distance] Invalid timestamp: $value")
+            null
         }
     }
-
-
-    // =========================================================
-    // PARSE API DATE/TIME
-    // =========================================================
-    //
-    // Supports:
-    //
-    // 2026-10-01 04:24:04
-    //
-    // and:
-    //
-    // 2026-10-01T04:24:04
-    //
-    // Timezone is not important here because we only need
-    // the difference between two timestamps.
-    // =========================================================
-
-    private fun parseDateTimeToMillis(
-        value: String
-    ): Long {
-
-        val normalized =
-            value
-                .trim()
-                .replace(
-                    " ",
-                    "T"
-                )
-
-
-        val localDateTime =
-            LocalDateTime.parse(
-                normalized
-            )
-
-
-        return localDateTime
-            .toInstant(TimeZone.UTC)
-            .toEpochMilliseconds()
-    }
-
-
-    // =========================================================
-    // HAVERSINE DISTANCE
-    // =========================================================
 
     private fun haversineDistance(
         lat1: Double,
@@ -1225,70 +1176,28 @@ class HistoryPlaybackViewModel(
         lat2: Double,
         lng2: Double
     ): Double {
+        val earthRadiusKm = 6371.0088
 
-        val earthRadius =
-            6371.0
+        val lat1Rad = lat1 * PI / 180.0
+        val lat2Rad = lat2 * PI / 180.0
+        val deltaLat = (lat2 - lat1) * PI / 180.0
+        val deltaLng = (lng2 - lng1) * PI / 180.0
 
+        val sinLat = sin(deltaLat / 2.0)
+        val sinLng = sin(deltaLng / 2.0)
 
-        val dLat =
-            (lat2 - lat1) *
-                    PI /
-                    180.0
+        val a = (
+                sinLat * sinLat +
+                        cos(lat1Rad) * cos(lat2Rad) *
+                        sinLng * sinLng
+                ).coerceIn(0.0, 1.0)
 
+        val centralAngle = 2.0 * atan2(
+            sqrt(a),
+            sqrt(1.0 - a)
+        )
 
-        val dLng =
-            (lng2 - lng1) *
-                    PI /
-                    180.0
-
-
-        val lat1Rad =
-            lat1 *
-                    PI /
-                    180.0
-
-
-        val lat2Rad =
-            lat2 *
-                    PI /
-                    180.0
-
-
-        var a =
-            sin(dLat / 2.0)
-                .let {
-                    it * it
-                } +
-                    cos(lat1Rad) *
-                    cos(lat2Rad) *
-                    sin(dLng / 2.0)
-                        .let {
-                            it * it
-                        }
-
-
-        /*
-         * Floating point safety.
-         *
-         * a should always be between 0 and 1.
-         */
-
-        a =
-            a.coerceIn(
-                0.0,
-                1.0
-            )
-
-
-        val c =
-            2.0 *
-                    atan2(
-                        sqrt(a),
-                        sqrt(1.0 - a)
-                    )
-
-
-        return earthRadius * c
+        return earthRadiusKm * centralAngle
     }
 
 
@@ -1337,8 +1246,45 @@ class HistoryPlaybackViewModel(
         playbackJob?.cancel()
 
 
+        /*
+         * Play at the end of the route means replay it.
+         *
+         * Without this the loop below has nothing left to advance: the condition is
+         * false on the first check, so isPlaying flipped to true and straight back to
+         * false and the marker never moved. A short route makes that the normal case
+         * rather than an edge one — four fixes is 1.5 s at PLAYBACK_STEP_MS, so the
+         * first press finishes before the user has looked up, and every press after
+         * that did nothing at all.
+         */
+
+        if (
+            _currentPlaybackIndex.value >=
+            _routePoints.value.size - 1
+        ) {
+
+            _currentPlaybackIndex.value =
+                0
+
+
+            _currentSpeed.value =
+                _routePoints.value
+                    .firstOrNull()
+                    ?.getSpeedInt()
+                    ?: 0
+        }
+
+
         _isPlaying.value =
             true
+
+
+        println(
+            "▶️ [History] playback from " +
+                    _currentPlaybackIndex.value +
+                    " of " +
+                    _routePoints.value.size +
+                    " points"
+        )
 
 
         playbackJob =
@@ -1350,7 +1296,24 @@ class HistoryPlaybackViewModel(
                     _routePoints.value.size - 1
                 ) {
 
-                    delay(PLAYBACK_STEP_MS)
+                    /*
+                     * Paced by the leg the marker is travelling right now, not by a
+                     * flat rate — see playbackStepMillis.
+                     *
+                     * The index it is asked about is the *current* one, deliberately.
+                     * The marker glides into point N while this loop is waiting to
+                     * advance to N+1, so the wait that has to match that glide is the
+                     * duration of the leg ending at N. Asking for N+1 here would draw
+                     * every leg at the next leg's pace and leave the marker
+                     * perpetually mid-glide when it arrived.
+                     */
+
+                    delay(
+                        playbackStepMillis(
+                            _routePoints.value,
+                            _currentPlaybackIndex.value
+                        )
+                    )
 
 
                     _currentPlaybackIndex.value += 1
@@ -1368,6 +1331,12 @@ class HistoryPlaybackViewModel(
 
                 _isPlaying.value =
                     false
+
+
+                println(
+                    "⏹️ [History] playback reached " +
+                            _currentPlaybackIndex.value
+                )
             }
     }
 
@@ -1390,20 +1359,20 @@ class HistoryPlaybackViewModel(
     // CONSTANTS
     // =========================================================
 
-    companion object {
+   /* companion object {
 
-        /**
+        *//**
          * How long playback dwells on each route point.
          *
          * The map's marker glides across one step in exactly this long
          * (`rememberSmoothPlaybackPosition`), so the two must agree: a glide shorter
          * than the step makes the marker stop and wait between points, and a longer
          * one makes it fall behind the index it is supposed to be showing.
-         */
+         *//*
         const val PLAYBACK_STEP_MS = 500L
 
 
-        /*
+        *//*
          * Maximum physically reasonable speed
          * accepted for a GPS segment.
          *
@@ -1411,22 +1380,54 @@ class HistoryPlaybackViewModel(
          * for distance calculation.
          *
          * Playback point itself is NOT deleted.
-         */
+         *//*
 
         private const val
                 MAX_VALID_GPS_SPEED_KMH =
             180.0
 
 
-        /*
+        *//*
          * Ignore GPS movement smaller than 3 meters.
          *
          * 0.003 km = 3 meters
-         */
+         *//*
 
         private const val
                 MIN_DISTANCE_KM =
             0.003
+    }*/
+
+    companion object {
+
+        /**
+         * Playback is no longer paced by a constant: each leg takes the real time it
+         * took the vehicle, compressed — see `playbackStepMillis`, which both this
+         * loop and `rememberSmoothPlaybackPosition` call so the glide and the index
+         * cannot drift apart. `DEFAULT_STEP_MS` is what the old constant became, and
+         * is used only where the timestamps cannot answer.
+         */
+        const val PLAYBACK_STEP_MS = DEFAULT_STEP_MS
+
+        /**
+         * Maximum accepted GPS segment speed.
+         * Segments exceeding this speed are ignored
+         * for distance calculation only.
+         * Playback points are not deleted.
+         */
+        private const val MAX_VALID_GPS_SPEED_KMH = 180.0
+
+        /**
+         * Ignore GPS movements smaller than 3 metres
+         * to reduce small GPS-position fluctuations.
+         */
+        private const val MIN_DISTANCE_KM = 0.003
+
+        /**
+         * Do not calculate distance across timestamp gaps
+         * greater than 3 minutes (180 seconds).
+         */
+        private const val MAX_DISTANCE_GAP_SECONDS = 180.0
     }
 
 
@@ -1445,3 +1446,4 @@ class HistoryPlaybackViewModel(
         super.onCleared()
     }
 }
+

@@ -62,6 +62,7 @@ fun HistoryPlaybackScreen(
     val showDeviceDropdown by viewModel.showDeviceDropdown.collectAsState()
     val showNoDataDialog by viewModel.showNoDataDialog.collectAsState()
     val currentSpeed by viewModel.currentSpeed.collectAsState()
+    val vehicleSlug by viewModel.vehicleSlug.collectAsState()
 
     var showDatePicker by remember { mutableStateOf(false) }
 
@@ -116,7 +117,8 @@ fun HistoryPlaybackScreen(
         onPreviousDate = { viewModel.navigateToPreviousDate() },
         onNextDate = { viewModel.navigateToNextDate() },
         onDateClick = { showDatePicker = true },
-        onPlayClick = { viewModel.togglePlayback() }
+        onPlayClick = { viewModel.togglePlayback() },
+        vehicleSlug = vehicleSlug
     )
 
     if (showDatePicker) {
@@ -167,12 +169,16 @@ fun HistoryPlaybackContent(
     onNextDate: () -> Unit,
     onDateClick: () -> Unit,
     onPlayClick: () -> Unit,
+    // Defaulted so previews and tests can build this screen without one; the live
+    // screen passes the slug the history response reported.
+    vehicleSlug: String? = null,
     mapContent: @Composable (Modifier) -> Unit = { mapModifier ->
         HistoryMapView(
             routePoints = routePoints,
             snappedRoute = snappedRoute,
             currentIndex = currentIndex,
-            modifier = mapModifier
+            modifier = mapModifier,
+            vehicleSlug = vehicleSlug
         )
     }
 ) {
@@ -866,7 +872,16 @@ expect fun HistoryMapView(
     routePoints: List<RoutePoint>,
     snappedRoute: SnappedRoute,
     currentIndex: Int,
-    modifier: Modifier
+    modifier: Modifier,
+    /**
+     * The vehicle the terminal was fitted to, as the slug out of the history
+     * response's `vehicle_icon_url` — see `RouteHistoryResponse.vehicleIconSlug`.
+     * The marker draws that vehicle in the colour of the fix being played back.
+     *
+     * Null — a device the server names no vehicle for — falls back to the heading
+     * arrow, the same as the live map.
+     */
+    vehicleSlug: String? = null
 )
 
 

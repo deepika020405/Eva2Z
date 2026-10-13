@@ -636,7 +636,7 @@ fun isVaultSessionValid(storageManager: StorageManager): Boolean {
     if (expiry.isEmpty()) return false
 
     return try {
-        val expiryInstant = kotlinx.datetime.Instant.parse(expiry)
+        val expiryInstant = kotlin.time.Instant.parse(expiry)
         val now = Clock.System.now()
         now < expiryInstant
     } catch (e: Exception) {

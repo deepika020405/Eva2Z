@@ -11,8 +11,10 @@ target 'iosApp' do
   # ✅ PhonePe Payment SDK
   pod 'PhonePePayment'
 
-  # ✅ WebRTC — voice calling
-  pod 'GoogleWebRTC'
+  # ✅ WebRTC — voice calling. Jitsi's build ships WebRTC.xcframework with an
+  # arm64 simulator slice, which the abandoned GoogleWebRTC fat framework lacked.
+  # Module name is still `WebRTC`, so `import WebRTC` is unchanged.
+  pod 'JitsiWebRTC', '~> 124.0'
 
   # ✅ Socket.IO — WebRTC signaling transport
   pod 'Socket.IO-Client-Swift', '~> 16.1'
@@ -22,19 +24,6 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
-      # GoogleWebRTC ships device-only (arm64) — exclude arm64 from simulator builds
-      # so the linker picks x86_64 / Rosetta instead of failing.
-      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
     end
   end
-
-  # Remove any overriding EXCLUDED_ARCHS from the main target so the Pods xcconfig
-  # value (arm64) is inherited cleanly without causing a conflict warning.
-  main_project = installer.aggregate_targets.first&.user_project
-  main_project&.targets&.each do |target|
-    target.build_configurations.each do |config|
-      config.build_settings.delete('EXCLUDED_ARCHS[sdk=iphonesimulator*]')
-    end
-  end
-  main_project&.save
 end

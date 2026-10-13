@@ -2,6 +2,7 @@ package com.developer.ev2z.network
 
 import com.developer.ev2z.data.local.model.DeviceResponse
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
+import com.developer.ev2z.ui.screens.AddDevice.VehicleTypesResponse
 import com.developer.ev2z.request.CandidateDto
 import com.developer.ev2z.request.CandidateRequest
 import com.developer.ev2z.request.CartAddRequest
@@ -31,7 +32,13 @@ import com.developer.ev2z.ui.screens.VehicleParkingTag.ParkingResponse
 import com.developer.ev2z.ui.screens.VehicleParkingTag.UserParkingListResponse
 import com.developer.ev2z.ui.screens.serviceWarranty.*
 import com.developer.ev2z.util.AppTokenProvider
+import kotlinx.coroutines.Dispatchers
+// Not redundant: in commonMain `Dispatchers.IO` is an extension property, and without
+// this import it resolves to the JVM member — which compiles for Android and then
+// fails the iOS build with "it is internal in 'kotlinx.coroutines.Dispatchers'".
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import io.ktor.client.call.*
 import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.ResponseException
@@ -137,6 +144,45 @@ data class ServiceComplaintPost(val statusCode: Int, val body: JsonObject) {
             ?.containsKey("vehicle_type") == true
 }
 
+/**
+ * Runs [block] off the UI thread, and is why the calls below say so explicitly.
+ *
+ * A suspend function runs on **its caller's** dispatcher, and every caller here is a
+ * ViewModel coroutine: `viewModelScope` is `Dispatchers.Main.immediate`, and the
+ * handful of ViewModels that build their own scope use `CoroutineScope(Dispatchers
+ * .Main)`. Ktor hands the socket to its own engine threads, so the *waiting* was never
+ * the problem — but the work on either side of the wait (building the request, reading
+ * the body into a String, logging it, and parsing the JSON) resumes on Main, and a
+ * day of route history is megabytes of it.
+ *
+ * That is what the ANRs were: thirteen in one dropbox dump, main-thread stacks landing
+ * in `getDeviceLiveLocation` and `getDeviceStatus`, with `logd` burning 15% CPU
+ * alongside. Polling made it periodic — Track & Trace and Device Report each poll
+ * live-location every 30 s, three screens poll the fleet — so the UI froze on a timer.
+ *
+ * `IO` rather than `Default`: `bodyAsText()` can block reading the stream, and it is
+ * what the rest of the app already reaches for off the main thread — see
+ * `DocumentsViewModel`, `SessionLogout` and `FcmRegistrar`, all of them in `commonMain`.
+ */
+private suspend inline fun <T> offMainThread(crossinline block: suspend () -> T): T =
+    withContext(Dispatchers.IO) { block() }
+
+/**
+ * How much of a response body is logged.
+ *
+ * Whole bodies used to go to logcat — 88 call sites of `println("📝 … RAW = $raw")` —
+ * which on `route-history` is a day of fixes written out character by character on
+ * whatever thread decoded it. Enough is kept to recognise the shape of a payload and
+ * read an error message out of it; the length is printed so a truncated log still says
+ * how much there was.
+ */
+private const val RAW_LOG_CHARS = 400
+
+/** [raw] as a log line: bounded, and honest about what it left out. */
+private fun rawForLog(raw: String): String =
+    if (raw.length <= RAW_LOG_CHARS) raw
+    else "${raw.take(RAW_LOG_CHARS)}… (+${raw.length - RAW_LOG_CHARS} more chars)"
+
 class ApiService {
 
     private val client = KtorClient.client
@@ -193,7 +239,7 @@ class ApiService {
             println("   response body: $text")
 
             // ✅ Parse and return error JSON (don't throw here)
-            val json = Json { ignoreUnknownKeys = true }
+            val json = ApiJson
             val errorObj = json.parseToJsonElement(text).jsonObject
 
             // ✅ Return error JSON as-is
@@ -240,7 +286,7 @@ class ApiService {
             println("   response body: $text")
 
             // ✅ Parse and return error JSON (don't throw here)
-            val json = Json { ignoreUnknownKeys = true }
+            val json = ApiJson
             val errorObj = json.parseToJsonElement(text).jsonObject
 
             // ✅ Return error JSON as-is
@@ -392,7 +438,7 @@ class ApiService {
             println("   response body: $text")
 
             // ✅ Parse and return error JSON (don't throw here)
-            val json = Json { ignoreUnknownKeys = true }
+            val json = ApiJson
             val errorObj = json.parseToJsonElement(text).jsonObject
 
             // ✅ Return error JSON as-is
@@ -513,10 +559,10 @@ class ApiService {
     // ===============================================
 
     // ---------------- LATEST LOCATIONS ----------------
-    suspend fun getDevicesLatestLocations(token: String): DeviceResponse {
+    suspend fun getDevicesLatestLocations(token: String): DeviceResponse = offMainThread {
         println("🌐 API: Fetching latest locations")
 
-        return try {
+        try {
             val response = client.get("${baseUrl}user/devices/latest-locations") {
                 header(HttpHeaders.Authorization, "Bearer $token")
             }
@@ -533,6 +579,33 @@ class ApiService {
             throw e
         } catch (e: Exception) {
             println("❌ Latest Location Error: ${e.message}")
+            throw e
+        }
+    }
+
+    // ---------------- VEHICLE TYPES ----------------
+    /**
+     * The catalogue the add-device form picks a vehicle from.
+     *
+     * Open — it answers 200 without a token — but the header is sent anyway so the
+     * call behaves like every other one if the route is closed later. On the GPS
+     * host, like `add-device`, whose `vehicle_id` these ids feed.
+     */
+    suspend fun getVehicleTypes(token: String): VehicleTypesResponse {
+        println("🌐 API: Fetching vehicle types → ${gpsBaseUrl}vehicle-types")
+
+        return try {
+            val response = client.get("${gpsBaseUrl}vehicle-types") {
+                if (token.isNotBlank()) header(HttpHeaders.Authorization, "Bearer $token")
+            }
+
+            val raw = response.bodyAsText()
+            println("✔️ Vehicle Types Status: ${response.status}")
+
+            ApiJson.decodeFromString(VehicleTypesResponse.serializer(), raw)
+
+        } catch (e: Exception) {
+            println("❌ Vehicle Types Error: ${e.message}")
             throw e
         }
     }
@@ -591,7 +664,7 @@ class ApiService {
 
     // ---------------- FUEL PRICES ----------------
     /** Lenient so a rate sent as a number instead of "117.51" still decodes. */
-    private val fuelJson = Json { ignoreUnknownKeys = true; isLenient = true }
+    private val fuelJson = ApiJson
 
     /** Public endpoint — no bearer token. Every state / union territory. */
     suspend fun getFuelPrices(): FuelPricesResponse {
@@ -639,7 +712,7 @@ class ApiService {
     }
 
     // ---------------- WEATHER ----------------
-    private val weatherJson = Json { ignoreUnknownKeys = true; isLenient = true }
+    private val weatherJson = ApiJson
 
     /**
      * Current conditions plus an hourly and 7-day forecast for a coordinate, from
@@ -689,19 +762,19 @@ class ApiService {
     }
 
     // ---------------- MY DEVICES ----------------
-    suspend fun getMyDevices(token: String): MyDevicesResponse {
+    suspend fun getMyDevices(token: String): MyDevicesResponse = offMainThread {
         println("🌐 API: Fetching my devices")
 
-        return try {
+        try {
             val response = client.get("${baseUrl}devices/my-devices") {
                 header(HttpHeaders.Authorization, "Bearer $token")
             }
 
             val raw = response.bodyAsText()
             println("✔️ My Devices Status: ${response.status}")
-            println("📝 MY DEVICES RAW = $raw")
+            println("📝 MY DEVICES RAW = ${rawForLog(raw)}")
 
-            Json { ignoreUnknownKeys = true }
+            ApiJson
                 .decodeFromString(MyDevicesResponse.serializer(), raw)
 
         } catch (e: Exception) {
@@ -714,23 +787,22 @@ class ApiService {
     suspend fun getDeviceLiveLocation(
         token: String,
         deviceId: String
-    ): LiveLocationResponse {
+    ): LiveLocationResponse = offMainThread {
 
-        return try {
+        try {
             val response = client.get("${baseUrl}live-location/$deviceId") {
                 header(HttpHeaders.Authorization, "Bearer $token")
             }
 
             val raw = response.bodyAsText()
             println("✔️ Live Location Status: ${response.status} deviceId=$deviceId")
-            println("📝 LIVE LOCATION RAW = $raw")
+            println("📝 LIVE LOCATION RAW = ${rawForLog(raw)}")
 
             if (response.status == HttpStatusCode.Unauthorized) {
-                throw UnauthorizedException()
+                 throw UnauthorizedException()
             }
 
-            Json { ignoreUnknownKeys = true }
-                .decodeFromString(LiveLocationResponse.serializer(), raw)
+            ApiJson.decodeFromString(LiveLocationResponse.serializer(), raw)
 
         } catch (e: UnauthorizedException) {
             throw e
@@ -1116,7 +1188,7 @@ class ApiService {
             println("   response body: $text")
 
             // ✅ Parse and return error JSON (don't throw here)
-            val json = Json { ignoreUnknownKeys = true }
+            val json = ApiJson
             val errorObj = json.parseToJsonElement(text).jsonObject
 
             return errorObj
@@ -1185,10 +1257,10 @@ class ApiService {
         startDate: String,
         endDate: String,
         terminalId: String
-    ): RouteHistoryResponse {
+    ): RouteHistoryResponse = offMainThread {
         println("🌐 API: Fetching route history")
 
-        return try {
+        try {
             println("📤 Route History Request: terminal_id=$terminalId, start=$startDate, end=$endDate")
             val response = client.post("${baseUrl}route-history") {
                 header(HttpHeaders.Authorization, "Bearer $token")
@@ -1202,8 +1274,8 @@ class ApiService {
 
             println("✔️ Route History Status: ${response.status}")
             val raw = response.bodyAsText()
-            println("📝 Route History RAW = $raw")
-            Json { ignoreUnknownKeys = true }.decodeFromString(RouteHistoryResponse.serializer(), raw)
+            println("📝 Route History RAW = ${rawForLog(raw)}")
+            ApiJson.decodeFromString(RouteHistoryResponse.serializer(), raw)
 
         } catch (e: Exception) {
             println("❌ Route History Error: ${e::class.simpleName} — ${e.message}")
@@ -1212,6 +1284,7 @@ class ApiService {
     }
 
     // ---------------- DELETE ACCOUNT ----------------
+
     suspend fun deleteAccount(
         token: String,
         body: JsonObject
@@ -1243,7 +1316,7 @@ class ApiService {
             println("   response body: $text")
 
             // ✅ Parse and return error JSON
-            val json = Json { ignoreUnknownKeys = true }
+            val json = ApiJson
             val errorObj = json.parseToJsonElement(text).jsonObject
 
             return errorObj
@@ -1278,7 +1351,7 @@ class ApiService {
             println("❌ Referral Code Error: HTTP $status")
             println("   response body: $text")
 
-            val json = Json { ignoreUnknownKeys = true }
+            val json = ApiJson
             json.decodeFromString<ReferralCodeResponse>(text)
 
         } catch (e: Exception) {
@@ -1312,19 +1385,23 @@ class ApiService {
     }
 
 
-    suspend fun getDevicesStatus(token: String, deviceId: String): DeviceStatusResponse {
+    suspend fun getDevicesStatus(
+        token: String,
+        deviceId: String
+    ): DeviceStatusResponse = offMainThread {
         val response = client.get("${baseUrl}device/status-details/$deviceId") {
             header(HttpHeaders.Authorization, "Bearer $token")
         }
 
         // Always parse body as text first
         val text = response.bodyAsText()
-        println("DEBUG: Response body: $text")
+        println("DEBUG: Response body: ${rawForLog(text)}")
 
-        // Now deserialize manually
-        return kotlinx.serialization.json.Json {
-            ignoreUnknownKeys = true  // ✅ ignore extra fields
-        }.decodeFromString(DeviceStatusResponse.serializer(), text)
+        // ApiJson, not a Json {} built here: a parser is compiled on construction, so
+        // building one per call paid for that on the UI thread every time the device
+        // dropdown changed — which is the other main-thread stack in the ANR dump. It
+        // is also the tolerant one; see ApiJson.
+        ApiJson.decodeFromString(DeviceStatusResponse.serializer(), text)
     }
 
 
@@ -1479,7 +1556,7 @@ class ApiService {
             val raw = response.bodyAsText()
             println("✔️ parkVehicle ${response.status}: $raw")
 
-            val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
+            val json = ApiJson
 
             when {
                 response.status == HttpStatusCode.OK ||
@@ -1529,7 +1606,7 @@ class ApiService {
 
             if (!response.status.isSuccess()) return emptyList()
 
-            val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
+            val json = ApiJson
 
             // Try list response: { "status": true, "data": [ {...}, {...} ] }
             runCatching {
@@ -1596,7 +1673,7 @@ class ApiService {
             }
             val raw = response.bodyAsText()
             println("📥 deleteVehicle ${response.status}: $raw")
-            Json { ignoreUnknownKeys = true }.parseToJsonElement(raw).jsonObject
+            ApiJson.parseToJsonElement(raw).jsonObject
         } catch (e: Exception) {
             println("❌ deleteVehicle: ${e.message}")
             throw e
@@ -1638,7 +1715,7 @@ class ApiService {
             }
             val raw = response.bodyAsText()
             println("✔️ updateVehicle ${response.status}: $raw")
-            val json = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
+            val json = ApiJson
             when {
                 response.status.isSuccess() ->
                     json.decodeFromString(ParkingResponse.serializer(), raw)
@@ -1677,7 +1754,7 @@ class ApiService {
             if (!response.status.isSuccess()) {
                 return MyChatsResponse(status = false)
             }
-            Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
+            ApiJson
                 .decodeFromString(MyChatsResponse.serializer(), raw)
         } catch (e: Exception) {
             println("❌ getMyChatsWithMessages: ${e.message}")
@@ -2009,7 +2086,7 @@ class ApiService {
             }
             val raw = response.bodyAsText()
             println("✔️ acceptCall ${response.status}: $raw")
-            val lenient = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
+            val lenient = ApiJson
             when {
                 response.status.value in 200..201 ->
                     lenient.decodeFromString(SosReplyResponse.serializer(), raw)
@@ -2040,7 +2117,7 @@ class ApiService {
             }
             val raw = response.bodyAsText()
             println("✔️ declineCall ${response.status}: $raw")
-            val lenient = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
+            val lenient = ApiJson
             when {
                 response.status.value in 200..201 ->
                     lenient.decodeFromString(SosReplyResponse.serializer(), raw)
@@ -2072,7 +2149,7 @@ class ApiService {
             }
             val raw = response.bodyAsText()
             println("✔️ initiateCall ${response.status}: $raw")
-            val lenient = Json { ignoreUnknownKeys = true; isLenient = true; coerceInputValues = true }
+            val lenient = ApiJson
             when {
                 response.status.value in 200..201 ->
                     lenient.decodeFromString(InitiateCallResponse.serializer(), raw)
@@ -2268,7 +2345,7 @@ class ApiService {
         println("📡 CREATE ORDER STATUS = ${response.status}")
         println("📝 CREATE ORDER RAW = $raw")
 
-        return Json { ignoreUnknownKeys = true }.parseToJsonElement(raw).jsonObject
+        return ApiJson.parseToJsonElement(raw).jsonObject
     }
 
 
@@ -2425,7 +2502,7 @@ class ApiService {
             println("✔️ Posts Status: ${response.status}")
 
             val raw = response.bodyAsText()
-            val json = Json { ignoreUnknownKeys = true }
+            val json = ApiJson
             val element = json.parseToJsonElement(raw)
 
             // API may return either a bare array [ {...} ] or a wrapper { "data": [ {...} ] }
@@ -2688,7 +2765,7 @@ class ApiService {
             println("📡 GET GEOFENCES STATUS = ${response.status}")
             println("📝 GET GEOFENCES RAW = $raw")
 
-            Json { ignoreUnknownKeys = true }
+            ApiJson
                 .decodeFromString(GeoFenceResponse.serializer(), raw)
 
         } catch (e: Exception) {
@@ -2737,7 +2814,7 @@ class ApiService {
         println("📡 SAVE GEOFENCE STATUS = ${response.status}")
         println("📝 SAVE GEOFENCE RAW = $raw")
 
-        return Json { ignoreUnknownKeys = true }
+        return ApiJson
             .parseToJsonElement(raw).jsonObject
     }
 
@@ -2945,7 +3022,7 @@ class ApiService {
 
         return ServiceComplaintPost(
             statusCode = response.status.value,
-            body = Json { ignoreUnknownKeys = true }.parseToJsonElement(raw).jsonObject,
+            body = ApiJson.parseToJsonElement(raw).jsonObject,
         )
     }
 
@@ -2974,7 +3051,7 @@ class ApiService {
             throw IllegalStateException("Complaint list failed: HTTP ${response.status.value}")
         }
 
-        return Json { ignoreUnknownKeys = true }.parseToJsonElement(raw).jsonObject
+        return ApiJson.parseToJsonElement(raw).jsonObject
     }
 
     /**
@@ -3008,7 +3085,7 @@ class ApiService {
             throw IllegalStateException("Open complaints failed: HTTP ${response.status.value}")
         }
 
-        return Json { ignoreUnknownKeys = true }.parseToJsonElement(raw).jsonObject
+        return ApiJson.parseToJsonElement(raw).jsonObject
     }
 
     /**
@@ -3037,7 +3114,7 @@ class ApiService {
             throw IllegalStateException("Complaint detail failed: HTTP ${response.status.value}")
         }
 
-        return Json { ignoreUnknownKeys = true }.parseToJsonElement(raw).jsonObject
+        return ApiJson.parseToJsonElement(raw).jsonObject
     }
 
     /**
@@ -3070,7 +3147,7 @@ class ApiService {
             throw IllegalStateException("Service order failed: HTTP ${response.status.value}")
         }
 
-        return Json { ignoreUnknownKeys = true }.parseToJsonElement(raw).jsonObject
+        return ApiJson.parseToJsonElement(raw).jsonObject
     }
 
     /**
@@ -3323,7 +3400,7 @@ class ApiService {
             // wrapper `{"success":true,"data":[...]}`. Decoding the wrapper as
             // a list throws, and the catch below turns that into an empty
             // list — i.e. a vault full of documents shows up as empty.
-            val json = Json { ignoreUnknownKeys = true }
+            val json = ApiJson
             val element = json.parseToJsonElement(raw)
             val array = when (element) {
                 is JsonArray  -> element
@@ -3366,7 +3443,7 @@ class ApiService {
 
             if (!response.status.isSuccess()) return null
 
-            kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+            ApiJson
                 .decodeFromString(VaultDocumentDetailResponse.serializer(), raw)
                 .data
 
@@ -3555,7 +3632,7 @@ class ApiService {
         val raw = response.bodyAsText()
         println("📤 vault upload/update ${response.status}: $raw")
 
-        val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+        val json = ApiJson
         return try {
             json.decodeFromString(VaultUploadResponse.serializer(), raw)
         } catch (e: Exception) {
@@ -3587,7 +3664,7 @@ class ApiService {
             println("✔️ Support Request Status: ${response.status}")
             println("📝 Support Response: $raw")
 
-            Json { ignoreUnknownKeys = true }.decodeFromString(SupportResponse.serializer(), raw)
+            ApiJson.decodeFromString(SupportResponse.serializer(), raw)
 
         } catch (e: Exception) {
             println("❌ Support Request Error: ${e.message}")

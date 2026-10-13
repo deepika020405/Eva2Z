@@ -101,7 +101,7 @@ PODS:
   - GoogleUtilities/UserDefaults (8.1.0):
     - GoogleUtilities/Logger
     - GoogleUtilities/Privacy
-  - GoogleWebRTC (1.1.32000)
+  - JitsiWebRTC (124.0.2)
   - nanopb (3.30910.0):
     - nanopb/decode (= 3.30910.0)
     - nanopb/encode (= 3.30910.0)
@@ -116,7 +116,7 @@ PODS:
 DEPENDENCIES:
   - Firebase/Core
   - Firebase/Messaging
-  - GoogleWebRTC
+  - JitsiWebRTC (~> 124.0)
   - PhonePePayment
   - Socket.IO-Client-Swift (~> 16.1)
 
@@ -132,7 +132,7 @@ SPEC REPOS:
     - GoogleAppMeasurement
     - GoogleDataTransport
     - GoogleUtilities
-    - GoogleWebRTC
+    - JitsiWebRTC
     - nanopb
     - PhonePePayment
     - PromisesObjC
@@ -150,13 +150,13 @@ SPEC CHECKSUMS:
   GoogleAppMeasurement: 700dce7541804bec33db590a5c496b663fbe2539
   GoogleDataTransport: aae35b7ea0c09004c3797d53c8c41f66f219d6a7
   GoogleUtilities: 00c88b9a86066ef77f0da2fab05f65d7768ed8e1
-  GoogleWebRTC: 4d261187b30512efdb711d21fa961a6adf138717
+  JitsiWebRTC: b47805ab5668be38e7ee60e2258f49badfe8e1d0
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
   PhonePePayment: 9516849183e00c77a2d64bb85e2c9942a5e618b7
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
   Socket.IO-Client-Swift: 3614bea82ba005df1c2ff01154f4004993e05ad7
   Starscream: 19b5533ddb925208db698f0ac508a100b884a1b9
 
-PODFILE CHECKSUM: 2fbee272dba5a865ebcc1a276ea422a3ba1e1437
+PODFILE CHECKSUM: e381d2af649514ae1d768efe720a285de54fe7ef
 
 COCOAPODS: 1.16.2

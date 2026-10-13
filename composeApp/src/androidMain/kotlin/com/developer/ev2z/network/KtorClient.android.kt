@@ -28,13 +28,12 @@ actual fun createHttpClient(): HttpClient {
             }
         }
 
+        // ApiJson, not a local config: every `response.body()` on this client gets the
+        // same null tolerance as the hand-rolled decodeFromString call sites. Without
+        // it `user/devices/latest-locations` would still throw on the first nulled
+        // field, which is exactly how live-location lost whole fixes.
         install(ContentNegotiation) {
-            json(Json {
-                ignoreUnknownKeys = true
-                isLenient = true
-                prettyPrint = true
-                encodeDefaults = true   // ⭐ THIS IS THE FIX
-            })
+            json(ApiJson)
         }
 
         install(Logging) {

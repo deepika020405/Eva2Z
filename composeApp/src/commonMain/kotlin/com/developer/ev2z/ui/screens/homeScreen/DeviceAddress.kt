@@ -28,7 +28,8 @@ import kotlin.math.round
 /**
  * Coordinates are rounded to this many decimals to form the cache key — 4 decimals is
  * about 11 m, so a parked vehicle keeps hitting the same entry however much its fix
- * drifts, and a 15s poll does not re-ask for an address that cannot have changed.
+ * drifts, and polling faster does not re-ask for an address that cannot have changed —
+ * the key is the position, not the tick.
  */
 internal const val DEVICE_ADDRESS_PRECISION = 4
 
@@ -75,10 +76,26 @@ private val lastShownByDevice = mutableStateMapOf<String, String>()
  * on every poll would make it flicker all the way down the road.
  */
 @Composable
-fun rememberDeviceAddress(device: Device): String? {
-    val latitude = device.getLatitudeDouble()
-    val longitude = device.getLongitudeDouble()
+fun rememberDeviceAddress(device: Device): String? = rememberAddressAt(
+    latitude = device.getLatitudeDouble(),
+    longitude = device.getLongitudeDouble(),
+    ownerKey = device.deviceId
+)
 
+/**
+ * The same lookup as [rememberDeviceAddress], for callers that hold coordinates rather
+ * than a [Device] — the live map has the fix out of `latest-locations` and no device
+ * row to go with it.
+ *
+ * [ownerKey] is what the last-shown address is remembered against, so two vehicles on
+ * screen never inherit each other's address; pass the device id when there is one.
+ *
+ * Pass the vehicle's *real* fix, not an interpolated animation frame: the cache key is
+ * the position, and feeding it 60 positions a second would geocode the gaps between
+ * the buckets instead of the fix.
+ */
+@Composable
+fun rememberAddressAt(latitude: Double?, longitude: Double?, ownerKey: String): String? {
     if (latitude == null || longitude == null) return null
 
     val key = deviceAddressKey(latitude, longitude)
@@ -91,7 +108,7 @@ fun rememberDeviceAddress(device: Device): String? {
     // composition is what makes a composable re-invalidate itself. This runs once the
     // composition has committed.
     if (resolved != null) {
-        SideEffect { lastShownByDevice[device.deviceId] = resolved }
+        SideEffect { lastShownByDevice[ownerKey] = resolved }
     }
 
     LaunchedEffect(key) {
@@ -117,7 +134,7 @@ fun rememberDeviceAddress(device: Device): String? {
         }
     }
 
-    return resolved ?: lastShownByDevice[device.deviceId]
+    return resolved ?: lastShownByDevice[ownerKey]
 }
 
 /**
