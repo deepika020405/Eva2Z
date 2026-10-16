@@ -17,3 +17,9 @@ captures
 !*.xcworkspace/contents.xcworkspacedata
 **/xcshareddata/WorkspaceSettings.xcsettings
 node_modules/
+
+# Release build outputs (aab + ProGuard mapping exceed GitHub's 100MB file limit)
+composeApp/release/
+
+# iOS pod debug symbols — regenerate with `pod install`
+iosApp/Pods/**/dSYMs/
