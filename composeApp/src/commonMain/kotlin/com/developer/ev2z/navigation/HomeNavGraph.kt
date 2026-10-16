@@ -195,8 +195,6 @@ class HomeTab(
                 onBack = { showLiveLocation = false },
                 onNavigateToAddDevice = onNavigateToAddDevice,
                 onNavigateToDeviceReport = onNavigateToDeviceReport,
-                onOpenDeviceStatus = onOpenDeviceStatus,
-                onOpenTrackTrace = onOpenTrackTrace,
                 onOpenCommunity = onOpenCommunity,
                 onSessionExpired = onLogout
             )

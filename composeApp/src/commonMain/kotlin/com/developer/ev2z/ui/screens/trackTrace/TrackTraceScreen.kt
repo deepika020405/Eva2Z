@@ -40,6 +40,7 @@ import androidx.compose.ui.zIndex
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.network.LIVE_LOCATION_POLL_INTERVAL_MS
 import com.developer.ev2z.response.Device
+import com.developer.ev2z.response.markerVehicleSlug
 import com.developer.ev2z.data.local.model.statusDisplayOf
 import com.developer.ev2z.data.local.model.isMotionKind
 import com.developer.ev2z.data.local.model.statusKindOf
@@ -332,7 +333,11 @@ private fun StableTrackMapSection(viewModel: TrackTraceViewModel) {
             statusKind = statusKind,
             // The vehicle the server says this tracker is on; null until one is
             // assigned, and the marker falls back to the heading arrow.
-            vehicleSlug = latest?.iconSlug,
+            //
+            // Both descriptions of this tracker, merged field by field rather than one
+            // preferred whole — `live-location` sends no `vehicle_id` and the dropdown's
+            // device (from `latest-locations`) is what carries it. See markerVehicleSlug.
+            vehicleSlug = markerVehicleSlug(latest, selectedDevice),
             // Null until the first geocode lands, which draws no chip rather than an
             // empty box over the vehicle.
             addressLabel = address,

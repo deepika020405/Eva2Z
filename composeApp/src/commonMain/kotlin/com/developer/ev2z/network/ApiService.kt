@@ -822,7 +822,7 @@ class ApiService {
         }
         val url = "${baseUrl}candidate"
 
-        // ✅ DTO instead of manual JSON
+        // ✅ DTO ins     tead of manual JSON
         val body = CandidateRequest(
             candidate = CandidateDto(
                 name = form.name,
@@ -1023,10 +1023,13 @@ class ApiService {
 
 
     // ---------------- TOTAL MILAGES ----------------
-    suspend fun getTotalMilages(token: String, terminalId: String): TotalMilagesResponse {
+    suspend fun getTotalMilages(
+        token: String,
+        terminalId: String
+    ): TotalMilagesResponse = offMainThread {
         println("🌐 API: Fetching total milages")
 
-        return try {
+        try {
             val response = client.submitForm(
                 url = "${baseUrl}total-milages",
                 formParameters = Parameters.build {
@@ -1038,7 +1041,7 @@ class ApiService {
             }
 
             println("✔️ Total Milages Status: ${response.status}")
-            response.body()
+            response.body<TotalMilagesResponse>()
 
         } catch (e: Exception) {
             println("❌ Total Milages Error: ${e.message}")
@@ -1051,11 +1054,11 @@ class ApiService {
         token: String,
         terminalId: String,
         command: String
-    ): MobilizeResponse {
+    ): MobilizeResponse = offMainThread {
 
         println("🌐 API: Mobilize command: $command")
 
-        return try {
+        try {
             val response = client.submitForm(
                 url = "${baseUrl}mobilize",
                 formParameters = Parameters.build {
@@ -1068,7 +1071,7 @@ class ApiService {
             }
 
             println("✔️ Mobilize Status: ${response.status}")
-            response.body()
+            response.body<MobilizeResponse>()
 
         } catch (e: Exception) {
             println("❌ Mobilize Error: ${e.message}")
@@ -1081,11 +1084,11 @@ class ApiService {
         token: String,
         deviceId: String,
         range: String
-    ): DeviceAnalyticsResponse {
+    ): DeviceAnalyticsResponse = offMainThread {
 
         println("🌐 API: Device Analytics")
 
-        return try {
+        try {
             val response = client.post("${baseUrl}device/analytics") {
                 header(HttpHeaders.Authorization, "Bearer $token")
                 contentType(ContentType.Application.Json)
@@ -1093,7 +1096,7 @@ class ApiService {
             }
 
             println("✔️ Analytics Status: ${response.status}")
-            response.body()
+            response.body<DeviceAnalyticsResponse>()
 
         } catch (e: Exception) {
             println("❌ Analytics Error: ${e.message}")

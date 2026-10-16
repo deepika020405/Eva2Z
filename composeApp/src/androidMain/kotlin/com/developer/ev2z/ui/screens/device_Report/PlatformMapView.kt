@@ -141,6 +141,28 @@ actual fun PlatformMapView(
     }
 
     val mapView        = remember { MapView(context) }
+
+    // A MapView carries an Activity's lifecycle of its own, and the factory below only
+    // ever called onCreate. Without onResume it idles without drawing; without
+    // onDestroy it never hands its renderer back, so every visit to this screen left
+    // another live map behind — five `androidmapsapi-` threads and a `GL-Map` thread
+    // apiece, all still rendering a map nobody was looking at.
+    //
+    // That is what the ANR cluster on 2026-10-14 was. The 11:23 trace caught the main
+    // thread inside `MapView.onCreate` loading the renderer; the 11:25 and 11:29 ones
+    // caught it runnable in the vsync hook with no frame of ours on the stack at all —
+    // the process simply had nothing left, with GC at 44% of a core and 16 MB of large
+    // objects collected in a single pass.
+    DisposableEffect(mapView) {
+        mapView.onStart()
+        mapView.onResume()
+        onDispose {
+            mapView.onPause()
+            mapView.onStop()
+            mapView.onDestroy()
+        }
+    }
+
     val markerHolder   = remember { arrayOfNulls<com.google.android.gms.maps.model.Marker>(1) }
     // The address chip rides on its own marker rather than being drawn into the
     // vehicle bitmap: the vehicle marker rotates to the heading, and text baked into

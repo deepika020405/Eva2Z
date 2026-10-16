@@ -104,6 +104,29 @@ internal class RouteGapFiller(
                     "longest ${worst.second.toInt()} m at " +
                     "${formatCoordinate(from.latitude)},${formatCoordinate(from.longitude)}"
         )
+        // Both ends of the worst few, so a chord can be put to Directions by hand and
+        // the answer compared with what was drawn. A length on its own cannot tell a
+        // straight road from a line across the buildings — on 2026-10-13 the longest
+        // leftover on a 26 km day looked wrong on screen and turned out to be 230 m of
+        // Vyapar Marg, which really is straight and really is diagonal.
+        //
+        // Grouped, because the same chord recurs once per pass: a vehicle that drove a
+        // road four times is snapped onto the same vertices four times, and four
+        // identical lines in the log read as a duplication bug that is not there.
+        chords
+            .groupBy { (index, _) -> route.path[index] to route.path[index + 1] }
+            .entries
+            .sortedByDescending { it.value.first().second }
+            .take(5)
+            .forEach { (ends, repeats) ->
+                val (a, b) = ends
+                val passes = if (repeats.size > 1) " ×${repeats.size}" else ""
+                println(
+                    "🛣️ [RoadSnap]   chord ${repeats.first().second.toInt()} m$passes: " +
+                            "${formatCoordinate(a.latitude)},${formatCoordinate(a.longitude)}" +
+                            " → ${formatCoordinate(b.latitude)},${formatCoordinate(b.longitude)}"
+                )
+            }
     }
 
     /**

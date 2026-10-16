@@ -44,6 +44,17 @@ internal class AddressChipAnnotations {
     private val pins = mutableMapOf<String, Pin>()
 
     /**
+     * Which device [candidate] labels, or null if it is not one of these chips.
+     *
+     * A chip is a label rather than a target, but it sits on top of the vehicle it
+     * belongs to, so a tap aimed at the vehicle often lands here instead. Resolving it
+     * lets the caller select the same device either way — which is what the fleet map
+     * on Android already does.
+     */
+    fun deviceIdFor(candidate: MKAnnotationProtocol): String? =
+        pins.entries.firstOrNull { it.value.annotation === candidate }?.key
+
+    /**
      * The view for one of these chips, or null when [candidate] is some other
      * annotation — which the caller must go on to handle.
      */

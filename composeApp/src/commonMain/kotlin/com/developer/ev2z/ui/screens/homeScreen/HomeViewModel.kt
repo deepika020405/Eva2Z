@@ -35,8 +35,6 @@ class HomeViewModel(
     private val _selectedDevice = MutableStateFlow<Device?>(null)
     val selectedDevice: StateFlow<Device?> = _selectedDevice.asStateFlow()
 
-    private val _showOverview = MutableStateFlow(false)
-    val showOverview: StateFlow<Boolean> = _showOverview.asStateFlow()
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing = _isRefreshing.asStateFlow()
 
@@ -135,25 +133,23 @@ class HomeViewModel(
         )
     }
 
+    /**
+     * Picks a device, or lets go of the one already picked.
+     *
+     * Tapping the same vehicle again clears the selection, and that is not a nicety: a
+     * selected device is the only one the map labels, so with no way to deselect, one
+     * tap on a marker stripped the chips off every other vehicle for the rest of the
+     * session. The overview sheet used to clear it on dismiss; the sheet is gone, so
+     * the tap has to.
+     */
     fun selectDevice(device: Device) {
-        _selectedDevice.value = device
+        _selectedDevice.value =
+            if (_selectedDevice.value?.deviceId == device.deviceId) null else device
         _showDeviceDropdown.value = false
-        if (device.hasValidLocation()) {
-            _showOverview.value = true
-        }
     }
 
     fun toggleDeviceDropdown() {
         _showDeviceDropdown.value = !_showDeviceDropdown.value
-    }
-
-    fun showOverviewSheet() {
-        _showOverview.value = true
-    }
-
-    fun hideOverviewSheet() {
-        _showOverview.value = false
-        _selectedDevice.value = null
     }
 
     fun refreshDevices(token: String) {

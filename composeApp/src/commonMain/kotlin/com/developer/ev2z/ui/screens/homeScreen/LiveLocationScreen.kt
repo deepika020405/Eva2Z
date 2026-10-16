@@ -1,11 +1,6 @@
 // composeApp/src/commonMain/kotlin/com/developer/ev2z/ui/screens/homeScreen/LiveLocationScreen.kt
 package com.developer.ev2z.ui.screens.homeScreen
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -24,11 +19,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.data.local.model.Device
-import com.developer.ev2z.data.local.model.DeviceResponse
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.graphicsLayer
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.ui.components.FloatingContactButton
 import com.developer.ev2z.util.Analytics
@@ -58,15 +51,12 @@ fun LiveLocationScreen(
     onBack: () -> Unit,
     onNavigateToAddDevice: () -> Unit,
     onNavigateToDeviceReport: () -> Unit,
-    onOpenDeviceStatus: () -> Unit,
-    onOpenTrackTrace: () -> Unit,
     onOpenCommunity: () -> Unit,
     onSessionExpired: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val selectedDevice by viewModel.selectedDevice.collectAsState()
     val showDeviceDropdown by viewModel.showDeviceDropdown.collectAsState()
-    val isRefreshing by viewModel.isRefreshing.collectAsState()
     var autoNavigated by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -316,7 +306,11 @@ fun LiveLocationScreen(
                             when (deviceCount) {
                                 0 -> Unit
                                 1 -> onNavigateToDeviceReport()
-                                else -> viewModel.showOverviewSheet()
+                                // The overview sheet this used to open is gone, and an
+                                // icon that does nothing is how that sheet came to be
+                                // unreachable in the first place. The device list is the
+                                // part of it worth keeping on a fleet of more than one.
+                                else -> viewModel.toggleDeviceDropdown()
                             }
                         },
                         showDropdown = deviceCount > 1
@@ -355,6 +349,7 @@ fun LiveLocationScreen(
                         .padding(start = 20.dp, bottom = 20.dp)
                 )
             }
+
         }
 
     }
@@ -574,6 +569,9 @@ fun DeviceDropdownSheet(
 fun DeviceListItem(device: Device, onClick: () -> Unit) {
     val statusColor = Color(device.getStatusColor())
     val address = rememberDeviceAddress(device)
+    // Null while the fix is current. A five-day-old position and a live one read
+    // identically without it, which is the one thing a live-location list must not do.
+    val fixAge = device.fixAgeLabel()
 
     Row(
         modifier = Modifier
@@ -606,260 +604,23 @@ fun DeviceListItem(device: Device, onClick: () -> Unit) {
             )
         }
         Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = device.getStatusDisplay(),
-            fontSize = 12.sp,
-            color = statusColor,
-            fontWeight = FontWeight.Medium
-        )
-    }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  OverviewBottomSheet
-//  FIX 7: Heavy calculations wrapped in remember(response.data)
-// ─────────────────────────────────────────────────────────────────────────────
-@Composable
-fun OverviewBottomSheet(
-    response: DeviceResponse,
-    onClose: () -> Unit,
-    onNavigateToDeviceReport: () -> Unit,
-    onOpenDeviceStatus: () -> Unit,
-    onOpenTrackTrace: () -> Unit,
-    token: String,
-    viewModel: HomeViewModel,
-    isRefreshing: Boolean
-) {
-    // FIX 7: Only recompute when response.data actually changes
-    val devicesWithLocation = remember(response.data) {
-        response.data.filter { it.hasValidLocation() }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Column(horizontalAlignment = Alignment.End) {
             Text(
-                text = "Device Overview",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                RefreshIcon(
-                    isRefreshing = isRefreshing,
-                    onClick = { viewModel.refreshDevices(token) }
-                )
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Close",
-                    modifier = Modifier
-                        .size(24.dp)
-                        .clickable { onClose() }
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Button(
-                onClick = { onOpenDeviceStatus() },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(52.dp),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text(
-                    text = "Today's Report",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                )
-            }
-
-            Button(
-                onClick = { onOpenTrackTrace() },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(52.dp),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text(
-                    text = "Track & Trace",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            ColorIndicator(response.runningCount.toString(), Color(0xFF86b071), "Running")
-            ColorIndicator(response.idleCount.toString(), Color(0xFFfcd158), "Ideal")
-            ColorIndicator(response.parkedCount.toString(), Color(0xFFfa7575), "Parked")
-            ColorIndicator(response.offlineCount.toString(), Color(0xFFe8e8e8), "Offline")
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // FIX 6 (continued): key() so list items don't fully rebind on refresh
-        devicesWithLocation.forEach { device ->
-            key(device.deviceId ?: device.hashCode()) {
-                DeviceOverviewItem(
-                    device = device,
-                    onClick = { onNavigateToDeviceReport() }
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-    }
-}
-
-@Composable
-fun DeviceOverviewItem(
-    device: Device,
-    onClick: () -> Unit
-) {
-    val statusColor = Color(device.getStatusColor())
-
-    // Where the vehicle is sitting, once the geocoder answers. Null while it is being
-    // looked up, and for a vehicle that is moving — see rememberDeviceAddress.
-    val address = rememberDeviceAddress(device)
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() }
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .background(statusColor, CircleShape)
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = device.getDisplayName(),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium
-            )
-            // The address replaces the device id here: an owner looking at this sheet
-            // wants to know where the vehicle is, and the id told them nothing. It
-            // tracks the coordinates of the current poll, so it follows the vehicle
-            // while live tracking is running.
-            Text(
-                text = address ?: "Locating…",
-                fontSize = 11.sp,
-                color = Color.Gray,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = device.getStatusDisplay(),
-            fontSize = 12.sp,
-            color = statusColor,
-            fontWeight = FontWeight.Medium
-        )
-    }
-}
-
-@Composable
-fun StatItem(label: String, value: String) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = label, fontSize = 12.sp, color = Color.Gray)
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(text = value, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-    }
-}
-
-@Composable
-fun ColorIndicator(value: String, color: Color, label: String) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(80.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(45.dp)
-                .background(color, RoundedCornerShape(8.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = value,
-                color = Color.White,
-                fontWeight = FontWeight.Bold,
-                fontSize = 22.sp
-            )
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(color, CircleShape)
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Text(
-                text = label,
+                text = device.getStatusDisplay(),
                 fontSize = 12.sp,
-                color = Color.DarkGray,
+                color = statusColor,
                 fontWeight = FontWeight.Medium
             )
+            if (fixAge != null) {
+                Text(
+                    text = fixAge,
+                    fontSize = 10.sp,
+                    color = Color.Gray,
+                    maxLines = 1
+                )
+            }
         }
     }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  RefreshIcon — unchanged
-// ─────────────────────────────────────────────────────────────────────────────
-@Composable
-fun RefreshIcon(
-    isRefreshing: Boolean,
-    onClick: () -> Unit
-) {
-    val rotation by animateFloatAsState(
-        targetValue = if (isRefreshing) 360f else 0f,
-        animationSpec = if (isRefreshing)
-            infiniteRepeatable(
-                animation = tween(800, easing = LinearEasing),
-                repeatMode = RepeatMode.Restart
-            )
-        else tween(0),
-        label = "refresh_rotation"
-    )
-
-    Icon(
-        imageVector = Icons.Default.Refresh,
-        contentDescription = "Refresh",
-        modifier = Modifier
-            .size(24.dp)
-            .graphicsLayer { rotationZ = rotation }
-            .clickable(enabled = !isRefreshing) { onClick() },
-        tint = if (isRefreshing) Color.Gray else Color.Black
-    )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

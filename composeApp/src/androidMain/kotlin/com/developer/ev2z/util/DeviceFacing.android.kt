@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Looper
 import android.view.Surface
 import android.view.WindowManager
+import kotlin.math.abs
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -105,6 +106,11 @@ actual fun rememberDeviceFacing(): DeviceFacing? {
         var declination = 0.0
         var declinationFrom: Pair<Double, Double>? = null
 
+        // The eased heading, kept as a plain local rather than read back out of the
+        // snapshot state below. The easing needs a value every reading; composition
+        // does not.
+        var eased = Double.NaN
+
         val listener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
                 SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
@@ -140,7 +146,30 @@ actual fun rememberDeviceFacing(): DeviceFacing? {
                 }
 
                 val target = (magnetic + declination + 360.0) % 360.0
-                heading = easeBearing(heading, target, COMPASS_EASE)
+                eased = easeBearing(eased, target, COMPASS_EASE)
+
+                // Published only when the cone would be drawn somewhere else.
+                //
+                // `heading` is Compose state, and it is read in the *body* of every map
+                // screen that draws a cone — so a write here recomposes that whole
+                // screen, `AndroidView` update block and all. At SENSOR_DELAY_UI that
+                // was sixteen full recompositions a second, for as long as a map was
+                // open, to move a cone by fractions of a degree. A phone lying still on
+                // a desk still produced them: the magnetometer wobbles, so the eased
+                // value never settles on exactly the same double twice.
+                //
+                // Caught twice in ANR traces landing in this listener's `setValue`
+                // (2026-10-13 16:42, 2026-10-14 11:20). The earlier `GeomagneticField`
+                // fix above cut the allocation per reading; this cuts the recomposition.
+                //
+                // A degree is well inside the width of the drawn cone, and turning the
+                // phone by hand crosses it in a frame or two.
+                val drawn = heading
+                if (drawn.isNaN() ||
+                    abs((eased - drawn + 540.0) % 360.0 - 180.0) >= COMPASS_PUBLISH_DEGREES
+                ) {
+                    heading = eased
+                }
             }
 
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit

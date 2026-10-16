@@ -118,7 +118,7 @@ internal class MovementStatusTracker(private val windowMs: Long = MOVEMENT_WINDO
 
         return response.withStatuses { device ->
             when {
-                device.currentPosition() == null -> STATUS_OFFLINE
+                device.isNotReporting() -> STATUS_OFFLINE
                 // A device first seen mid-window has no verdict to carry, so it falls
                 // back to its reported speed exactly as a first sighting does.
                 else -> verdict[device.deviceId] ?: device.withMovementStatus(null).status
@@ -139,9 +139,11 @@ internal fun Device.withMovementStatus(previous: GeoPoint?): Device {
     val current = currentPosition()
 
     val status = when {
-        // No usable fix at all: the vehicle is not reporting, which is a different
-        // thing from reporting that it has not moved.
-        current == null -> STATUS_OFFLINE
+        // Not reporting at all, which is a different thing from reporting that it has
+        // not moved — and the two were being conflated. See [isNotReporting]. The null
+        // test is spelled out rather than left to the helper so the branches below keep
+        // their smart cast on `current`.
+        current == null || isNotReporting() -> STATUS_OFFLINE
 
         previous == null -> if (speed > 0) STATUS_RUNNING else STATUS_STOPPED
 
@@ -153,6 +155,23 @@ internal fun Device.withMovementStatus(previous: GeoPoint?): Device {
 
     return copy(status = status)
 }
+
+/**
+ * Whether this tracker is not reporting, whatever its last coordinates say.
+ *
+ * A dead tracker does not stop sending a position — the fleet endpoint keeps returning
+ * the last one it ever had, days old, with `status: "offline"` and
+ * `last_seen_minutes_ago` in the thousands. So the no-fix test below is not enough on
+ * its own, and the movement rule ran on those coordinates instead: a tracker silent for
+ * five days had "not moved", which came out as **Parked**, in red, next to a count of
+ * zero offline devices — while the server's own payload said two were offline.
+ *
+ * The server's word is taken for this and only this. Running versus stopped is still
+ * decided from the coordinates, because that is the judgement the server was getting
+ * wrong; whether the tracker is reporting at all is the one thing only the server knows.
+ */
+internal fun Device.isNotReporting(): Boolean =
+    currentPosition() == null || getStatusKind() == STATUS_OFFLINE
 
 /** Where the device is now, or null if it has no valid fix. */
 internal fun Device.currentPosition(): GeoPoint? {

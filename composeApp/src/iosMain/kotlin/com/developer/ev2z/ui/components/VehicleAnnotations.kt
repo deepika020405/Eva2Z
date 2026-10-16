@@ -74,6 +74,17 @@ internal class VehicleAnnotations {
      * annotation — the cone, or the user-location dot — which the caller must go on to
      * handle. Returning null is also how MapKit is told to draw its own default.
      */
+    /**
+     * Which device [candidate] belongs to, or null if it is not one of these pins.
+     *
+     * What turns a tap on a vehicle into a selection: MapKit hands the delegate an
+     * annotation, and the caller needs the device behind it. Without this the fleet
+     * map's `onMarkerClick` was accepted and never called — tapping a vehicle on iOS
+     * did nothing at all, while the same tap on Android selected it.
+     */
+    fun deviceIdFor(candidate: MKAnnotationProtocol): String? =
+        pins.entries.firstOrNull { it.value.annotation === candidate }?.key
+
     fun annotationView(mapView: MKMapView, candidate: MKAnnotationProtocol): MKAnnotationView? {
         val pin = pins.values.firstOrNull { it.annotation === candidate } ?: return null
         val marker = pin.marker ?: return null

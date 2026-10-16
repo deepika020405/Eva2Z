@@ -10,9 +10,12 @@ import com.developer.ev2z.repository.DeviceReportRepository
 import com.developer.ev2z.response.Device
 import com.developer.ev2z.response.DeviceAnalyticsData
 import com.developer.ev2z.response.TotalMilagesData
+import io.ktor.util.date.getTimeMillis
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +23,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.minus
+import kotlinx.datetime.toLocalDateTime
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sqrt
@@ -27,7 +35,32 @@ import kotlin.math.sqrt
 enum class AnalyticsRange(val apiValue: String) {
     TODAY("today"),
     WEEK("week"),
-    MONTH("month")
+    MONTH("month");
+
+    /**
+     * The `YYYY-MM-DD` start and end dates this chip covers, inclusive, for the
+     * `route-history` call the activity breakdown is built from.
+     *
+     * Rolling windows ending today, not calendar weeks or months: "Week" on a Tuesday
+     * means the last seven days, which is what someone checking a vehicle expects, and
+     * a calendar week would show two days of data on a Tuesday morning.
+     *
+     * The day count is one less than the window so that both ends are included — seven
+     * days is today plus the six before it.
+     */
+    fun dateRange(): Pair<String, String> {
+        val today = Instant.fromEpochMilliseconds(getTimeMillis())
+            .toLocalDateTime(TimeZone.currentSystemDefault())
+            .date
+
+        val start = when (this) {
+            TODAY -> today
+            WEEK -> today.minus(6, DateTimeUnit.DAY)
+            MONTH -> today.minus(29, DateTimeUnit.DAY)
+        }
+
+        return start.toString() to today.toString()
+    }
 }
 
 /**
@@ -52,6 +85,14 @@ class DeviceReportViewModel(
     // ── polling jobs ────────────────────────────────────────────────
     private var liveLocationJob: Job? = null
     private var devicesPollingJob: Job? = null
+
+    /**
+     * The analytics load in flight. Cancelled before a new one starts: changing the
+     * range chip twice quickly used to leave two loads running, and whichever finished
+     * last won — so a fast tap through Today → Week → Month could settle on Week's
+     * numbers under Month's highlighted chip.
+     */
+    private var analyticsJob: Job? = null
 
     // ── screen state ────────────────────────────────────────────────
     private val _uiState = MutableStateFlow<DeviceReportUiState>(DeviceReportUiState.Loading)
@@ -108,6 +149,17 @@ class DeviceReportViewModel(
     private val _analyticsError = MutableStateFlow<String?>(null)
     val analyticsError: StateFlow<String?> = _analyticsError.asStateFlow()
 
+    /**
+     * Running / stopped / parked worked out from the fixes, or null when they cannot say.
+     *
+     * The screen prefers this over [deviceAnalytics]: `device/analytics` returns all
+     * three segments as zero, so the donut drawn from it is empty whatever the vehicle
+     * did. The server's figures stay as the fallback for when the history call fails or
+     * a range holds too few fixes to measure.
+     */
+    private val _activityBreakdown = MutableStateFlow<ActivityBreakdown?>(null)
+    val activityBreakdown: StateFlow<ActivityBreakdown?> = _activityBreakdown.asStateFlow()
+
     data class MobilizeDialogData(
         val command: String,   // "cut" or "restore"
         val terminalId: String
@@ -139,7 +191,10 @@ class DeviceReportViewModel(
         _totalMilages.value = null
         _mobilizeMessage.value = null
         _showConfirmationDialog.value = null
+        analyticsJob?.cancel()
+        analyticsJob = null
         _deviceAnalytics.value = null
+        _activityBreakdown.value = null
         _analyticsError.value = null
         _isAnalyticsLoading.value = false
         _selectedAnalyticsRange.value = AnalyticsRange.TODAY
@@ -248,11 +303,24 @@ class DeviceReportViewModel(
             val response = repository.getDeviceLiveLocation(token, deviceId)
             if (response.success) {
                 _liveLocation.value = response
-                // validPosition() drops the "0"/"0" a tracker sends while it has no
-                // satellite fix, which would otherwise be geocoded and shown as an
-                // address in the Atlantic.
-                response.data?.latestLocation?.validPosition()?.let { (lat, lng) ->
-                    refreshAddressIfMoved(lat, lng)
+
+                val latest = response.data?.latestLocation
+                val fromServer = latest?.serverAddress()
+
+                if (fromServer != null) {
+                    // The endpoint resolved it for us — no geocoder, no throttle, and no
+                    // disagreement between Android's one-line address and the five
+                    // components iOS joins together. See LatestLocation.address: this is
+                    // null today, so the branch below is what actually runs.
+                    addressJob?.cancel()
+                    _address.value = fromServer
+                } else {
+                    // validPosition() drops the "0"/"0" a tracker sends while it has no
+                    // satellite fix, which would otherwise be geocoded and shown as an
+                    // address in the Atlantic.
+                    latest?.validPosition()?.let { (lat, lng) ->
+                        refreshAddressIfMoved(lat, lng)
+                    }
                 }
             }
             // Note: we do NOT blank out _liveLocation on a failed tick —
@@ -297,6 +365,11 @@ class DeviceReportViewModel(
         addressJob?.cancel()
         _address.value = null
         lastGeocodedAt = null
+        // The chart belongs to the vehicle that was selected, so it goes with it —
+        // otherwise the previous vehicle's running/parked split sits under the new
+        // vehicle's name until its own history lands.
+        analyticsJob?.cancel()
+        _activityBreakdown.value = null
 
         startLiveLocationPolling(token, device.device_id)
     }
@@ -396,28 +469,100 @@ class DeviceReportViewModel(
         deviceId: String,
         range: AnalyticsRange = _selectedAnalyticsRange.value
     ) {
-        viewModelScope.launch {
+        analyticsJob?.cancel()
+        analyticsJob = viewModelScope.launch {
             _isAnalyticsLoading.value = true
             _analyticsError.value = null
 
             try {
-                val response = repository.getDeviceAnalytics(
-                    token = token,
-                    deviceId = deviceId,
-                    range = range.apiValue
-                )
-
-                if (response.success && response.data != null) {
-                    _deviceAnalytics.value = response.data
-                    _selectedAnalyticsRange.value = range
-                } else {
-                    _analyticsError.value = response.message ?: "Failed to fetch analytics"
+                // Both at once. The distance card comes from the server's answer and the
+                // activity chart from the fixes, so waiting for one before asking for the
+                // other would show the user two sequential spinners for one screen.
+                coroutineScope {
+                    val serverAnalytics = async { loadServerAnalytics(token, deviceId, range) }
+                    val breakdown = async { loadActivityBreakdown(token, deviceId, range) }
+                    serverAnalytics.await()
+                    breakdown.await()
                 }
-            } catch (e: Exception) {
-                _analyticsError.value = e.message ?: "Unknown error while fetching analytics"
-            } finally {
-                _isAnalyticsLoading.value = false
+            } catch (e: UnauthorizedException) {
+                // Same backstop the two polling loops use: stop rather than keep asking
+                // with a token the server has already rejected.
+                println("🔒 [DeviceReport] 401 Unauthorized — stopping analytics")
+                stopPolling()
             }
+
+            _isAnalyticsLoading.value = false
+        }
+    }
+
+    private suspend fun loadServerAnalytics(
+        token: String,
+        deviceId: String,
+        range: AnalyticsRange
+    ) {
+        try {
+            val response = repository.getDeviceAnalytics(
+                token = token,
+                deviceId = deviceId,
+                range = range.apiValue
+            )
+
+            if (response.success && response.data != null) {
+                _deviceAnalytics.value = response.data
+                _selectedAnalyticsRange.value = range
+            } else {
+                _analyticsError.value = response.message ?: "Failed to fetch analytics"
+            }
+        } catch (e: UnauthorizedException) {
+            throw e
+        } catch (e: Exception) {
+            _analyticsError.value = e.message ?: "Unknown error while fetching analytics"
+        }
+    }
+
+    /**
+     * Fetches the range's fixes and works the activity breakdown out of them.
+     *
+     * Left at whatever it was on failure rather than blanked: a history call that times
+     * out is no reason to replace a chart that is already right with an empty one.
+     */
+    private suspend fun loadActivityBreakdown(
+        token: String,
+        deviceId: String,
+        range: AnalyticsRange
+    ) {
+        try {
+            val (startDate, endDate) = range.dateRange()
+            val response = repository.getRouteHistory(
+                token = token,
+                terminalId = deviceId,
+                startDate = startDate,
+                endDate = endDate
+            )
+
+            // `Default`, not `IO`: this is filtering and arithmetic over every fix in the
+            // range — up to tens of thousands on the month chip — and it is CPU-bound.
+            // On viewModelScope's Main dispatcher it would freeze the screen outright.
+            val breakdown = withContext(Dispatchers.Default) {
+                computeActivityBreakdown(prepareFixesForBreakdown(response.data))
+            }
+
+            if (breakdown != null) {
+                _activityBreakdown.value = breakdown
+                println(
+                    "📊 [DeviceReport] ${range.apiValue}: ${response.data.size} fixes → " +
+                            "running ${breakdown.running.minutes}m, " +
+                            "stopped ${breakdown.stopped.minutes}m, " +
+                            "parked ${breakdown.parked.minutes}m, " +
+                            "unknown ${breakdown.unknownMinutes}m"
+                )
+            } else {
+                println("📊 [DeviceReport] ${range.apiValue}: fixes cannot answer — keeping server figures")
+            }
+        } catch (e: UnauthorizedException) {
+            throw e
+        } catch (e: Exception) {
+            println("⚠️ [DeviceReport] activity breakdown failed: ${e.message}")
         }
     }
 
@@ -438,6 +583,7 @@ class DeviceReportViewModel(
     override fun onCleared() {
         liveLocationJob?.cancel()
         devicesPollingJob?.cancel()
+        analyticsJob?.cancel()
         super.onCleared()
     }
 }

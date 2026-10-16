@@ -6,7 +6,14 @@ import com.developer.ev2z.response.Device
 import com.developer.ev2z.response.DeviceAnalyticsResponse
 import com.developer.ev2z.response.MobilizeResponse
 import com.developer.ev2z.response.MyDevicesResponse
+import com.developer.ev2z.response.RouteHistoryResponse
 import com.developer.ev2z.response.TotalMilagesResponse
+import kotlinx.coroutines.Dispatchers
+// Not redundant: `Dispatchers.IO` is an extension on the Dispatchers object in
+// commonMain, so without this import Android still compiles (it resolves the JVM
+// member) and the iOS targets fail.
+import kotlinx.coroutines.IO
+import kotlinx.coroutines.withContext
 
 class DeviceReportRepository(
     private val apiService: ApiService
@@ -21,9 +28,17 @@ class DeviceReportRepository(
      * The old `devices/my-devices` endpoint returned a stale `engine_status`
      * and caused moving devices to show as "Stopped" in the dropdown.
      */
-    suspend fun getMyDevices(token: String): MyDevicesResponse {
+    /**
+     * On `IO`, not merely *called* from it. `getDevicesLatestLocations` returns to
+     * whatever dispatcher asked for it, and the caller is `viewModelScope` — so the
+     * remapping below used to walk the whole fleet and allocate a [Device] per vehicle
+     * on the UI thread, once every [com.developer.ev2z.network.DEVICES_POLL_INTERVAL_MS]
+     * for as long as this screen was open. Small per device, but it is the fleet, on a
+     * timer, competing with the frame it is about to cause.
+     */
+    suspend fun getMyDevices(token: String): MyDevicesResponse = withContext(Dispatchers.IO) {
         val latest = apiService.getDevicesLatestLocations(token)
-        return MyDevicesResponse(
+        MyDevicesResponse(
             success = latest.success,
             total_devices = latest.totalDevices,
             username = latest.name,
@@ -34,7 +49,15 @@ class DeviceReportRepository(
                     device_name = src.deviceName ?: src.deviceId,
                     engine_status = src.status, // "moving" / "idle" / "offline" / "no_data"
                     status = src.status,
-                    created_at = src.timestamp ?: ""
+                    created_at = src.timestamp ?: "",
+                    // Carried, not dropped. This is the only endpoint on this screen
+                    // that knows which vehicle the tracker is fitted to —
+                    // `live-location/{id}` sends no vehicle_id and a null icon_url — so
+                    // losing it here is what left the map marker as a bare arrow for a
+                    // device that has a vehicle assigned.
+                    vehicle_id = src.vehicleId,
+                    icon = src.icon,
+                    icon_url = src.iconUrl
                 )
             }
         )
@@ -70,5 +93,27 @@ class DeviceReportRepository(
         range: String
     ): DeviceAnalyticsResponse {
         return apiService.getDeviceAnalytics(token, deviceId, range)
+    }
+
+    /**
+     * The raw fixes behind the activity breakdown.
+     *
+     * `device/analytics` already reports running / stopped / parked, but it has been
+     * answering zero for all three — so the screen works the figures out from the fixes
+     * themselves instead (see `computeActivityBreakdown`). Dates are `YYYY-MM-DD`,
+     * inclusive at both ends, the same as the playback screen sends.
+     */
+    suspend fun getRouteHistory(
+        token: String,
+        terminalId: String,
+        startDate: String,
+        endDate: String
+    ): RouteHistoryResponse {
+        return apiService.getRouteHistory(
+            token = token,
+            startDate = startDate,
+            endDate = endDate,
+            terminalId = terminalId
+        )
     }
 }

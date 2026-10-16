@@ -3,9 +3,6 @@ package com.developer.ev2z.ui.screens.HistoryPlayback
 import com.developer.ev2z.network.GeoPoint
 import com.developer.ev2z.network.approxDistanceMeters
 import com.developer.ev2z.response.RoutePoint
-import kotlinx.datetime.LocalDateTime
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toInstant
 
 /**
  * Keeps the fixes that form one journey and drops the ones that cannot belong to it.
@@ -131,17 +128,6 @@ private fun isTravelable(
 
     return approxDistanceMeters(start, end) <= reach
 }
-
-/** `created_at` as epoch seconds, or null if it is missing or malformed. */
-private fun RoutePoint.epochSecondsOrNull(): Long? =
-    try {
-        // The zone is irrelevant: only differences between two of these are ever used.
-        LocalDateTime.parse(createdAt.trim().replace(" ", "T"))
-            .toInstant(TimeZone.UTC)
-            .epochSeconds
-    } catch (e: Exception) {
-        null
-    }
 
 /**
  * The fastest a tracked vehicle is taken to travel, in metres per second (90 km/h).

@@ -4,6 +4,7 @@ import com.developer.ev2z.data.local.model.DeviceResponse
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
 import com.developer.ev2z.network.ApiJson
 import com.developer.ev2z.response.MyDevicesResponse
+import com.developer.ev2z.response.markerVehicleSlug
 import com.developer.ev2z.response.RouteHistoryResponse
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -217,13 +218,13 @@ class EndpointVocabularyTest {
     }
 
     /**
-     * `vehicle_id` is read on all three endpoints, and beats the slug on each.
+     * `vehicle_id` is read on every endpoint that sends it, and beats the slug on each.
      *
-     * The payloads below are the real ones as of 2026-10-13: `latest-locations` gained
-     * `vehicle_id`, `vehicle_name`, `icon` and `icon_url` together; `route-history` has
-     * `vehicle_id` beside `vehicle_icon_url`; `live-location` still sends only
-     * `icon_url`, which is why it is pinned here with an id it does not send yet — the
-     * day the gateway adds it, this test says the app already used it.
+     * The payloads below are the real ones: `latest-locations` carries `vehicle_id`,
+     * `vehicle_name`, `icon` and `icon_url` together; `route-history` has `vehicle_id`
+     * beside `vehicle_icon_url`; `live-location` sends only `icon_url` — re-checked
+     * 2026-10-14 — which is why it is pinned here with an id it does not send, so the
+     * day the gateway adds it this test says the app already read it.
      */
     @Test
     fun theVehicleIdIsReadEverywhereAndOutranksTheSlug() {
@@ -254,7 +255,8 @@ class EndpointVocabularyTest {
         assertEquals(null, unassigned.iconSlug)
         assertEquals(12.9, unassigned.getLatitudeDouble())
 
-        // Route history, which sends the id next to its own spelling of the URL.
+        // Route history, which sends the id next to its own spelling of the URL. The id
+        // answers; the URL disagreeing with it does not get a say.
         val history = ApiJson.decodeFromString(
             RouteHistoryResponse.serializer(),
             """{"success":true,"terminal_id":"D1","vehicle_id":35,
@@ -262,6 +264,15 @@ class EndpointVocabularyTest {
                "data":[]}""",
         )
         assertEquals("water-tanker", history.vehicleIconSlug)
+
+        // With no id, the URL is what is left.
+        val historyByUrl = ApiJson.decodeFromString(
+            RouteHistoryResponse.serializer(),
+            """{"success":true,"terminal_id":"D1",
+               "vehicle_icon_url":"https://gps.eva2z.in/api/vehicle-icons/car.svg",
+               "data":[]}""",
+        )
+        assertEquals("car", historyByUrl.vehicleIconSlug)
 
         // Live location, which does not send the id yet — today the URL is all it has.
         fun live(body: String) = ApiJson.decodeFromString(
@@ -373,5 +384,172 @@ class EndpointVocabularyTest {
 
         assertNotNull(fix)
         assertEquals(28.6 to 77.4, fix.validPosition())
+    }
+
+    /**
+     * The vehicle survives the mapping into the device-dropdown model.
+     *
+     * This is the model Track & Trace and Device Report select a device from, and it is
+     * built by hand out of `latest-locations` in their repositories. It had no vehicle
+     * fields at all, so the id was dropped in that mapping — and since
+     * `live-location/{id}` sends no `vehicle_id` and a null `icon_url`, those two
+     * screens had nothing left to identify the vehicle with and drew the bare heading
+     * arrow for a tracker that had a vehicle assigned in add-device.
+     */
+    @Test
+    fun theDropdownModelCarriesTheVehicle() {
+        fun deviceWith(fields: String) = ApiJson.decodeFromString(
+            MyDevicesResponse.serializer(),
+            """{"success":true,"devices":[{"device_id":"D1",$fields}]}""",
+        ).devices.first()
+
+        // Same precedence as the other three endpoints: the id answers, and a slug that
+        // disagrees with it loses.
+        assertEquals("three-wheeler", deviceWith(""""vehicle_id":41,"icon":"car"""").iconSlug)
+        assertEquals("three-wheeler", deviceWith(""""vehicle_id":41""").iconSlug)
+
+        // The three types added most recently, straight off the live catalogue.
+        assertEquals("golf-cart", deviceWith(""""vehicle_id":38""").iconSlug)
+        assertEquals("atv", deviceWith(""""vehicle_id":39""").iconSlug)
+        assertEquals("other", deviceWith(""""vehicle_id":40""").iconSlug)
+
+        // No id: the bare slug, then the slug out of the URL, underscores and all.
+        assertEquals("electric-scooter", deviceWith(""""icon":"electric_scooter"""").iconSlug)
+        assertEquals(
+            "tourist-bus",
+            deviceWith(
+                """"icon_url":"https://gps.eva2z.in/api/vehicle-icons/tourist-bus.svg""""
+            ).iconSlug,
+        )
+
+        // Nothing assigned is null, not a guess — the marker is then the heading arrow.
+        assertEquals(null, deviceWith(""""device_name":"Scooter 1"""").iconSlug)
+        assertEquals(null, deviceWith(""""vehicle_id":null,"icon":null,"icon_url":null""").iconSlug)
+    }
+
+    /**
+     * `vehicle_id` beats an `icon` that disagrees with it.
+     *
+     * The real payload, captured from `latest-locations` on 2026-10-14: device
+     * 0869727076942661 is a **car**, and the endpoint sends the correct `vehicle_id` 1
+     * beside `"icon":"motorcycle"` and a motorcycle URL. `vehicle_id` is what
+     * `add-device` sets; the two slug fields are derived from it server-side and this is
+     * the derivation going wrong, so reading them drew a bike for a car.
+     */
+    @Test
+    fun aVehicleIdOutranksAnIconThatContradictsIt() {
+        val fleet = ApiJson.decodeFromString(
+            DeviceResponse.serializer(),
+            """{"success":true,"data":[{"device_id":"0869727076942661","vehicle_id":1,
+               "icon":"motorcycle",
+               "icon_url":"https://gps.eva2z.in/api/vehicle-icons/motorcycle.svg"}]}""",
+        ).data.first()
+
+        assertEquals("car", fleet.iconSlug, "the assigned id wins over a derived icon")
+
+        // The dropdown model the single-vehicle maps select from has to agree.
+        val dropdown = ApiJson.decodeFromString(
+            MyDevicesResponse.serializer(),
+            """{"success":true,"devices":[{"device_id":"0869727076942661","vehicle_id":1,
+               "icon":"motorcycle"}]}""",
+        ).devices.first()
+        assertEquals("car", dropdown.iconSlug)
+
+        // Live-location sends no vehicle_id at all, so there the URL is all there is —
+        // which is why the slug path stays rather than being deleted.
+        val live = ApiJson.decodeFromString(
+            LiveLocationResponse.serializer(),
+            """{"success":true,"data":{"latest_location":{
+               "device_id":"0869727076942661","latitude":"28.6","longitude":"77.4",
+               "icon_url":"https://gps.eva2z.in/api/vehicle-icons/motorcycle.svg"}}}""",
+        ).data?.latestLocation
+        assertEquals("motorcycle", live?.iconSlug)
+
+        // An unrecognised slug with no id is still passed through, because
+        // vehicleTopViewFor draws "sedan" as a car rather than as nothing. The server
+        // really does send it, and it is in no catalogue row.
+        val sedanOnly = ApiJson.decodeFromString(
+            DeviceResponse.serializer(),
+            """{"success":true,"data":[{"device_id":"D1","icon":"sedan"}]}""",
+        ).data.first()
+        assertEquals("sedan", sedanOnly.iconSlug)
+
+        // The single-vehicle maps see both of those at once, and this is the combination
+        // that was drawing a bike for a car: the live fix has only the wrong motorcycle
+        // URL, the dropdown's device has the right id, and the id has to win across the
+        // two sources just as it does within one.
+        assertEquals("car", markerVehicleSlug(live, dropdown))
+    }
+
+    /**
+     * One tracker, one vehicle, whichever endpoint described it.
+     *
+     * The fleet map reads `latest-locations`, the single-vehicle maps read
+     * `live-location` with the dropdown's device behind it, and playback reads
+     * `route-history`. A tracker that changes shape between two of those screens reads
+     * as a different vehicle, so the four models have to agree on the same id.
+     */
+    @Test
+    fun oneVehicleIdMeansOneMarkerOnEveryMap() {
+        val fleet = ApiJson.decodeFromString(
+            DeviceResponse.serializer(),
+            """{"success":true,"data":[{"device_id":"D1","vehicle_id":41}]}""",
+        ).data.first()
+
+        val dropdown = ApiJson.decodeFromString(
+            MyDevicesResponse.serializer(),
+            """{"success":true,"devices":[{"device_id":"D1","vehicle_id":41}]}""",
+        ).devices.first()
+
+        val history = ApiJson.decodeFromString(
+            RouteHistoryResponse.serializer(),
+            """{"success":true,"terminal_id":"D1","vehicle_id":41,"data":[]}""",
+        )
+
+        val live = ApiJson.decodeFromString(
+            LiveLocationResponse.serializer(),
+            """{"success":true,"data":{"latest_location":{"device_id":"D1","vehicle_id":41}}}""",
+        ).data?.latestLocation
+
+        assertNotNull(live)
+        assertEquals("three-wheeler", fleet.iconSlug)
+        assertEquals("three-wheeler", dropdown.iconSlug)
+        assertEquals("three-wheeler", history.vehicleIconSlug)
+        assertEquals("three-wheeler", live.iconSlug)
+    }
+
+    /**
+     * A server-resolved address, read under any of the four names it might arrive as.
+     *
+     * `live-location` sends none of them today — checked against the live payload on
+     * 2026-10-14, where `latest_location` ends at `last_seen_seconds_ago` — so the
+     * screen reverse-geocodes the coordinates on the device instead. Pinned here for
+     * the same reason `vehicle_id` is: the day the backend adds the field, this says the
+     * app already stopped geocoding.
+     */
+    @Test
+    fun aServerResolvedAddressIsReadUnderAnyOfItsNames() {
+        fun fixWith(key: String) = ApiJson.decodeFromString(
+            LiveLocationResponse.serializer(),
+            """{"success":true,"data":{"latest_location":{"latitude":"28.614916",
+               "longitude":"77.430097","$key":"Vyapar Marg, Sector 3, Noida"}}}""",
+        ).data?.latestLocation
+
+        listOf("address", "location_name", "full_address", "location_address").forEach { key ->
+            assertEquals("Vyapar Marg, Sector 3, Noida", fixWith(key)?.serverAddress(), key)
+        }
+
+        // What the endpoint actually sends today: no address at all, which has to read
+        // as null so the geocoder fallback runs rather than a blank line being shown.
+        val today = ApiJson.decodeFromString(LiveLocationResponse.serializer(), liveLocationJson)
+            .data?.latestLocation
+        assertNotNull(today)
+        assertEquals(null, today.serverAddress(), "live-location sends no address yet")
+
+        // An empty or whitespace string is the other way this goes wrong: the field
+        // present but unresolved. That is not an address, and must not win over the
+        // geocoder — otherwise the card shows an empty line forever.
+        assertEquals(null, fixWith("address")?.copy(address = "")?.serverAddress())
+        assertEquals(null, fixWith("address")?.copy(address = "   ")?.serverAddress())
     }
 }

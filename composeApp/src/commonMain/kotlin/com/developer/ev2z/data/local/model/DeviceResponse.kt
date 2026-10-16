@@ -63,9 +63,11 @@ data class Device(
      * The catalogue id of the vehicle this tracker is fitted to, as `vehicle-types`
      * numbers them — 1..41, null while no vehicle is assigned.
      *
-     * The **first** choice for the marker, ahead of the slug below: an integer cannot
-     * arrive hyphenated on one endpoint and underscored on another, inside a URL that
-     * 404s, or spelled a way this build has never seen. See `vehicleSlugForId`.
+     * The **first** choice for the marker, ahead of the slug below: this is the field
+     * `add-device` actually sets, while `icon` and `icon_url` are derived from it
+     * server-side and have been seen disagreeing with it. An integer also cannot arrive
+     * hyphenated on one endpoint and underscored on another, inside a URL that 404s, or
+     * spelled a way this build has never seen. See [resolveVehicleSlug].
      */
     @SerialName("vehicle_id") val vehicleId: Int? = null,
     /** What the catalogue calls it — "Electric Scooter". Not drawn; useful in logs. */
@@ -151,18 +153,45 @@ data class Device(
      * only holds while both read the slug the same way. Null when no vehicle is
      * assigned, which the marker draws as the heading arrow.
      */
-    val iconSlug: String?
-        get() = vehicleSlugForId(vehicleId)
-            ?: icon?.trim()?.replace('_', '-')?.takeIf { it.isNotBlank() }
-            ?: iconUrl
-                ?.substringAfterLast('/')
-                ?.substringBeforeLast('.')
-                ?.replace('_', '-')
-                ?.takeIf { it.isNotBlank() }
+    val iconSlug: String? get() = resolveVehicleSlug(vehicleId, icon, iconUrl)
 
     fun getStatusDisplay(): String = statusDisplayOf(status)
 
     fun getStatusColor(): Long = statusColorOf(status)
+
+    /**
+     * How old this device's position is, or null while it is current.
+     *
+     * The fleet payload reports this per device and the map never showed it, so a pin
+     * whose tracker last spoke five days ago sat on the screen looking exactly as live
+     * as the vehicle moving right now — on a screen called Live Location. Null below
+     * [FRESH_WITHIN_MINUTES], where the age is noise rather than news.
+     */
+    fun fixAgeLabel(): String? = lastSeenMinutes()
+        ?.takeIf { it >= FRESH_WITHIN_MINUTES }
+        ?.let { formatFixAge(it) }
+
+    /**
+     * Whether this position is old enough that it describes where the vehicle *was*.
+     *
+     * What the map dims and the list spells out. Ten minutes: the trackers upload every
+     * few tens of seconds while they have signal, so anything past that is a tracker
+     * that has stopped reporting rather than one between fixes.
+     */
+    fun isFixStale(): Boolean = (lastSeenMinutes() ?: 0) >= STALE_AFTER_MINUTES
+
+    /**
+     * What the fleet map writes beside this vehicle.
+     *
+     * The registration first, because a fleet of identical arrows is unreadable without
+     * it — three grey pins told the owner only that they had three devices. The age
+     * follows when the fix is old, so a pin that cannot be trusted says so where it is
+     * drawn rather than one tap away.
+     */
+    fun mapLabel(): String {
+        val age = fixAgeLabel() ?: return getDisplayName()
+        return "${getDisplayName()} · $age"
+    }
 
     internal companion object {
         /**
@@ -174,5 +203,25 @@ data class Device(
          * there.
          */
         const val NO_FIX_DEGREES = 0.001
+
+        /** Below this the fix is simply current, and its age is not worth the pixels. */
+        const val FRESH_WITHIN_MINUTES = 2
+
+        /** Past this the position describes where the vehicle was, not where it is. */
+        const val STALE_AFTER_MINUTES = 10
     }
+}
+
+/**
+ * A fix age in minutes, as short as it can be said.
+ *
+ * Floored, never rounded up: a position 353 minutes old is reported as five hours old,
+ * not six. The number is there to be distrusted by, and rounding it the wrong way
+ * makes a stale pin sound staler than the data supports.
+ */
+fun formatFixAge(minutes: Int): String = when {
+    minutes <= 0 -> "just now"
+    minutes < 60 -> "${minutes}m ago"
+    minutes < 60 * 24 -> "${minutes / 60}h ago"
+    else -> "${minutes / (60 * 24)}d ago"
 }

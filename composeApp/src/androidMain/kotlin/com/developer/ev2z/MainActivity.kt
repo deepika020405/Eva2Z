@@ -21,6 +21,7 @@ import com.developer.ev2z.calling.VoiceCallManager
 import com.developer.ev2z.util.initGeocoder
 import com.developer.ev2z.util.initOpenUrl
 import com.facebook.appevents.AppEventsConstants
+import com.google.android.gms.maps.MapsInitializer
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -72,6 +73,21 @@ class MainActivity : ComponentActivity() {
                     App()
                 }
             }
+
+            // The Maps renderer lives in a Play-services module that has to be loaded
+            // before any map can draw, and whoever opens the first map pays for it on
+            // the main thread. That is a binder round trip into the dynamite module and
+            // it is not quick: the ANR trace at 2026-10-14 11:23 caught the main thread
+            // runnable inside `MapView.onCreate` → `GoogleMap.onCreate` → the module's
+            // own constructor, five seconds into a tap that had nothing to do with maps.
+            //
+            // Asked for here instead, with a callback rather than a wait, so the load
+            // overlaps app start and the first map open finds it already done. Three
+            // screens open maps, so whichever one is reached first benefits.
+            MapsInitializer.initialize(
+                applicationContext,
+                MapsInitializer.Renderer.LATEST
+            ) { renderer -> Log.d("MainActivity", "🗺️ Maps renderer ready: $renderer") }
 
             Log.d("MainActivity", "✅ App initialized successfully")
 

@@ -38,7 +38,6 @@ import com.developer.ev2z.ui.components.vehicleMarkerIcon
 import com.developer.ev2z.ui.components.vehicleTopViewFor
 import com.developer.ev2z.util.rememberDeviceFacing
 import com.google.maps.android.compose.*
-import kotlinx.coroutines.flow.first
 
 /*
 @Composable
@@ -240,13 +239,17 @@ actual fun PlatformMapView(
     }
 
 
-    val locatedDevices = devices.mapNotNull { device ->
+    // Derived once per fleet response, not on every recomposition: this list is read
+    // by the effects below and by the marker loop, and recomputing it per recomposition
+    // also reprinted the whole fleet to logcat each time.
+    val locatedDevices = remember(devices) {
+        devices.mapNotNull { device ->
 
-        val lat = device.getLatitudeDouble()
-        val lng = device.getLongitudeDouble()
+            val lat = device.getLatitudeDouble()
+            val lng = device.getLongitudeDouble()
 
-        println(
-            """
+            println(
+                """
         ========== EV2Z DEVICE LOCATION ==========
         Device ID : ${device.deviceId}
         Device    : ${device.getDisplayName()}
@@ -257,31 +260,32 @@ actual fun PlatformMapView(
         Status    : ${device.getStatusKind()}
         ==========================================
         """.trimIndent()
-        )
+            )
 
-        if (lat == null || lng == null) {
-            println("❌ Invalid location: latitude or longitude is null")
-            return@mapNotNull null
+            if (lat == null || lng == null) {
+                println("❌ Invalid location: latitude or longitude is null")
+                return@mapNotNull null
+            }
+
+            if (!lat.isFinite() || !lng.isFinite()) {
+                println("❌ Invalid location: coordinates are not finite")
+                return@mapNotNull null
+            }
+
+            if (lat !in -90.0..90.0 || lng !in -180.0..180.0) {
+                println("❌ Invalid location: coordinates out of range")
+                return@mapNotNull null
+            }
+
+            if (lat == 0.0 && lng == 0.0) {
+                println("⚠️ Skipping (0,0): check whether API uses it as an invalid GPS fix")
+                return@mapNotNull null
+            }
+
+            println("✅ Valid location: $lat, $lng")
+
+            Triple(device, lat, lng)
         }
-
-        if (!lat.isFinite() || !lng.isFinite()) {
-            println("❌ Invalid location: coordinates are not finite")
-            return@mapNotNull null
-        }
-
-        if (lat !in -90.0..90.0 || lng !in -180.0..180.0) {
-            println("❌ Invalid location: coordinates out of range")
-            return@mapNotNull null
-        }
-
-        if (lat == 0.0 && lng == 0.0) {
-            println("⚠️ Skipping (0,0): check whether API uses it as an invalid GPS fix")
-            return@mapNotNull null
-        }
-
-        println("✅ Valid location: $lat, $lng")
-
-        Triple(device, lat, lng)
     }
 
     println("📍 Total devices from API: ${devices.size}")
@@ -289,14 +293,18 @@ actual fun PlatformMapView(
 
 
     // Fit the camera to the first valid API coordinates only.
-    LaunchedEffect(isMapLoaded) {
-        if (!isMapLoaded || hasFittedCamera) {
+    //
+    // Keyed on the coordinates as well as the map, so a fleet that arrives *after* the
+    // map has loaded still gets fitted. This used to wait on
+    // `snapshotFlow { locatedDevices }.first { it.isNotEmpty() }`, but that lambda reads
+    // a plain local list rather than snapshot state: the flow emitted the value captured
+    // when the effect launched and never again, so an empty first batch left the camera
+    // parked on the India-wide view for the rest of the screen's life however many
+    // polls later the positions turned up.
+    LaunchedEffect(isMapLoaded, locatedDevices) {
+        if (!isMapLoaded || hasFittedCamera || locatedDevices.isEmpty()) {
             return@LaunchedEffect
         }
-
-        // Wait until the first valid device coordinates arrive.
-        snapshotFlow { locatedDevices }
-            .first { it.isNotEmpty() }
 
         val coordinates = locatedDevices.map { (_, lat, lng) ->
             LatLng(lat, lng)
@@ -407,6 +415,11 @@ actual fun PlatformMapView(
                     // very first frame, before the animation has seeded itself.
                     val drawn = smoothedPositions[device.deviceId]
 
+                    // How old this device's fix is, which the fleet payload reports per
+                    // device and this map used to drop on the floor: two of three pins
+                    // can be days old and looked exactly as live as the one moving.
+                    val fixAge = device.fixAgeLabel()
+
                     Marker(
                         // rememberUpdatedMarkerState pushes each frame's position into
                         // the one remembered state, which is what actually walks the
@@ -418,8 +431,15 @@ actual fun PlatformMapView(
                                 ?: LatLng(lat, lng)
                         ),
                         title = device.getDisplayName(),
-                        snippet = address
-                            ?: "${device.getStatusDisplay()} - ${device.speed} km/h",
+                        // Status and speed first, then where, then how long ago — a
+                        // parked vehicle's address means something quite different if
+                        // the tracker stopped reporting last Tuesday.
+                        snippet = buildString {
+                            append(device.getStatusDisplay())
+                            if (device.speed > 0) append(" · ${device.speed} km/h")
+                            if (address != null) append(" · $address")
+                            if (fixAge != null) append(" · $fixAge")
+                        },
                         icon = markerIcon
                             ?: BitmapDescriptorFactory.defaultMarker(
                                 when (statusKind) {
@@ -459,7 +479,7 @@ actual fun PlatformMapView(
                         }
                     )
 
-                    // The address chip: on the selected vehicle, or on all of them while
+                    // The name chip: on the selected vehicle, or on all of them while
                     // nothing is selected.
                     //
                     // Selected-only on its own is what this shipped as, and on this
@@ -475,9 +495,15 @@ actual fun PlatformMapView(
                     // upside down every time the vehicle drove south.
                     val labelled = selectedDevice == null ||
                             device.deviceId == selectedDevice.deviceId
-                    if (labelled && address != null) {
-                        val labelIcon = remember(address, statusKind) {
-                            addressLabelIcon(address, statusColorOf(statusKind).toInt())
+                    if (labelled) {
+                        // The registration, not the street: this is the fleet map, and
+                        // with no vehicle assigned to any tracker — `vehicle_id` is null
+                        // for every device on some accounts — all three pins are the
+                        // same grey arrow. The chip is the only thing that says which
+                        // one is which. The address is one tap away in the callout.
+                        val chipText = device.mapLabel()
+                        val labelIcon = remember(chipText, statusKind) {
+                            addressLabelIcon(chipText, statusColorOf(statusKind).toInt())
                         }
                         Marker(
                             state = rememberUpdatedMarkerState(

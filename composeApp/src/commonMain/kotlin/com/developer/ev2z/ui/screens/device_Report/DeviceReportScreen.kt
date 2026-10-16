@@ -53,6 +53,7 @@ import com.developer.ev2z.data.local.model.statusDisplayOf
 import com.developer.ev2z.data.local.model.statusKindOf
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
 import com.developer.ev2z.response.Device
+import com.developer.ev2z.response.markerVehicleSlug
 import com.developer.ev2z.response.DeviceAnalyticsData
 import com.developer.ev2z.ui.screens.trackTrace.rememberAnimatedLatLng
 import com.developer.ev2z.util.Analytics
@@ -60,6 +61,7 @@ import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
 import org.jetbrains.compose.resources.painterResource
 import kotlin.math.min
+import kotlin.math.roundToInt
 import com.developer.ev2z.theme.AppPageBg
 
 
@@ -276,7 +278,11 @@ fun DeviceReportContent(
                 statusKind = latestFix.motionKind().takeIf { isMotionKind(it) }
                     ?: latestFix.statusKind().takeIf { it != "unknown" }
                     ?: statusKindOf(selectedDevice?.engine_status),
-                vehicleSlug = latestFix.iconSlug
+                // Both descriptions of this tracker, merged field by field rather than
+                // one preferred whole — `live-location` sends no `vehicle_id` and the
+                // dropdown's device (from `latest-locations`) is what carries it. See
+                // markerVehicleSlug.
+                vehicleSlug = markerVehicleSlug(latestFix, selectedDevice)
             )
         }
 
@@ -948,7 +954,12 @@ fun DeviceBasicInfoWithData(
     // Goes through the ViewModel's distance throttle, not straight to the geocoder:
     // this fires on every poll, and `latitude.toDouble()` — which this used — throws
     // on a non-numeric field rather than returning null.
+    //
+    // Skipped entirely when the endpoint sent an address of its own: the ViewModel has
+    // already published that one, and geocoding the same fix would overwrite the
+    // server's answer with the device's.
     LaunchedEffect(latest?.latitude, latest?.longitude) {
+        if (latest?.serverAddress() != null) return@LaunchedEffect
         latest?.validPosition()?.let { (lat, lng) ->
             viewModel.refreshAddressIfMoved(lat, lng)
         }
@@ -1119,6 +1130,7 @@ fun DeviceAnalysisContentWithData(
 ) {
     val selectedRange by viewModel.selectedAnalyticsRange.collectAsState()
     val analytics by viewModel.deviceAnalytics.collectAsState()
+    val breakdown by viewModel.activityBreakdown.collectAsState()
     val isLoading by viewModel.isAnalyticsLoading.collectAsState()
     val selectedDevice by viewModel.selectedDevice.collectAsState()
 
@@ -1158,17 +1170,31 @@ fun DeviceAnalysisContentWithData(
 
         Spacer(Modifier.height(12.dp))
 
-        HeadingGraphCardWithData(analytics = analytics)
+        HeadingGraphCardWithData(analytics = analytics, breakdown = breakdown)
 
         Spacer(Modifier.height(20.dp))
     }
 }
 
 
+/**
+ * The activity donut and its legend.
+ *
+ * Two possible sources, and [breakdown] wins: it is worked out from the vehicle's own
+ * fixes, while `device/analytics` has been answering zero for running, stopped and
+ * parked alike — a chart drawn from that is empty whatever the vehicle did. The server's
+ * segments stay as the fallback for when the history call fails or a range holds too few
+ * fixes to measure.
+ */
 @Composable
 fun HeadingGraphCardWithData(
-    analytics: DeviceAnalyticsData?
+    analytics: DeviceAnalyticsData?,
+    breakdown: ActivityBreakdown? = null
 ) {
+    val running = breakdown?.running ?: analytics?.running
+    val stopped = breakdown?.stopped ?: analytics?.stopped
+    val parked = breakdown?.parked ?: analytics?.parked
+
     Card(
         modifier = Modifier
             .padding(horizontal = 18.dp)
@@ -1192,11 +1218,11 @@ fun HeadingGraphCardWithData(
                     .size(150.dp)
                     .align(Alignment.CenterHorizontally)
             ) {
-                if (analytics != null) {
+                if (running != null && stopped != null && parked != null) {
                     DonutChart(
-                        runningPercent = analytics.running.percent,
-                        stoppedPercent = analytics.stopped.percent,
-                        parkedPercent = analytics.parked.percent,
+                        runningPercent = running.percent,
+                        stoppedPercent = stopped.percent,
+                        parkedPercent = parked.percent,
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
@@ -1215,32 +1241,58 @@ fun HeadingGraphCardWithData(
 
             Spacer(Modifier.height(18.dp))
 
-            analytics?.let { data ->
+            if (running != null && stopped != null && parked != null) {
                 LegendRow(
                     label = "Running",
                     color = DR_Running,
-                    hours = data.running.hours,
-                    percent = data.running.percent
+                    hours = running.hours,
+                    percent = running.percent
                 )
                 Spacer(Modifier.height(6.dp))
                 LegendRow(
                     label = "Stopped",
                     color = DR_Stopped,
-                    hours = data.stopped.hours,
-                    percent = data.stopped.percent
+                    hours = stopped.hours,
+                    percent = stopped.percent
                 )
                 Spacer(Modifier.height(6.dp))
                 LegendRow(
                     label = "Parked",
                     color = DR_Idle,
-                    hours = data.parked.hours,
-                    percent = data.parked.percent
+                    hours = parked.hours,
+                    percent = parked.percent
                 )
-            } ?: run {
+
+                // Time the tracker did not report, named rather than hidden. The
+                // percentages are a share of what *is* known, so without this line a day
+                // with four hours of silence looks like a fully accounted-for day.
+                breakdown?.takeIf { it.unknownMinutes > 0 }?.let { data ->
+                    Spacer(Modifier.height(10.dp))
+                    Text(
+                        "Based on ${formatHoursShort(data.knownHours)} of reported activity · " +
+                                "${formatHoursShort(data.unknownMinutes / 60.0)} not reported",
+                        fontSize = 11.sp,
+                        color = DR_TextHint
+                    )
+                }
+            } else {
                 Text("No analytics data available", color = DR_TextHint, fontSize = 13.sp)
             }
         }
     }
+}
+
+/**
+ * Hours for the footnote under the legend — "45 min", "1.5 hr", "6 hr".
+ *
+ * Minutes below the hour, because "0.3 hr" of reporting silence is not a figure anyone
+ * reads as twenty minutes, and a whole number loses its ".0".
+ */
+private fun formatHoursShort(hours: Double): String {
+    if (hours < 1.0) return "${(hours * 60).roundToInt()} min"
+    val rounded = (hours * 10).roundToInt() / 10.0
+    val whole = rounded.toInt()
+    return if (rounded == whole.toDouble()) "$whole hr" else "$rounded hr"
 }
 
 @Composable

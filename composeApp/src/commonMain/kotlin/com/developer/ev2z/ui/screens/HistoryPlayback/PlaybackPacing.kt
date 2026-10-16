@@ -1,9 +1,6 @@
 package com.developer.ev2z.ui.screens.HistoryPlayback
 
 import com.developer.ev2z.response.RoutePoint
-import kotlinx.datetime.LocalDateTime
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toInstant
 
 /**
  * How long playback takes to travel the leg that *ends* at [index], in milliseconds.
@@ -66,13 +63,3 @@ private const val MAX_STEP_MS = 1_200L
 /** Used wherever the timestamps cannot answer. The old flat rate. */
 internal const val DEFAULT_STEP_MS = 500L
 
-/** `created_at` as epoch seconds, or null if it is missing or malformed. */
-private fun RoutePoint.epochSecondsOrNull(): Long? =
-    try {
-        // The zone is irrelevant: only differences between two of these are ever used.
-        LocalDateTime.parse(createdAt.trim().replace(" ", "T"))
-            .toInstant(TimeZone.UTC)
-            .epochSeconds
-    } catch (e: Exception) {
-        null
-    }

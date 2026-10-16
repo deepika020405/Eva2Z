@@ -3,7 +3,7 @@ package com.developer.ev2z.data.local.remote
 import com.developer.ev2z.data.local.model.Device
 import com.developer.ev2z.data.local.model.isMotionKind
 import com.developer.ev2z.data.local.model.statusKindOf
-import com.developer.ev2z.data.local.model.vehicleSlugForId
+import com.developer.ev2z.data.local.model.resolveVehicleSlug
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -81,10 +81,14 @@ data class LatestLocation(
     /**
      * The catalogue id of the vehicle, as `vehicle-types` numbers them.
      *
-     * Read here even though this endpoint does **not** send it yet — checked on
-     * 2026-10-13, where `latest-locations` and `route-history` both do and this one
-     * still carries only `icon_url`. Reading it costs nothing and means the better key
-     * is used the day the gateway adds it, with no release. See `vehicleSlugForId`.
+     * Read here even though this endpoint does **not** send it — re-checked against the
+     * live payload on 2026-10-14, where `latest_location` carries `icon_url` and no
+     * `vehicle_id` under any name, while `latest-locations` and `route-history` both
+     * send it. Reading it costs nothing and it is used the day the gateway adds it, with
+     * no release.
+     *
+     * It is the first choice when it is there — see [resolveVehicleSlug] — which on this
+     * endpoint means the `icon_url` slug is what actually answers today.
      */
     @SerialName("vehicle_id")
     val vehicleId: Int? = null,
@@ -117,8 +121,28 @@ data class LatestLocation(
     @SerialName("last_seen_seconds_ago")
     val lastSeenSecondsAgo: Int? = null,
     @SerialName("last_seen_minutes_ago")
-    val lastSeenMinutes: Int? = null
+    val lastSeenMinutes: Int? = null,
+    /**
+     * The street address of this fix, resolved by the server.
+     *
+     * Read even though this endpoint does **not** send it — checked against the live
+     * payload on 2026-10-14, where `latest_location` ends at `last_seen_seconds_ago`
+     * and carries no address under any name. Same reasoning as [vehicleId] above:
+     * reading it costs nothing and the screen stops geocoding the day the backend adds
+     * it, with no app release.
+     *
+     * Four spellings, because this is a field that does not exist yet and so has no
+     * established name to match — whichever the backend picks, the app already reads it.
+     *
+     * Until then it is null and `DeviceReportViewModel` falls back to the on-device
+     * geocoder. See `refreshAddressIfMoved`.
+     */
+    @JsonNames("location_name", "full_address", "location_address")
+    val address: String? = null
 ) {
+    /** The server's address if it sent a usable one, else null. Blank is not an address. */
+    fun serverAddress(): String? = address?.trim()?.takeIf { it.isNotEmpty() }
+
     /**
      * Fix age in whole minutes, from whichever unit the server sent. Rounds down, so
      * a fix 9 seconds old reads 0 — which is what "just now" should say.
@@ -156,14 +180,7 @@ data class LatestLocation(
      * which they use for the identical slug, and this endpoint's spelling is the one
      * that does not resolve. Null when no vehicle is assigned.
      */
-    val iconSlug: String?
-        get() = vehicleSlugForId(vehicleId)
-            ?: icon?.trim()?.replace('_', '-')?.takeIf { it.isNotBlank() }
-            ?: iconUrl
-                ?.substringAfterLast('/')
-                ?.substringBeforeLast('.')
-                ?.replace('_', '-')
-                ?.takeIf { it.isNotBlank() }
+    val iconSlug: String? get() = resolveVehicleSlug(vehicleId, icon, iconUrl)
 
     /**
      * The coordinates, or null when this fix carries no usable position.

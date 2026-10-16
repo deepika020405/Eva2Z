@@ -74,6 +74,16 @@ actual fun PlatformMapView(
     // balloon that says nothing about which way the vehicle is going. The cone and the
     // vehicles draw their own views now; anything else still falls through to null,
     // which is how MapKit is told to carry on drawing its own.
+    // The devices currently drawn, by id, so a tap can be resolved back to one. Held in
+    // a ref rather than captured: the delegate is remembered once and would otherwise
+    // keep the first poll's list for the life of the screen.
+    val devicesById = remember { mutableStateOf(emptyMap<String, Device>()) }
+    devicesById.value = remember(devices) { devices.associateBy { it.deviceId } }
+
+    // onMarkerClick as the delegate sees it, kept current for the same reason.
+    val onMarkerClickRef = remember { mutableStateOf(onMarkerClick) }
+    onMarkerClickRef.value = onMarkerClick
+
     val mapDelegate = remember {
         object : NSObject(), MKMapViewDelegateProtocol {
             override fun mapView(
@@ -85,6 +95,22 @@ actual fun PlatformMapView(
 
                 chips.annotationView(mapView, viewForAnnotation)?.let { return it }
                 return vehicles.annotationView(mapView, viewForAnnotation)
+            }
+
+            /**
+             * A tap on a vehicle — or on the chip sitting over it — selects that device.
+             *
+             * This map took an `onMarkerClick` and never called it: tapping a vehicle on
+             * iOS did nothing, while the same tap on Android selected the device and
+             * zoomed to it. MapKit reports a tap by selecting the annotation, so this is
+             * where it has to be picked up.
+             */
+            override fun mapView(mapView: MKMapView, didSelectAnnotationView: MKAnnotationView) {
+                val annotation = didSelectAnnotationView.annotation ?: return
+                val deviceId = vehicles.deviceIdFor(annotation)
+                    ?: chips.deviceIdFor(annotation)
+                    ?: return
+                devicesById.value[deviceId]?.let { onMarkerClickRef.value(it) }
             }
 
             override fun mapView(mapView: MKMapView, regionDidChangeAnimated: Boolean) {
@@ -105,16 +131,21 @@ actual fun PlatformMapView(
     // address when there is one, which is the question a pin tap is really asking.
     val addresses = rememberDeviceAddresses(devices)
 
-    // Rasterised once per address, not once per frame: this block re-runs on every
-    // poll, and an address only changes when the vehicle leaves an ~11 m bucket.
-    val chipImages = remember(addresses, devices, selectedDevice?.deviceId) {
+    // Rasterised once per label, not once per frame: this block re-runs on every poll,
+    // and the registration only changes when the device does.
+    //
+    // The registration and the fix age, not the street: this is the fleet map, and with
+    // no vehicle assigned to any tracker — `vehicle_id` is null for every device on some
+    // accounts — all of the pins are the same grey arrow, and the chip is the only thing
+    // that tells them apart. The address is in the callout, one tap away.
+    val chipImages = remember(devices, selectedDevice?.deviceId) {
         devices.mapNotNull { device ->
             val labelled = selectedDevice == null || device.deviceId == selectedDevice.deviceId
             if (!labelled) return@mapNotNull null
-            val text = addresses[device.deviceId]?.trim()?.takeIf { it.isNotEmpty() }
-                ?: return@mapNotNull null
-            val image = buildAddressLabelImage(text, statusColorOf(device.getStatusKind()))
-                ?: return@mapNotNull null
+            val image = buildAddressLabelImage(
+                device.mapLabel(),
+                statusColorOf(device.getStatusKind())
+            ) ?: return@mapNotNull null
             device.deviceId to image
         }.toMap()
     }
@@ -170,8 +201,16 @@ actual fun PlatformMapView(
                     vehicle = vehicleTopViewFor(device.iconSlug),
                     statusKind = device.getStatusKind(),
                     title = device.getDisplayName(),
-                    subtitle = addresses[device.deviceId]
-                        ?: "${device.getStatusDisplay()} - ${device.speed} km/h",
+                    // Status and speed first, then where, then how long ago — a parked
+                    // vehicle's address means something quite different if the tracker
+                    // stopped reporting five days back, which this payload says of two
+                    // devices out of three.
+                    subtitle = buildString {
+                        append(device.getStatusDisplay())
+                        if (device.speed > 0) append(" · ${device.speed} km/h")
+                        addresses[device.deviceId]?.let { append(" · $it") }
+                        device.fixAgeLabel()?.let { append(" · $it") }
+                    },
                 )
             }
             vehicles.update(view, markers)

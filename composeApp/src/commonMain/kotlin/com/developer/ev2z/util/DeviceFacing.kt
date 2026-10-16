@@ -50,3 +50,18 @@ expect fun rememberDeviceFacing(): DeviceFacing?
  * that turning on the spot keeps up.
  */
 internal const val COMPASS_EASE = 0.2
+
+/**
+ * How far the eased heading has to move before it is published to composition.
+ *
+ * The compass listener fires about sixteen times a second and the heading it produces
+ * is Compose state read in the body of every map screen that draws a cone, so each
+ * reading recomposed a whole map screen. Almost all of those were worthless: a phone
+ * sitting still still wobbles by a fraction of a degree, so the eased value never
+ * repeats exactly and every reading looked like a change.
+ *
+ * A degree is well inside the width of the cone being drawn, and a phone actually
+ * being turned crosses it in a reading or two — so the cone still tracks the hand
+ * holding it, while a stationary one stops recomposing altogether.
+ */
+internal const val COMPASS_PUBLISH_DEGREES = 1.0

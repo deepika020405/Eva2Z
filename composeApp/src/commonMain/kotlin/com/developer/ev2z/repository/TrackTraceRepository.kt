@@ -38,7 +38,13 @@ class TrackTraceRepository(
                     device_name = src.deviceName ?: src.deviceId,
                     engine_status = src.status,
                     status = src.status,
-                    created_at = src.timestamp ?: ""
+                    created_at = src.timestamp ?: "",
+                    // See DeviceReportRepository: the fleet endpoint is the only one on
+                    // this screen that carries the vehicle, and dropping it here is what
+                    // made the marker an arrow instead of the assigned vehicle.
+                    vehicle_id = src.vehicleId,
+                    icon = src.icon,
+                    icon_url = src.iconUrl
                 )
             }
         )

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.developer.ev2z.repository.DeviceStatusRepository
 import com.developer.ev2z.response.DeviceStatusResponse
 import com.developer.ev2z.response.MyDevicesResponse
+import com.developer.ev2z.response.asLegs
 import com.developer.ev2z.util.getAddressFromLatLng
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -38,13 +39,21 @@ class DeviceStatusViewModel(
     val addressMap = _addressMap.asStateFlow()
 
 
+    /**
+     * The day's sessions, each with both ends resolved, then filtered.
+     *
+     * Resolved *before* filtering, never after: a session's start is derived from the
+     * session before it, and in a list of only the parked ones that predecessor is the
+     * wrong session — the drive in between is what moved the vehicle. See
+     * [com.developer.ev2z.response.asLegs].
+     */
     val filteredSessions = combine(
         deviceStatus,
         statusFilter
     ) { statusResponse, filter ->
-        val sessions = statusResponse?.data?.sessions ?: emptyList()
-        if (filter == "all") sessions
-        else sessions.filter { it.status == filter }
+        val legs = (statusResponse?.data?.sessions ?: emptyList()).asLegs()
+        if (filter == "all") legs
+        else legs.filter { it.session.status == filter }
     }
 
     fun setFilter(filter: String) {

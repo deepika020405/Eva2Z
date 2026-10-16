@@ -33,6 +33,8 @@ import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.response.Post
 import com.developer.ev2z.response.StatusSession
+import com.developer.ev2z.response.durationLabel
+import com.developer.ev2z.response.durationSeconds
 import com.developer.ev2z.response.VaultDocumentDto
 import com.developer.ev2z.ui.screens.SOSParkingTag.ChatThread
 import com.developer.ev2z.ui.screens.SOSParkingTag.ChatThreadListUiState
@@ -79,7 +81,8 @@ internal sealed class NotifItem {
         val deviceName: String,
         val status: String,
         val startTime: String,
-        val durationMin: Int,
+        /** Already formatted — see `StatusSession.durationLabel`. */
+        val duration: String,
     ) : NotifItem()
     data class VaultItem(val doc: VaultDocumentDto) : NotifItem()
     data class CommunityItem(val post: Post) : NotifItem()
@@ -195,7 +198,7 @@ fun NotificationsScreen(
                 deviceName  = deviceName,
                 status      = s.status,
                 startTime   = s.start_time,
-                durationMin = s.duration_minutes,
+                duration    = if (s.durationSeconds() > 0) s.durationLabel() else "",
             )
         }
         val vault     = vaultDocs.map { NotifItem.VaultItem(it) }
@@ -461,7 +464,7 @@ private fun GpsNotificationCard(item: NotifItem.GpsItem, isDark: Boolean, cardBg
     val iconBg = if (isDark) dotColor.copy(alpha = 0.18f) else bgColor
 
     val bodyParts = mutableListOf(item.deviceName)
-    if (item.durationMin > 0) bodyParts.add("${item.durationMin} min")
+    item.duration.takeIf { it.isNotEmpty() }?.let { bodyParts.add(it) }
     relativeTime(item.startTime).takeIf { it.isNotEmpty() }?.let { bodyParts.add(it) }
 
     NotificationCard(

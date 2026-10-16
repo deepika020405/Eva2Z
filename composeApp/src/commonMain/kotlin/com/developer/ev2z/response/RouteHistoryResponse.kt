@@ -1,8 +1,11 @@
 package com.developer.ev2z.response
 
-import com.developer.ev2z.data.local.model.vehicleSlugForId
+import com.developer.ev2z.data.local.model.resolveVehicleSlug
 
 import com.developer.ev2z.data.local.model.statusKindOf
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toInstant
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -38,7 +41,7 @@ data class RouteHistoryResponse(
      */
     /**
      * The catalogue id of the vehicle, as `vehicle-types` numbers them — the first
-     * choice for the playback marker, ahead of the URL below. See `vehicleSlugForId`.
+     * choice for the playback marker, ahead of the URL below. See [resolveVehicleSlug].
      */
     @SerialName("vehicle_id")
     val vehicleId: Int? = null,
@@ -59,12 +62,7 @@ data class RouteHistoryResponse(
      * would read as a different vehicle.
      */
     val vehicleIconSlug: String?
-        get() = vehicleSlugForId(vehicleId)
-            ?: vehicleIconUrl
-                ?.substringAfterLast('/')
-                ?.substringBeforeLast('.')
-                ?.replace('_', '-')
-                ?.takeIf { it.isNotBlank() }
+        get() = resolveVehicleSlug(vehicleId, iconUrl = vehicleIconUrl)
 }
 
 @OptIn(ExperimentalSerializationApi::class)
@@ -87,6 +85,27 @@ data class RoutePoint(
 
     /** The motion state in the app's own vocabulary — the same words every other model uses. */
     fun statusKind(): String = statusKindOf(movement)
+
+    /**
+     * [createdAt] as epoch seconds, or null if it cannot be read.
+     *
+     * Lives on the model because three callers need the identical answer — the
+     * continuity filter, the playback pacing and the activity breakdown — and it was
+     * previously copied privately into the first two.
+     *
+     * The zone is irrelevant: only *differences* between two of these are ever used, and
+     * both ends of a difference are read the same way. Note what the value means —
+     * `created_at` is when the server received the fix, not when the tracker took it,
+     * and the tracker uploads in batches.
+     */
+    fun epochSecondsOrNull(): Long? =
+        try {
+            LocalDateTime.parse(createdAt.trim().replace(" ", "T"))
+                .toInstant(TimeZone.UTC)
+                .epochSeconds
+        } catch (e: Exception) {
+            null
+        }
 
     fun isValid(): Boolean {
         val lat = getLatDouble() ?: return false
