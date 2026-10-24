@@ -1375,7 +1375,10 @@ class ApiService {
 
         return try {
             val response = client.get("${baseUrl}device-status/$deviceId") {
-                header(HttpHeaders.Authorization, token)
+                // "Bearer " is not optional: the bare token returns 401
+                // {"message":"Unauthenticated."} on this host, as it does on every
+                // other endpoint here.
+                header(HttpHeaders.Authorization, "Bearer $token")
             }
 
             println("✔️ Device Status: ${response.status}")
@@ -1387,13 +1390,107 @@ class ApiService {
         }
     }
 
+    /**
+     * The ignition line out of the same endpoint, typed: "on", "off", or null.
+     *
+     * Null covers every answer that is not a usable ignition state — the
+     * `{"success":false,"message":"No status found for this device."}` a tracker with no
+     * ignition wire returns, a 401, a dropped request — because the one caller
+     * ([com.developer.ev2z.util.IdleStatusResolver]) treats "we could not tell" and "the
+     * engine is off" identically: neither makes a standing vehicle idle. Throwing
+     * instead would put the fleet poll's notifications at the mercy of an endpoint that
+     * only refines them.
+     */
+    suspend fun getDeviceIgnition(token: String, deviceId: String): String? = offMainThread {
+        try {
+            val response = client.get("${baseUrl}device-status/$deviceId") {
+                header(HttpHeaders.Authorization, "Bearer $token")
+            }
 
+            val text = response.bodyAsText()
+            val parsed = ApiJson.decodeFromString(DeviceIgnitionResponse.serializer(), text)
+
+            if (!parsed.success) {
+                // Expected on a tracker without the wire; logged once per lookup, which
+                // the resolver's cache keeps to a trickle.
+                println("ℹ️ No ignition for $deviceId: ${parsed.message}")
+                null
+            } else {
+                parsed.status?.trim()?.takeIf { it.isNotEmpty() }
+            }
+        } catch (e: Exception) {
+            println("❌ Ignition lookup failed for $deviceId: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * The status the server has most recently recorded for this device today — the second
+     * idle source, for the trackers whose ignition line [getDeviceIgnition] cannot read.
+     *
+     * `device-status/{id}` answers `{"success":false,"message":"No status found for this
+     * device."}` on a tracker with no ignition wire, and such a device could never be
+     * called idle however long it stood there with its engine running. `status-details`
+     * has the answer anyway: it keeps idle sessions of its own, and on this account it
+     * wrote nine of them for a day on which the fleet payload said "parked" or "moving"
+     * throughout.
+     *
+     * Null on every answer that is not a usable status, for the same reason as the
+     * ignition lookup: the one caller treats "we could not tell" as "not idling", and an
+     * endpoint that only refines the alerts must not be able to break them. The dates are
+     * required now — the call 422s without them, where it used to ignore them and return
+     * today regardless.
+     */
+    suspend fun getDeviceLatestSessionStatus(
+        token: String,
+        deviceId: String,
+        date: String,
+    ): String? = offMainThread {
+        try {
+            val response = client.get("${baseUrl}device/status-details/$deviceId") {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                parameter("start_date", date)
+                parameter("end_date", date)
+            }
+
+            val text = response.bodyAsText()
+            val parsed = ApiJson.decodeFromString(DeviceStatusResponse.serializer(), text)
+            val latest = parsed.data?.latestSessionStatus()
+
+            // Logged either way: this is the only trace the fallback leaves on a device
+            // that turns out not to be idling, and "did it even ask" was the first
+            // question about it.
+            if (latest == null) {
+                println("ℹ️ No session today for $deviceId: ${parsed.message ?: "empty day"}")
+            } else {
+                println("🗓️ Newest session for $deviceId on $date: $latest")
+            }
+            latest?.trim()?.takeIf { it.isNotEmpty() }
+        } catch (e: Exception) {
+            println("❌ Session lookup failed for $deviceId: ${e.message}")
+            null
+        }
+    }
+
+
+    /**
+     * One device's status sessions for a day, or for a span of them.
+     *
+     * The dates are ISO `yyyy-MM-dd` and go out as `?start_date=&end_date=`, the shape
+     * the endpoint asks for — `endDate` defaults to [startDate] because the screen picks
+     * a single day. Both omitted is the old call: whatever the endpoint calls today.
+     */
     suspend fun getDevicesStatus(
         token: String,
-        deviceId: String
+        deviceId: String,
+        startDate: String? = null,
+        endDate: String? = startDate
     ): DeviceStatusResponse = offMainThread {
+        println("📤 Device Status Request: terminal_id=$deviceId, start=$startDate, end=$endDate")
         val response = client.get("${baseUrl}device/status-details/$deviceId") {
             header(HttpHeaders.Authorization, "Bearer $token")
+            if (!startDate.isNullOrBlank()) parameter("start_date", startDate)
+            if (!endDate.isNullOrBlank()) parameter("end_date", endDate)
         }
 
         // Always parse body as text first

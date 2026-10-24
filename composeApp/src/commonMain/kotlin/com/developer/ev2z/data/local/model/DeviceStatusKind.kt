@@ -67,13 +67,39 @@ fun statusDisplayOf(raw: String?): String = when (val kind = statusKindOf(raw)) 
         ?: kind.replaceFirstChar { it.uppercase() }
 }
 
+/** Moving. */
+const val RUNNING_COLOR = 0xFF4CAF50
+
+/** Not moving — a stop and a park read the same on a map. */
+const val STOPPED_COLOR = 0xFFF44336
+
 /** The dot/badge colour for a kind out of [statusKindOf]. */
 fun statusColorOf(raw: String?): Long = when (statusKindOf(raw)) {
-    "running" -> 0xFF4CAF50  // Green
+    "running" -> RUNNING_COLOR
     "idle" -> 0xFFFFC107     // Yellow
-    "parked" -> 0xFFF44336   // Red, matching the Parked swatch in the overview sheet
-    "stopped" -> 0xFFF44336  // Red — a stop reads the same as a park on the map
+    "parked" -> STOPPED_COLOR  // Matching the Parked swatch in the overview sheet
+    "stopped" -> STOPPED_COLOR
     "offline" -> 0xFFBDBDBD  // Gray
     "no_data" -> 0xFF9E9E9E  // Light Gray
     else -> 0xFF9E9E9E
 }
+
+/**
+ * The colour the live fleet map draws a vehicle in: green while it is running, red
+ * while it is not.
+ *
+ * Two colours, not [statusColorOf]'s five, because the live map is asked exactly one
+ * question — is this vehicle moving or standing still — and its status is derived from
+ * whether the coordinates actually moved rather than from the server's word (see
+ * `MovementStatusTracker`), which is a two-way split to begin with. The third value that
+ * derivation produces, "offline", came out grey, and the trackers on a real account
+ * report `status: "offline"` between uploads: every standing vehicle was a grey arrow,
+ * so the one answer the screen exists to give was the one it did not give.
+ *
+ * How old the fix is is still said — in the chip beside the vehicle ("· 5d ago") and in
+ * the callout — so a red vehicle whose tracker has been quiet for days does not claim to
+ * have just pulled up. The badges, rows and overview counts keep [statusColorOf], where
+ * offline is a distinction worth drawing.
+ */
+fun fleetMarkerColorOf(raw: String?): Long =
+    if (isRunningKind(raw)) RUNNING_COLOR else STOPPED_COLOR

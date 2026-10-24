@@ -67,6 +67,8 @@ kotlin {
             implementation(libs.play.services.auth.api.phone)
             implementation(libs.play.services.location)
             implementation(libs.app.update.ktx)
+            // Periodic idle check that keeps running with the app backgrounded or killed.
+            implementation(libs.androidx.work.runtime)
 
             implementation("com.android.installreferrer:installreferrer:2.2")
             // ✅ FIREBASE ONLY - NO PLAY INTEGRITY
@@ -145,8 +147,8 @@ android {
         applicationId = "com.developer.ev2z"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 116
-        versionName = "5.7.6"
+        versionCode = 118
+        versionName = "5.7.8"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

@@ -2,6 +2,7 @@ package com.developer.ev2z.repository
 
 import com.developer.ev2z.data.local.model.DeviceResponse
 import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.util.todayInReportZone
 
 class HomeRepository(private val apiService: ApiService) {
 
@@ -14,4 +15,25 @@ class HomeRepository(private val apiService: ApiService) {
             Result.failure(e)
         }
     }
+
+    /**
+     * One device's ignition — "on", "off", or null when it cannot be told.
+     *
+     * No `Result` wrapper, unlike the call above: the only caller is the idle derivation
+     * in [com.developer.ev2z.util.IdleStatusResolver], which treats every failure as
+     * "not idling" and has nothing to do with a failure it can distinguish.
+     */
+    suspend fun getDeviceIgnition(token: String, deviceId: String): String? =
+        apiService.getDeviceIgnition(token, deviceId)
+
+    /**
+     * The newest status the server recorded for this device today, for the same
+     * derivation — unwrapped for the same reason, and defaulting to the server's own day
+     * so no caller has to work out which date "today" is (see [todayInReportZone]).
+     */
+    suspend fun getDeviceLatestSessionStatus(
+        token: String,
+        deviceId: String,
+        date: String = todayInReportZone(),
+    ): String? = apiService.getDeviceLatestSessionStatus(token, deviceId, date)
 }

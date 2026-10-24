@@ -1,11 +1,35 @@
 package com.developer.ev2z.response
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlin.math.roundToInt
 
+/**
+ * `device-status/{deviceId}` — the tracker's ignition line, and nothing else:
+ * `{"success":true,"terminal_id":"0863…","status":"on"}`.
+ *
+ * The one field the fleet payload does not carry, and the only way to tell an idling
+ * vehicle from a parked one: `latest-locations` calls both of them "parked" (see
+ * [com.developer.ev2z.util.IdleStatusResolver]).
+ *
+ * A tracker with no ignition wire answers `{"success":false,"message":"No status found
+ * for this device."}` rather than failing, which is why [success] decides whether
+ * [status] means anything.
+ */
+@Serializable
+data class DeviceIgnitionResponse(
+    val success: Boolean = false,
+    @SerialName("terminal_id") val terminalId: String? = null,
+    /** "on" or "off" — null on the no-ignition answer above. */
+    val status: String? = null,
+    val message: String? = null,
+)
+
 @Serializable
 data class DeviceStatusResponse(
-    val success: Boolean,
+    // val success: Boolean
+    // gemini use to code
+    val success: Boolean = true,
     val message: String? = null,
     val data: DeviceStatusData? = null
 )
@@ -13,8 +37,8 @@ data class DeviceStatusResponse(
 
 @Serializable
 data class DeviceStatusData(
-    val status_count: StatusCount,
-    val sessions: List<StatusSession>,
+    val status_count: StatusCount = StatusCount(),
+    val sessions: List<StatusSession> = emptyList(),
     /**
      * How long the day was spent in each status, which the session list cannot answer
      * at a glance: four moving sessions add up to 6h 49m, and reading that off seven
@@ -221,6 +245,54 @@ internal fun clockLabel(stamp: String): String {
 
 /** Two digits, so a column of clock times lines up under one another. */
 private fun twoDigits(value: Int): String = if (value < 10) "0$value" else "$value"
+
+/**
+ * [end_time] in a form that sorts, so the newest session of a day can be picked out of
+ * the list: "2026-10-22 02:40:19 PM" → "2026-10-22T144019".
+ *
+ * Sorting on the stamp as sent does not work — it is twelve-hour, so "02:40:19 PM" comes
+ * out below "11:19:48 AM" — and the list cannot simply be read from the end either: the
+ * sessions overlap, and on this account a day ends `moving 02:38:51 → 02:39:49` followed
+ * by `idle 02:39:49 → 02:40:19`, where the later-starting row is the later one but the
+ * order is not something to rely on.
+ *
+ * Null when the stamp is not one this understands, which keeps a malformed row out of
+ * the comparison rather than making it sort first. A twenty-four-hour stamp — this
+ * endpoint sends those on some days — is taken as already being in that form.
+ */
+fun StatusSession.endSortKey(): String? = sortKeyOf(end_time)
+
+internal fun sortKeyOf(stamp: String): String? {
+    val parts = stamp.trim().split(" ").filter { it.isNotEmpty() }
+    val date = parts.getOrNull(0)?.takeIf { it.contains("-") } ?: return null
+    val pieces = parts.getOrNull(1)?.split(":") ?: return null
+
+    var hour = pieces.getOrNull(0)?.toIntOrNull() ?: return null
+    val minute = pieces.getOrNull(1)?.toIntOrNull() ?: return null
+    val second = pieces.getOrNull(2)?.toIntOrNull() ?: 0
+
+    when (parts.getOrNull(2)?.uppercase()) {
+        "AM" -> if (hour == 12) hour = 0
+        "PM" -> if (hour != 12) hour += 12
+    }
+
+    if (hour !in 0..23 || minute !in 0..59 || second !in 0..59) return null
+    return "${date}T${twoDigits(hour)}${twoDigits(minute)}${twoDigits(second)}"
+}
+
+/**
+ * The status the day ended in — the newest session's word, or null on a day with none.
+ *
+ * What [com.developer.ev2z.util.IdleStatusResolver] falls back to on a tracker whose
+ * ignition cannot be read: this endpoint records idle sessions for a device that
+ * `latest-locations` is calling "parked" at the same moment, so the newest session is a
+ * second opinion on what the vehicle is doing right now.
+ */
+fun DeviceStatusData.latestSessionStatus(): String? = sessions
+    .mapNotNull { session -> session.endSortKey()?.let { it to session } }
+    .maxByOrNull { it.first }
+    ?.second
+    ?.status
 
 /** The day out of a server stamp ("2026-10-15"), for a session that crosses midnight. */
 internal fun dateLabel(stamp: String): String? =

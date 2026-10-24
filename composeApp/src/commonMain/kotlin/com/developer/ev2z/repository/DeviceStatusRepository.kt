@@ -12,11 +12,18 @@ class DeviceStatusRepository(
         return api.getMyDevices(token)
     }
 
+    /** [date] is the single ISO `yyyy-MM-dd` day the report covers, start and end. */
     suspend fun getDeviceStatus(
         token: String,
-        deviceId: String
+        deviceId: String,
+        date: String? = null
     ): DeviceStatusResponse {
-        return api.getDevicesStatus(token, deviceId)
+        return api.getDevicesStatus(
+            token = token,
+            deviceId = deviceId,
+            startDate = date,
+            endDate = date
+        )
     }
 
 

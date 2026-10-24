@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.data.local.StorageKeys
 import com.developer.ev2z.data.local.StorageManager
+import com.developer.ev2z.data.local.model.statusDisplayOf
+import com.developer.ev2z.data.local.model.statusKindOf
 import com.developer.ev2z.network.ApiService
 import com.developer.ev2z.navigation.PlatformBackHandler
 import com.developer.ev2z.response.Post
@@ -41,6 +43,7 @@ import com.developer.ev2z.ui.screens.SOSParkingTag.ChatThreadListUiState
 import com.developer.ev2z.ui.screens.SOSParkingTag.SosTagViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlin.time.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toInstant
@@ -147,7 +150,15 @@ fun NotificationsScreen(
         // GPS sessions
         if (showGpsEvents && deviceId != null && apiService != null) {
             try {
-                val resp = apiService.getDevicesStatus(token, deviceId)
+                // The dates are required, not optional: without them the endpoint
+                // answers 422 `{"message":"The start date field is required."}`, and
+                // because DeviceStatusResponse defaults `success` to true with a
+                // nullable `data`, that parses cleanly as a report with no sessions —
+                // so the feed went silently empty instead of failing. Today, which is
+                // the only day this endpoint has ever served.
+                val today = Clock.System.now()
+                    .toLocalDateTime(TimeZone.currentSystemDefault()).date.toString()
+                val resp = apiService.getDevicesStatus(token, deviceId, today, today)
                 gpsEvents = resp.data?.sessions?.reversed()?.take(20) ?: emptyList()
             } catch (_: Exception) {}
         }
@@ -187,16 +198,24 @@ fun NotificationsScreen(
         val qr = (threadListState as? ChatThreadListUiState.Success)
             ?.threads?.map { NotifItem.QrItem(it) } ?: emptyList()
         val gps = gpsEvents.map { s ->
+            // Through `statusKindOf`, not off the raw value: this endpoint spells idle
+            // as "ideal" and moving as "running" on some devices, and the literal `when`
+            // that used to be here fell through to its else — so an idle session arrived
+            // titled "Ideal" with the grey fallback car instead of the Engine Idle card,
+            // and the GPS filter looked like it had no idle events at all. Same fix the
+            // Device Status screen's `statusUi` already carries.
+            val kind = statusKindOf(s.status)
             NotifItem.GpsItem(
-                title = when (s.status) {
-                    "moving"  -> "Vehicle Moving"
+                title = when (kind) {
+                    "running" -> "Vehicle Moving"
                     "idle"    -> "Engine Idle"
                     "parked"  -> "Vehicle Parked"
+                    "stopped" -> "Engine Off"
                     "offline" -> "Device Offline"
-                    else      -> s.status.replaceFirstChar { it.uppercase() }
+                    else      -> statusDisplayOf(s.status)
                 },
                 deviceName  = deviceName,
-                status      = s.status,
+                status      = kind,
                 startTime   = s.start_time,
                 duration    = if (s.durationSeconds() > 0) s.durationLabel() else "",
             )
@@ -447,10 +466,12 @@ private fun QrNotificationCard(
 
 // ─── GPS notification card ────────────────────────────────────────────────────
 
+/** Keyed by a kind out of [statusKindOf] — "running", not the server's "moving"/"ideal". */
 private val GpsStatusMeta = mapOf(
-    "moving"  to Triple(Color(0xFF00A844), Color(0xFFDCFCE7), Icons.Default.DirectionsCar as ImageVector),
+    "running" to Triple(Color(0xFF00A844), Color(0xFFDCFCE7), Icons.Default.DirectionsCar as ImageVector),
     "idle"    to Triple(Color(0xFFD97706), Color(0xFFFEF3C7), Icons.Default.EvStation     as ImageVector),
     "parked"  to Triple(Color(0xFF2563EB), Color(0xFFDBEAFE), Icons.Default.LocalParking  as ImageVector),
+    "stopped" to Triple(Color(0xFFDC2626), Color(0xFFFEE2E2), Icons.Default.PowerSettingsNew as ImageVector),
     "offline" to Triple(Color(0xFF94A3B8), Color(0xFFF8FAFC), Icons.Default.CloudOff      as ImageVector),
 )
 
@@ -473,7 +494,7 @@ private fun GpsNotificationCard(item: NotifItem.GpsItem, isDark: Boolean, cardBg
         iconBg     = iconBg,
         title      = item.title,
         body       = bodyParts.joinToString(" · "),
-        action     = if (item.status == "moving") "View trip" else null,
+        action     = if (item.status == "running") "View trip" else null,
         cardBg     = cardBg,
         titleColor = tPrimary,
         bodyColor  = tGray,

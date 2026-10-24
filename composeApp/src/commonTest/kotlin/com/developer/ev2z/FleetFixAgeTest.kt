@@ -1,7 +1,11 @@
 package com.developer.ev2z
 
 import com.developer.ev2z.data.local.model.DeviceResponse
+import com.developer.ev2z.data.local.model.RUNNING_COLOR
+import com.developer.ev2z.data.local.model.STOPPED_COLOR
+import com.developer.ev2z.data.local.model.fleetMarkerColorOf
 import com.developer.ev2z.data.local.model.formatFixAge
+import com.developer.ev2z.data.local.model.statusColorOf
 import com.developer.ev2z.network.ApiJson
 import com.developer.ev2z.ui.screens.homeScreen.MovementStatusTracker
 import kotlin.test.Test
@@ -171,6 +175,28 @@ class FleetFixAgeTest {
         // it, and the one that distinguishes "not moving" from "not reporting".
         assertEquals(1, nextWindow.parkedCount)
         assertEquals(0, nextWindow.runningCount)
+    }
+
+    /**
+     * What the markers are actually painted: green for the vehicle that is moving, red
+     * for the two that are not.
+     *
+     * The status kinds above are the right answer for the counts and the rows, where
+     * "offline" is a distinction worth drawing — but they used to be the marker colour
+     * too, and the grey that came out of them is why two standing vehicles looked like
+     * map furniture on a screen called Live Location. The age they carry in the chip is
+     * what keeps a red five-day-old fix from claiming to have just parked.
+     */
+    @Test
+    fun theMarkersAreGreenMovingAndRedStandingStill() {
+        val shown = MovementStatusTracker().apply(response, nowMs = 0L).data
+
+        assertEquals(
+            listOf(STOPPED_COLOR, RUNNING_COLOR, STOPPED_COLOR),
+            shown.map { fleetMarkerColorOf(it.getStatusKind()) },
+        )
+        // No grey anywhere on the map, however quiet the tracker has been.
+        assertTrue(shown.none { fleetMarkerColorOf(it.getStatusKind()) == statusColorOf("offline") })
     }
 
     @Test

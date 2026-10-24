@@ -1,7 +1,25 @@
 package com.developer.ev2z.util
 
 import kotlinx.datetime.*
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+
+/**
+ * The zone every stamp out of the status endpoints is already expressed in, which they
+ * say so themselves: `status-details` sends `"timezone":"Asia/Kolkata"` with each day.
+ */
+private val REPORT_ZONE = TimeZone.of("Asia/Kolkata")
+
+/**
+ * Today as the reports count it — ISO `yyyy-MM-dd`, the form `?start_date=` wants.
+ *
+ * The server's day, not the phone's: `status-details` buckets its sessions in
+ * Asia/Kolkata whatever zone the handset is set to, so a phone a few hours behind would
+ * otherwise ask for yesterday and be told the device has done nothing since midnight.
+ */
+@OptIn(ExperimentalTime::class)
+fun todayInReportZone(): String =
+    Clock.System.now().toLocalDateTime(REPORT_ZONE).date.toString()
 
 @OptIn(ExperimentalTime::class)
 fun formatToIST(dateUtc: String): String {

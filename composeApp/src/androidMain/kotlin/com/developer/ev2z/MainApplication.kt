@@ -2,8 +2,11 @@ package com.developer.ev2z
 
 import android.app.Application
 import android.util.Log
+import com.developer.ev2z.data.local.initStorageManager
 import com.developer.ev2z.ui.screens.social_media.initOpenUrl
 import com.developer.ev2z.util.AlertPrefs
+import androidx.core.app.NotificationManagerCompat
+import com.developer.ev2z.util.StatusCheckScheduler
 import com.developer.ev2z.util.Analytics
 import com.developer.ev2z.util.AppContextProvider
 import com.developer.ev2z.util.MetaAnalytics
@@ -27,6 +30,26 @@ class MainApplication : Application() {
         NotificationUtil.createChannel(this)
         NotificationUtil.createCallChannel(this)
         NotificationUtil.createCallServiceChannel(this)
+
+        // Storage here as well as in MainActivity: the processes that run without any
+        // Activity — the FCM delivery above, and StatusCheckWorker below — read the token
+        // out of it, and initStorageManager is what makes createStorageManager() work.
+        initStorageManager(this)
+
+        // The Moving / Idle / Parked notifications with the app backgrounded or closed.
+        //
+        // No foreground service: Android makes one show a permanent notification and
+        // offers no way to hide it, and that row is not worth the reliability it buys.
+        // The alarm chain carries the checks instead — each delivery gets its own short
+        // allowlist from the system, which is enough for one request — and the worker is
+        // the watchdog that re-arms the chain if a link is ever lost. Both no-op while
+        // nobody is logged in.
+        StatusCheckScheduler.schedule(this)
+        StatusAlarmScheduler.scheduleNext(this, delayMs = FIRST_CHECK_DELAY_MS)
+
+        // A leftover from a build that did run a foreground service: its ongoing
+        // notification outlives the service that posted it until something clears it.
+        NotificationManagerCompat.from(this).cancel(LEGACY_TRACKING_NOTIFICATION_ID)
 
         try {
             // Meta SDK
@@ -55,6 +78,14 @@ class MainApplication : Application() {
         } catch (e: Exception) {
             Log.e("MainApplication", "❌ Application init error: ${e.message}", e)
         }
+    }
+
+    private companion object {
+        /** Soon enough after launch that the first alert does not wait a whole minute. */
+        const val FIRST_CHECK_DELAY_MS = 5_000L
+
+        /** VehicleStatusService's foreground notification id, for clearing a stale one. */
+        const val LEGACY_TRACKING_NOTIFICATION_ID = 9004
     }
 }
 

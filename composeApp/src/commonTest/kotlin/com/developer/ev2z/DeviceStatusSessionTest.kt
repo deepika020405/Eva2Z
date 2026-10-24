@@ -1,8 +1,12 @@
 package com.developer.ev2z
 
 import com.developer.ev2z.network.ApiJson
+import com.developer.ev2z.response.DeviceStatusData
 import com.developer.ev2z.response.DeviceStatusResponse
+import com.developer.ev2z.response.StatusSession
 import com.developer.ev2z.response.coveredGround
+import com.developer.ev2z.response.latestSessionStatus
+import com.developer.ev2z.response.sortKeyOf
 import com.developer.ev2z.response.durationLabel
 import com.developer.ev2z.response.endClock
 import com.developer.ev2z.response.endPoint
@@ -452,5 +456,103 @@ class DeviceStatusSessionTest {
         assertNull(session.startPoint())
         assertNull(session.endPoint())
         assertFalse(session.coveredGround())
+    }
+
+    // use to gemini code
+    @Test
+    fun missingSuccessFieldDefaultsToTrue() {
+        val missingSuccess = """
+            {
+              "data": {
+                "status_count": { "offline": 0, "moving": 1, "idle": 0, "parked": 0 },
+                "sessions": []
+              }
+            }
+        """.trimIndent()
+
+        val parsed = ApiJson.decodeFromString(DeviceStatusResponse.serializer(), missingSuccess)
+        assertTrue(parsed.success)
+        assertTrue(parsed.data != null)
+    }
+
+    // ── Picking the newest session, for the idle fallback ────────────────────
+
+    private fun session(status: String, endTime: String) =
+        StatusSession(status = status, start_time = endTime, end_time = endTime)
+
+    /**
+     * Why the list cannot simply be read from the end, and why the stamp cannot be sorted
+     * as sent: these four are in the order the real payload sent them, the last row is
+     * not the latest one, and "02:40:19 PM" is below "11:19:48 AM" as a string.
+     */
+    @Test
+    fun theNewestSessionIsTheOneWithTheLatestEndTime() {
+        val data = DeviceStatusData(
+            sessions = listOf(
+                session("parked", "2026-10-22 11:19:48 AM"),
+                session("idle", "2026-10-22 02:40:19 PM"),
+                session("moving", "2026-10-22 02:39:49 PM"),
+            )
+        )
+
+        assertEquals("idle", data.latestSessionStatus())
+    }
+
+    /** The twenty-four-hour form this endpoint sends on some days. */
+    @Test
+    fun aTwentyFourHourStampIsTakenAsAlreadyInThatForm() {
+        val data = DeviceStatusData(
+            sessions = listOf(
+                session("idle", "2026-10-22 09:36:57"),
+                session("parked", "2026-10-22 14:02:11"),
+            )
+        )
+
+        assertEquals("parked", data.latestSessionStatus())
+    }
+
+    @Test
+    fun midnightAndNoonCrossTheMeridiemCorrectly() {
+        assertEquals("2026-10-22T000047", sortKeyOf("2026-10-22 12:00:47 AM"))
+        assertEquals("2026-10-22T120047", sortKeyOf("2026-10-22 12:00:47 PM"))
+        assertEquals("2026-10-22T233000", sortKeyOf("2026-10-22 11:30:00 PM"))
+    }
+
+    /** A session that ran past midnight sorts above one that ended earlier the same day. */
+    @Test
+    fun theDateIsPartOfTheComparison() {
+        val data = DeviceStatusData(
+            sessions = listOf(
+                session("moving", "2026-10-23 12:04:00 AM"),
+                session("idle", "2026-10-22 11:58:00 PM"),
+            )
+        )
+
+        assertEquals("moving", data.latestSessionStatus())
+    }
+
+    /**
+     * A malformed stamp is dropped from the comparison rather than sorting first — null
+     * would otherwise be the smallest key and could win by default.
+     */
+    @Test
+    fun anUnparseableStampIsIgnoredRatherThanWinning() {
+        assertNull(sortKeyOf(""))
+        assertNull(sortKeyOf("not a stamp"))
+        assertNull(sortKeyOf("2026-10-22 25:00:00"))
+
+        val data = DeviceStatusData(
+            sessions = listOf(
+                session("moving", "nonsense"),
+                session("idle", "2026-10-22 02:40:19 PM"),
+            )
+        )
+
+        assertEquals("idle", data.latestSessionStatus())
+    }
+
+    @Test
+    fun aDayWithNoSessionsHasNoNewestOne() {
+        assertNull(DeviceStatusData(sessions = emptyList()).latestSessionStatus())
     }
 }

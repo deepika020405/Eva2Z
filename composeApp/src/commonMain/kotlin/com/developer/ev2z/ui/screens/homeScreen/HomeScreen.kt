@@ -50,7 +50,7 @@ private val TextSecondary   = Color(0xFF6B7280)
 private val TextHint        = Color(0xFFADB5BD)
 private val EngineRed       = Color(0xFFE53935)
 private val EngineRedLight  = Color(0xFFFDECEC)
-private val ChallanAmber      = Color(0xFFF59E0B)
+private val ChallanAmber    = Color(0xFFF59E0B)
 private val BellBg          = Color(0xFFEEEEEE)
 private val ShadowColor     = Color(0x14000000)
 

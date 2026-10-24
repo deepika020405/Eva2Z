@@ -24,7 +24,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.data.local.model.Device
-import com.developer.ev2z.data.local.model.statusColorOf
+import com.developer.ev2z.data.local.model.fleetMarkerColorOf
+import com.developer.ev2z.data.local.model.isRunningKind
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
@@ -404,7 +405,12 @@ actual fun PlatformMapView(
                     // Null if the Maps SDK cannot supply a descriptor, which falls back
                     // to the default pin rather than taking the screen down.
                     val markerIcon = remember(vehicle, statusKind) {
-                        val color = statusColorOf(statusKind).toInt()
+                        // Green running, red standing still — fleetMarkerColorOf, not
+                        // statusColorOf: this map answers "is it moving?" and nothing
+                        // else, and the grey its offline bucket used to paint made a
+                        // parked vehicle look like a map decoration. The fix age is
+                        // still in the chip and the callout below.
+                        val color = fleetMarkerColorOf(statusKind).toInt()
                         if (vehicle == null) vehicleArrowIcon(context, color)
                         else vehicleMarkerIcon(context, vehicle, color)
                     }
@@ -440,14 +446,13 @@ actual fun PlatformMapView(
                             if (address != null) append(" · $address")
                             if (fixAge != null) append(" · $fixAge")
                         },
+                        // The fallback pin carries the same two colours as the vehicle
+                        // it stands in for, so the Maps SDK failing to rasterise a
+                        // bitmap cannot also change what the marker is saying.
                         icon = markerIcon
                             ?: BitmapDescriptorFactory.defaultMarker(
-                                when (statusKind) {
-                                    "running" -> BitmapDescriptorFactory.HUE_GREEN
-                                    "idle" -> BitmapDescriptorFactory.HUE_YELLOW
-                                    "parked", "stopped" -> BitmapDescriptorFactory.HUE_RED
-                                    else -> BitmapDescriptorFactory.HUE_AZURE
-                                }
+                                if (isRunningKind(statusKind)) BitmapDescriptorFactory.HUE_GREEN
+                                else BitmapDescriptorFactory.HUE_RED
                             ),
                         // Turns to the direction it is travelling in, so a vehicle
                         // crossing the map faces along the road rather than sliding
@@ -502,8 +507,11 @@ actual fun PlatformMapView(
                         // same grey arrow. The chip is the only thing that says which
                         // one is which. The address is one tap away in the callout.
                         val chipText = device.mapLabel()
+                        // The chip takes the vehicle's colour, not the badge palette:
+                        // a grey chip over a red vehicle reads as two different
+                        // claims about the same tracker.
                         val labelIcon = remember(chipText, statusKind) {
-                            addressLabelIcon(chipText, statusColorOf(statusKind).toInt())
+                            addressLabelIcon(chipText, fleetMarkerColorOf(statusKind).toInt())
                         }
                         Marker(
                             state = rememberUpdatedMarkerState(

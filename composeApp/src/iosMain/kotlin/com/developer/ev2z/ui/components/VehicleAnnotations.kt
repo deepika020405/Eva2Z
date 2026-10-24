@@ -1,6 +1,6 @@
 package com.developer.ev2z.ui.components
 
-import com.developer.ev2z.data.local.model.statusColorOf
+import com.developer.ev2z.data.local.model.fleetMarkerColorOf
 import kotlinx.cinterop.ExperimentalForeignApi
 import platform.CoreGraphics.CGPointMake
 import platform.CoreLocation.CLLocationCoordinate2DMake
@@ -185,9 +185,11 @@ internal class VehicleAnnotations {
         // getOrPut reads a null entry as a miss — it would try again every frame.
         if (images.containsKey(key)) return images[key]
 
-        // The body colour is the status colour, the same as every other map in the
-        // app: green while the vehicle is running, yellow idling, red stopped.
-        val color = statusColorOf(marker.statusKind)
+        // Green while the vehicle is moving, red while it is standing still — the live
+        // fleet map's two-colour answer, see fleetMarkerColorOf. statusColorOf's grey
+        // offline bucket used to land here, and the trackers on a real account report
+        // offline between uploads, so every standing vehicle was a grey arrow.
+        val color = fleetMarkerColorOf(marker.statusKind)
         val image = if (marker.vehicle == null) vehicleArrowImage(color)
         else vehicleMarkerImage(marker.vehicle, color)
         images[key] = image

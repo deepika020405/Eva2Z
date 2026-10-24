@@ -1,5 +1,6 @@
 import UIKit
 import AVFoundation
+import BackgroundTasks
 import CallKit
 import PushKit
 import ComposeApp
@@ -108,6 +109,12 @@ class AppDelegate: NSObject,
         self.voipRegistry = voipReg
         print("✅ VoIP PushKit registered")
 
+        // Vehicle status check in the background. MUST be registered before
+        // didFinishLaunching returns — BGTaskScheduler raises an exception for a task
+        // identifier submitted without a handler, so this cannot be deferred.
+        registerStatusCheckTask()
+        scheduleStatusCheck()
+
         // Cold-start: app killed and user tapped a notification banner
         if let payload = launchOptions?[UIApplication.LaunchOptionsKey.remoteNotification] as? [AnyHashable: Any] {
             print("🧊 Cold-start notification payload:", payload)
@@ -116,6 +123,72 @@ class AppDelegate: NSObject,
         }
 
         return true
+    }
+
+    // MARK: - Vehicle status background check
+
+    // Moving, Idle and Parked are all raised by the app itself (VehicleStatusNotifier)
+    // from the live-location poll, which needs the app to be running — this is how it
+    // keeps running once the user leaves the screen. A server push would not need any of
+    // this, which is why the killed-app case below still belongs to the backend.
+    //
+    // A BGAppRefreshTask is opportunistic by design: iOS decides when to grant it, from
+    // how the app is used and how much battery there is, and it typically means tens of
+    // minutes to hours rather than the seconds the foreground poll manages. If the
+    // user force-quits the app from the app switcher, iOS stops granting it altogether
+    // until the app is opened again. For alerts that must survive that, the server has to
+    // push them — a push with an `aps.alert` payload is the only thing iOS will show for
+    // an app it is not running.
+    private static let statusCheckTaskId = "com.developer.ev2z.vehicle-status-check"
+
+    private func registerStatusCheckTask() {
+        BGTaskScheduler.shared.register(
+            forTaskWithIdentifier: Self.statusCheckTaskId,
+            using: nil
+        ) { task in
+            self.handleStatusCheck(task: task)
+        }
+        print("✅ Vehicle status background task registered")
+    }
+
+    private func scheduleStatusCheck() {
+        let request = BGAppRefreshTaskRequest(identifier: Self.statusCheckTaskId)
+        // The earliest iOS may run it, not a promise that it will.
+        request.earliestBeginDate = Date(timeIntervalSinceNow: 15 * 60)
+        do {
+            try BGTaskScheduler.shared.submit(request)
+            print("⏰ Status check submitted — earliest in 15 min")
+        } catch {
+            print("❌ Status check could not be submitted: \(error.localizedDescription)")
+        }
+    }
+
+    private func handleStatusCheck(task: BGTask) {
+        // Re-submit first: one grant buys one run, and a task that forgets to ask again
+        // is never scheduled a second time.
+        scheduleStatusCheck()
+
+        // iOS gives the task a few seconds and then takes the time back. The expiration
+        // handler is the only chance to admit the work did not finish — without it the
+        // system records the task as having overrun and grants fewer of them.
+        task.expirationHandler = {
+            print("⌛️ Status check expired before it finished")
+            task.setTaskCompleted(success: false)
+        }
+
+        // KotlinBoolean, not Bool: a Boolean inside a Kotlin lambda crosses to Swift boxed.
+        IosStatusCheck.shared.run { ranCleanly in
+            let ok = ranCleanly.boolValue
+            print("🔁 Status check finished — ok=\(ok)")
+            task.setTaskCompleted(success: ok)
+        }
+    }
+
+    // Leaving the app is the moment worth asking for the next window: iOS weighs the
+    // request against how the app is actually used, and submitting on background entry
+    // is what that heuristic expects.
+    func applicationDidEnterBackground(_ application: UIApplication) {
+        scheduleStatusCheck()
     }
 
     // MARK: - APNs Token

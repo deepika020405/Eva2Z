@@ -24,7 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.developer.ev2z.data.local.model.Device
-import com.developer.ev2z.data.local.model.statusColorOf
+import com.developer.ev2z.data.local.model.fleetMarkerColorOf
 import com.developer.ev2z.ui.screens.device_Report.LABEL_LIFT_POINTS
 import com.developer.ev2z.ui.screens.device_Report.buildAddressLabelImage
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -142,9 +142,11 @@ actual fun PlatformMapView(
         devices.mapNotNull { device ->
             val labelled = selectedDevice == null || device.deviceId == selectedDevice.deviceId
             if (!labelled) return@mapNotNull null
+            // The chip takes the vehicle's own colour, not the badge palette: a grey
+            // chip over a red vehicle reads as two claims about one tracker.
             val image = buildAddressLabelImage(
                 device.mapLabel(),
-                statusColorOf(device.getStatusKind())
+                fleetMarkerColorOf(device.getStatusKind())
             ) ?: return@mapNotNull null
             device.deviceId to image
         }.toMap()

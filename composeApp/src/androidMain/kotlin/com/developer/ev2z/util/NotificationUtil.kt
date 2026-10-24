@@ -27,6 +27,8 @@ object NotificationUtil {
     // The service plays the ringtone itself via playRingtone(); the notification
     // must not also trigger channel sound or the user hears double ringing.
     const val CALL_SERVICE_CHANNEL_ID = "eva2z_call_service_v4"
+    // Silent channel for VehicleStatusService's ongoing notification.
+    const val TRACKING_CHANNEL_ID     = "eva2z_tracking_v1"
 
     const val GEOFENCE_NOTIFICATION_ID = 9001
     const val CALL_NOTIFICATION_ID     = 9002
@@ -35,6 +37,10 @@ object NotificationUtil {
     // above the fixed ids above that a document id can never collide with them.
     private const val VAULT_NOTIFICATION_ID_BASE = 20_000
     private const val VAULT_REQUEST_CODE_BASE    = 20_000
+
+    // Locally raised vehicle status alerts (Engine Idle), one id per device, kept above
+    // the vault block so a device id and a document id can never land on each other.
+    private const val VEHICLE_STATUS_ID_BASE = 30_000
 
     // ── Android 14+: request USE_FULL_SCREEN_INTENT if not granted ───
     fun requestFullScreenIntentPermissionIfNeeded(context: Context) {
@@ -89,6 +95,28 @@ object NotificationUtil {
                 vibrationPattern = longArrayOf(0, 300, 200, 300)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
                 setShowBadge(true)
+            }
+            nm.createNotificationChannel(channel)
+        }
+    }
+
+    // ── Silent channel for VehicleStatusService's own notification ────
+    // MIN importance and no sound: this is the permanent "Vehicle alerts on" row the
+    // foreground service is required to show, not an alert in its own right. The alerts
+    // it raises go out on CHANNEL_ID like every other one.
+    fun createTrackingChannel(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val channel = NotificationChannel(
+                TRACKING_CHANNEL_ID,
+                "Eva2z Vehicle Alerts",
+                NotificationManager.IMPORTANCE_MIN
+            ).apply {
+                description = "Keeps moving / idle / parked alerts running in the background"
+                setSound(null, null)
+                enableVibration(false)
+                setShowBadge(false)
+                lockscreenVisibility = Notification.VISIBILITY_SECRET
             }
             nm.createNotificationChannel(channel)
         }
@@ -203,6 +231,40 @@ object NotificationUtil {
         }
 
         NotificationManagerCompat.from(context).notify(notificationId, builder.build())
+    }
+
+    // ── Vehicle status alert the app raised itself (Engine Idle) ──────
+    /**
+     * Same channel, icon and sound as the pushed Moving/Parked banners — see
+     * `showVehicleStatusNotification`, the only caller.
+     *
+     * [key] is the identity of the alert, not of the occasion: it is hashed into a
+     * stable notification id so the same device idling again replaces its own banner
+     * instead of stacking a second one. The id is offset into its own range, clear of
+     * the fixed geofence/call ids and of the vault block above.
+     */
+    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
+    fun showVehicleStatus(context: Context, title: String, body: String, key: String) {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val notificationId = VEHICLE_STATUS_ID_BASE + (key.hashCode() and 0xFFFF)
+        val clickPendingIntent = PendingIntent.getActivity(
+            context, notificationId, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.app_logos)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
+            .setAutoCancel(true)
+            .setContentIntent(clickPendingIntent)
+
+        NotificationManagerCompat.from(context).notify(notificationId, builder.build())
+        Log.d("NotificationUtil", "🔔 vehicle status notification posted — $key: $title")
     }
 
     // ── Incoming-call notification (ringtone + full-screen intent) ────

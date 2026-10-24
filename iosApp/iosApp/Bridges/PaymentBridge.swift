@@ -10,6 +10,15 @@ import ComposeApp
     static let shared = PaymentBridge()
     private var ppPayment: PPPayment?
 
+    /// The live merchant the orders actually belong to. PhonePe's own
+    /// checkout/ui/v2/transaction/details and .../status report this id for every order the
+    /// backend mints ("EVA2Z Electric"). The UAT twin — same prefix with a "UAT" suffix — is
+    /// what the service API still returns in its `merchant_id` field and what this bridge used
+    /// to pass; against the production environment that merchant does not exist, so
+    /// checkout/ui/v2/pay answered INTERNAL_SERVER_ERROR with isRetryEnabled=false. Android
+    /// never hit it because startCheckoutPage() takes no merchantId and derives it from the token.
+    private static let merchantId = "M22VRDGEOVBYA"
+
     #if DEBUG
     private static let consoleHandlerName = "ev2zCheckoutDebug"
     private var didAttachConsoleBridge = false
@@ -53,10 +62,13 @@ import ComposeApp
             self.didAttachConsoleBridge = false
             #endif
 
+            // flowId is PhonePe's handle for one checkout journey in their logs. The sample
+            // app's placeholder was shared by every attempt, so their event batches mixed
+            // this order in with stale events from unrelated transactions.
             self.ppPayment = PPPayment(
                 environment: .production,
-                flowId: "ABCDEFGHIJK12",
-                merchantId: "M22VRDGEOVBYAUAT",
+                flowId: orderId,
+                merchantId: Self.merchantId,
                 enableLogging: true
             )
 
@@ -75,7 +87,7 @@ import ComposeApp
             }
 
             self.ppPayment?.startCheckoutFlow(
-                merchantId: "M22VRDGEOVBYAUAT",
+                merchantId: Self.merchantId,
                 orderId: orderId,
                 token: token,
                 appSchema: "eva2zgps",
@@ -191,15 +203,18 @@ import ComposeApp
 
       var originalFetch = window.fetch;
       if (originalFetch) {
-        window.fetch = function (input) {
+        window.fetch = function (input, init) {
           var url = String(input && input.url ? input.url : input);
+          // The request payload is the only place the merchant id and sdkContext the page
+          // forwards to /pay are visible — a 500 there says nothing about what was sent.
+          var req = clip((init && init.body) || (input && input.body) || '');
           return originalFetch.apply(this, arguments).then(function (res) {
             res.clone().text().then(function (body) {
-              post({ kind: 'fetch', status: res.status, url: url, body: clip(body) });
+              post({ kind: 'fetch', status: res.status, url: url, req: req, body: clip(body) });
             }).catch(function () {});
             return res;
           }).catch(function (err) {
-            post({ kind: 'fetch', status: -1, url: url, body: clip(err) });
+            post({ kind: 'fetch', status: -1, url: url, req: req, body: clip(err) });
             throw err;
           });
         };
@@ -211,10 +226,11 @@ import ComposeApp
         this.__ev2zUrl = url;
         return open.apply(this, arguments);
       };
-      XMLHttpRequest.prototype.send = function () {
+      XMLHttpRequest.prototype.send = function (body) {
         var xhr = this;
+        var req = clip(body || '');
         xhr.addEventListener('loadend', function () {
-          post({ kind: 'xhr', status: xhr.status, url: String(xhr.__ev2zUrl), body: clip(xhr.responseText) });
+          post({ kind: 'xhr', status: xhr.status, url: String(xhr.__ev2zUrl), req: req, body: clip(xhr.responseText) });
         });
         return send.apply(this, arguments);
       };
@@ -289,6 +305,11 @@ extension PaymentBridge: WKScriptMessageHandler {
             let status = info["status"] as? Int ?? 0
             let url = info["url"] as? String ?? ""
             print("🌐 [checkout \(kind) \(status)] \(url)")
+            // Only worth the noise when the call actually failed.
+            if status >= 400 || status < 0,
+               let req = info["req"] as? String, !req.isEmpty {
+                print("   ↰ \(req)")
+            }
             if let body = info["body"] as? String, !body.isEmpty {
                 print("   ↳ \(body)")
             }

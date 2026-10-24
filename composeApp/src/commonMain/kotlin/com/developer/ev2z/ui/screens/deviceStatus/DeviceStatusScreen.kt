@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -22,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material3.*
@@ -55,7 +57,14 @@ import eva2z_connect_multiplatform.composeapp.generated.resources.Res
 import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
 import org.jetbrains.compose.resources.painterResource
 import com.developer.ev2z.theme.AppPageBg
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.toLocalDateTime
 import kotlin.math.roundToInt
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -69,6 +78,12 @@ fun DeviceStatusScreen(onBack: () -> Unit) {
     val sessions by viewModel.filteredSessions.collectAsState(emptyList())
     val filter by viewModel.statusFilter.collectAsState()
     val addressMap by viewModel.addressMap.collectAsState()
+    val selectedDeviceId by viewModel.selectedDeviceId.collectAsState()
+    val selectedDate by viewModel.selectedDate.collectAsState()
+    val loading by viewModel.loading.collectAsState()
+    val error by viewModel.error.collectAsState()
+
+
 
     PlatformBackHandler(true) { onBack() }
 
@@ -76,6 +91,8 @@ fun DeviceStatusScreen(onBack: () -> Unit) {
         viewModel.loadDevices()
     }
 
+    // One device is no choice at all, so it is made for the user — but only the device.
+    // The day is still theirs to pick, which is what actually fires the request.
     LaunchedEffect(devices) {
         val deviceList = devices?.devices ?: emptyList()
 
@@ -88,7 +105,7 @@ fun DeviceStatusScreen(onBack: () -> Unit) {
         containerColor = Color(0xFFF5F5F5), // 👈 screen background
         topBar = {
             TopAppBar(
-                title = { Text("Today's Report") },
+                title = { Text("Status Report") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.Default.ArrowBack, null)
@@ -112,8 +129,10 @@ fun DeviceStatusScreen(onBack: () -> Unit) {
                 DeviceDropdownCardSimple(
                     userName = devices?.username.orEmpty(),
                     devices = it,
-                    selectedDeviceId = viewModel.selectedDeviceId.collectAsState().value,
+                    selectedDeviceId = selectedDeviceId,
+                    selectedDate = selectedDate,
                     onDeviceSelect = viewModel::selectDevice,
+                    onDateSelect = viewModel::selectDate,
                     onLocationClick = { /* optional */ }
                 )
 
@@ -144,17 +163,43 @@ fun DeviceStatusScreen(onBack: () -> Unit) {
             Spacer(Modifier.height(12.dp))
 
             when {
-                viewModel.selectedDeviceId.collectAsState().value == null -> {
+                // The two choices, in the order the screen asks for them: a device
+                // first, then the day — nothing is fetched until both are in hand.
+                selectedDeviceId == null -> {
                     EmptyState(
                         title = "Select a device",
                         subtitle = "Please select a device to view status history"
                     )
                 }
 
+                selectedDate == null -> {
+                    EmptyState(
+                        title = "Select a date",
+                        subtitle = "Pick a date to view this device's status report"
+                    )
+                }
+
+                loading -> {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(top = 80.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = Color(0xFF00A844))
+                    }
+                }
+
+                error != null -> {
+                    EmptyState(
+                        title = "Could not load report",
+                        subtitle = error ?: "Please try again"
+                    )
+                }
+
                 statusResponse?.success == false -> {
                     EmptyState(
                         title = "No data found",
-                        subtitle = statusResponse?.message ?: "No status available for today"
+                        subtitle = statusResponse?.message
+                            ?: "No status available for ${displayDate(selectedDate)}"
                     )
                 }
 
@@ -162,9 +207,9 @@ fun DeviceStatusScreen(onBack: () -> Unit) {
                     EmptyState(
                         title = if (filter == "all") "No activity" else "No $filter sessions",
                         subtitle = if (filter == "all")
-                            "This device has no status records today"
+                            "This device has no status records for ${displayDate(selectedDate)}"
                         else
-                            "Nothing recorded with this status today"
+                            "Nothing recorded with this status on this date"
                     )
                 }
 
@@ -202,21 +247,25 @@ fun DeviceDropdownCardSimple(
     userName: String,
     devices: MyDevicesResponse,
     selectedDeviceId: String?,
+    selectedDate: String?,
     onDeviceSelect: (String) -> Unit,
+    onDateSelect: (String) -> Unit,
     onLocationClick: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    // Picking a device is the first half of the question; the picker for the second half
+    // opens on its own so the user is not left wondering what else is wanted.
+    var showDatePicker by remember { mutableStateOf(false) }
 
     val deviceCount = devices.devices.size
     val isSingleDevice = deviceCount == 1
 
-    // 🔥 device name resolve
+    // 🔥 device name resolve — only for a device actually selected. Falling back to the
+    // first device's name made an unselected dropdown look like a made choice, and the
+    // user then waited for a report nothing had asked for.
     val selectedDeviceName = devices.devices
         .find { it.device_id == selectedDeviceId }
-        ?.device_name
-        ?.takeIf { it.isNotEmpty() }
-        ?: devices.devices.firstOrNull()?.device_name
-        ?: selectedDeviceId
+        ?.let { it.device_name.ifEmpty { it.device_id } }
         ?: "Select Device"
 
     Card(
@@ -264,6 +313,7 @@ fun DeviceDropdownCardSimple(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .height(41.dp)
                     .background(Color(0xFFF5F5F5), RoundedCornerShape(8.dp))
                     .clickable(enabled = !isSingleDevice) { expanded = true }
                     .padding(12.dp),
@@ -278,9 +328,11 @@ fun DeviceDropdownCardSimple(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
+                        modifier = Modifier.align(Alignment.CenterVertically),
                         text = selectedDeviceName,
                         fontSize = 15.sp,
-                        maxLines = 1
+                        maxLines = 1,
+                        color = if (selectedDeviceId != null) Color(0xFF1B1B1B) else Color.Gray
                     )
                 }
 
@@ -308,15 +360,153 @@ fun DeviceDropdownCardSimple(
                             onClick = {
                                 expanded = false
                                 onDeviceSelect(device.device_id)
+                                // Straight into step two — unless a day is already
+                                // chosen, in which case the report is on its way.
+                                if (selectedDate == null) showDatePicker = true
                             }
                         )
                     }
                 }
             }
+
+            Spacer(Modifier.height(5.dp))
+
+            // The date row only means anything once there is a device to report on.
+            DateSelectorRow(
+                selectedDate = selectedDate,
+                enabled = selectedDeviceId != null,
+                showDialog = showDatePicker,
+                onShowDialogChange = { showDatePicker = it },
+                onDateSelect = onDateSelect
+            )
         }
     }
 }
 
+/**
+ * The day picker: a row showing the chosen date, and the dialog behind it.
+ *
+ * Disabled until a device is selected — the report is for one device on one day, and a
+ * date picked against no device has nothing to fetch. The dialog's open state lives in
+ * the caller so selecting a device can open it directly.
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalTime::class)
+@Composable
+fun DateSelectorRow(
+    selectedDate: String?,
+    enabled: Boolean,
+    showDialog: Boolean,
+    onShowDialogChange: (Boolean) -> Unit,
+    onDateSelect: (String) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(41.dp)
+            .background(
+                Color(0xFFF5F5F5),
+                RoundedCornerShape(8.dp)
+            )
+            .clickable(enabled = enabled) { onShowDialogChange(true) }
+            .padding(horizontal = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = when {
+                selectedDate != null -> displayDate(selectedDate)
+                enabled -> "Select Date"
+                else -> "Select a device first"
+            },
+            fontSize = 14.sp,
+            color = if (selectedDate != null) Color(0xFF1B1B1B) else Color.Gray
+        )
+
+        Icon(
+            imageVector = Icons.Default.DateRange,
+            contentDescription = "Select date",
+            tint = if (enabled) Color(0xFF2E7D32) else Color.Gray
+        )
+    }
+
+    if (showDialog) {
+        val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+
+        val datePickerState = rememberDatePickerState(
+            initialSelectedDateMillis = selectedDate?.let { isoToUtcMillis(it) },
+            // There is no report for a day that has not happened.
+            selectableDates = object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long): Boolean =
+                    Instant.fromEpochMilliseconds(utcTimeMillis)
+                        .toLocalDateTime(TimeZone.UTC)
+                        .date <= today
+            }
+        )
+
+        DatePickerDialog(
+            onDismissRequest = { onShowDialogChange(false) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        // The picker's millis are UTC midnight of the chosen day, so UTC
+                        // is what reads the day back out — the device's own timezone
+                        // would shift it by a day west of Greenwich.
+                        datePickerState.selectedDateMillis?.let { millis ->
+                            val date = Instant.fromEpochMilliseconds(millis)
+                                .toLocalDateTime(TimeZone.UTC)
+                                .date
+                            onDateSelect(date.toString())
+                        }
+                        onShowDialogChange(false)
+                    },
+                    enabled = datePickerState.selectedDateMillis != null
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { onShowDialogChange(false) }) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            ) {
+                DatePicker(
+                    state = datePickerState,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
+/** UTC midnight of an ISO `yyyy-MM-dd` day — what [DatePicker] counts its days in. */
+@OptIn(ExperimentalTime::class)
+private fun isoToUtcMillis(iso: String): Long? = try {
+    LocalDate.parse(iso).atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds()
+} catch (e: Exception) {
+    null
+}
+
+private val MONTHS = listOf(
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+)
+
+/** `2026-10-19` → `19 Oct 2026`, with the ISO string kept for the API. */
+fun displayDate(iso: String?): String {
+    if (iso == null) return "Select Date"
+    return try {
+        val date = LocalDate.parse(iso)
+        "${date.day} ${MONTHS[date.month.ordinal]} ${date.year}"
+    } catch (e: Exception) {
+        iso
+    }
+}
 
 
 

@@ -9,6 +9,7 @@ import com.developer.ev2z.network.DEVICES_POLL_INTERVAL_MS
 import com.developer.ev2z.network.UnauthorizedException
 import com.developer.ev2z.repository.HomeRepository
 import com.developer.ev2z.util.SessionState
+import com.developer.ev2z.util.VehicleStatusAlerts
 import io.ktor.util.date.getTimeMillis
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -99,7 +100,30 @@ class HomeViewModel(
                 // Status comes from whether the coordinates moved, not from the
                 // server's field. The tracker holds the reference position across polls
                 // so the comparison always spans MOVEMENT_WINDOW_MS.
-                val withStatus = movementTracker.apply(response, getTimeMillis())
+                val nowMs = getTimeMillis()
+                val withStatus = movementTracker.apply(response, nowMs)
+
+                // The Moving / Idle / Parked notifications, raised by the app itself
+                // so they arrive whether or not a push does. Shared with the background
+                // check rather than owned here, so the two cannot each announce the
+                // same spell.
+                //
+                // Fed the server's own words, not `withStatus`: the tracker answers one
+                // question — moving or standing still — and collapses idle and parked
+                // into "stopped" on the way.
+                //
+                // The ignition lookup is what makes the Idle alert possible at all: this
+                // response calls an engine-on standstill "parked". It is only spent on a
+                // vehicle that is standing still, and cached — see IdleStatusResolver.
+                // The session fallback behind it covers the trackers whose ignition line
+                // reads nothing at all — without it, Vehicle Idle works on one vehicle
+                // of this account and never on the other.
+                VehicleStatusAlerts.onPoll(
+                    response,
+                    sessionKindOf = { repository.getDeviceLatestSessionStatus(token, it) },
+                ) {
+                    repository.getDeviceIgnition(token, it)
+                }
 
                 _uiState.value = HomeUiState.Success(withStatus)
                 // First proof this run that the stored token is still good. FCM registration
@@ -120,6 +144,9 @@ class HomeViewModel(
                 if (error is UnauthorizedException) {
                     println("🔒 [Home] 401 Unauthorized — redirecting to login")
                     SessionState.invalidate()
+                    // Whoever logs in next starts from silence rather than inheriting
+                    // the previous session's idle spells.
+                    VehicleStatusAlerts.reset()
                     _uiState.value = HomeUiState.Unauthorized
                 } else {
                     println("❌ Error loading devices: ${error.message}")

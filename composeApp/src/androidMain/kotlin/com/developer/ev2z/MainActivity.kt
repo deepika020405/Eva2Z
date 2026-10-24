@@ -10,6 +10,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import com.developer.ev2z.data.local.DeepLinkManager
 import com.developer.ev2z.data.local.createStorageManager
 import com.developer.ev2z.data.local.initStorageManager
+import com.developer.ev2z.util.BatteryOptimization
 import com.developer.ev2z.phonepe.PaymentBus
 import com.developer.ev2z.ui.screens.Profile.GlobalContext
 import com.developer.ev2z.util.DeepLinkBus
@@ -58,6 +59,15 @@ class MainActivity : ComponentActivity() {
             // ✅ Step 2: DeepLinkManager init — reuse same storage instance
             val storage = createStorageManager()
             DeepLinkManager.init(storage)
+
+            // Asked once, and only with a session in hand: without the exemption the
+            // alerts stop the moment the phone sleeps, which is the whole complaint.
+            BatteryOptimization.requestExemptionOnce(this)
+
+            // The alarm chain is the only thing carrying the alerts while the app is
+            // away, and a chain that lost a link stays lost. Re-arming on every launch
+            // costs one replaced PendingIntent.
+            StatusAlarmScheduler.scheduleNext(this)
 
             // ✅ Step 3: Context set karo
             AppContextHolder.context = applicationContext

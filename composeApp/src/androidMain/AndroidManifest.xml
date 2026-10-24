@@ -44,6 +44,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
     <!-- Android 14+ — required for ActiveCallService (keeps WebRTC mic alive in background) -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/>
+
+    <!-- Keeps the moving / idle / parked alerts running with the app closed -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
     <!-- Proximity sensor — turn off screen when phone is held to ear -->
     <uses-feature android:name="android.hardware.sensor.proximity" android:required="false" />
     <!-- Microphone hardware declaration -->
@@ -197,6 +202,29 @@
             android:name=".ActiveCallService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
+
+        <!-- The vehicle status alerts run on an alarm chain (StatusAlarmReceiver) and a
+             periodic worker, with no foreground service: Android requires one to show a
+             permanent notification and gives no way to hide it. -->
+
+
+        <!-- ⏱️ Heartbeat that wakes the app for each status check while it is closed -->
+        <receiver
+            android:name=".StatusAlarmReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+        <!-- Restores the service after a reboot or an app update -->
+        <receiver
+            android:name=".BootReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+            </intent-filter>
+        </receiver>
 
         <!-- META -->
         <meta-data
