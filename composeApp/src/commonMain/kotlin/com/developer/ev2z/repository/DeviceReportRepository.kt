@@ -63,6 +63,22 @@ class DeviceReportRepository(
         )
     }
 
+    /**
+     * `device_id` → `device_type` ("wired" / "wireless") for every device on the account.
+     *
+     * A second endpoint on purpose: [getMyDevices] above reads `latest-locations` for
+     * real-time status, and that payload carries no `device_type` at all — so the screens
+     * deciding whether a tracker has a relay to cut would see null for every device. The
+     * stale `engine_status` that moved this screen off `devices/my-devices` doesn't matter
+     * here, because only the type is taken from it. Devices that report no type are
+     * dropped rather than guessed at.
+     */
+    suspend fun getDeviceTypes(token: String): Map<String, String> = withContext(Dispatchers.IO) {
+        apiService.getMyDevices(token).devices
+            .filter { it.device_id.isNotBlank() && !it.device_type.isNullOrBlank() }
+            .associate { it.device_id to it.device_type!!.trim().lowercase() }
+    }
+
     suspend fun getDeviceLiveLocation(
         token: String,
         deviceId: String

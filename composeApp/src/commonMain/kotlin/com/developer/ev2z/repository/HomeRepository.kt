@@ -2,6 +2,7 @@ package com.developer.ev2z.repository
 
 import com.developer.ev2z.data.local.model.DeviceResponse
 import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.response.DeviceAlarm
 import com.developer.ev2z.util.todayInReportZone
 
 class HomeRepository(private val apiService: ApiService) {
@@ -25,6 +26,18 @@ class HomeRepository(private val apiService: ApiService) {
      */
     suspend fun getDeviceIgnition(token: String, deviceId: String): String? =
         apiService.getDeviceIgnition(token, deviceId)
+
+    /**
+     * One device's recorded events, for the engine on/off alerts.
+     *
+     * Unwrapped, and deliberately *not* swallowing failures the way [getDeviceIgnition]
+     * does: the notifier has to be able to tell "no new events" from "could not read the
+     * log", because the two mean opposite things to something that works by comparing
+     * against what it last saw. [com.developer.ev2z.util.IgnitionAlerts] handles the
+     * failures, including the 404 that stands the feature down.
+     */
+    suspend fun getDeviceAlarms(token: String, deviceId: String): List<DeviceAlarm> =
+        apiService.getDeviceAlarms(token, deviceId).data
 
     /**
      * The newest status the server recorded for this device today, for the same

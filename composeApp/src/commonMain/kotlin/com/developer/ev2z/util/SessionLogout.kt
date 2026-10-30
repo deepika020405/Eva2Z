@@ -4,6 +4,8 @@ import com.developer.ev2z.FcmBridge
 import com.developer.ev2z.data.local.StorageManager
 import com.developer.ev2z.data.local.UserPrefs
 import com.developer.ev2z.network.ApiService
+import com.developer.ev2z.network.RateLimitGate
+import com.developer.ev2z.network.SharedFleetLocations
 import com.developer.ev2z.platformName
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -108,5 +110,16 @@ object SessionLogout {
             storage.saveString("device_uuid", deviceUuid)
         }
         FcmBridge.clear()
+        // The fleet answer is shared between screens and keyed on the token, so the next
+        // account could not be served this one's vehicles — but it is held for a few
+        // seconds after a logout and there is no reason to keep it.
+        SharedFleetLocations.clear()
+        // A throttle hold belongs to the session that earned it; whoever signs in next
+        // should start polling straight away.
+        RateLimitGate.open()
+        // Both notifiers' memories go with the session, so the next account is baselined
+        // rather than told what the previous one's vehicles were doing.
+        VehicleStatusAlerts.reset()
+        IgnitionAlerts.reset()
     }
 }

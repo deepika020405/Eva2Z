@@ -9,7 +9,7 @@ import platform.UserNotifications.UNUserNotificationCenter
  * The local banner for a status the app worked out itself.
  *
  * `AppDelegate` already posts local notifications for data-only pushes the same way, so
- * an idle alert raised here looks like every other vehicle notification. Authorisation
+ * an alert raised here looks like every other vehicle notification. Authorisation
  * was requested at launch (`AppDelegate.didFinishLaunching`); if the user declined,
  * iOS drops the request and the completion handler reports it.
  *
@@ -33,9 +33,9 @@ actual fun showVehicleStatusNotification(key: String, title: String, body: Strin
     UNUserNotificationCenter.currentNotificationCenter()
         .addNotificationRequest(request) { error ->
             if (error != null) {
-                println("❌ Idle notification failed — ${error.localizedDescription}")
+                println("❌ Status notification failed — ${error.localizedDescription}")
             } else {
-                println("🔔 Idle notification posted — $key")
+                println("🔔 Status notification posted — $key")
             }
         }
 }

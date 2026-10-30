@@ -1,6 +1,7 @@
 package com.developer.ev2z.util
 
 import com.developer.ev2z.data.local.model.Device
+import com.developer.ev2z.data.local.model.isRunningKind
 import com.developer.ev2z.data.local.model.statusKindOf
 import io.ktor.util.date.getTimeMillis
 import kotlinx.coroutines.sync.Mutex
@@ -27,11 +28,14 @@ typealias StatusSessionLookup = suspend (deviceId: String) -> String?
  * `device/status-details` records idle session after idle session — so an engine-on
  * standstill arrives at the app spelled "parked".
  *
- * That is the whole reason the Vehicle Idle notification never fired:
- * [VehicleStatusNotifier] does recognise "idle" (and "ideal", and every casing of both),
- * but nothing ever handed it the word. Observed on device 0863656047639278 — standing
- * with the ignition on for a minute while the fleet payload said "parked" throughout,
- * and `status-details` wrote three 30-second idle sessions for that same minute.
+ * Observed on device 0863656047639278 — standing with the ignition on for a minute while
+ * the fleet payload said "parked" throughout, and `status-details` wrote three 30-second
+ * idle sessions for that same minute.
+ *
+ * Idle itself carries no notification (see [WATCHED_STATUS_KINDS]); the word still has to
+ * exist, because a standstill the app cannot tell from a park is announced as one. That
+ * is what this stops: the Parked banner waits for the engine to go off rather than firing
+ * at the first red light.
  *
  * The missing field is ignition, which `device-status/{id}` has and the fleet payload
  * does not, so idle is derived here:
@@ -43,8 +47,8 @@ typealias StatusSessionLookup = suspend (deviceId: String) -> String?
  *
  * `device-status` answers `{"success":false,"message":"No status found for this
  * device."}` for some trackers — the Yamaha on this account among them — and on those the
- * rule above can never fire, so the Idle notification that works on one vehicle is
- * missing on the next. `status-details` is asked in exactly that case: it keeps idle
+ * rule above can never fire, so a standstill that is really idling reads as a park on one
+ * vehicle of an account and not the next. `status-details` is asked in that case: it keeps idle
  * sessions of its own, and its newest session is a second opinion on what the vehicle is
  * doing now.
  *
@@ -115,10 +119,53 @@ class IdleStatusResolver(
         ignitionOf: IgnitionLookup,
         sessionKindOf: StatusSessionLookup? = null,
     ): List<VehicleStatusSample> = devices.map { device ->
-        VehicleStatusSample(
+        resolveOne(device, ignitionOf, sessionKindOf)
+    }
+
+    /**
+     * One device's sample: the status the notifier should see, and the engine state this
+     * poll could establish.
+     *
+     * The ignition comes out of the same work the idle rule does, so the Engine On/Off
+     * alerts ride along on it rather than adding requests of their own:
+     *
+     * * **A moving vehicle's engine is on**, and that needs no endpoint to know. Which
+     *   matters more than it sounds: `device-status` is only asked about standstills (see
+     *   [couldBeIdling]), so without this rule a vehicle that started and drove off would
+     *   never report an engine, and the alert would be the one thing on this screen that
+     *   missed a vehicle setting out.
+     * * **A standstill's engine** is the ignition reading the idle rule already fetched
+     *   and cached — free within [IGNITION_CACHE_TTL_MS].
+     * * **Anything else is null**: a stale fix, or a tracker with no ignition wire. Null
+     *   means "not known", and the notifier leaves such a device exactly as it was rather
+     *   than announcing a guess.
+     */
+    private suspend fun resolveOne(
+        device: Device,
+        ignitionOf: IgnitionLookup,
+        sessionKindOf: StatusSessionLookup?,
+    ): VehicleStatusSample {
+        val movingNow = isRunningKind(statusKindOf(device.status)) || device.speed > 0
+        val freshEnough = (device.lastSeenMinutes() ?: 0) <= MAX_FIX_AGE_MINUTES
+
+        val status = statusFor(device, ignitionOf, sessionKindOf)
+
+        val ignition = when {
+            !freshEnough -> null
+            movingNow -> IGNITION_ON
+            // Reads the cache the line above has just filled for a standstill; null here
+            // is a tracker whose ignition line says nothing.
+            couldBeIdling(device) -> cachedOr(cache, device.deviceId, now()) {
+                ignitionOf(device.deviceId)
+            }
+            else -> null
+        }
+
+        return VehicleStatusSample(
             deviceId = device.deviceId,
             deviceName = device.getDisplayName(),
-            status = statusFor(device, ignitionOf, sessionKindOf),
+            status = status,
+            ignition = ignition,
         )
     }
 
@@ -195,7 +242,10 @@ class IdleStatusResolver(
         /** Spelled the way [statusKindOf] already understands it. */
         const val IDLE_STATUS = "idle"
 
-        /** What `device-status` calls a live ignition line. */
+        /**
+         * What `device-status` calls a live ignition line, and the word the samples carry
+         * for it — [IgnitionAlertNotifier] reads it with the same spelling.
+         */
         const val IGNITION_ON = "on"
 
         /** The kinds an idling vehicle arrives disguised as. */

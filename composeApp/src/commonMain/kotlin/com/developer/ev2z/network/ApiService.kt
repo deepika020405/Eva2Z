@@ -46,6 +46,7 @@ import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import io.ktor.util.date.getTimeMillis
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -80,6 +81,33 @@ class ServiceEndpointMissingException(val path: String) :
 
 /** 404/405/501 all mean "this route does not exist here", not "your request was bad". */
 private val MISSING_ENDPOINT_CODES = setOf(404, 405, 501)
+
+/**
+ * The route for one device's ignition log, under `baseUrl`, without the device id.
+ *
+ * `gps.eva2z.in/api/ignition-log/{device_id}` — confirmed 2026-10-28 against this
+ * account: 200 with `{"success":true,"data":[…],"meta":{…}}`, and `?per_page=` honoured.
+ *
+ * Two things it does that the models and callers have to allow for:
+ *
+ *  - **403 on a device the account cannot read**, as `{"success":false,"message":
+ *    "Unauthorized or device not found."}`. That is *not* a session problem and must
+ *    never be confused with a 401 — see [DeviceForbiddenException].
+ *  - **`meta.per_page` changes type.** It is a number when the server defaults it (`50`)
+ *    and a string when it echoes the query back (`"5"`). `ApiJson` is lenient, so both
+ *    decode; worth knowing before anyone tightens that configuration.
+ */
+const val DEVICE_ALARMS_PATH = "ignition-log"
+
+/**
+ * When the ignition log was last asked for — any device, and per device.
+ *
+ * Only for the cadence line in [ApiService.getDeviceAlarms]. Top-level rather than
+ * instance state because sixteen call sites build their own `ApiService`, so a field
+ * would measure one object's calls instead of the app's.
+ */
+private var lastAlarmCallAtMs: Long? = null
+private val lastAlarmCallPerDevice = mutableMapOf<String, Long>()
 
 /**
  * Type + message + cause, for logging a failure that has to be told apart from
@@ -559,7 +587,18 @@ class ApiService {
     // ===============================================
 
     // ---------------- LATEST LOCATIONS ----------------
-    suspend fun getDevicesLatestLocations(token: String): DeviceResponse = offMainThread {
+    /**
+     * The whole fleet's current positions — the home map, and both device dropdowns.
+     *
+     * Shared through [SharedFleetLocations], so the three screens that poll this cost
+     * one request per interval between them instead of one each.
+     */
+    suspend fun getDevicesLatestLocations(token: String): DeviceResponse =
+        SharedFleetLocations.get(token, DEVICES_SHARE_WINDOW_MS) {
+            fetchDevicesLatestLocations(token)
+        }
+
+    private suspend fun fetchDevicesLatestLocations(token: String): DeviceResponse = offMainThread {
         println("🌐 API: Fetching latest locations")
 
         try {
@@ -572,6 +611,27 @@ class ApiService {
             if (response.status == HttpStatusCode.Unauthorized) {
                 throw UnauthorizedException()
             }
+
+            // 429 and every other error status must *fail* here rather than be decoded.
+            //
+            // DeviceResponse defaults every field, so Laravel's throttle body —
+            // {"message":"Too Many Attempts.","exception":…} — parsed into a perfectly
+            // valid response carrying zero devices, and the home map drew it: every
+            // marker gone, no error anywhere, tracking apparently switched off. See
+            // RateLimit.kt. A failure instead leaves the last known fleet on screen.
+            if (response.status == HttpStatusCode.TooManyRequests) {
+                val retryAfterMs = retryAfterMsOf(response)
+                RateLimitGate.close(retryAfterMs)
+                throw RateLimitedException(retryAfterMs)
+            }
+
+            if (!response.status.isSuccess()) {
+                throw ApiStatusException(response.status.value, "user/devices/latest-locations")
+            }
+
+            // The server is answering again — let the pollers resume without waiting
+            // out the rest of a hold from an earlier window.
+            RateLimitGate.open()
 
             response.body()
 
@@ -801,6 +861,23 @@ class ApiService {
             if (response.status == HttpStatusCode.Unauthorized) {
                  throw UnauthorizedException()
             }
+
+            // Same as the fleet call above: a throttled response is not a fix. This one
+            // happened to survive it — `success` is the one required field in
+            // LiveLocationResponse, so the 429 body failed to decode and the screen kept
+            // its last position — but it failed as an unexplained decode error once a
+            // second, and it told the pollers nothing. Now it parks them instead.
+            if (response.status == HttpStatusCode.TooManyRequests) {
+                val retryAfterMs = retryAfterMsOf(response)
+                RateLimitGate.close(retryAfterMs)
+                throw RateLimitedException(retryAfterMs)
+            }
+
+            if (!response.status.isSuccess()) {
+                throw ApiStatusException(response.status.value, "live-location/$deviceId")
+            }
+
+            RateLimitGate.open()
 
             ApiJson.decodeFromString(LiveLocationResponse.serializer(), raw)
 
@@ -1421,6 +1498,110 @@ class ApiService {
         } catch (e: Exception) {
             println("❌ Ignition lookup failed for $deviceId: ${e.message}")
             null
+        }
+    }
+
+    // ---------------- DEVICE ALARMS (event log) ----------------
+    /**
+     * One device's recorded events, newest first — the source of the engine on/off
+     * notifications.
+     *
+     * `alarm_type` here states the ignition in words ("Ignition OFF"), which no other
+     * endpoint on this account does: `latest-locations` reports an engine-on standstill
+     * as "parked", and `device-status/{id}` answers nothing at all on a tracker with no
+     * ignition wire. See [DeviceAlarmsResponse].
+     *
+     * [perPage] is kept small on purpose. The notifier only needs the events since the
+     * last one it announced, and a short page is both cheaper and kinder to the host's
+     * request budget (see `RateLimit.kt`) than pulling a day of history every poll.
+     *
+     * A 404/405 raises [ServiceEndpointMissingException] rather than a generic failure,
+     * because [DEVICE_ALARMS_PATH] is the one thing here that is **not confirmed** — the
+     * payload was supplied without its URL and none of the obvious spellings answers on
+     * `gps.eva2z.in` yet. [com.developer.ev2z.util.IgnitionAlerts] catches it and turns
+     * the feature off for the session instead of logging a 404 every poll, so the wrong
+     * path costs nothing until the right one is filled in here.
+     */
+    suspend fun getDeviceAlarms(
+        token: String,
+        deviceId: String,
+        perPage: Int = 5,
+    ): DeviceAlarmsResponse = offMainThread {
+        val path = "$DEVICE_ALARMS_PATH/$deviceId"
+
+        // The gap since the previous call is printed with the call, so the cadence can be
+        // read straight off logcat instead of being worked out from timestamps. This is a
+        // per-device endpoint polled on a rotation, so "how often is it called" and "how
+        // often is one vehicle read" are different questions — the line answers both.
+        val now = getTimeMillis()
+        val sinceAny = lastAlarmCallAtMs?.let { now - it }
+        val sinceThisDevice = lastAlarmCallPerDevice[deviceId]?.let { now - it }
+        lastAlarmCallAtMs = now
+        lastAlarmCallPerDevice[deviceId] = now
+
+        println(
+            buildString {
+                append("🌐 API: ignition-log $deviceId")
+                append(" (any device: ")
+                append(sinceAny?.let { "+${it}ms" } ?: "first call")
+                append(", this device: ")
+                append(sinceThisDevice?.let { "+${it}ms" } ?: "first call")
+                append(")")
+            }
+        )
+
+        try {
+            val response = client.get("$baseUrl$path") {
+                header(HttpHeaders.Authorization, "Bearer $token")
+                header(HttpHeaders.Accept, ContentType.Application.Json.toString())
+                parameter("per_page", perPage)
+            }
+
+            val raw = response.bodyAsText()
+            println("✔️ Device Alarms Status: ${response.status} deviceId=$deviceId")
+            println("📝 DEVICE ALARMS RAW = ${rawForLog(raw)}")
+
+            if (response.status == HttpStatusCode.Unauthorized) {
+                throw UnauthorizedException()
+            }
+
+            if (response.status.value in MISSING_ENDPOINT_CODES) {
+                throw ServiceEndpointMissingException(path)
+            }
+
+            // 403 means this device is not on the account, not that the session is over.
+            // Thrown as its own type so the caller can drop the device and keep the
+            // session — treating it as a 401 would log the user out over somebody else's
+            // tracker id.
+            if (response.status == HttpStatusCode.Forbidden) {
+                throw DeviceForbiddenException(deviceId)
+            }
+
+            // Same rule as the fleet call: an error body is never decoded as data. Every
+            // field of DeviceAlarmsResponse defaults, so a throttle page would otherwise
+            // parse into "this device has no events" — which, for a notifier that works
+            // by comparing against what it saw last, is a silent and permanent stop.
+            if (response.status == HttpStatusCode.TooManyRequests) {
+                val retryAfterMs = retryAfterMsOf(response)
+                RateLimitGate.close(retryAfterMs)
+                throw RateLimitedException(retryAfterMs)
+            }
+
+            if (!response.status.isSuccess()) {
+                throw ApiStatusException(response.status.value, path)
+            }
+
+            ApiJson.decodeFromString(DeviceAlarmsResponse.serializer(), raw)
+
+        } catch (e: UnauthorizedException) {
+            throw e
+        } catch (e: ServiceEndpointMissingException) {
+            throw e
+        } catch (e: DeviceForbiddenException) {
+            throw e
+        } catch (e: Exception) {
+            println("❌ Ignition Log Error: ${e.message}")
+            throw e
         }
     }
 

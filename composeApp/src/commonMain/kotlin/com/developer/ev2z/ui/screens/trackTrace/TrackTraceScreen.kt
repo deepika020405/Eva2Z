@@ -49,6 +49,7 @@ import com.developer.ev2z.ui.components.glideDurationMs
 import com.developer.ev2z.ui.components.isFarJump
 import com.developer.ev2z.ui.screens.device_Report.PlatformMapView
 import com.developer.ev2z.ui.screens.homeScreen.rememberAddressAt
+import com.developer.ev2z.util.MarkerAddressSource
 import com.developer.ev2z.util.rememberRoadWalk
 import io.ktor.util.date.getTimeMillis
 import eva2z_connect_multiplatform.composeapp.generated.resources.Res
@@ -304,7 +305,11 @@ private fun StableTrackMapSection(viewModel: TrackTraceViewModel) {
     val address = rememberAddressAt(
         latitude = position?.first,
         longitude = position?.second,
-        ownerKey = selectedDevice?.device_id?.takeIf { it.isNotEmpty() } ?: "track-trace"
+        ownerKey = selectedDevice?.device_id?.takeIf { it.isNotEmpty() } ?: "track-trace",
+        // The address chip on this map is the one users read while following a vehicle,
+        // so its text, the live fix under it and the geocoder's own coordinates are
+        // recorded in MarkerAddressRecorder as it moves.
+        source = MarkerAddressSource.TRACK_TRACE_MAP,
     )
 
     // The road between the last two fixes, walked rather than cut across.

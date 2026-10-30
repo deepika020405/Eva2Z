@@ -7,7 +7,9 @@ import com.developer.ev2z.data.local.model.Device
 import com.developer.ev2z.data.local.model.DeviceResponse
 import com.developer.ev2z.network.DEVICES_POLL_INTERVAL_MS
 import com.developer.ev2z.network.UnauthorizedException
+import com.developer.ev2z.network.pollAtFixedRate
 import com.developer.ev2z.repository.HomeRepository
+import com.developer.ev2z.util.IgnitionAlerts
 import com.developer.ev2z.util.SessionState
 import com.developer.ev2z.util.VehicleStatusAlerts
 import io.ktor.util.date.getTimeMillis
@@ -71,10 +73,15 @@ class HomeViewModel(
     fun startDevicesPolling(token: String) {
         devicesPollingJob?.cancel()
         devicesPollingJob = viewModelScope.launch {
-            while (isActive) {
-                // Delay first: loadDevices has already made the opening request, so
-                // firing one here too would just double it.
-                delay(DEVICES_POLL_INTERVAL_MS)
+            // Delay first: loadDevices has already made the opening request, so firing
+            // one here too would just double it.
+            delay(DEVICES_POLL_INTERVAL_MS)
+            // pollAtFixedRate rather than a bare while/delay loop, for what the loop
+            // carries with it: it waits out a server throttle instead of hammering
+            // through one, keeps the cadence from drifting by the request's latency, and
+            // survives a tick that throws. A hand-rolled loop here ended permanently on
+            // the first exception, and nothing restarts it.
+            pollAtFixedRate(DEVICES_POLL_INTERVAL_MS) {
                 fetchDevices(token, showLoading = false)
             }
         }
@@ -97,32 +104,59 @@ class HomeViewModel(
 
         repository.getDevicesLatestLocations(token).fold(
             onSuccess = { response ->
+                // `success=false` is not a fleet, and must never be drawn as one.
+                //
+                // An account with no devices answers 200 with `success=true` and an
+                // empty list, so this branch is only ever reached by a body that is not
+                // a fleet reply at all — the 429 throttle page being the one seen in the
+                // wild. DeviceResponse defaults every field, so such a body decodes into
+                // a valid-looking response with zero devices; publishing it wiped every
+                // marker off the map and read as GPS tracking turning itself off.
+                // ApiService now fails the call outright (see RateLimit.kt); this is the
+                // second line of defence, for a 200 that still says success=false.
+                if (!response.success) {
+                    println("⚠️ Fleet poll answered success=false — keeping the last known positions")
+                    if (_uiState.value !is HomeUiState.Success) {
+                        _uiState.value = HomeUiState.Error("Could not load devices")
+                    }
+                    return@fold
+                }
+
                 // Status comes from whether the coordinates moved, not from the
                 // server's field. The tracker holds the reference position across polls
                 // so the comparison always spans MOVEMENT_WINDOW_MS.
                 val nowMs = getTimeMillis()
                 val withStatus = movementTracker.apply(response, nowMs)
 
-                // The Moving / Idle / Parked notifications, raised by the app itself
-                // so they arrive whether or not a push does. Shared with the background
-                // check rather than owned here, so the two cannot each announce the
-                // same spell.
+                // The Moving / Parked notifications, raised by the app itself so they
+                // arrive whether or not a push does. Shared with the background check
+                // rather than owned here, so the two cannot each announce the same spell.
                 //
                 // Fed the server's own words, not `withStatus`: the tracker answers one
                 // question — moving or standing still — and collapses idle and parked
                 // into "stopped" on the way.
                 //
-                // The ignition lookup is what makes the Idle alert possible at all: this
-                // response calls an engine-on standstill "parked". It is only spent on a
-                // vehicle that is standing still, and cached — see IdleStatusResolver.
-                // The session fallback behind it covers the trackers whose ignition line
-                // reads nothing at all — without it, Vehicle Idle works on one vehicle
-                // of this account and never on the other.
+                // The ignition lookup is what tells an idling vehicle from a parked one:
+                // this response calls an engine-on standstill "parked". Idle carries no
+                // banner of its own, but telling the two apart is what keeps the Parked
+                // banner honest — it waits for the engine to go off instead of firing at
+                // the first red light. Only spent on a vehicle that is standing still,
+                // and cached; the session fallback behind it covers the trackers whose
+                // ignition line reads nothing at all. See IdleStatusResolver.
                 VehicleStatusAlerts.onPoll(
                     response,
                     sessionKindOf = { repository.getDeviceLatestSessionStatus(token, it) },
                 ) {
                     repository.getDeviceIgnition(token, it)
+                }
+
+                // Engine on/off, from `ignition-log/{id}` rather than inferred from the
+                // fleet's "parked". Called every five seconds, taking the vehicles in
+                // turn — see IGNITION_DEVICES_PER_TICK: this endpoint is per device, so
+                // reading the whole fleet every tick would be four times the request rate
+                // of everything else in the app put together.
+                IgnitionAlerts.onFleetPoll(response.data) {
+                    repository.getDeviceAlarms(token, it)
                 }
 
                 _uiState.value = HomeUiState.Success(withStatus)
@@ -145,8 +179,10 @@ class HomeViewModel(
                     println("🔒 [Home] 401 Unauthorized — redirecting to login")
                     SessionState.invalidate()
                     // Whoever logs in next starts from silence rather than inheriting
-                    // the previous session's idle spells.
+                    // the previous session's idle spells — or its engine events, which
+                    // would otherwise announce the last account's ignition to the new one.
                     VehicleStatusAlerts.reset()
+                    IgnitionAlerts.reset()
                     _uiState.value = HomeUiState.Unauthorized
                 } else {
                     println("❌ Error loading devices: ${error.message}")

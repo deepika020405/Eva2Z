@@ -36,6 +36,7 @@ import com.developer.ev2z.ui.components.VehicleAnnotations
 import com.developer.ev2z.ui.components.VehicleMarker
 import com.developer.ev2z.ui.components.userFacingImage
 import com.developer.ev2z.ui.components.vehicleTopViewFor
+import com.developer.ev2z.util.MarkerAddressSource
 import com.developer.ev2z.util.rememberDeviceFacing
 import platform.MapKit.*
 import platform.darwin.NSObject
@@ -129,7 +130,10 @@ actual fun PlatformMapView(
     // Resolved up here, not in the update block below: that block is a plain lambda
     // handed to UIKitView, so it cannot call a composable. Tapping a pin shows the
     // address when there is one, which is the question a pin tap is really asking.
-    val addresses = rememberDeviceAddresses(devices)
+    // Recorded under FLEET_MAP, same as the Android pins: each callout's address goes
+    // into MarkerAddressRecorder with the API fix the annotation sits on and the
+    // coordinates the geocoder answered with.
+    val addresses = rememberDeviceAddresses(devices, MarkerAddressSource.FLEET_MAP)
 
     // Rasterised once per label, not once per frame: this block re-runs on every poll,
     // and the registration only changes when the device does.

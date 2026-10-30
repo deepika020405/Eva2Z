@@ -33,6 +33,7 @@ import com.developer.ev2z.ui.components.screenHeightDp
 import com.developer.ev2z.util.Analytics
 import kotlinx.coroutines.launch
 import com.developer.ev2z.theme.AppPageBg
+import com.developer.ev2z.data.local.DeviceTypeStore
 
 private val primaryContainerLight = Color(0xFF00C853)
 private val BottomSheetPeek = 72.dp
@@ -591,6 +592,11 @@ fun AddDeviceDetailsCommon(
                                 deviceType.lowercase(),
                                 vehicle.vehicleId
                             )
+                            // Cached for both types, not just wireless: the screens that
+                            // hide engine controls on a wireless tracker have to know a
+                            // device is wired to keep showing them, and the endpoint they
+                            // poll (`latest-locations`) never reports device_type.
+                            DeviceTypeStore.save(deviceId, deviceType)
                         }
                     },
                     // The vehicle is part of this list because the server requires

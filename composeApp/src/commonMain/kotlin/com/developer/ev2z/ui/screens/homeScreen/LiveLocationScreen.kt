@@ -30,6 +30,7 @@ import eva2z_connect_multiplatform.composeapp.generated.resources.app_logo
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.InternalResourceApi
 import com.developer.ev2z.util.BottomBarController
+import com.developer.ev2z.util.MarkerAddressSource
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.text.style.TextOverflow
 
@@ -318,9 +319,9 @@ fun LiveLocationScreen(
 
                     Spacer(Modifier.height(4.dp))
 
-                    CommunityEntryCard(
+                   /* CommunityEntryCard(
                         onClick = { onOpenCommunity() }
-                    )
+                    )*/
 
                     if (showDeviceDropdown && deviceCount > 1) {
                         key("device_dropdown") {
@@ -568,7 +569,10 @@ fun DeviceDropdownSheet(
 @Composable
 fun DeviceListItem(device: Device, onClick: () -> Unit) {
     val statusColor = Color(device.getStatusColor())
-    val address = rememberDeviceAddress(device)
+    // Filed separately from the map pins: this row and the pin for the same vehicle
+    // show the same address, and recording both under one source would make a row's
+    // record overwrite the pin's.
+    val address = rememberDeviceAddress(device, MarkerAddressSource.FLEET_SHEET_ROW)
     // Null while the fix is current. A five-day-old position and a live one read
     // identically without it, which is the one thing a live-location list must not do.
     val fixAge = device.fixAgeLabel()
@@ -626,50 +630,50 @@ fun DeviceListItem(device: Device, onClick: () -> Unit) {
 // ─────────────────────────────────────────────────────────────────────────────
 //  CommunityEntryCard — unchanged
 // ─────────────────────────────────────────────────────────────────────────────
-@Composable
-fun CommunityEntryCard(onClick: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
-        shape = RoundedCornerShape(14.dp),
-        elevation = CardDefaults.cardElevation(6.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                shape = CircleShape,
-                color = Color(0xFF7B61FF).copy(alpha = 0.15f),
-                modifier = Modifier.size(40.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Groups,
-                    contentDescription = "Community",
-                    tint = Color(0xFF7B61FF),
-                    modifier = Modifier.padding(8.dp)
-                )
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = "Community", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                Text(
-                    text = "Connect with other EVA2Z users",
-                    fontSize = 12.sp,
-                    color = Color.Gray
-                )
-            }
-            Icon(
-                imageVector = Icons.Default.ArrowForwardIos,
-                contentDescription = null,
-                tint = Color.Gray,
-                modifier = Modifier.size(16.dp)
-            )
-        }
-    }
-}
+//@Composable
+//fun CommunityEntryCard(onClick: () -> Unit) {
+//    Card(
+//        modifier = Modifier
+//            .fillMaxWidth()
+//            .clickable { onClick() },
+//        shape = RoundedCornerShape(14.dp),
+//        elevation = CardDefaults.cardElevation(6.dp),
+//        colors = CardDefaults.cardColors(containerColor = Color.White)
+//    ) {
+//        Row(
+//            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+//            verticalAlignment = Alignment.CenterVertically
+//        ) {
+//            Surface(
+//                shape = CircleShape,
+//                color = Color(0xFF7B61FF).copy(alpha = 0.15f),
+//                modifier = Modifier.size(40.dp)
+//            ) {
+//                Icon(
+//                    imageVector = Icons.Default.Groups,
+//                    contentDescription = "Community",
+//                    tint = Color(0xFF7B61FF),
+//                    modifier = Modifier.padding(8.dp)
+//                )
+//            }
+//            Spacer(modifier = Modifier.width(12.dp))
+//            Column(modifier = Modifier.weight(1f)) {
+//                Text(text = "Community", fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+//                Text(
+//                    text = "Connect with other EVA2Z users",
+//                    fontSize = 12.sp,
+//                    color = Color.Gray
+//                )
+//            }
+//            Icon(
+//                imageVector = Icons.Default.ArrowForwardIos,
+//                contentDescription = null,
+//                tint = Color.Gray,
+//                modifier = Modifier.size(16.dp)
+//            )
+//        }
+//    }
+//}
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Platform expect — unchanged

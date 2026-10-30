@@ -37,6 +37,7 @@ import com.developer.ev2z.ui.components.vehicleArrowIcon
 import com.developer.ev2z.ui.components.markerRotationDegrees
 import com.developer.ev2z.ui.components.vehicleMarkerIcon
 import com.developer.ev2z.ui.components.vehicleTopViewFor
+import com.developer.ev2z.util.MarkerAddressSource
 import com.developer.ev2z.util.rememberDeviceFacing
 import com.google.maps.android.compose.*
 
@@ -415,7 +416,11 @@ actual fun PlatformMapView(
                         else vehicleMarkerIcon(context, vehicle, color)
                     }
 
-                    val address = rememberDeviceAddress(device)
+                    // Recorded under FLEET_MAP: the pin's address, the API fix it is
+                    // drawn at and the coordinates the geocoder answered with all go
+                    // into MarkerAddressRecorder, so a pin showing the wrong street can
+                    // be traced to the fix or to the geocode afterwards.
+                    val address = rememberDeviceAddress(device, MarkerAddressSource.FLEET_MAP)
 
                     // The glided position when there is one; the raw coordinates on the
                     // very first frame, before the animation has seeded itself.
@@ -444,7 +449,7 @@ actual fun PlatformMapView(
                             append(device.getStatusDisplay())
                             if (device.speed > 0) append(" · ${device.speed} km/h")
                             if (address != null) append(" · $address")
-                            if (fixAge != null) append(" · $fixAge")
+                           // if (fixAge != null) append(" · $fixAge")
                         },
                         // The fallback pin carries the same two colours as the vehicle
                         // it stands in for, so the Maps SDK failing to rasterise a

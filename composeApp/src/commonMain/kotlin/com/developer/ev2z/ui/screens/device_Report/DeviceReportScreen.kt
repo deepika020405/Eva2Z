@@ -48,6 +48,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.developer.ev2z.BackPressHandler
+import com.developer.ev2z.data.local.DeviceTypeStore
+import com.developer.ev2z.data.local.isWirelessDeviceType
 import com.developer.ev2z.data.local.model.isMotionKind
 import com.developer.ev2z.data.local.model.statusDisplayOf
 import com.developer.ev2z.data.local.model.statusKindOf
@@ -1036,73 +1038,84 @@ fun DeviceBasicInfoWithData(
     val isTurnOnEnabled = !isOnState
     val isTurnOffEnabled = isOnState
 
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 18.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        // Engine On
-        OutlinedButton(
-            onClick = {
-                viewModel.openMobilizeDialog("restore", device.device_id)
-            },
-            enabled = isTurnOnEnabled,
-            modifier = Modifier
-                .weight(1f)
-                .height(44.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = if (isTurnOnEnabled) {
-                ButtonDefaults.outlinedButtonColors(contentColor = DR_Running)
-            } else {
-                ButtonDefaults.outlinedButtonColors(
-                    contentColor = DR_TextHint,
-                    disabledContentColor = DR_TextHint.copy(alpha = 0.5f)
-                )
-            }
-        ) {
-            Icon(
-                Icons.Default.PowerSettingsNew,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(Modifier.width(6.dp))
-            Text("Engine On", fontSize = 13.sp, fontWeight = FontWeight.Medium)
-        }
+    // Only a wired tracker has a relay in line with the ignition, so Engine On/Off is
+    // shown for wired devices and hidden for wireless ones — the command would be
+    // accepted and do nothing. The server's type is preferred; the local cache covers a
+    // device added on this phone before that call has returned, and a device whose type
+    // neither knows keeps the controls rather than losing them to a guess.
+    val deviceTypes by viewModel.deviceTypes.collectAsState()
+    val deviceType = deviceTypes[device.device_id]
+        ?: remember(device.device_id) { DeviceTypeStore.get(device.device_id) }
 
-        // Engine Off
-        Button(
-            onClick = {
-                viewModel.openMobilizeDialog("cut", device.device_id)
-            },
-            enabled = isTurnOffEnabled,
-            modifier = Modifier
-                .weight(1f)
-                .height(44.dp),
-            shape = RoundedCornerShape(12.dp),
-            colors = if (isTurnOffEnabled) {
-                ButtonDefaults.buttonColors(containerColor = DR_Stopped)
-            } else {
-                ButtonDefaults.buttonColors(
-                    containerColor = DR_TextHint.copy(alpha = 0.2f),
-                    disabledContainerColor = DR_TextHint.copy(alpha = 0.12f),
-                    disabledContentColor = DR_TextHint.copy(alpha = 0.5f)
+    if (!isWirelessDeviceType(deviceType)) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // Engine On
+            OutlinedButton(
+                onClick = {
+                    viewModel.openMobilizeDialog("restore", device.device_id)
+                },
+                enabled = isTurnOnEnabled,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(44.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = if (isTurnOnEnabled) {
+                    ButtonDefaults.outlinedButtonColors(contentColor = DR_Running)
+                } else {
+                    ButtonDefaults.outlinedButtonColors(
+                        contentColor = DR_TextHint,
+                        disabledContentColor = DR_TextHint.copy(alpha = 0.5f)
+                    )
+                }
+            ) {
+                Icon(
+                    Icons.Default.PowerSettingsNew,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text("Engine On", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            }
+
+            // Engine Off
+            Button(
+                onClick = {
+                    viewModel.openMobilizeDialog("cut", device.device_id)
+                },
+                enabled = isTurnOffEnabled,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(44.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = if (isTurnOffEnabled) {
+                    ButtonDefaults.buttonColors(containerColor = DR_Stopped)
+                } else {
+                    ButtonDefaults.buttonColors(
+                        containerColor = DR_TextHint.copy(alpha = 0.2f),
+                        disabledContainerColor = DR_TextHint.copy(alpha = 0.12f),
+                        disabledContentColor = DR_TextHint.copy(alpha = 0.5f)
+                    )
+                }
+            ) {
+                Icon(
+                    Icons.Default.PowerSettingsNew,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = if (isTurnOffEnabled) Color.White else DR_TextHint.copy(alpha = 0.5f)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "Engine Off",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = if (isTurnOffEnabled) Color.White else DR_TextHint.copy(alpha = 0.5f)
                 )
             }
-        ) {
-            Icon(
-                Icons.Default.PowerSettingsNew,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-                tint = if (isTurnOffEnabled) Color.White else DR_TextHint.copy(alpha = 0.5f)
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(
-                "Engine Off",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                color = if (isTurnOffEnabled) Color.White else DR_TextHint.copy(alpha = 0.5f)
-            )
         }
     }
 

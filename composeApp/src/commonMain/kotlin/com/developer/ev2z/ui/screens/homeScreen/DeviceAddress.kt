@@ -7,7 +7,11 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import com.developer.ev2z.data.local.model.Device
-import com.developer.ev2z.util.getAddressFromLatLng
+import com.developer.ev2z.util.GeocodedAddress
+import com.developer.ev2z.util.MarkerAddressFix
+import com.developer.ev2z.util.MarkerAddressRecorder
+import com.developer.ev2z.util.MarkerAddressSource
+import com.developer.ev2z.util.geocodeAddressAt
 import kotlin.math.round
 
 /**
@@ -48,7 +52,7 @@ internal const val DEVICE_ADDRESS_CACHE_LIMIT = 200
  * three places at once — the overview row, the device picker and the map pin — and a
  * plain map meant all three missed, and all three geocoded the same coordinates.
  */
-private val addressCache = mutableStateMapOf<String, String>()
+private val addressCache = mutableStateMapOf<String, GeocodedAddress>()
 
 /** Keys with a lookup already running, so the three callers above share one request. */
 private val lookupsInFlight = mutableSetOf<String>()
@@ -61,7 +65,7 @@ private val lookupsInFlight = mutableSetOf<String>()
  * would blank out every time the vehicle moved and fill back in a moment later, which
  * reads as flickering all the way down the road.
  */
-private val lastShownByDevice = mutableStateMapOf<String, String>()
+private val lastShownByDevice = mutableStateMapOf<String, GeocodedAddress>()
 
 /**
  * The street address for [device] at the coordinates it is reporting right now, or
@@ -76,10 +80,14 @@ private val lastShownByDevice = mutableStateMapOf<String, String>()
  * on every poll would make it flicker all the way down the road.
  */
 @Composable
-fun rememberDeviceAddress(device: Device): String? = rememberAddressAt(
+fun rememberDeviceAddress(
+    device: Device,
+    source: String = MarkerAddressSource.UNSPECIFIED,
+): String? = rememberAddressAt(
     latitude = device.getLatitudeDouble(),
     longitude = device.getLongitudeDouble(),
-    ownerKey = device.deviceId
+    ownerKey = device.deviceId,
+    source = source,
 )
 
 /**
@@ -93,9 +101,43 @@ fun rememberDeviceAddress(device: Device): String? = rememberAddressAt(
  * Pass the vehicle's *real* fix, not an interpolated animation frame: the cache key is
  * the position, and feeding it 60 positions a second would geocode the gaps between
  * the buckets instead of the fix.
+ *
+ * [source] names the marker this address is for, out of [MarkerAddressSource]; it is
+ * what the recorded coordinates are filed under — see [rememberMarkerAddress].
  */
 @Composable
-fun rememberAddressAt(latitude: Double?, longitude: Double?, ownerKey: String): String? {
+fun rememberAddressAt(
+    latitude: Double?,
+    longitude: Double?,
+    ownerKey: String,
+    source: String = MarkerAddressSource.UNSPECIFIED,
+): String? = rememberMarkerAddress(latitude, longitude, ownerKey, source)?.address
+
+/**
+ * The same lookup as [rememberAddressAt], handing back the coordinates behind the
+ * address as well as the text — and recording them.
+ *
+ * Two pairs of coordinates come out of one marker address, and they are not the same
+ * pair:
+ *
+ *  - `markerLatitude`/`markerLongitude` — the fix the fleet/live API reported, which is
+ *    where the marker is drawn;
+ *  - `addressLatitude`/`addressLongitude` — the position the *geocoder response* gives
+ *    for the address it answered with, which is null on a platform match that carries
+ *    no coordinates.
+ *
+ * Every one shown is filed in [MarkerAddressRecorder] under [source] and [ownerKey], so
+ * "this pin is showing the wrong street" can be answered after the fact: a bad tracker
+ * fix and a geocoder naming the nearest place it knows look identical on the map, and
+ * only the gap between the two pairs tells them apart.
+ */
+@Composable
+fun rememberMarkerAddress(
+    latitude: Double?,
+    longitude: Double?,
+    ownerKey: String,
+    source: String = MarkerAddressSource.UNSPECIFIED,
+): MarkerAddressFix? {
     if (latitude == null || longitude == null) return null
 
     val key = deviceAddressKey(latitude, longitude)
@@ -117,9 +159,12 @@ fun rememberAddressAt(latitude: Double?, longitude: Double?, ownerKey: String): 
         if (!lookupsInFlight.add(key)) return@LaunchedEffect
 
         try {
-            val address = runCatching { getAddressFromLatLng(latitude, longitude) }
+            // geocodeAddressAt, not getAddressFromLatLng: the response's own
+            // coordinates are half of what is recorded, and the plain call throws them
+            // away. Cached whole, so a cache hit still knows where the geocoder put it.
+            val geocoded = runCatching { geocodeAddressAt(latitude, longitude) }
                 .getOrNull()
-                ?.takeIf { it.isUsableAddress() }
+                ?.takeIf { it.address.isUsableAddress() }
                 ?: return@LaunchedEffect
 
             // Oldest entry out first. A failed lookup is never stored, so the next
@@ -128,13 +173,34 @@ fun rememberAddressAt(latitude: Double?, longitude: Double?, ownerKey: String): 
             if (addressCache.size >= DEVICE_ADDRESS_CACHE_LIMIT) {
                 addressCache.keys.firstOrNull()?.let { addressCache.remove(it) }
             }
-            addressCache[key] = address
+            addressCache[key] = geocoded
         } finally {
             lookupsInFlight.remove(key)
         }
     }
 
-    return resolved ?: lastShownByDevice[ownerKey]
+    // The previous address while the current bucket resolves, as before. Its response
+    // coordinates travel with it — they belong to that text, not to this fix, which is
+    // exactly what makes a stale address visible in the record rather than hidden.
+    val shown = resolved ?: lastShownByDevice[ownerKey] ?: return null
+
+    val fix = MarkerAddressFix(
+        source = source,
+        ownerKey = ownerKey,
+        address = shown.address,
+        markerLatitude = latitude,
+        markerLongitude = longitude,
+        addressLatitude = shown.latitude,
+        addressLongitude = shown.longitude,
+    )
+
+    // SideEffect for the same reason as above — recording writes snapshot state, and
+    // doing it inline would invalidate this composition from inside itself. The
+    // recorder drops a repeat of the identical fix, so a marker recomposing on every
+    // animation frame does not fill the trail with one position.
+    SideEffect { MarkerAddressRecorder.record(fix) }
+
+    return fix
 }
 
 /**
@@ -145,7 +211,10 @@ fun rememberAddressAt(latitude: Double?, longitude: Double?, ownerKey: String): 
  * in composition and handed in as plain data.
  */
 @Composable
-fun rememberDeviceAddresses(devices: List<Device>): Map<String, String> {
+fun rememberDeviceAddresses(
+    devices: List<Device>,
+    source: String = MarkerAddressSource.UNSPECIFIED,
+): Map<String, String> {
     val addresses = mutableMapOf<String, String>()
 
     // key() per device, because a device leaving the account shifts every later entry
@@ -153,7 +222,7 @@ fun rememberDeviceAddresses(devices: List<Device>): Map<String, String> {
     // whichever vehicle moved up into its position.
     for (device in devices) {
         key(device.deviceId) {
-            rememberDeviceAddress(device)?.let { addresses[device.deviceId] = it }
+            rememberDeviceAddress(device, source)?.let { addresses[device.deviceId] = it }
         }
     }
 

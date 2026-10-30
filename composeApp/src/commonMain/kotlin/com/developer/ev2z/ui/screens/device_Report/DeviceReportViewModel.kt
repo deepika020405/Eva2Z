@@ -2,6 +2,7 @@ package com.developer.ev2z.ui.screens.device_Report
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.developer.ev2z.data.local.DeviceTypeStore
 import com.developer.ev2z.data.local.remote.LiveLocationResponse
 import com.developer.ev2z.network.DEVICES_POLL_INTERVAL_MS
 import com.developer.ev2z.network.UnauthorizedException
@@ -106,6 +107,18 @@ class DeviceReportViewModel(
     private val _liveLocation = MutableStateFlow<LiveLocationResponse?>(null)
     val liveLocation: StateFlow<LiveLocationResponse?> = _liveLocation.asStateFlow()
 
+    /**
+     * `device_id` → "wired" / "wireless", for hiding the engine controls on a tracker
+     * that has no relay to cut. Empty until the one-shot load below returns; the screen
+     * falls back to [com.developer.ev2z.data.local.DeviceTypeStore] for devices added on
+     * this phone, so a freshly added device is right on its first frame.
+     */
+    private val _deviceTypes = MutableStateFlow<Map<String, String>>(emptyMap())
+    val deviceTypes: StateFlow<Map<String, String>> = _deviceTypes.asStateFlow()
+
+    /** The type load in flight or already done — the types don't change, so it runs once. */
+    private var deviceTypesJob: Job? = null
+
     private val _totalDevices = MutableStateFlow(0)
     val totalDevices: StateFlow<Int> = _totalDevices.asStateFlow()
 
@@ -182,6 +195,10 @@ class DeviceReportViewModel(
         _selectedDevice.value = null
         _liveLocation.value = null
         _totalDevices.value = 0
+        // The next account's devices are not these devices, so their types go too.
+        deviceTypesJob?.cancel()
+        deviceTypesJob = null
+        _deviceTypes.value = emptyMap()
         addressJob?.cancel()
         _address.value = null
         // Cleared with the address it belongs to: left behind, it tells the next
@@ -217,6 +234,34 @@ class DeviceReportViewModel(
             _uiState.value = DeviceReportUiState.Loading
         }
         startDevicesPolling(token)
+        loadDeviceTypes(token)
+    }
+
+    /**
+     * Loads which devices are wired and which are wireless — once per session, not on the
+     * device poll: a tracker's type is fixed when it is installed, and this screen polls
+     * every [DEVICES_POLL_INTERVAL_MS].
+     *
+     * A failure clears the job so re-entering the screen tries again, and costs nothing
+     * more than the type staying unknown in the meantime.
+     */
+    private fun loadDeviceTypes(token: String) {
+        if (deviceTypesJob != null) return
+        deviceTypesJob = viewModelScope.launch {
+            try {
+                val types = repository.getDeviceTypes(token)
+                if (types.isNotEmpty()) {
+                    _deviceTypes.value = types
+                    // Cached so the next cold start knows each type before this returns.
+                    DeviceTypeStore.saveAll(types)
+                }
+            } catch (e: UnauthorizedException) {
+                println("🔒 [DeviceReport] 401 Unauthorized — device types not loaded")
+            } catch (e: Exception) {
+                println("⚠️ [DeviceReport] device types unavailable: ${e.message}")
+                deviceTypesJob = null
+            }
+        }
     }
 
     /**

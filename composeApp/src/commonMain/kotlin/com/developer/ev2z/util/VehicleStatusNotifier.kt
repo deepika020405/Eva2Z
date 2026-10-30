@@ -10,12 +10,11 @@ import kotlinx.serialization.json.Json
  * The statuses worth a notification, keyed by a kind out of [statusKindOf]: the title
  * the banner carries, and how the vehicle's name reads in its body.
  *
- * "stopped" (ignition off) and "offline" are absent — neither is one of the three
- * states this feature is about — but they are not treated alike; see [VehicleStatusNotifier].
+ * "idle", "stopped" (ignition off) and "offline" are all absent — none of them carries a
+ * banner — but they are not treated alike; see [VehicleStatusNotifier].
  */
 internal val WATCHED_STATUS_KINDS = mapOf(
     "running" to ("Vehicle Moving" to "is now moving"),
-    "idle" to ("Vehicle Idle" to "is now idle"),
     "parked" to ("Vehicle Parked" to "is now parked"),
 )
 
@@ -24,6 +23,17 @@ data class VehicleStatusSample(
     val deviceId: String,
     val deviceName: String,
     val status: String?,
+    /**
+     * The engine, as this poll could tell it: `"on"`, `"off"`, or null when it could not
+     * be read at all.
+     *
+     * Carried on the sample rather than looked up separately because it is already known
+     * by the time one is built — [IdleStatusResolver] reads the ignition to decide
+     * whether a standstill is idling, and a moving vehicle's engine needs no lookup to
+     * establish. That makes the Engine On/Off alerts cost nothing beyond the requests the
+     * idle rule was already making. See [IgnitionAlertNotifier].
+     */
+    val ignition: String? = null,
 )
 
 /** The last status this device was seen in — one entry per vehicle. */
@@ -68,9 +78,14 @@ class StorageStatusSpellStore(
  * vehicle's status staying put is silence.** No waiting period and no rate limit — the
  * banner goes out on the same poll that first reports the new status.
  *
- * * **Moving → "Vehicle Moving", idle → "Vehicle Idle", parked → "Vehicle Parked"**,
- *   read through [statusKindOf] because the server spells these several ways
- *   ("running", "ideal", casing of its own).
+ * * **Moving → "Vehicle Moving", parked → "Vehicle Parked"**, read through [statusKindOf]
+ *   because the server spells these several ways ("running", casing of its own).
+ * * **Idle has no banner.** It is still remembered as a state of its own, though, which
+ *   is the point of keeping it out of [WATCHED_STATUS_KINDS] rather than out of the
+ *   samples: a vehicle that stops with the engine running goes quiet instead of
+ *   announcing a park it has not made, and the "Vehicle Parked" banner then lands when
+ *   the engine actually goes off. Pulling away from an idle spell still says "Vehicle
+ *   Moving". See [IdleStatusResolver], which is what puts the word on the sample.
  * * **One per change, not per poll.** The last status is remembered per vehicle, so the
  *   five-second foreground poll and the background check can both run over an unchanged
  *   fleet all day without posting anything.

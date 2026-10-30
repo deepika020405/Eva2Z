@@ -8,7 +8,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * The Moving / Idle / Parked notifications the app raises for itself.
+ * The Moving / Parked notifications the app raises for itself.
  *
  * The contract, in one line: a vehicle's status changing is a notification, a vehicle's
  * status staying put is silence — per vehicle, across polls, and across the processes
@@ -27,7 +27,7 @@ class VehicleStatusNotifierTest {
     private fun sample(status: String, id: String = "D1", name: String = "Bike") =
         listOf(VehicleStatusSample(deviceId = id, deviceName = name, status = status))
 
-    // ── The three statuses ───────────────────────────────────────────────────
+    // ── The two statuses that carry a banner ─────────────────────────────────
 
     @Test
     fun announcesEachStatusAsItArrives() {
@@ -35,20 +35,44 @@ class VehicleStatusNotifierTest {
         val notifier = VehicleStatusNotifier(post = spy::post)
 
         notifier.onPoll(sample("moving"))
-        notifier.onPoll(sample("idle"))
         notifier.onPoll(sample("parked"))
 
         assertEquals(
-            listOf("Vehicle Moving", "Vehicle Idle", "Vehicle Parked"),
+            listOf("Vehicle Moving", "Vehicle Parked"),
             spy.titles(),
         )
         assertEquals(
             listOf(
                 Triple("vehicle-running-D1", "Vehicle Moving", "Bike is now moving"),
-                Triple("vehicle-idle-D1", "Vehicle Idle", "Bike is now idle"),
                 Triple("vehicle-parked-D1", "Vehicle Parked", "Bike is now parked"),
             ),
             spy.posted,
+        )
+    }
+
+    /**
+     * Idle is silent — and still a state of its own, which is the half of it worth a test.
+     *
+     * A standstill with the engine running must not announce a park the vehicle has not
+     * made; the park is announced when the engine goes off, and pulling away from an idle
+     * spell is still a change worth a banner.
+     */
+    @Test
+    fun idleIsSilentButStillRemembered() {
+        val spy = Spy()
+        val notifier = VehicleStatusNotifier(post = spy::post)
+
+        notifier.onPoll(sample("moving"))
+        notifier.onPoll(sample("idle"))
+        assertEquals(listOf("Vehicle Moving"), spy.titles(), "idle has no banner")
+
+        notifier.onPoll(sample("parked"))
+        notifier.onPoll(sample("idle"))
+        notifier.onPoll(sample("moving"))
+
+        assertEquals(
+            listOf("Vehicle Moving", "Vehicle Parked", "Vehicle Moving"),
+            spy.titles(),
         )
     }
 
@@ -69,13 +93,14 @@ class VehicleStatusNotifierTest {
         val notifier = VehicleStatusNotifier(post = spy::post)
 
         // A drive through town: pulls away, stops at lights, drives on, parks, leaves.
+        // The lights are silent; everything either side of them is a banner.
         listOf("moving", "idle", "moving", "parked", "moving").forEach {
             notifier.onPoll(sample(it))
         }
 
         assertEquals(
             listOf(
-                "Vehicle Moving", "Vehicle Idle", "Vehicle Moving",
+                "Vehicle Moving", "Vehicle Moving",
                 "Vehicle Parked", "Vehicle Moving",
             ),
             spy.titles(),
@@ -95,7 +120,7 @@ class VehicleStatusNotifierTest {
         assertEquals(1, spy.posted.size, "one change is one notification")
     }
 
-    /** "ideal" is how this endpoint spells idle, "running" how it spells moving. */
+    /** "running" is how this endpoint spells moving, "park" how it spells parked. */
     @Test
     fun treatsTheServersSpellingsAsTheSameStatus() {
         val spy = Spy()
@@ -106,10 +131,10 @@ class VehicleStatusNotifierTest {
         notifier.onPoll(sample("running"))
         assertEquals(listOf("Vehicle Moving"), spy.titles())
 
-        notifier.onPoll(sample("Ideal"))
-        notifier.onPoll(sample("ideal"))
-        notifier.onPoll(sample("IDLE"))
-        assertEquals(listOf("Vehicle Moving", "Vehicle Idle"), spy.titles())
+        notifier.onPoll(sample("Park"))
+        notifier.onPoll(sample("parked"))
+        notifier.onPoll(sample("PARKED"))
+        assertEquals(listOf("Vehicle Moving", "Vehicle Parked"), spy.titles())
     }
 
     /**
@@ -184,7 +209,7 @@ class VehicleStatusNotifierTest {
         notifier.onPoll(
             listOf(
                 VehicleStatusSample("D1", "Bike", "parked"),
-                VehicleStatusSample("D2", "truck", "parked"),
+                VehicleStatusSample("D2", "truck", "moving"),
             )
         )
         spy.posted.clear()
@@ -193,11 +218,11 @@ class VehicleStatusNotifierTest {
         notifier.onPoll(
             listOf(
                 VehicleStatusSample("D1", "Bike", "moving"),
-                VehicleStatusSample("D2", "truck", "idle"),
+                VehicleStatusSample("D2", "truck", "parked"),
             )
         )
 
-        assertEquals(listOf("Vehicle Moving", "Vehicle Idle"), spy.titles())
+        assertEquals(listOf("Vehicle Moving", "Vehicle Parked"), spy.titles())
     }
 
     // ── Across processes ─────────────────────────────────────────────────────

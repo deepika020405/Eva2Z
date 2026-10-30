@@ -26,8 +26,17 @@ object VehicleStatusAlerts {
      */
     private val idleResolver = IdleStatusResolver()
 
-    /** Hands one poll's devices to the notifier. */
-    fun onPoll(samples: List<VehicleStatusSample>) = notifier.onPoll(samples)
+    /**
+     * Hands one poll's devices to both notifiers.
+     *
+     * Engine On/Off goes out alongside Moving/Parked, off the same samples and on the
+     * same tick — which is what makes the two families of alert behave identically. The
+     * engine state rides on the samples; see [VehicleStatusSample.ignition].
+     */
+    fun onPoll(samples: List<VehicleStatusSample>) {
+        notifier.onPoll(samples)
+        IgnitionAlerts.onStates(samples)
+    }
 
     /**
      * Reads the devices straight out of a `latest-locations` response, with idle derived
@@ -90,6 +99,13 @@ object VehicleStatusBackgroundCheck {
                 response,
                 sessionKindOf = { api.getDeviceLatestSessionStatus(token, it, today) },
             ) { api.getDeviceIgnition(token, it) }
+
+            // Engine on/off too, and `onRound` rather than `onFleetPoll`: this process
+            // exists for a few seconds every fifteen minutes, so there is no faster tick
+            // to throttle against — and skipping the round because the last one was
+            // "recent" would mean never running it in the background at all.
+            IgnitionAlerts.onRound(response.data) { api.getDeviceAlarms(token, it).data }
+
             println("✅ Status check ran over ${response.data.size} device(s)")
             true
         } catch (e: Exception) {
