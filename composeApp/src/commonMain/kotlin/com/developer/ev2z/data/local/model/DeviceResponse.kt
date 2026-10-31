@@ -183,15 +183,12 @@ data class Device(
     /**
      * What the fleet map writes beside this vehicle.
      *
-     * The registration first, because a fleet of identical arrows is unreadable without
-     * it — three grey pins told the owner only that they had three devices. The age
-     * follows when the fix is old, so a pin that cannot be trusted says so where it is
-     * drawn rather than one tap away.
+     * The registration and nothing else, because a fleet of identical arrows is
+     * unreadable without it — three grey pins told the owner only that they had three
+     * devices. The fix age used to follow it here; the chip now carries the name alone,
+     * and [fixAgeLabel] stays where the device list spells it out.
      */
-    fun mapLabel(): String {
-        val age = fixAgeLabel() ?: return getDisplayName()
-        return "${getDisplayName()} · $age"
-    }
+    fun mapLabel(): String = getDisplayName()
 
     internal companion object {
         /**

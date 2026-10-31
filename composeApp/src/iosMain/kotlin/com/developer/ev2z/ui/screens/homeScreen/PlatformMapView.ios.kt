@@ -138,10 +138,10 @@ actual fun PlatformMapView(
     // Rasterised once per label, not once per frame: this block re-runs on every poll,
     // and the registration only changes when the device does.
     //
-    // The registration and the fix age, not the street: this is the fleet map, and with
-    // no vehicle assigned to any tracker — `vehicle_id` is null for every device on some
-    // accounts — all of the pins are the same grey arrow, and the chip is the only thing
-    // that tells them apart. The address is in the callout, one tap away.
+    // The registration, not the street and not the fix age: this is the fleet map, and
+    // with no vehicle assigned to any tracker — `vehicle_id` is null for every device on
+    // some accounts — all of the pins are the same grey arrow, and the chip is the only
+    // thing that tells them apart. The address is in the callout, one tap away.
     val chipImages = remember(devices, selectedDevice?.deviceId) {
         devices.mapNotNull { device ->
             val labelled = selectedDevice == null || device.deviceId == selectedDevice.deviceId
@@ -207,15 +207,13 @@ actual fun PlatformMapView(
                     vehicle = vehicleTopViewFor(device.iconSlug),
                     statusKind = device.getStatusKind(),
                     title = device.getDisplayName(),
-                    // Status and speed first, then where, then how long ago — a parked
-                    // vehicle's address means something quite different if the tracker
-                    // stopped reporting five days back, which this payload says of two
-                    // devices out of three.
+                    // Status, speed, then where — the same three the Android callout
+                    // carries. No fix age: the age belongs to the device list, not to
+                    // the pins.
                     subtitle = buildString {
                         append(device.getStatusDisplay())
                         if (device.speed > 0) append(" · ${device.speed} km/h")
                         addresses[device.deviceId]?.let { append(" · $it") }
-                        device.fixAgeLabel()?.let { append(" · $it") }
                     },
                 )
             }

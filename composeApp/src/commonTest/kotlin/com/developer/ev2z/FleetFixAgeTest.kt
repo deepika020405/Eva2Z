@@ -119,10 +119,12 @@ class FleetFixAgeTest {
      * same arrow, so the registration is what tells three grey pins apart.
      */
     @Test
-    fun theMapLabelCarriesTheRegistrationAndTheAgeWhenThereIsOne() {
-        assertEquals("ka 03 AJ 9053 · 5d ago", response.data[0].mapLabel())
+    fun theMapLabelCarriesTheRegistrationAndNothingElse() {
+        // The age is not in the chip, however old the fix is: five days, current and
+        // five hours all label the same way. `fixAgeLabel` is where the list reads it.
+        assertEquals("ka 03 AJ 9053", response.data[0].mapLabel())
         assertEquals("KA 03 AH 0291", response.data[1].mapLabel())
-        assertEquals("Ka 01el 1839 · 5h ago", response.data[2].mapLabel())
+        assertEquals("Ka 01el 1839", response.data[2].mapLabel())
 
         // No vehicle on any of them, which is what falls back to the heading arrow.
         assertTrue(response.data.all { it.iconSlug == null })

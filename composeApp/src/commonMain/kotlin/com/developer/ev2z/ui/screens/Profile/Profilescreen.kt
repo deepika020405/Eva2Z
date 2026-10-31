@@ -1115,7 +1115,7 @@ fun SocialLinksRow(
         SocialPngIcon(
             icon = Res.drawable.ic_youtube,
             contentDescription = "YouTube",
-            onClick = onYouTube,
+            onClick = onLinkedIn,
             bgSize = iconBgSize,
             imgSize = iconImgSize
         )

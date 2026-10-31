@@ -290,7 +290,7 @@ actual fun PlatformMapView(
         }
     }
 
-    println("📍 Total devices from API: ${devices.size}")
+ println("📍 Total devices from API: ${devices.size}")
     println("📍 Devices with valid coordinates: ${locatedDevices.size}")
 
 
@@ -426,11 +426,6 @@ actual fun PlatformMapView(
                     // very first frame, before the animation has seeded itself.
                     val drawn = smoothedPositions[device.deviceId]
 
-                    // How old this device's fix is, which the fleet payload reports per
-                    // device and this map used to drop on the floor: two of three pins
-                    // can be days old and looked exactly as live as the one moving.
-                    val fixAge = device.fixAgeLabel()
-
                     Marker(
                         // rememberUpdatedMarkerState pushes each frame's position into
                         // the one remembered state, which is what actually walks the
@@ -442,14 +437,12 @@ actual fun PlatformMapView(
                                 ?: LatLng(lat, lng)
                         ),
                         title = device.getDisplayName(),
-                        // Status and speed first, then where, then how long ago — a
-                        // parked vehicle's address means something quite different if
-                        // the tracker stopped reporting last Tuesday.
+                        // Status, speed, then where. No fix age: the age belongs to the
+                        // device list, not to the pins.
                         snippet = buildString {
                             append(device.getStatusDisplay())
                             if (device.speed > 0) append(" · ${device.speed} km/h")
                             if (address != null) append(" · $address")
-                           // if (fixAge != null) append(" · $fixAge")
                         },
                         // The fallback pin carries the same two colours as the vehicle
                         // it stands in for, so the Maps SDK failing to rasterise a
